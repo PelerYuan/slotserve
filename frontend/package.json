@@ -10,7 +10,7 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
-    "lucide-vue-next": "^0.577.0",
+    "lucide-vue-next": "^1.0.0",
     "naive-ui": "^2.45.3",
     "vue": "^3.5.44",
     "vue-i18n": "^11.4.16",
