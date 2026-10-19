@@ -12,6 +12,10 @@ updates:
     directory: /frontend
     schedule:
       interval: weekly
+    ignore:
+      # vue-tsc follows TypeScript majors with a delay; upgrade together by hand.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
     groups:
       npm-minor:
         update-types: [minor, patch]
