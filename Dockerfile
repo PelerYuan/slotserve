@@ -4,7 +4,7 @@
 ARG CUDA_IMAGE=nvidia/cuda:12.8.1-runtime-ubuntu24.04
 
 # ---- frontend ---------------------------------------------------------------
-FROM node:22-alpine AS web
+FROM node:26-alpine AS web
 WORKDIR /src/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
