@@ -7,6 +7,14 @@ import type {
   ApiKeyCreated,
   AppConfig,
   AuditEntry,
+  BookingInput,
+  CalendarLinks,
+  HfFile,
+  NotifyPrefs,
+  Preset,
+  RequestLog,
+  TelegramInfo,
+  WaitlistEntry,
   DownloadTask,
   SettingValue,
   Model,
@@ -78,6 +86,16 @@ export const api = {
   logout: () => request<void>('POST', '/api/auth/logout'),
   changePassword: (old_password: string, new_password: string) =>
     request<void>('PUT', '/api/auth/password', { old_password, new_password }),
+  preferences: (body: { locale?: string; notify_prefs?: NotifyPrefs }) =>
+    request<User>('PUT', '/api/auth/preferences', body),
+
+  // notifications & calendar
+  telegram: () => request<TelegramInfo>('GET', '/api/telegram'),
+  telegramLink: () => request<TelegramInfo>('POST', '/api/telegram/link'),
+  telegramUnlink: () => request<TelegramInfo>('DELETE', '/api/telegram/link'),
+  telegramTest: () => request<void>('POST', '/api/telegram/test'),
+  calendar: () => request<CalendarLinks>('GET', '/api/calendar'),
+  calendarReset: () => request<CalendarLinks>('POST', '/api/calendar/reset'),
 
   // config & status
   config: () => request<AppConfig>('GET', '/api/config'),
@@ -99,6 +117,11 @@ export const api = {
   clearDefault: (id: number) => request<void>('DELETE', `/api/models/${id}/default`),
   deleteModel: (id: number, deleteFile: boolean) =>
     request<void>('DELETE', `/api/models/${id}`, undefined, { delete_file: deleteFile }),
+  createPreset: (modelId: number, name: string, args: string) =>
+    request<Preset>('POST', `/api/models/${modelId}/presets`, { name, args }),
+  updatePreset: (modelId: number, id: number, name: string, args: string) =>
+    request<Preset>('PATCH', `/api/models/${modelId}/presets/${id}`, { name, args }),
+  deletePreset: (modelId: number, id: number) => request<void>('DELETE', `/api/models/${modelId}/presets/${id}`),
 
   // downloads
   downloads: () => request<DownloadTask[]>('GET', '/api/downloads'),
@@ -106,6 +129,13 @@ export const api = {
     request<DownloadTask>('POST', '/api/downloads', { url, filename: filename || null }),
   retryDownload: (id: number) => request<DownloadTask>('POST', `/api/downloads/${id}/retry`),
   removeDownload: (id: number) => request<void>('DELETE', `/api/downloads/${id}`),
+  hfFiles: (repo: string, revision = 'main') =>
+    request<{ repo: string; revision: string; files: HfFile[] }>('GET', '/api/downloads/hf/files', undefined, {
+      repo,
+      revision,
+    }),
+  hfDownload: (repo: string, files: string[], revision = 'main') =>
+    request<DownloadTask[]>('POST', '/api/downloads/hf', { repo, revision, files }),
 
   // reservations
   reservations: (start: Date, end: Date, mine = false) =>
@@ -114,18 +144,26 @@ export const api = {
       end: end.toISOString(),
       mine: mine || undefined,
     }),
-  createReservation: (model_id: number, start: Date, end: Date, note: string) =>
-    request<Reservation>('POST', '/api/reservations', {
-      model_id,
-      start_at: start.toISOString(),
-      end_at: end.toISOString(),
-      note,
-    }),
-  endReservation: (id: number) => request<Reservation>('DELETE', `/api/reservations/${id}`),
+  createReservation: (body: BookingInput) => request<Reservation[]>('POST', '/api/reservations', body),
+  updateReservation: (id: number, body: Partial<BookingInput>) =>
+    request<Reservation>('PATCH', `/api/reservations/${id}`, body),
+  extendReservation: (id: number, minutes: number) =>
+    request<Reservation>('POST', `/api/reservations/${id}/extend`, { minutes }),
+  endReservation: (id: number, series = false) =>
+    request<Reservation[]>('DELETE', `/api/reservations/${id}`, undefined, { series: series || undefined }),
+
+  // waitlist
+  waitlist: (everyone = false) =>
+    request<WaitlistEntry[]>('GET', '/api/waitlist', undefined, { everyone: everyone || undefined }),
+  joinWaitlist: (body: BookingInput & { auto_book: boolean }) =>
+    request<WaitlistEntry>('POST', '/api/waitlist', body),
+  leaveWaitlist: (id: number) => request<void>('DELETE', `/api/waitlist/${id}`),
 
   // usage
   usage: (days: number) =>
     request<Usage>('GET', '/api/usage', undefined, { days, tz_offset: -new Date().getTimezoneOffset() }),
+  usageExportUrl: (days: number, kind: 'summary' | 'requests') =>
+    `/api/usage/export?days=${days}&kind=${kind}&tz_offset=${-new Date().getTimezoneOffset()}`,
 
   // admin
   admin: {
@@ -147,5 +185,13 @@ export const api = {
       request<AdminSetting[]>('PUT', '/api/admin/settings', changes),
     audit: (limit: number, offset: number) =>
       request<{ total: number; items: AuditEntry[] }>('GET', '/api/admin/audit', undefined, { limit, offset }),
+    requests: (limit: number, offset: number, errorsOnly = false) =>
+      request<{ total: number; items: RequestLog[] }>('GET', '/api/admin/requests', undefined, {
+        limit,
+        offset,
+        errors_only: errorsOnly || undefined,
+      }),
+    manual: (body: { action: 'load' | 'unload' | 'auto'; model_id?: number; preset_id?: number | null; hours?: number | null }) =>
+      request<void>('POST', '/api/admin/runtime/manual', body),
   },
 }

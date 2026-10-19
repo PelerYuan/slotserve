@@ -41,6 +41,7 @@ plugins:
             Getting started: 快速开始
             Configuration: 配置参考
             User guide: 使用指南
+            Notifications & integrations: 通知与集成
             API: 接口
             How scheduling works: 调度原理
             Development: 开发
@@ -65,6 +66,7 @@ nav:
   - Getting started: getting-started.md
   - Configuration: configuration.md
   - User guide: user-guide.md
+  - Notifications & integrations: integrations.md
   - API: api.md
   - How scheduling works: scheduling.md
   - Development: development.md

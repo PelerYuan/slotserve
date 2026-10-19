@@ -70,6 +70,7 @@ SlotServe 在 `/v1` 提供 **OpenAI 兼容**接口。任何可以设置 base URL
 | 401 | `missing_api_key` / `invalid_api_key` | 未提供密钥、密钥不存在或已吊销 |
 | 403 | `gpu_reserved` | 当前 GPU 被其他人预约，消息中包含结束时间 |
 | 409 | `model_not_loaded` | 请求了一个已登记但未加载的模型 |
+| 503 | `gpu_exclusive` | 你自己的整卡预约正在进行，不提供模型服务 |
 | 503 | `model_unavailable` | 模型加载中或启动失败；请按 `Retry-After` 重试 |
 | 502 | `upstream_error` | llama-server 没有响应 |
 

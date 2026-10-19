@@ -137,7 +137,7 @@ svg {
   display: block;
 }
 .gridlines line {
-  stroke: #ececf1;
+  stroke: var(--grid-line);
   stroke-width: 1;
 }
 .gridlines text,

@@ -56,13 +56,13 @@ watch(show, (open) => {
   height: calc(100vh - 70px);
   overflow: auto;
   padding: 16px 20px;
-  background: #fbfbfc;
+  background: var(--code-bg);
   font-family: var(--mono);
   font-size: 12px;
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-all;
-  color: #2f2f3a;
+  color: var(--code-text);
 }
 .mark {
   color: var(--brand);

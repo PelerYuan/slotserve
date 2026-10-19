@@ -38,23 +38,23 @@ const tone = computed(
   background: currentColor;
 }
 .ok {
-  color: #08875d;
+  color: var(--ok-text);
   background: var(--ok-soft);
 }
 .warn {
-  color: #b45309;
+  color: var(--warn-text);
   background: var(--warn-soft);
 }
 .warn .dot {
   animation: pulse 1.4s ease-in-out infinite;
 }
 .danger {
-  color: #c4282d;
+  color: var(--danger-text);
   background: var(--danger-soft);
 }
 .idle {
   color: var(--text-2);
-  background: #f0f0f3;
+  background: var(--neutral-soft);
 }
 @keyframes pulse {
   50% {

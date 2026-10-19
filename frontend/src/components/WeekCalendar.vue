@@ -18,7 +18,9 @@ const emit = defineEmits<{
   open: [reservation: Reservation]
 }>()
 
-const { locale } = useI18n()
+const { locale, t } = useI18n()
+const label = (r: Reservation) =>
+  r.exclusive ? t('schedule.kindExclusive') : r.preset_name ? `${r.model_name} · ${r.preset_name}` : (r.model_name ?? '')
 const HOUR_PX = 48
 const DAY_PX = 24 * HOUR_PX
 const slotPx = computed(() => (props.slotMinutes / 60) * HOUR_PX)
@@ -202,13 +204,13 @@ onMounted(async () => {
             v-for="s in segmentsByDay[i]"
             :key="s.r.id"
             class="event"
-            :class="{ mine: s.mine, active: s.active, short: s.height < 40 }"
+            :class="{ mine: s.mine, active: s.active, short: s.height < 40, exclusive: s.r.exclusive }"
             :style="{ top: `${s.top}px`, height: `${s.height}px` }"
-            :title="`${s.r.username} · ${s.r.model_name}`"
+            :title="`${s.r.username} · ${label(s.r)}`"
             @click.stop="emit('open', s.r)"
           >
             <span class="ev-title">{{ s.r.username }}</span>
-            <span v-if="s.height >= 40" class="ev-sub">{{ s.r.model_name }}</span>
+            <span v-if="s.height >= 40" class="ev-sub">{{ label(s.r) }}</span>
             <span v-if="s.height >= 58 && s.first" class="ev-time">{{ formatTime(s.r.start_at) }} – {{ formatTime(s.r.end_at) }}</span>
           </button>
 
@@ -302,14 +304,14 @@ onMounted(async () => {
 .past {
   position: absolute;
   inset: 0 0 auto 0;
-  background: repeating-linear-gradient(-45deg, rgba(20, 20, 40, 0.025) 0 6px, transparent 6px 12px);
+  background: repeating-linear-gradient(-45deg, var(--past-hatch) 0 6px, transparent 6px 12px);
   pointer-events: none;
 }
 .hline {
   position: absolute;
   left: 0;
   right: 0;
-  border-top: 1px solid #f0f0f4;
+  border-top: 1px solid var(--grid-line);
   pointer-events: none;
 }
 .event {
@@ -318,10 +320,10 @@ onMounted(async () => {
   right: 4px;
   padding: 4px 8px;
   border-radius: 7px;
-  border: 1px solid #dcdde6;
-  border-left: 3px solid #a3a6b8;
-  background: #f1f2f6;
-  color: #3a3b48;
+  border: 1px solid var(--event-border);
+  border-left: 3px solid var(--event-accent);
+  background: var(--event-bg);
+  color: var(--event-text);
   text-align: left;
   font-family: inherit;
   cursor: pointer;
@@ -338,10 +340,13 @@ onMounted(async () => {
   z-index: 2;
 }
 .event.mine {
-  background: #e8e9ff;
-  border-color: #c9ccfb;
+  background: var(--event-mine-bg);
+  border-color: var(--event-mine-border);
   border-left-color: var(--brand);
-  color: #2b2a8a;
+  color: var(--event-mine-text);
+}
+.event.exclusive {
+  background-image: repeating-linear-gradient(-45deg, var(--event-hatch) 0 5px, transparent 5px 10px);
 }
 .event.active {
   box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.18);

@@ -170,7 +170,7 @@ function setMode(m: 'login' | 'register') {
   display: flex;
   flex-direction: column;
   padding: 40px 56px;
-  background: #f7f7fc;
+  background: var(--hero-bg);
   border-right: 1px solid var(--border);
   isolation: isolate;
 }
@@ -231,7 +231,7 @@ function setMode(m: 'login' | 'register') {
   letter-spacing: -0.035em;
   font-weight: 700;
   margin: 0 0 14px;
-  background: linear-gradient(120deg, #17171c 30%, #4f46e5 100%);
+  background: linear-gradient(120deg, var(--heading-from) 30%, var(--brand) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -263,7 +263,7 @@ function setMode(m: 'login' | 'register') {
   flex: none;
   border-radius: 8px;
   color: var(--brand);
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--glass);
   box-shadow: 0 1px 2px rgba(40, 40, 110, 0.08), 0 0 0 1px rgba(79, 70, 229, 0.08);
 }
 
@@ -325,7 +325,7 @@ h1 {
   padding: 4px;
   margin-bottom: 24px;
   border-radius: 10px;
-  background: #f1f1f5;
+  background: var(--seg-bg);
 }
 .seg button {
   position: relative;
@@ -349,7 +349,7 @@ h1 {
   left: 4px;
   width: calc(50% - 4px);
   border-radius: 7px;
-  background: #fff;
+  background: var(--seg-pill);
   box-shadow: 0 1px 3px rgba(20, 20, 50, 0.1), 0 1px 1px rgba(20, 20, 50, 0.04);
   transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }

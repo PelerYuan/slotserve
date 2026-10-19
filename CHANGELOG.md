@@ -4,6 +4,31 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-20
+
+### Added
+
+- Whole-GPU bookings: llama-server is stopped for the slot so the GPU can run training or other programs.
+- Launch-argument presets per model, selectable when booking.
+- Edit upcoming bookings, extend or shorten running ones, and weekly repeating bookings.
+- Admins can book for someone else and edit any booking.
+- Waitlist with automatic booking when the time frees up.
+- Per-person quotas: hours per week and open bookings.
+- Admin manual control: load a model or unload now, for a set time or until the next booking.
+- Automatic fallback to the default model while a booked model fails to load.
+- Telegram bot with reminders, readiness and change notifications, inline extend/end buttons and commands.
+- Private iCalendar feeds for your own or everyone's bookings.
+- Usage export as CSV (daily summary or every request).
+- Admin request log.
+- Hugging Face repository browser for downloads, with mirror endpoint and token support.
+- Prometheus metrics at `/metrics`.
+- Dark theme (system, light or dark).
+
+### Changed
+
+- Database schema is now versioned; upgrades back up the database file to `data/backups/` first.
+- `POST /api/reservations` and `DELETE /api/reservations/{id}` return a list of bookings.
+
 ## [0.2.0] - 2026-10-20
 
 ### Added
@@ -37,6 +62,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Admin CLI: `slotserve reset-password`, `slotserve set-admin`.
 - Bilingual documentation site (MkDocs Material).
 
-[Unreleased]: https://github.com/PelerYuan/slotserve/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/PelerYuan/slotserve/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/PelerYuan/slotserve/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/PelerYuan/slotserve/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/PelerYuan/slotserve/releases/tag/v0.1.0

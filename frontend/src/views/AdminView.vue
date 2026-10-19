@@ -9,12 +9,13 @@ import AdminReservations from '@/components/admin/AdminReservations.vue'
 import AdminKeys from '@/components/admin/AdminKeys.vue'
 import AdminSettings from '@/components/admin/AdminSettings.vue'
 import AdminAudit from '@/components/admin/AdminAudit.vue'
+import AdminRequests from '@/components/admin/AdminRequests.vue'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
-const TABS = ['overview', 'users', 'reservations', 'keys', 'settings', 'audit'] as const
+const TABS = ['overview', 'users', 'reservations', 'requests', 'keys', 'settings', 'audit'] as const
 type Tab = (typeof TABS)[number]
 
 const tab = computed<Tab>({
@@ -37,6 +38,7 @@ const tab = computed<Tab>({
         <AdminOverview v-if="name === 'overview'" @navigate="(v: Tab) => (tab = v)" />
         <AdminUsers v-else-if="name === 'users'" />
         <AdminReservations v-else-if="name === 'reservations'" />
+        <AdminRequests v-else-if="name === 'requests'" />
         <AdminKeys v-else-if="name === 'keys'" />
         <AdminSettings v-else-if="name === 'settings'" />
         <AdminAudit v-else />

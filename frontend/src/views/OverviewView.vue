@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NProgress, NTabPane, NTabs } from 'naive-ui'
-import { CalendarPlus, Cpu, KeyRound, RotateCw, ScrollText, ShieldCheck, Lock } from 'lucide-vue-next'
+import { NButton, NDropdown, NProgress, NTabPane, NTabs } from 'naive-ui'
+import { CalendarPlus, Cpu, Hand, KeyRound, Lock, RotateCw, ScrollText, ShieldCheck, TriangleAlert } from 'lucide-vue-next'
 import StatusDot from '@/components/StatusDot.vue'
 import CodeBlock from '@/components/CodeBlock.vue'
 import LogDrawer from '@/components/LogDrawer.vue'
@@ -24,6 +24,30 @@ const runtime = computed(() => status.value?.runtime)
 const holder = computed(() => status.value?.active_reservation ?? null)
 const mine = computed(() => holder.value?.user_id === session.user?.id)
 const canRestart = computed(() => !holder.value || mine.value || session.user?.is_admin)
+const manual = computed(() => status.value?.manual ?? null)
+const fallbackFrom = computed(() => (status.value?.reason === 'fallback' ? status.value.fallback_from : null))
+const exclusive = computed(() => !!holder.value?.exclusive)
+const modelLabel = computed(() => {
+  const rt = runtime.value
+  if (!rt?.model_name) return null
+  return rt.preset_name ? `${rt.model_name} · ${rt.preset_name}` : rt.model_name
+})
+
+const extendOptions = computed(() => [
+  { key: 30, label: t('schedule.extendBy', { n: 30 }) },
+  { key: 60, label: t('schedule.extendBy', { n: 60 }) },
+])
+
+async function extend(minutes: number) {
+  if (!holder.value) return
+  try {
+    await api.extendReservation(holder.value.id, minutes)
+    message.success(t('schedule.extended'))
+    refresh()
+  } catch (e) {
+    showError(e)
+  }
+}
 
 const loadProgress = computed(() => {
   const rt = runtime.value
@@ -85,6 +109,22 @@ async function restart() {
       </RouterLink>
     </div>
 
+    <div v-if="fallbackFrom" class="banner warn">
+      <TriangleAlert :size="16" />
+      <span>{{ t('overview.fallbackBanner', { model: fallbackFrom, current: runtime?.model_name }) }}</span>
+    </div>
+    <div v-else-if="manual" class="banner">
+      <Hand :size="16" />
+      <span>
+        {{
+          manual.model_name
+            ? t('overview.manualLoad', { user: manual.by, model: manual.model_name })
+            : t('overview.manualUnload', { user: manual.by })
+        }}
+        {{ manual.until ? t('overview.manualUntil', { time: formatTime(manual.until) }) : t('overview.manualUntilNext') }}
+      </span>
+    </div>
+
     <div class="top">
       <!-- Current model -->
       <section class="card card-pad model-card">
@@ -93,7 +133,7 @@ async function restart() {
           <span class="spacer" />
           <StatusDot v-if="runtime" :state="runtime.state" />
         </div>
-        <div class="model-name">{{ runtime?.model_name ?? t('overview.noModel') }}</div>
+        <div class="model-name">{{ exclusive ? t('schedule.kindExclusive') : (modelLabel ?? t('overview.noModel')) }}</div>
         <div class="model-sub muted">
           <template v-if="loadProgress">
             {{
@@ -108,6 +148,7 @@ async function restart() {
           <template v-else-if="runtime?.state === 'failed'">
             <span class="err">{{ runtime.error }}</span>
           </template>
+          <template v-else-if="exclusive">{{ t('overview.exclusiveHint') }}</template>
           <template v-else-if="!runtime?.model_name">{{ t('overview.noModelHint') }}</template>
         </div>
         <NProgress
@@ -116,8 +157,8 @@ async function restart() {
           :percentage="loadProgress.pct"
           :show-indicator="false"
           :height="6"
-          color="#4f46e5"
-          rail-color="#ececf4"
+          color="var(--brand)"
+          rail-color="var(--rail)"
           class="progress"
         />
         <div class="actions">
@@ -155,6 +196,9 @@ async function restart() {
             </div>
           </div>
         </div>
+        <NDropdown v-if="holder && mine" :options="extendOptions" trigger="click" @select="extend">
+          <NButton size="small" secondary type="primary" class="extend">{{ t('schedule.extend') }}</NButton>
+        </NDropdown>
       </section>
 
       <!-- GPU -->
@@ -178,8 +222,8 @@ async function restart() {
               :percentage="memPct(g.memory_used_mb, g.memory_total_mb)"
               :show-indicator="false"
               :height="6"
-              color="#4f46e5"
-              rail-color="#ececf4"
+              color="var(--brand)"
+              rail-color="var(--rail)"
             />
             <div class="metrics">
               <div>
@@ -257,6 +301,28 @@ async function restart() {
 </template>
 
 <style scoped>
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  border-radius: 10px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 500;
+}
+.banner.warn {
+  background: var(--warn-soft);
+  color: var(--warn-text);
+}
+.banner svg {
+  flex: none;
+}
+.extend {
+  margin-top: 14px;
+}
 .top {
   display: grid;
   grid-template-columns: 1.25fr 1fr 1fr;
@@ -313,7 +379,7 @@ async function restart() {
   place-items: center;
   flex: none;
   background: var(--ok-soft);
-  color: #08875d;
+  color: var(--ok-text);
 }
 .reserved .access-icon {
   background: var(--brand-soft);

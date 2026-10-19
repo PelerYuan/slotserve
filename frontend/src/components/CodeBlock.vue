@@ -38,7 +38,7 @@ async function copy() {
 <style scoped>
 .code {
   position: relative;
-  background: #fafafc;
+  background: var(--code-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
 }
@@ -48,7 +48,7 @@ pre {
   overflow-x: auto;
   font-size: 12.5px;
   line-height: 1.65;
-  color: #2b2b36;
+  color: var(--code-text);
 }
 .inline pre {
   padding: 9px 96px 9px 12px;

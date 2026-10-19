@@ -40,8 +40,18 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | `SLOTSERVE_PRELOAD_BUFFER_SECONDS` | `60` | Extra margin when preloading before a booking |
 | `SLOTSERVE_SCHEDULER_INTERVAL_SECONDS` | `5` | How often the scheduler re-evaluates |
 | `SLOTSERVE_DOWNLOAD_MIN_FREE_GB` | `2` | Disk space that must remain free after a download |
+| `SLOTSERVE_PUBLIC_URL` | *empty* | Address people use to reach SlotServe; used in calendar links |
+| `SLOTSERVE_TIMEZONE` | `UTC` | IANA time zone for notifications and weekly quotas |
+| `SLOTSERVE_QUOTA_WEEKLY_HOURS` | `0` | Hours one person may book per week (0 = unlimited; admins exempt) |
+| `SLOTSERVE_QUOTA_UPCOMING` | `0` | Open bookings one person may hold (0 = unlimited) |
+| `SLOTSERVE_REMINDER_MINUTES` | `10` | Lead time of start and end reminders |
+| `SLOTSERVE_HF_ENDPOINT` | `https://huggingface.co` | Hugging Face endpoint or mirror |
+| `SLOTSERVE_HF_TOKEN` | *empty* | Token for gated or private repositories |
+| `SLOTSERVE_TELEGRAM_BOT_TOKEN` | *empty* | Telegram bot token; empty disables the bot |
+| `SLOTSERVE_TELEGRAM_PROXY` | *empty* | `http://` or `socks5://` proxy for Telegram |
+| `SLOTSERVE_METRICS_TOKEN` | *empty* | Bearer token for `/metrics`; empty disables it |
 
-Admins can override five of these in **Admin → System settings** without a restart: `REGISTRATION_OPEN`, `INVITE_CODE`, `MAX_RESERVATION_HOURS`, `MAX_ADVANCE_DAYS` and `DEFAULT_LLAMA_ARGS`. Overrides live in the database and win over `.env`; **Use default** removes an override.
+Admins can override most of these in **Admin → System settings** without a restart: registration, invite code, booking limits and quotas, default launch arguments, time zone, public URL, Hugging Face, Telegram and metrics settings. Overrides live in the database and win over `.env`; **Use default** removes an override.
 
 ## Per-model launch arguments
 

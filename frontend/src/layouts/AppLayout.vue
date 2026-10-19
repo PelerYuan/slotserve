@@ -185,7 +185,7 @@ const holder = computed(() => status.value?.active_reservation)
   transition: background 0.12s, color 0.12s;
 }
 .nav-item:hover {
-  background: #f3f3f6;
+  background: var(--hover);
   color: var(--text);
 }
 .nav-item.active {
@@ -231,7 +231,7 @@ const holder = computed(() => status.value?.active_reservation)
   text-align: left;
 }
 .user:hover {
-  background: #f3f3f6;
+  background: var(--hover);
 }
 .avatar {
   width: 30px;
@@ -303,7 +303,7 @@ const holder = computed(() => status.value?.active_reservation)
     z-index: 10;
     height: 56px;
     padding: 0 16px;
-    background: rgba(255, 255, 255, 0.9);
+    background: color-mix(in srgb, var(--surface) 90%, transparent);
     backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border);
   }

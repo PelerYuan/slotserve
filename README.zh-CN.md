@@ -33,6 +33,8 @@ SlotServe 把一张 GPU 变成实验室或小团队可预约的共享服务：�
 - **模型下载**：粘贴 `.gguf` 直链（支持 Hugging Face 的 `resolve` 链接），断点续传，逐个下载。
 - **用量看板**：按用户、按模型统计请求数、输入/输出 token 和预约时长。
 - **管理面板**：管理用户、预约和 API 密钥，在线修改系统设置，查看审计日志。
+- **灵活预约**：可整卡预约用于训练，支持参数预设、每周重复、延长、候补和每人配额。
+- **Telegram 通知**：预约提醒、一键延长；另有**日历订阅**、**CSV 导出**和 **Prometheus 指标**。
 - **GPU 状态**：实时显存、利用率、温度和功耗。
 - **中英双语界面**，浅色简洁风格，手机也能用。
 - **单容器部署**：SQLite、三个目录挂载，无需其他服务。
@@ -102,6 +104,7 @@ SDK/客户端 ─/v1┘    鉴权 · 准入        │  仅监听 127.0.0.1     
 | [快速开始](https://peleryuan.github.io/slotserve/zh/getting-started/) | 编译 llama.cpp、配置、部署、不用 Docker 运行 |
 | [配置参考](https://peleryuan.github.io/slotserve/zh/configuration/) | 全部环境变量、每个模型的启动参数、管理员命令行 |
 | [使用指南](https://peleryuan.github.io/slotserve/zh/user-guide/) | 预约、模型、下载、密钥、用量、管理 |
+| [通知与集成](https://peleryuan.github.io/slotserve/zh/integrations/) | Telegram、日历订阅、CSV 导出、Prometheus |
 | [接口](https://peleryuan.github.io/slotserve/zh/api/) | 接口列表、`model` 字段、错误码 |
 | [开发](https://peleryuan.github.io/slotserve/zh/development/) | mock llama-server、测试、前端开发服务器 |
 | [常见问题](https://peleryuan.github.io/slotserve/zh/faq/) | 加载慢、反向代理、备份 |

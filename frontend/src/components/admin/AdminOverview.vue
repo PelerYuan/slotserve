@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, useMessage } from 'naive-ui'
+import { NButton, NFormItem, NModal, NSelect, useMessage } from 'naive-ui'
 import { CalendarClock, Boxes, Coins, KeyRound, Activity, Users } from 'lucide-vue-next'
 import LogDrawer from '@/components/LogDrawer.vue'
 import StatusDot from '@/components/StatusDot.vue'
 import { api } from '@/api/client'
-import type { AdminStats } from '@/api/types'
+import type { AdminStats, Model } from '@/api/types'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { useStatus } from '@/composables/useStatus'
-import { formatCompact, formatDateTime, formatDuration, formatNumber } from '@/utils/format'
+import { formatCompact, formatDateTime, formatDuration, formatNumber, formatTime } from '@/utils/format'
 
 const emit = defineEmits<{ navigate: [tab: 'users' | 'reservations' | 'keys'] }>()
 const { t } = useI18n()
@@ -74,6 +74,49 @@ async function restart() {
   }
 }
 
+// ---- manual control ----------------------------------------------------------
+const manual = computed(() => status.value?.manual ?? null)
+const loadForm = ref({ open: false, modelId: null as number | null, presetId: null as number | null, hours: 0 })
+const models = ref<Model[]>([])
+const busyManual = ref(false)
+const readyModels = computed(() => models.value.filter((m) => m.status === 'ready' && m.file_exists))
+const modelOptions = computed(() => readyModels.value.map((m) => ({ label: m.name, value: m.id })))
+const presetOptions = computed(() => [
+  { label: t('schedule.presetDefault'), value: null as unknown as number },
+  ...(readyModels.value.find((m) => m.id === loadForm.value.modelId)?.presets ?? []).map((p) => ({
+    label: p.name,
+    value: p.id,
+  })),
+])
+const durationOptions = computed(() => [
+  { label: t('admin.manual.untilNext'), value: 0 },
+  ...[1, 2, 4, 8, 24].map((h) => ({ label: t('admin.manual.hours', { n: h }), value: h })),
+])
+
+async function openLoad() {
+  models.value = await api.models().catch(() => [])
+  loadForm.value = { open: true, modelId: readyModels.value[0]?.id ?? null, presetId: null, hours: 0 }
+}
+
+async function manualAction(action: 'load' | 'unload' | 'auto') {
+  busyManual.value = true
+  try {
+    await api.admin.manual({
+      action,
+      model_id: action === 'load' ? loadForm.value.modelId ?? undefined : undefined,
+      preset_id: action === 'load' ? loadForm.value.presetId : undefined,
+      hours: action === 'auto' ? undefined : loadForm.value.hours || null,
+    })
+    loadForm.value.open = false
+    message.success(t('admin.manual.done'))
+    window.setTimeout(refresh, 500)
+  } catch (e) {
+    showError(e)
+  } finally {
+    busyManual.value = false
+  }
+}
+
 const seconds = (a: string, b: string) => (new Date(b).getTime() - new Date(a).getTime()) / 1000
 </script>
 
@@ -103,15 +146,53 @@ const seconds = (a: string, b: string) => (new Date(b).getTime() - new Date(a).g
         <StatusDot v-if="runtime" :state="runtime.state" />
         <span v-if="runtime?.model_name" class="muted mono">{{ runtime.model_name }}</span>
       </div>
-      <div class="row">
+      <div class="row wrap">
+        <NButton size="small" secondary type="primary" @click="openLoad">{{ t('admin.manual.load') }}</NButton>
+        <NButton size="small" secondary :loading="busyManual" @click="loadForm.hours = 0; manualAction('unload')">
+          {{ t('admin.manual.unload') }}
+        </NButton>
+        <NButton v-if="manual" size="small" secondary :loading="busyManual" @click="manualAction('auto')">
+          {{ t('admin.manual.auto') }}
+        </NButton>
         <NButton size="small" secondary @click="logs = true">{{ t('admin.viewLogs') }}</NButton>
         <NButton size="small" secondary :loading="restarting" :disabled="!runtime?.model_name" @click="restart">
           {{ t('admin.restart') }}
         </NButton>
       </div>
     </div>
+    <div v-if="manual" class="manual-note">
+      {{ manual.model_name ? t('overview.manualLoad', { user: manual.by, model: manual.model_name }) : t('overview.manualUnload', { user: manual.by }) }}
+      {{ manual.until ? t('overview.manualUntil', { time: formatTime(manual.until) }) : t('overview.manualUntilNext') }}
+    </div>
     <div v-if="runtime?.error" class="runtime-error mono">{{ runtime.error }}</div>
   </section>
+
+  <NModal
+    v-model:show="loadForm.open"
+    preset="card"
+    :title="t('admin.manual.load')"
+    :bordered="false"
+    style="width: 440px; max-width: calc(100vw - 32px)"
+  >
+    <p class="muted hint">{{ t('admin.manual.hint') }}</p>
+    <NFormItem :label="t('schedule.model')">
+      <NSelect v-model:value="loadForm.modelId" :options="modelOptions" filterable />
+    </NFormItem>
+    <NFormItem :label="t('schedule.preset')">
+      <NSelect v-model:value="loadForm.presetId" :options="presetOptions" />
+    </NFormItem>
+    <NFormItem :label="t('admin.manual.duration')">
+      <NSelect v-model:value="loadForm.hours" :options="durationOptions" />
+    </NFormItem>
+    <template #footer>
+      <div class="footer">
+        <NButton @click="loadForm.open = false">{{ t('common.cancel') }}</NButton>
+        <NButton type="primary" :disabled="!loadForm.modelId" :loading="busyManual" @click="manualAction('load')">
+          {{ t('admin.manual.loadNow') }}
+        </NButton>
+      </div>
+    </template>
+  </NModal>
 
   <section class="card">
     <div class="card-header">
@@ -198,6 +279,25 @@ const seconds = (a: string, b: string) => (new Date(b).getTime() - new Date(a).g
 .runtime .card-header {
   border-bottom: none;
   flex-wrap: wrap;
+}
+.wrap {
+  flex-wrap: wrap;
+}
+.manual-note {
+  margin: 0 20px 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 12.5px;
+}
+.hint {
+  margin: 0 0 16px;
+}
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 .runtime-error {
   margin: 0 20px 16px;

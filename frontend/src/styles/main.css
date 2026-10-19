@@ -26,6 +26,89 @@
   --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
   --sidebar: 232px;
   color-scheme: light;
+
+  /* derived roles (swapped in dark mode) */
+  --ok-text: #047857;
+  --warn-text: #b45309;
+  --danger-text: #c4282d;
+  --orange-text: #c2410c;
+  --orange-soft: #fff1e6;
+  --neutral-soft: #f0f0f3;
+  --hover: #f3f3f6;
+  --rail: #ececf4;
+  --code-bg: #fafafc;
+  --code-text: #2b2b36;
+  --grid-line: #f0f0f4;
+  --event-bg: #f1f2f6;
+  --event-border: #dcdde6;
+  --event-accent: #a3a6b8;
+  --event-text: #3a3b48;
+  --event-mine-bg: #e8e9ff;
+  --event-mine-border: #c9ccfb;
+  --event-mine-text: #2b2a8a;
+  --event-hatch: rgba(20, 20, 40, 0.07);
+  --past-hatch: rgba(20, 20, 40, 0.025);
+  --seg-bg: #f1f1f5;
+  --seg-pill: #ffffff;
+  --hero-bg: #f7f7fc;
+  --glass: rgba(255, 255, 255, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.9);
+  --track: #f8f8fb;
+  --track-line: #f1f1f6;
+  --heading-from: #17171c;
+}
+
+:root[data-theme='dark'] {
+  --bg: #0f0f12;
+  --surface: #18181d;
+  --surface-muted: #1d1d23;
+  --border: #2a2a32;
+  --border-strong: #3a3a44;
+  --text: #ececf1;
+  --text-2: #b4b4c0;
+  --text-3: #80808e;
+  --brand: #818cf8;
+  --brand-hover: #a5b4fc;
+  --brand-soft: rgba(129, 140, 248, 0.14);
+  --brand-softer: rgba(129, 140, 248, 0.07);
+  --ok: #34d399;
+  --ok-soft: rgba(52, 211, 153, 0.12);
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.12);
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.12);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+
+  --ok-text: #4ade80;
+  --warn-text: #fbbf24;
+  --danger-text: #fca5a5;
+  --orange-text: #fdba74;
+  --orange-soft: rgba(251, 146, 60, 0.14);
+  --neutral-soft: #26262e;
+  --hover: #22222a;
+  --rail: #2a2a33;
+  --code-bg: #131317;
+  --code-text: #d6d6de;
+  --grid-line: #222229;
+  --event-bg: #23232b;
+  --event-border: #33333d;
+  --event-accent: #6b6b7b;
+  --event-text: #d0d0da;
+  --event-mine-bg: rgba(129, 140, 248, 0.2);
+  --event-mine-border: rgba(129, 140, 248, 0.4);
+  --event-mine-text: #c7cbff;
+  --event-hatch: rgba(255, 255, 255, 0.06);
+  --past-hatch: rgba(255, 255, 255, 0.025);
+  --seg-bg: #1f1f26;
+  --seg-pill: #2d2d36;
+  --hero-bg: #121218;
+  --glass: rgba(28, 28, 36, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --track: #1f1f26;
+  --track-line: #26262e;
+  --heading-from: #ececf1;
 }
 
 * {
@@ -156,6 +239,11 @@ pre,
   flex: 1;
 }
 
+/* sign-in page aurora: much quieter on dark backgrounds */
+:root[data-theme='dark'] .auth .blob {
+  opacity: 0.16;
+}
+
 /* badges */
 .badge {
   display: inline-flex;
@@ -168,22 +256,22 @@ pre,
   font-weight: 550;
   white-space: nowrap;
   color: var(--text-2);
-  background: #f1f1f5;
+  background: var(--neutral-soft);
 }
 .badge.brand {
   color: var(--brand);
   background: var(--brand-soft);
 }
 .badge.ok {
-  color: #047857;
+  color: var(--ok-text);
   background: var(--ok-soft);
 }
 .badge.warn {
-  color: #b45309;
+  color: var(--warn-text);
   background: var(--warn-soft);
 }
 .badge.danger {
-  color: #c4282d;
+  color: var(--danger-text);
   background: var(--danger-soft);
 }
 

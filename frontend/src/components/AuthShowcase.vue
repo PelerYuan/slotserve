@@ -140,10 +140,10 @@ const pct = (v: number) => `${(v * 100).toFixed(2)}%`
   max-width: 480px;
 }
 .card {
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--glass);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--glass-border);
   border-radius: 16px;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 24px 48px -24px rgba(40, 40, 110, 0.28),
     0 2px 6px rgba(40, 40, 110, 0.05);
@@ -188,11 +188,11 @@ const pct = (v: number) => `${(v * 100).toFixed(2)}%`
 }
 .chip.idle {
   background: var(--ok-soft);
-  color: #047857;
+  color: var(--ok-text);
 }
 .chip.load {
   background: var(--warn-soft);
-  color: #b45309;
+  color: var(--warn-text);
 }
 .chip.busy {
   background: var(--brand-soft);
@@ -229,7 +229,7 @@ const pct = (v: number) => `${(v * 100).toFixed(2)}%`
   flex: 1;
   height: 100%;
   border-radius: 7px;
-  background: repeating-linear-gradient(90deg, #f1f1f6 0 1px, transparent 1px calc(100% / 6)), #f8f8fb;
+  background: repeating-linear-gradient(90deg, var(--track-line) 0 1px, transparent 1px calc(100% / 6)), var(--track);
 }
 .pre {
   position: absolute;
@@ -250,8 +250,8 @@ const pct = (v: number) => `${(v * 100).toFixed(2)}%`
   font-size: 11px;
   font-weight: 600;
   color: var(--c);
-  background: color-mix(in srgb, var(--c) 13%, white);
-  border: 1px solid color-mix(in srgb, var(--c) 25%, white);
+  background: color-mix(in srgb, var(--c) 14%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--c) 28%, var(--surface));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -315,7 +315,7 @@ const pct = (v: number) => `${(v * 100).toFixed(2)}%`
   flex: 1;
   height: 6px;
   border-radius: 3px;
-  background: #ededf3;
+  background: var(--rail);
   overflow: hidden;
 }
 .bar span {
@@ -364,15 +364,15 @@ const pct = (v: number) => `${(v * 100).toFixed(2)}%`
   font-variant-numeric: tabular-nums;
 }
 .c200 {
-  color: #047857;
+  color: var(--ok-text);
   background: var(--ok-soft);
 }
 .c403 {
-  color: #c2410c;
-  background: #fff1e6;
+  color: var(--orange-text);
+  background: var(--orange-soft);
 }
 .c503 {
-  color: #b45309;
+  color: var(--warn-text);
   background: var(--warn-soft);
 }
 .note {

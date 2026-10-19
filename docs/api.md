@@ -70,6 +70,7 @@ Errors use the OpenAI shape: `{"error": {"message", "type", "code"}}`.
 | 401 | `missing_api_key` / `invalid_api_key` | No key, unknown key or revoked key |
 | 403 | `gpu_reserved` | Someone else has booked the GPU right now; the message says until when |
 | 409 | `model_not_loaded` | You asked for a registered model that is not loaded |
+| 503 | `gpu_exclusive` | Your own whole-GPU booking is running, so no model is served |
 | 503 | `model_unavailable` | The model is loading or failed to start; honour `Retry-After` |
 | 502 | `upstream_error` | llama-server did not answer |
 

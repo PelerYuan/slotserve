@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NCheckbox, NDropdown, NForm, NFormItem, NInput, NModal, NProgress, useDialog } from 'naive-ui'
-import { Download, FolderSearch, MoreHorizontal, RotateCw, ScrollText, Star, X } from 'lucide-vue-next'
+import { NButton, NCheckbox, NDropdown, NForm, NFormItem, NInput, NModal, NProgress, NTabPane, NTabs, useDialog } from 'naive-ui'
+import { Download, FolderSearch, MoreHorizontal, Plus, RotateCw, ScrollText, Search, Star, Trash2, X } from 'lucide-vue-next'
 import LogDrawer from '@/components/LogDrawer.vue'
 import { api } from '@/api/client'
-import type { DownloadTask, Model } from '@/api/types'
+import type { DownloadTask, HfFile, Model } from '@/api/types'
 import { session } from '@/composables/session'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { formatBytes, formatDateTime, formatDuration } from '@/utils/format'
@@ -66,7 +66,7 @@ function menuFor(m: Model) {
         ? { key: 'unset-default', label: t('models.unsetDefault') }
         : { key: 'default', label: t('models.setDefault'), disabled: m.status !== 'ready' || !m.file_exists },
     )
-  if (canEdit(m)) items.push({ type: 'divider', key: 'd' }, { key: 'delete', label: t('common.delete'), props: { style: 'color:#e5484d' } })
+  if (canEdit(m)) items.push({ type: 'divider', key: 'd' }, { key: 'delete', label: t('common.delete'), props: { style: 'color:var(--danger)' } })
   return items
 }
 
@@ -93,6 +93,52 @@ function openEdit(m: Model) {
   form.name = m.name
   form.args = m.args
   form.description = m.description
+  presetRows.value = m.presets.map((p) => ({ id: p.id, name: p.name, args: p.args, saved: { ...p } }))
+}
+
+// ---- presets ----
+
+interface PresetRow {
+  id: number | null
+  name: string
+  args: string
+  saved: { name: string; args: string } | null
+}
+const presetRows = ref<PresetRow[]>([])
+const presetBusy = ref(false)
+
+function addPresetRow() {
+  presetRows.value.push({ id: null, name: '', args: form.args, saved: null })
+}
+
+const rowDirty = (r: PresetRow) => !r.saved || r.saved.name !== r.name || r.saved.args !== r.args
+
+async function savePreset(r: PresetRow) {
+  if (!editing.value || !r.name.trim()) return
+  presetBusy.value = true
+  try {
+    const saved = r.id
+      ? await api.updatePreset(editing.value.id, r.id, r.name.trim(), r.args)
+      : await api.createPreset(editing.value.id, r.name.trim(), r.args)
+    Object.assign(r, { id: saved.id, name: saved.name, args: saved.args, saved: { name: saved.name, args: saved.args } })
+    await loadModels()
+  } catch (e) {
+    showError(e)
+  } finally {
+    presetBusy.value = false
+  }
+}
+
+async function removePreset(r: PresetRow) {
+  if (r.id && editing.value) {
+    try {
+      await api.deletePreset(editing.value.id, r.id)
+      await loadModels()
+    } catch (e) {
+      return showError(e)
+    }
+  }
+  presetRows.value = presetRows.value.filter((x) => x !== r)
 }
 
 async function save() {
@@ -162,6 +208,57 @@ async function startDownload() {
   }
 }
 
+// ---- Hugging Face ----
+
+const dlTab = ref<'url' | 'hf'>('url')
+const hf = reactive({ repo: '', revision: 'main', files: [] as HfFile[], picked: [] as string[], listing: false, error: '' })
+
+function hfRepoFromInput(text: string) {
+  const m = text.trim().match(/(?:huggingface\.co\/|hf-mirror\.com\/)?([\w.-]+\/[\w.-]+)/)
+  return m ? m[1] : text.trim()
+}
+
+async function hfList() {
+  hf.repo = hfRepoFromInput(hf.repo)
+  if (!hf.repo) return
+  hf.listing = true
+  hf.error = ''
+  hf.files = []
+  hf.picked = []
+  try {
+    const res = await api.hfFiles(hf.repo, hf.revision || 'main')
+    hf.files = res.files
+  } catch (e) {
+    showError(e)
+  } finally {
+    hf.listing = false
+  }
+}
+
+function togglePick(path: string, on: boolean) {
+  hf.picked = on ? [...hf.picked, path] : hf.picked.filter((p) => p !== path)
+}
+
+const pickedSize = computed(() =>
+  hf.files.filter((f) => hf.picked.includes(f.path)).reduce((sum, f) => sum + f.size_bytes, 0),
+)
+
+async function hfDownload() {
+  const files = hf.files.filter((f) => hf.picked.includes(f.path)).flatMap((f) => f.files)
+  if (!files.length) return
+  submitting.value = true
+  try {
+    await api.hfDownload(hf.repo, files, hf.revision || 'main')
+    message.success(t('models.hf.queued', { n: files.length }))
+    hf.picked = []
+    await loadDownloads()
+  } catch (e) {
+    showError(e)
+  } finally {
+    submitting.value = false
+  }
+}
+
 async function downloadAction(d: DownloadTask, action: 'retry' | 'remove') {
   try {
     if (action === 'retry') await api.retryDownload(d.id)
@@ -214,6 +311,10 @@ function eta(d: DownloadTask) {
             <div class="m-file mono faint" :title="m.file_path">{{ m.file_name }}</div>
             <div v-if="m.description" class="m-desc muted">{{ m.description }}</div>
             <code class="m-args" :title="m.args">{{ m.args || '—' }}</code>
+            <div v-if="m.presets.length" class="m-presets">
+              <span class="faint small">{{ t('models.presets') }}</span>
+              <span v-for="p in m.presets" :key="p.id" class="badge" :title="p.args">{{ p.name }}</span>
+            </div>
           </div>
           <div class="m-stats">
             <div>
@@ -243,14 +344,45 @@ function eta(d: DownloadTask) {
           <div class="card-sub">{{ t('models.downloadsHint') }}</div>
         </div>
       </div>
-      <form class="dl-form card-pad" @submit.prevent="startDownload">
-        <NInput v-model:value="dl.url" :placeholder="'https://huggingface.co/<repo>/resolve/main/<file>.gguf'" class="dl-url" clearable />
-        <NInput v-model:value="dl.filename" :placeholder="guessedName || t('models.filenameHint')" class="dl-name" />
-        <NButton type="primary" attr-type="submit" :loading="submitting" :disabled="!dl.url.trim()">
-          <template #icon><Download :size="16" /></template>
-          {{ t('models.startDownload') }}
-        </NButton>
-      </form>
+      <NTabs v-model:value="dlTab" type="line" size="small" class="dl-tabs" :tabs-padding="20">
+        <NTabPane name="url" :tab="t('models.hf.tabUrl')">
+          <form class="dl-form card-pad" @submit.prevent="startDownload">
+            <NInput v-model:value="dl.url" :placeholder="'https://huggingface.co/<repo>/resolve/main/<file>.gguf'" class="dl-url" clearable />
+            <NInput v-model:value="dl.filename" :placeholder="guessedName || t('models.filenameHint')" class="dl-name" />
+            <NButton type="primary" attr-type="submit" :loading="submitting" :disabled="!dl.url.trim()">
+              <template #icon><Download :size="16" /></template>
+              {{ t('models.startDownload') }}
+            </NButton>
+          </form>
+        </NTabPane>
+        <NTabPane name="hf" tab="Hugging Face">
+          <form class="dl-form card-pad" @submit.prevent="hfList">
+            <NInput v-model:value="hf.repo" placeholder="Qwen/Qwen3-8B-GGUF" class="dl-url" clearable />
+            <NInput v-model:value="hf.revision" placeholder="main" class="dl-rev" />
+            <NButton secondary attr-type="submit" :loading="hf.listing" :disabled="!hf.repo.trim()">
+              <template #icon><Search :size="16" /></template>
+              {{ t('models.hf.list') }}
+            </NButton>
+          </form>
+          <div v-if="hf.files.length" class="hf-files">
+            <label v-for="f in hf.files" :key="f.path" class="hf-file" :class="{ on: hf.picked.includes(f.path) }">
+              <NCheckbox :checked="hf.picked.includes(f.path)" @update:checked="(v: boolean) => togglePick(f.path, v)" />
+              <span class="mono hf-path">{{ f.path }}</span>
+              <span v-if="f.parts > 1" class="badge">{{ t('models.hf.parts', { n: f.parts }) }}</span>
+              <span v-if="f.kind === 'mmproj'" class="badge">mmproj</span>
+              <span class="spacer" />
+              <span class="num faint small">{{ formatBytes(f.size_bytes) }}</span>
+            </label>
+            <div class="hf-actions">
+              <span class="faint small">{{ t('models.hf.selected', { n: hf.picked.length, size: formatBytes(pickedSize) }) }}</span>
+              <NButton type="primary" :disabled="!hf.picked.length" :loading="submitting" @click="hfDownload">
+                <template #icon><Download :size="16" /></template>
+                {{ t('models.startDownload') }}
+              </NButton>
+            </div>
+          </div>
+        </NTabPane>
+      </NTabs>
       <div v-if="!downloads.length" class="empty slim">{{ t('models.noDownloads') }}</div>
       <ul v-else class="dls">
         <li v-for="d in downloads" :key="d.id">
@@ -280,8 +412,8 @@ function eta(d: DownloadTask) {
             :percentage="pct(d)"
             :show-indicator="false"
             :height="5"
-            :color="d.status === 'running' ? '#4f46e5' : '#c7c7d1'"
-            rail-color="#ececf4"
+            :color="d.status === 'running' ? 'var(--brand)' : 'var(--border-strong)'"
+            rail-color="var(--rail)"
           />
           <div v-if="d.error" class="dl-err small">{{ d.error }}</div>
         </li>
@@ -308,6 +440,26 @@ function eta(d: DownloadTask) {
         </NFormItem>
         <p v-if="editing?.is_loaded" class="faint small">{{ t('models.reloadHint') }}</p>
       </NForm>
+      <div class="presets">
+        <div class="presets-head">
+          <div>
+            <div class="presets-title">{{ t('models.presets') }}</div>
+            <div class="faint small">{{ t('models.presetsHint') }}</div>
+          </div>
+          <NButton size="small" secondary @click="addPresetRow">
+            <template #icon><Plus :size="14" /></template>
+            {{ t('models.addPreset') }}
+          </NButton>
+        </div>
+        <div v-for="(r, i) in presetRows" :key="r.id ?? `new-${i}`" class="preset-row">
+          <NInput v-model:value="r.name" size="small" :placeholder="t('models.presetName')" class="preset-name" maxlength="64" />
+          <NInput v-model:value="r.args" size="small" class="preset-args mono-input" placeholder="-c 32768" />
+          <NButton size="small" type="primary" secondary :disabled="!rowDirty(r) || !r.name.trim()" :loading="presetBusy" @click="savePreset(r)">
+            {{ t('common.save') }}
+          </NButton>
+          <NButton size="small" quaternary circle @click="removePreset(r)"><Trash2 :size="14" /></NButton>
+        </div>
+      </div>
       <template #footer>
         <div class="footer">
           <NButton @click="editing = null">{{ t('common.cancel') }}</NButton>
@@ -369,11 +521,11 @@ function eta(d: DownloadTask) {
 }
 .badge.ok {
   background: var(--ok-soft);
-  color: #08875d;
+  color: var(--ok-text);
 }
 .badge.danger {
   background: var(--danger-soft);
-  color: #c4282d;
+  color: var(--danger-text);
 }
 .m-file {
   font-size: 12px;
@@ -383,6 +535,82 @@ function eta(d: DownloadTask) {
 }
 .m-desc {
   font-size: 13px;
+}
+.m-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.dl-tabs :deep(.n-tabs-nav) {
+  padding-top: 4px;
+}
+.dl-rev {
+  width: 120px;
+  flex: none;
+}
+.hf-files {
+  margin: -6px 20px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.hf-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.hf-file.on {
+  background: var(--brand-softer);
+}
+.hf-path {
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.hf-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface-muted);
+}
+.presets {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+}
+.presets-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.presets-title {
+  font-weight: 600;
+}
+.preset-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.preset-name {
+  width: 140px;
+  flex: none;
+}
+.preset-args {
+  flex: 1;
+  min-width: 0;
 }
 .m-args {
   margin-top: 6px;
@@ -458,7 +686,7 @@ function eta(d: DownloadTask) {
   font-weight: 600;
   padding: 1px 7px;
   border-radius: 5px;
-  background: #f0f0f3;
+  background: var(--neutral-soft);
   color: var(--text-2);
   flex: none;
 }
@@ -468,14 +696,14 @@ function eta(d: DownloadTask) {
 }
 .dl-status.done {
   background: var(--ok-soft);
-  color: #08875d;
+  color: var(--ok-text);
 }
 .dl-status.failed {
   background: var(--danger-soft);
-  color: #c4282d;
+  color: var(--danger-text);
 }
 .dl-err {
-  color: #c4282d;
+  color: var(--danger-text);
 }
 .mono-input :deep(textarea) {
   font-family: var(--mono);

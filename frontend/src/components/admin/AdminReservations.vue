@@ -2,8 +2,10 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NRadioButton, NRadioGroup, NSelect, useDialog } from 'naive-ui'
+import { Plus } from 'lucide-vue-next'
+import BookingModal from '@/components/BookingModal.vue'
 import { api } from '@/api/client'
-import type { AdminUser, Reservation } from '@/api/types'
+import type { AdminUser, Model, Reservation } from '@/api/types'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { useStatus } from '@/composables/useStatus'
 import { formatRange } from '@/utils/format'
@@ -33,8 +35,39 @@ async function load() {
   }
 }
 
+const models = ref<Model[]>([])
+const modal = ref(false)
+const editing = ref<Reservation | null>(null)
+const draftStart = ref<Date | null>(null)
+const draftEnd = ref<Date | null>(null)
+
+function openNew() {
+  const slot = 30 * 60_000
+  const s = new Date(Math.ceil(Date.now() / slot) * slot)
+  draftStart.value = s
+  draftEnd.value = new Date(s.getTime() + 3_600_000)
+  editing.value = null
+  modal.value = true
+}
+
+function openEdit(r: Reservation) {
+  editing.value = r
+  modal.value = true
+}
+
+async function onDone() {
+  refreshStatus()
+  await load()
+}
+
+const what = (r: Reservation) =>
+  r.exclusive ? t('schedule.kindExclusive') : r.preset_name ? `${r.model_name} · ${r.preset_name}` : r.model_name
+
 onMounted(async () => {
-  users.value = await api.admin.users().catch(() => [])
+  ;[users.value, models.value] = await Promise.all([
+    api.admin.users().catch(() => []),
+    api.models().catch(() => []),
+  ])
   await load()
 })
 watch([phase, userId], load)
@@ -69,14 +102,20 @@ function end(r: Reservation) {
       <NRadioButton value="all">{{ t('admin.reservations.all') }}</NRadioButton>
       <NRadioButton v-for="p in PHASES" :key="p" :value="p">{{ t(`phase.${p}`) }}</NRadioButton>
     </NRadioGroup>
-    <NSelect
-      v-model:value="userId"
-      :options="userOptions"
-      :placeholder="t('admin.reservations.allUsers')"
-      clearable
-      size="small"
-      class="user-select"
-    />
+    <div class="row">
+      <NSelect
+        v-model:value="userId"
+        :options="userOptions"
+        :placeholder="t('admin.reservations.allUsers')"
+        clearable
+        size="small"
+        class="user-select"
+      />
+      <NButton size="small" type="primary" @click="openNew">
+        <template #icon><Plus :size="14" /></template>
+        {{ t('admin.reservations.bookFor') }}
+      </NButton>
+    </div>
   </div>
 
   <section class="card">
@@ -96,11 +135,16 @@ function end(r: Reservation) {
         <tbody>
           <tr v-for="r in rows" :key="r.id">
             <td class="strong">{{ r.username }}</td>
-            <td class="mono small">{{ r.model_name }}</td>
+            <td :class="{ mono: !r.exclusive }" class="small">
+              {{ what(r) }}<span v-if="r.series_id" class="faint"> ↻</span>
+            </td>
             <td class="muted num nowrap">{{ formatRange(r.start_at, r.end_at) }}</td>
             <td><span class="badge" :class="tone[r.phase]">{{ t(`phase.${r.phase}`) }}</span></td>
             <td class="muted note" :title="r.note">{{ r.note || '—' }}</td>
-            <td class="right">
+            <td class="right nowrap">
+              <NButton v-if="r.phase === 'upcoming' || r.phase === 'active'" size="small" quaternary @click="openEdit(r)">
+                {{ t('common.edit') }}
+              </NButton>
               <NButton
                 v-if="r.phase === 'upcoming' || r.phase === 'active'"
                 size="small"
@@ -116,6 +160,16 @@ function end(r: Reservation) {
       </table>
     </div>
   </section>
+
+  <BookingModal
+    v-model:show="modal"
+    :start="draftStart"
+    :end="draftEnd"
+    :models="models"
+    :reservations="rows"
+    :editing="editing"
+    @done="onDone"
+  />
 </template>
 
 <style scoped>

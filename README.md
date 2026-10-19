@@ -33,6 +33,8 @@ SlotServe turns one GPU into a shared, bookable service for a lab or small team.
 - **Model downloads**: paste a direct `.gguf` link (Hugging Face `resolve` URLs work). Downloads are resumable and run one at a time.
 - **Usage dashboard**: requests, prompt/completion tokens and booked hours per person and per model.
 - **Admin panel**: manage users, bookings and API keys, change settings at runtime, and review an audit log.
+- **Flexible bookings**: whole-GPU slots for training, argument presets, weekly repeats, extensions, a waitlist and per-person quotas.
+- **Telegram notifications** with reminders and one-tap extend, plus **calendar feeds**, **CSV export** and **Prometheus metrics**.
 - **GPU status**: live memory, utilization, temperature and power.
 - **English and Chinese UI**, light, minimal design, works on phones.
 - **One container**: SQLite, three bind mounts, no external services.
@@ -102,6 +104,7 @@ See [How scheduling works](https://peleryuan.github.io/slotserve/scheduling/) fo
 | [Getting started](https://peleryuan.github.io/slotserve/getting-started/) | Build llama.cpp, configure, deploy, run without Docker |
 | [Configuration](https://peleryuan.github.io/slotserve/configuration/) | Every environment variable, per-model launch arguments, admin CLI |
 | [User guide](https://peleryuan.github.io/slotserve/user-guide/) | Booking, models, downloads, keys, usage, administration |
+| [Notifications & integrations](https://peleryuan.github.io/slotserve/integrations/) | Telegram, calendar feeds, CSV export, Prometheus |
 | [API](https://peleryuan.github.io/slotserve/api/) | Endpoints, the `model` field, error codes |
 | [Development](https://peleryuan.github.io/slotserve/development/) | Mock llama-server, tests, frontend dev server |
 | [FAQ](https://peleryuan.github.io/slotserve/faq/) | Slow loads, reverse proxy, backups |

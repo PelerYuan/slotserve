@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NButtonGroup, NModal, useDialog } from 'naive-ui'
-import { CalendarPlus, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { NButton, NButtonGroup, NDropdown, NModal, useDialog, useMessage } from 'naive-ui'
+import { CalendarPlus, ChevronLeft, ChevronRight, Hourglass, Repeat } from 'lucide-vue-next'
 import WeekCalendar from '@/components/WeekCalendar.vue'
 import BookingModal from '@/components/BookingModal.vue'
 import { api } from '@/api/client'
-import type { Model, Reservation } from '@/api/types'
+import type { Model, Reservation, WaitlistEntry } from '@/api/types'
 import { session } from '@/composables/session'
 import { useNow } from '@/composables/useNow'
 import { useStatus } from '@/composables/useStatus'
@@ -15,6 +15,7 @@ import { formatDate, formatRange, relativeFromNow } from '@/utils/format'
 
 const { t } = useI18n()
 const dialog = useDialog()
+const message = useMessage()
 const { showError } = useErrorMessage()
 const { refresh: refreshStatus } = useStatus()
 const now = useNow(30_000)
@@ -47,17 +48,20 @@ const rangeEnd = computed(() => {
 
 const reservations = ref<Reservation[]>([])
 const mine = ref<Reservation[]>([])
+const waiting = ref<WaitlistEntry[]>([])
 const models = ref<Model[]>([])
 const slotMinutes = computed(() => session.config?.slot_minutes ?? 30)
 
 async function load() {
   try {
     const horizon = new Date(Date.now() + (session.config?.max_advance_days ?? 30) * 86_400_000)
-    const [all, my] = await Promise.all([
+    const [all, my, wl] = await Promise.all([
       api.reservations(rangeStart.value, rangeEnd.value),
       api.reservations(new Date(Date.now() - 86_400_000), horizon, true),
+      api.waitlist(),
     ])
     reservations.value = all
+    waiting.value = wl
     mine.value = my.filter((r) => r.phase === 'upcoming' || r.phase === 'active')
   } catch (e) {
     showError(e)
@@ -93,13 +97,46 @@ const rangeLabel = computed(() => {
 const booking = ref(false)
 const draftStart = ref<Date | null>(null)
 const draftEnd = ref<Date | null>(null)
+const editing = ref<Reservation | null>(null)
 
 function openBooking(start?: Date, end?: Date) {
   const slot = slotMinutes.value * 60_000
   const s = start ?? new Date(Math.ceil(Date.now() / slot) * slot)
   draftStart.value = s
   draftEnd.value = end ?? new Date(s.getTime() + 3_600_000)
+  editing.value = null
   booking.value = true
+}
+
+function openEdit(r: Reservation) {
+  detail.value = null
+  editing.value = r
+  booking.value = true
+}
+
+const extendOptions = computed(() => [
+  { key: 30, label: t('schedule.extendBy', { n: 30 }) },
+  { key: 60, label: t('schedule.extendBy', { n: 60 }) },
+  { key: 120, label: t('schedule.extendBy', { n: 120 }) },
+])
+
+async function extend(r: Reservation, minutes: number) {
+  try {
+    await api.extendReservation(r.id, minutes)
+    message.success(t('schedule.extended'))
+    detail.value = null
+    await load()
+    refreshStatus()
+  } catch (e) {
+    showError(e)
+  }
+}
+
+function leaveWaitlist(w: WaitlistEntry) {
+  api
+    .leaveWaitlist(w.id)
+    .then(load)
+    .catch(showError)
 }
 
 async function onBooked() {
@@ -112,25 +149,35 @@ async function onBooked() {
 const detail = ref<Reservation | null>(null)
 const canManage = (r: Reservation) => r.user_id === session.user?.id || !!session.user?.is_admin
 
+async function doEnd(r: Reservation, series: boolean) {
+  try {
+    await api.endReservation(r.id, series)
+    detail.value = null
+    await load()
+    refreshStatus()
+  } catch (e) {
+    showError(e)
+  }
+}
+
 function endReservation(r: Reservation) {
   const active = r.phase === 'active' || new Date(r.start_at).getTime() <= Date.now()
-  dialog.warning({
+  const series = !active && !!r.series_id
+  const d = dialog.warning({
     title: active ? t('schedule.release') : t('schedule.cancel'),
-    content: active ? t('schedule.confirmRelease') : t('schedule.confirmCancel'),
-    positiveText: t('common.confirm'),
-    negativeText: t('common.cancel'),
-    onPositiveClick: async () => {
-      try {
-        await api.endReservation(r.id)
-        detail.value = null
-        await load()
-        refreshStatus()
-      } catch (e) {
-        showError(e)
-      }
+    content: active ? t('schedule.confirmRelease') : series ? t('schedule.confirmCancelSeries') : t('schedule.confirmCancel'),
+    positiveText: series ? t('schedule.cancelThisOne') : t('common.confirm'),
+    negativeText: series ? t('schedule.cancelSeries') : t('common.cancel'),
+    onPositiveClick: () => doEnd(r, false),
+    onNegativeClick: () => {
+      if (series) doEnd(r, true)
     },
   })
+  if (series) d.closable = true
 }
+
+const what = (r: Reservation) =>
+  r.exclusive ? t('schedule.kindExclusive') : r.preset_name ? `${r.model_name} · ${r.preset_name}` : r.model_name
 </script>
 
 <template>
@@ -186,17 +233,53 @@ function endReservation(r: Reservation) {
               <span class="faint small">{{ relativeFromNow(r.phase === 'active' ? r.end_at : r.start_at) }}</span>
             </div>
             <div class="when num">{{ formatRange(r.start_at, r.end_at) }}</div>
-            <div class="mono faint small">{{ r.model_name }}</div>
+            <div class="faint small row-what">
+              <span :class="{ mono: !r.exclusive }">{{ what(r) }}</span>
+              <Repeat v-if="r.series_id" :size="12" :title="t('schedule.weekly')" />
+            </div>
             <div v-if="r.note" class="small muted note">{{ r.note }}</div>
-            <NButton size="tiny" secondary :type="r.phase === 'active' ? 'warning' : 'default'" class="end-btn" @click="endReservation(r)">
-              {{ r.phase === 'active' ? t('schedule.release') : t('schedule.cancel') }}
-            </NButton>
+            <div class="actions">
+              <NDropdown v-if="r.phase === 'active'" :options="extendOptions" trigger="click" @select="(m: number) => extend(r, m)">
+                <NButton size="tiny" secondary type="primary">{{ t('schedule.extend') }}</NButton>
+              </NDropdown>
+              <NButton v-else size="tiny" secondary @click="openEdit(r)">{{ t('common.edit') }}</NButton>
+              <NButton size="tiny" secondary :type="r.phase === 'active' ? 'warning' : 'default'" @click="endReservation(r)">
+                {{ r.phase === 'active' ? t('schedule.release') : t('schedule.cancel') }}
+              </NButton>
+            </div>
           </li>
         </ul>
+        <template v-if="waiting.length">
+          <div class="card-header wl-header">
+            <h3 class="card-title"><Hourglass :size="14" /> {{ t('schedule.myWaitlist') }}</h3>
+          </div>
+          <ul class="mine">
+            <li v-for="w in waiting" :key="w.id">
+              <div class="row">
+                <span class="phase" :class="w.status">{{ t(`waitlist.${w.status}`) }}</span>
+                <span class="spacer" />
+                <span class="faint small">{{ w.auto_book ? t('schedule.autoBook') : '' }}</span>
+              </div>
+              <div class="when num">{{ formatRange(w.start_at, w.end_at) }}</div>
+              <div class="faint small">{{ w.exclusive ? t('schedule.kindExclusive') : w.model_name }}</div>
+              <div class="actions">
+                <NButton size="tiny" secondary @click="leaveWaitlist(w)">{{ t('schedule.leaveWaitlist') }}</NButton>
+              </div>
+            </li>
+          </ul>
+        </template>
       </aside>
     </div>
 
-    <BookingModal v-model:show="booking" :start="draftStart" :end="draftEnd" :models="models" :reservations="reservations" @booked="onBooked" />
+    <BookingModal
+      v-model:show="booking"
+      :start="draftStart"
+      :end="draftEnd"
+      :models="models"
+      :reservations="reservations"
+      :editing="editing"
+      @done="onBooked"
+    />
 
     <NModal
       :show="!!detail"
@@ -209,7 +292,7 @@ function endReservation(r: Reservation) {
       <template v-if="detail">
         <dl class="dl">
           <dt>{{ t('schedule.model') }}</dt>
-          <dd class="mono">{{ detail.model_name }}</dd>
+          <dd :class="{ mono: !detail.exclusive }">{{ what(detail) }}</dd>
           <dt>{{ t('schedule.start') }} – {{ t('schedule.end') }}</dt>
           <dd class="num">{{ formatRange(detail.start_at, detail.end_at) }}</dd>
           <dt>{{ t('models.status') }}</dt>
@@ -222,6 +305,10 @@ function endReservation(r: Reservation) {
       </template>
       <template v-if="detail && canManage(detail) && (detail.phase === 'upcoming' || detail.phase === 'active')" #footer>
         <div class="footer">
+          <NDropdown v-if="detail.phase === 'active'" :options="extendOptions" trigger="click" @select="(m: number) => extend(detail!, m)">
+            <NButton secondary type="primary">{{ t('schedule.extend') }}</NButton>
+          </NDropdown>
+          <NButton v-else secondary @click="openEdit(detail)">{{ t('common.edit') }}</NButton>
           <NButton :type="detail.phase === 'active' ? 'warning' : 'error'" secondary @click="endReservation(detail)">
             {{ detail.phase === 'active' ? t('schedule.release') : t('schedule.cancel') }}
           </NButton>
@@ -272,7 +359,7 @@ function endReservation(r: Reservation) {
   background: var(--brand);
 }
 .sw.other {
-  background: #a3a6b8;
+  background: var(--event-accent);
   margin-left: 10px;
 }
 .mine {
@@ -296,7 +383,7 @@ function endReservation(r: Reservation) {
   font-weight: 600;
   padding: 1px 7px;
   border-radius: 5px;
-  background: #f0f0f3;
+  background: var(--neutral-soft);
   color: var(--text-2);
 }
 .phase.active {
@@ -313,9 +400,27 @@ function endReservation(r: Reservation) {
 .note {
   margin-top: 2px;
 }
-.end-btn {
-  justify-self: start;
+.actions {
+  display: flex;
+  gap: 6px;
   margin-top: 8px;
+}
+.row-what {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.wl-header {
+  border-top: 1px solid var(--border);
+}
+.wl-header .card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.phase.notified {
+  background: var(--ok-soft);
+  color: var(--ok-text);
 }
 .dl {
   display: grid;
@@ -333,6 +438,7 @@ function endReservation(r: Reservation) {
 .footer {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
 }
 @media (max-width: 1100px) {
   .layout {

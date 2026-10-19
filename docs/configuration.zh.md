@@ -40,8 +40,18 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_PRELOAD_BUFFER_SECONDS` | `60` | 预加载时额外预留的时间 |
 | `SLOTSERVE_SCHEDULER_INTERVAL_SECONDS` | `5` | 调度器重新评估的间隔 |
 | `SLOTSERVE_DOWNLOAD_MIN_FREE_GB` | `2` | 下载完成后磁盘至少保留的空间 |
+| `SLOTSERVE_PUBLIC_URL` | *空* | 大家访问 SlotServe 的地址，用于日历订阅链接 |
+| `SLOTSERVE_TIMEZONE` | `UTC` | IANA 时区，用于通知和每周配额 |
+| `SLOTSERVE_QUOTA_WEEKLY_HOURS` | `0` | 每人每周可预约小时数（0 不限，管理员不受限） |
+| `SLOTSERVE_QUOTA_UPCOMING` | `0` | 每人可持有的未结束预约数（0 不限） |
+| `SLOTSERVE_REMINDER_MINUTES` | `10` | 开始和结束提醒的提前量（分钟） |
+| `SLOTSERVE_HF_ENDPOINT` | `https://huggingface.co` | Hugging Face 地址或镜像 |
+| `SLOTSERVE_HF_TOKEN` | *空* | 受限或私有仓库所需的 Token |
+| `SLOTSERVE_TELEGRAM_BOT_TOKEN` | *空* | Telegram 机器人 Token，留空则不启用 |
+| `SLOTSERVE_TELEGRAM_PROXY` | *空* | 连接 Telegram 的 `http://` 或 `socks5://` 代理 |
+| `SLOTSERVE_METRICS_TOKEN` | *空* | `/metrics` 的 Bearer Token，留空则关闭 |
 
-其中五项可由管理员在**管理 → 系统设置**中直接修改，无需重启：`REGISTRATION_OPEN`、`INVITE_CODE`、`MAX_RESERVATION_HOURS`、`MAX_ADVANCE_DAYS` 和 `DEFAULT_LLAMA_ARGS`。修改保存在数据库中，优先于 `.env`；点**恢复默认**即可取消覆盖。
+其中大部分可由管理员在**管理 → 系统设置**中直接修改，无需重启：注册、邀请码、预约限制与配额、默认启动参数、时区、访问地址、Hugging Face、Telegram 和监控设置。修改保存在数据库中，优先于 `.env`；点**恢复默认**即可取消覆盖。
 
 ## 每个模型的启动参数
 

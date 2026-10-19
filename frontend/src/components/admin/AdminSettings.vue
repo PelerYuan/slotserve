@@ -48,14 +48,38 @@ async function save(payload: Record<string, SettingValue | null>) {
   }
 }
 
+const GROUPS: { id: string; keys: string[] }[] = [
+  { id: 'access', keys: ['registration_open', 'invite_code'] },
+  { id: 'booking', keys: ['max_reservation_hours', 'max_advance_days', 'quota_weekly_hours', 'quota_upcoming'] },
+  { id: 'models', keys: ['default_llama_args', 'hf_endpoint', 'hf_token'] },
+  { id: 'notify', keys: ['telegram_bot_token', 'telegram_proxy', 'public_url', 'timezone'] },
+  { id: 'monitor', keys: ['metrics_token'] },
+]
+const groups = computed(() =>
+  GROUPS.map((g) => ({
+    id: g.id,
+    items: g.keys.map((k) => settings.value.find((s) => s.key === k)).filter((s): s is AdminSetting => !!s),
+  })).filter((g) => g.items.length),
+)
+const minFor = (key: string) => (key.startsWith('quota_') ? 0 : 1)
+
 const display = (s: AdminSetting, v: SettingValue) =>
-  typeof v === 'boolean' ? (v ? t('admin.settings.on') : t('admin.settings.off')) : s.secret ? '••••••' : v === '' ? '""' : String(v)
+  typeof v === 'boolean'
+    ? v
+      ? t('admin.settings.on')
+      : t('admin.settings.off')
+    : v === ''
+      ? t('admin.settings.notSet')
+      : s.secret
+        ? '••••••'
+        : String(v)
 </script>
 
 <template>
   <p class="muted intro">{{ t('admin.settings.intro') }}</p>
-  <section class="card">
-    <div v-for="s in settings" :key="s.key" class="item">
+  <section v-for="g in groups" :key="g.id" class="card group">
+    <div class="group-title">{{ t(`admin.settings.groups.${g.id}`) }}</div>
+    <div v-for="s in g.items" :key="s.key" class="item">
       <div class="text">
         <div class="title">
           {{ t(`admin.settings.${s.key}`) }}
@@ -72,7 +96,7 @@ const display = (s: AdminSetting, v: SettingValue) =>
         <NInputNumber
           v-else-if="typeof s.value === 'number'"
           v-model:value="draft[s.key] as number"
-          :min="1"
+          :min="minFor(s.key)"
           :precision="0"
           class="num-input"
         />
@@ -85,11 +109,12 @@ const display = (s: AdminSetting, v: SettingValue) =>
         <NInput v-else v-model:value="draft[s.key] as string" class="mono-input" />
       </div>
     </div>
-    <div class="actions">
-      <NButton :disabled="!dirty" @click="adopt(settings)">{{ t('common.cancel') }}</NButton>
-      <NButton type="primary" :disabled="!dirty" :loading="busy" @click="save(changes)">{{ t('common.save') }}</NButton>
-    </div>
   </section>
+  <div class="actions sticky" :class="{ dirty }">
+    <span class="faint small">{{ dirty ? t('admin.settings.unsaved') : '' }}</span>
+    <NButton :disabled="!dirty" @click="adopt(settings)">{{ t('common.cancel') }}</NButton>
+    <NButton type="primary" :disabled="!dirty" :loading="busy" @click="save(changes)">{{ t('common.save') }}</NButton>
+  </div>
 </template>
 
 <style scoped>
@@ -131,12 +156,37 @@ const display = (s: AdminSetting, v: SettingValue) =>
   font-family: var(--mono);
   font-size: 12.5px;
 }
+.group {
+  margin-bottom: 16px;
+}
+.group-title {
+  padding: 12px 20px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--border);
+}
+.group .item:last-child {
+  border-bottom: none;
+}
 .actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 8px;
-  padding: 14px 20px;
-  background: var(--surface-muted);
+  padding: 12px 0;
+}
+.actions .small {
+  margin-right: auto;
+  font-size: 12.5px;
+}
+.sticky {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(to top, var(--bg) 70%, transparent);
 }
 @media (max-width: 760px) {
   .item {

@@ -3,6 +3,7 @@ export interface User {
   username: string
   is_admin: boolean
   created_at: string
+  locale?: string | null
 }
 
 export interface ApiKey {
@@ -33,6 +34,13 @@ export interface Model {
   created_by: number | null
   created_by_name: string | null
   created_at: string
+  presets: Preset[]
+}
+
+export interface Preset {
+  id: number
+  name: string
+  args: string
 }
 
 export interface DownloadTask {
@@ -57,8 +65,12 @@ export interface Reservation {
   id: number
   user_id: number
   username: string
-  model_id: number
-  model_name: string
+  model_id: number | null
+  model_name: string | null
+  preset_id: number | null
+  preset_name: string | null
+  exclusive: boolean
+  series_id: string | null
   start_at: string
   end_at: string
   status: 'booked' | 'cancelled'
@@ -74,6 +86,7 @@ export interface Runtime {
   state: RuntimeState
   model_id: number | null
   model_name: string | null
+  preset_name: string | null
   load_started_at: string | null
   ready_at: string | null
   est_load_seconds: number | null
@@ -90,9 +103,19 @@ export interface Gpu {
   power_w: number | null
 }
 
+export interface ManualOverride {
+  model_name: string | null
+  preset_name: string | null
+  until: string | null
+  by: string
+}
+
 export interface Status {
   now: string
   runtime: Runtime
+  reason: string | null
+  fallback_from: string | null
+  manual: ManualOverride | null
   active_reservation: Reservation | null
   upcoming: Reservation[]
   free_access: boolean
@@ -105,6 +128,9 @@ export interface AppConfig {
   max_reservation_hours: number
   max_advance_days: number
   registration_open: boolean
+  quota_weekly_hours: number
+  quota_upcoming: number
+  telegram_enabled: boolean
   version: string
 }
 
@@ -178,4 +204,71 @@ export interface AuditEntry {
   target: string
   detail: Record<string, unknown>
   created_at: string
+}
+
+export interface RequestLog {
+  id: number
+  created_at: string
+  username: string
+  key_name: string | null
+  model_name: string
+  endpoint: string
+  stream: boolean
+  status_code: number
+  duration_ms: number
+  prompt_tokens: number
+  completion_tokens: number
+}
+
+// ---- booking extras -------------------------------------------------------
+
+export interface BookingInput {
+  model_id: number | null
+  preset_id?: number | null
+  start_at: string
+  end_at: string
+  note?: string
+  repeat_weeks?: number
+  user_id?: number | null
+}
+
+export interface WaitlistEntry {
+  id: number
+  user_id: number
+  username: string
+  model_id: number | null
+  model_name: string | null
+  preset_name: string | null
+  exclusive: boolean
+  start_at: string
+  end_at: string
+  note: string
+  auto_book: boolean
+  status: 'waiting' | 'notified' | 'booked' | 'expired' | 'cancelled'
+  reservation_id: number | null
+  created_at: string
+}
+
+export type NotifyPrefs = Record<string, boolean>
+
+export interface TelegramInfo {
+  enabled: boolean
+  bot_username: string | null
+  linked: boolean
+  telegram_username: string | null
+  link_url: string | null
+  notify_prefs: NotifyPrefs
+}
+
+export interface CalendarLinks {
+  mine_url: string
+  all_url: string
+}
+
+export interface HfFile {
+  path: string
+  files: string[]
+  size_bytes: number
+  parts: number
+  kind: 'model' | 'mmproj'
 }
