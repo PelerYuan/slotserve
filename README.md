@@ -76,7 +76,7 @@ print(reply.choices[0].message.content)
 ```
 
 > [!NOTE]
-> On Volta GPUs (V100), build llama.cpp with CUDA 12.x. CUDA 13 dropped `sm_70`. Keep the image's `CUDA_IMAGE` on 12.x too.
+> Keep the CUDA major version of `CUDA_IMAGE` equal to the one your `llama-server` was built with.
 
 ## How it works
 

@@ -9,15 +9,15 @@ SlotServe 以一个 Docker 镜像发布，**不内置** llama.cpp：你把已经
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 - 启用 CUDA 编译的 llama.cpp（`llama-server`）
 
-!!! warning "Volta（V100）与 CUDA 13"
-    CUDA 13 已不再支持 Volta（`sm_70`）。V100 上请用 CUDA 12.x 编译 llama.cpp，并让 SlotServe 的 `CUDA_IMAGE` 也保持 12.x。
+!!! tip "CUDA 版本保持一致"
+    SlotServe 的 `CUDA_IMAGE` 的 CUDA 主版本必须与编译 `llama-server` 时使用的一致，并且该 CUDA 版本要支持你的 GPU。见[配置参考](configuration.md)。
 
 ## 1. 编译 llama.cpp（已有可跳过）
 
 ```bash
 git clone https://github.com/ggml-org/llama.cpp
 cd llama.cpp
-cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=70   # 70 = V100，按你的 GPU 修改
+cmake -B build -DGGML_CUDA=ON
 cmake --build build --config Release -j --target llama-server
 ls build/bin/llama-server
 ```

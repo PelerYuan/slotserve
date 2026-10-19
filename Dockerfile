@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1
 
 # CUDA major version must match the one your llama.cpp was built with.
-# Volta GPUs (V100, sm_70) need CUDA 12.x - CUDA 13 dropped them.
 ARG CUDA_IMAGE=nvidia/cuda:12.8.1-runtime-ubuntu24.04
 
 # ---- frontend ---------------------------------------------------------------

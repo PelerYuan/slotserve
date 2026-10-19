@@ -76,7 +76,7 @@ print(reply.choices[0].message.content)
 ```
 
 > [!NOTE]
-> Volta 架构（V100）请用 CUDA 12.x 编译 llama.cpp，因为 CUDA 13 已不再支持 `sm_70`。镜像的 `CUDA_IMAGE` 也要保持 12.x。
+> `CUDA_IMAGE` 的 CUDA 主版本需与编译 `llama-server` 时使用的保持一致。
 
 ## 工作原理
 

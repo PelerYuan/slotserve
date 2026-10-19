@@ -29,7 +29,7 @@ body:
     attributes:
       label: Environment / 环境
       description: GPU, driver and CUDA version, llama.cpp commit, OS, Docker or bare metal
-      placeholder: V100 32GB, driver 550, CUDA 12.4, llama.cpp b6800, Ubuntu 22.04, Docker
+      placeholder: GPU model and memory, driver, CUDA version, llama.cpp build, OS, Docker or bare metal
   - type: textarea
     id: logs
     attributes:
