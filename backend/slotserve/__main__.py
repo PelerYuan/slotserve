@@ -1,8 +1,8 @@
 """Command line entry point.
 
-    slotserve                         run the server (same as `slotserve serve`)
-    slotserve reset-password <user>   set a new password (prompted)
-    slotserve set-admin <user>        grant admin rights (--revoke to remove)
+slotserve                         run the server (same as `slotserve serve`)
+slotserve reset-password <user>   set a new password (prompted)
+slotserve set-admin <user>        grant admin rights (--revoke to remove)
 """
 
 import argparse

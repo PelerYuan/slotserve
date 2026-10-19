@@ -46,11 +46,15 @@ async def metrics(request: Request):
     w = _Writer()
     snap = request.app.state.runtime.snapshot()
     w.metric(
-        "slotserve_runtime_state", "gauge", "1 for the current llama-server state.",
+        "slotserve_runtime_state",
+        "gauge",
+        "1 for the current llama-server state.",
         [({"state": s.value}, 1 if snap.state == s else 0) for s in RuntimeState],
     )
     w.metric(
-        "slotserve_runtime_model_info", "gauge", "The loaded model (value is always 1).",
+        "slotserve_runtime_model_info",
+        "gauge",
+        "The loaded model (value is always 1).",
         [({"model": snap.model_name, "preset": snap.preset_name or "default"}, 1)] if snap.model_name else [],
     )
 
@@ -59,7 +63,9 @@ async def metrics(request: Request):
         active = await queries.active_reservation(db, now)
         users = dict((await db.execute(select(User.id, User.username))).all())
         w.metric(
-            "slotserve_reservation_active", "gauge", "1 while a booking is running.",
+            "slotserve_reservation_active",
+            "gauge",
+            "1 while a booking is running.",
             [({"user": users.get(active.user_id, "?") if active else ""}, 1 if active else 0)],
         )
         upcoming = (
@@ -117,12 +123,15 @@ async def metrics(request: Request):
             )
         ).all()
         w.metric(
-            "slotserve_model_loads_total", "counter", "Model load attempts.",
+            "slotserve_model_loads_total",
+            "counter",
+            "Model load attempts.",
             [({"model": m, "result": "success" if ok else "failure"}, n) for m, ok, n in loads],
         )
         models = (await db.execute(select(LlmModel).where(LlmModel.deleted_at.is_(None)))).scalars().all()
-        estimates = [({"model": m.name}, round(await queries.estimate_load_seconds(db, m, get_settings()), 1))
-                     for m in models]
+        estimates = [
+            ({"model": m.name}, round(await queries.estimate_load_seconds(db, m, get_settings()), 1)) for m in models
+        ]
         w.metric("slotserve_model_load_seconds", "gauge", "Expected load time per model.", estimates)
         queued = (
             await db.execute(select(func.count(DownloadTask.id)).where(DownloadTask.status.in_(("queued", "running"))))

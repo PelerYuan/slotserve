@@ -36,7 +36,17 @@ async def list_models(
     db: AsyncSession = Depends(get_db),
     runtime: LlamaRuntime = Depends(get_runtime),
 ):
-    models = (await db.execute(select(LlmModel).where(LlmModel.deleted_at.is_(None)).order_by(LlmModel.is_default.desc(), LlmModel.name))).scalars().all()
+    models = (
+        (
+            await db.execute(
+                select(LlmModel)
+                .where(LlmModel.deleted_at.is_(None))
+                .order_by(LlmModel.is_default.desc(), LlmModel.name)
+            )
+        )
+        .scalars()
+        .all()
+    )
     return await queries.model_out(db, list(models), get_settings(), runtime.model_id)
 
 

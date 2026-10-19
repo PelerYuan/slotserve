@@ -310,8 +310,7 @@ class LlamaRuntime:
         log.info("model %s ready after %.1fs", self.model_name, (self.ready_at - started).total_seconds())
         await self._record_event(model_id, started, True, None)
 
-        while proc.poll() is None:
-            await asyncio.sleep(2.0)
+        await asyncio.to_thread(proc.wait)
         if self._proc is proc:
             self._mark_failed(f"llama-server exited unexpectedly with code {proc.returncode}")
 
@@ -321,7 +320,7 @@ class LlamaRuntime:
                 self._log_file.flush()
         lines = self.tail_log(200)
         starts = [i for i, line in enumerate(lines) if line.startswith("===== ") and " start: " in line]
-        current = lines[starts[-1]:] if starts else lines  # only this launch's output
+        current = lines[starts[-1] :] if starts else lines  # only this launch's output
         if any(OOM_RE.search(line) for line in current):
             self.error_hint = "oom"
             message += " (GPU out of memory: offload fewer layers with -ngl, or lower the context size -c)"
@@ -344,7 +343,7 @@ class LlamaRuntime:
                     )
                 )
                 await db.commit()
-        except Exception:  # noqa: BLE001 - bookkeeping must never break the runtime
+        except Exception:
             log.exception("failed to record load event")
 
     def _terminate(self, proc: subprocess.Popen) -> None:

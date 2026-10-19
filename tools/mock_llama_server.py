@@ -30,7 +30,11 @@ oom_requested = "--mock-oom" in unknown
 if args.mock_fail:
     sys.exit("mock: simulated load failure")
 if oom_requested:
-    print("ggml_backend_cuda_buffer_type_alloc_buffer: allocating 20480.00 MiB on device 0: cudaMalloc failed: out of memory", file=sys.stderr)
+    print(
+        "ggml_backend_cuda_buffer_type_alloc_buffer: allocating 20480.00 MiB on device 0: "
+        "cudaMalloc failed: out of memory",
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 ALIAS = args.alias or os.path.basename(args.model)
@@ -118,10 +122,15 @@ async def _complete(body: dict, prompt: str, chat: bool):
             chunk = {"id": rid, "object": obj + ".chunk", "created": created, "model": ALIAS, "choices": [choice]}
             yield f"data: {json.dumps(chunk)}\n\n"
             await asyncio.sleep(TOKEN_DELAY)
-        final = {"index": 0, "delta": {}, "finish_reason": "stop"} if chat else {"index": 0, "text": "", "finish_reason": "stop"}
-        yield f"data: {json.dumps({'id': rid, 'object': obj + '.chunk', 'created': created, 'model': ALIAS, 'choices': [final]})}\n\n"
+        final = (
+            {"index": 0, "delta": {}, "finish_reason": "stop"}
+            if chat
+            else {"index": 0, "text": "", "finish_reason": "stop"}
+        )
+        head = {"id": rid, "object": obj + ".chunk", "created": created, "model": ALIAS}
+        yield f"data: {json.dumps({**head, 'choices': [final]})}\n\n"
         if include_usage:
-            yield f"data: {json.dumps({'id': rid, 'object': obj + '.chunk', 'created': created, 'model': ALIAS, 'choices': [], 'usage': usage})}\n\n"
+            yield f"data: {json.dumps({**head, 'choices': [], 'usage': usage})}\n\n"
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(events(), media_type="text/event-stream")

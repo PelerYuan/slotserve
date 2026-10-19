@@ -48,18 +48,24 @@ async def get_status(
         model = await db.get(LlmModel, m.model_id) if m.model_id else None
         preset = await db.get(ModelPreset, m.preset_id) if m.preset_id else None
         manual = ManualOut(
-            model_name=model.name if model else None, preset_name=preset.name if preset else None, until=m.until,
+            model_name=model.name if model else None,
+            preset_name=preset.name if preset else None,
+            until=m.until,
             by=m.by,
         )
     active = await queries.active_reservation(db, now)
     upcoming = (
-        await db.execute(
-            select(Reservation)
-            .where(Reservation.status == "booked", Reservation.start_at > now)
-            .order_by(Reservation.start_at)
-            .limit(5)
+        (
+            await db.execute(
+                select(Reservation)
+                .where(Reservation.status == "booked", Reservation.start_at > now)
+                .order_by(Reservation.start_at)
+                .limit(5)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     default = await queries.default_model(db)
     active_out = (await queries.reservation_out(db, [active], now))[0] if active else None
     return StatusOut(

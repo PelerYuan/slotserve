@@ -1,6 +1,6 @@
 import sqlite3
 from collections.abc import AsyncIterator, Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import DateTime, event
@@ -24,16 +24,16 @@ class UTCDateTime(TypeDecorator):
             return None
         if value.tzinfo is None:
             raise ValueError("naive datetime is not allowed")
-        return value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value.astimezone(UTC).replace(tzinfo=None)
 
     def process_result_value(self, value: datetime | None, dialect):
         if value is None:
             return None
-        return value.replace(tzinfo=timezone.utc)
+        return value.replace(tzinfo=UTC)
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 _engine: AsyncEngine | None = None
@@ -112,7 +112,7 @@ def prepare(db_path: Path, backup_dir: Path) -> int | None:
         if not has_schema or version >= SCHEMA_VERSION:
             return None
         backup_dir.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         target = sqlite3.connect(backup_dir / f"slotserve-v{version}-{stamp}.db")
         with target:
             con.backup(target)

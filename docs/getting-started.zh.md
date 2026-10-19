@@ -60,6 +60,10 @@ docker compose up -d --build
 docker compose logs -f
 ```
 
+!!! tip "预构建镜像"
+    也可以不自己构建，直接使用发布的镜像：`docker compose pull && docker compose up -d`。镜像自带 CUDA 12.8 运行库，兼容用任意 CUDA 12.x 编译的 llama.cpp。如需固定版本，在 `.env` 中设置 `SLOTSERVE_IMAGE=ghcr.io/peleryuan/slotserve:0.5.0`。
+
+
 浏览器打开 `http://<服务器>:8000`。
 
 ## 4. 网页上的第一步

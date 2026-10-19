@@ -38,15 +38,18 @@ See [docs/development.md](docs/development.md) for running the backend against t
 3. Add or update tests for backend behaviour (`backend/tests`).
 4. Make sure these pass:
    ```bash
+   ruff check . && ruff format --check .
    (cd backend && pytest)
-   (cd frontend && npm run build)
+   (cd frontend && npm run typecheck && npm run build)
+   pytest e2e        # end-to-end, needs the built frontend and `playwright install chromium`
    ```
+   CI runs the same checks on every pull request. `pre-commit install` runs ruff before each commit.
 5. User-facing text needs both languages: `frontend/src/i18n/en.ts` and `zh-CN.ts`. Docs pages have an English `*.md` and a Chinese `*.zh.md` version.
 6. Update `CHANGELOG.md` under **Unreleased**.
 
 ## Style
 
-- Python: type hints, small functions, standard library first. Follow the surrounding code.
+- Python: formatted and linted with ruff (`ruff.toml`), type hints, small functions, standard library first.
 - Vue: `<script setup lang="ts">`, Composition API, Naive UI components, colours from the CSS variables in `src/styles/main.css`.
 - Commit messages: short imperative summary (`Add download retry button`), with details in the body if needed.
 

@@ -4,9 +4,9 @@ import asyncio
 import sqlite3
 from datetime import timedelta
 
-from conftest import make_gguf, wait_for_state
 from sqlalchemy import select, update
 
+from conftest import make_gguf, wait_for_state
 from slotserve.db import SessionLocal, utcnow
 from slotserve.orm import OutboxItem, UsageDaily, UsageLog, User
 from slotserve.runtime.scheduler import Scheduler
@@ -40,7 +40,9 @@ async def test_switch_waits_for_running_requests(monkeypatch, app, make_client, 
     async def stream():
         chunks = []
         async with bob.stream(
-            "POST", "/v1/chat/completions", headers=key,
+            "POST",
+            "/v1/chat/completions",
+            headers=key,
             json={"messages": [{"role": "user", "content": "a " * 80}], "stream": True},
         ) as resp:
             async for chunk in resp.aiter_text():
@@ -52,9 +54,14 @@ async def test_switch_waits_for_running_requests(monkeypatch, app, make_client, 
     assert app.state.runtime.inflight == 1
 
     now = utcnow()
-    r = await admin.post("/api/reservations", json={
-        "model_id": models["large"], "start_at": now.isoformat(), "end_at": (now + timedelta(hours=1)).isoformat(),
-    })
+    r = await admin.post(
+        "/api/reservations",
+        json={
+            "model_id": models["large"],
+            "start_at": now.isoformat(),
+            "end_at": (now + timedelta(hours=1)).isoformat(),
+        },
+    )
     assert r.status_code == 201
     deadline = asyncio.get_running_loop().time() + 5
     while not app.state.runtime.draining and asyncio.get_running_loop().time() < deadline:
@@ -63,7 +70,9 @@ async def test_switch_waits_for_running_requests(monkeypatch, app, make_client, 
 
     # admin owns the booking: new requests wait for the switch instead of hitting the old model
     admin_key = await _key(admin)
-    r = await admin.post("/v1/chat/completions", headers=admin_key, json={"messages": [{"role": "user", "content": "x"}]})
+    r = await admin.post(
+        "/v1/chat/completions", headers=admin_key, json={"messages": [{"role": "user", "content": "x"}]}
+    )
     assert r.status_code == 503
 
     body = await task
@@ -73,11 +82,13 @@ async def test_switch_waits_for_running_requests(monkeypatch, app, make_client, 
 
 
 async def test_oom_failure_is_explained(make_client, models_dir, app):
-    admin, bob, models = await _setup(make_client, models_dir)
+    admin, _bob, models = await _setup(make_client, models_dir)
     await wait_for_state(admin, "ready", "small")
     await admin.post("/api/models/scan")
     p = (await admin.post(f"/api/models/{models['large']}/presets", json={"name": "huge", "args": "--mock-oom"})).json()
-    await admin.post("/api/admin/runtime/manual", json={"action": "load", "model_id": models["large"], "preset_id": p["id"]})
+    await admin.post(
+        "/api/admin/runtime/manual", json={"action": "load", "model_id": models["large"], "preset_id": p["id"]}
+    )
     deadline = asyncio.get_running_loop().time() + 15
     events = []
     while asyncio.get_running_loop().time() < deadline:
@@ -90,10 +101,12 @@ async def test_oom_failure_is_explained(make_client, models_dir, app):
 
 async def test_vram_warning(monkeypatch, make_client, models_dir):
     async def tiny_gpu():
-        return [GpuOut(index=0, name="Test GPU", memory_used_mb=0, memory_total_mb=2, utilization_pct=0, temperature_c=30)]
+        return [
+            GpuOut(index=0, name="Test GPU", memory_used_mb=0, memory_total_mb=2, utilization_pct=0, temperature_c=30)
+        ]
 
     monkeypatch.setattr("slotserve.runtime.gpu.gpu_stats", tiny_gpu)
-    admin, bob, models = await _setup(make_client, models_dir)
+    admin, _bob, _models = await _setup(make_client, models_dir)
     flags = {m["name"]: m["exceeds_vram"] for m in (await admin.get("/api/models")).json()}
     assert flags == {"small": False, "large": True}
 
@@ -113,7 +126,7 @@ async def test_login_throttling(make_client):
 
 
 async def test_manual_override_survives_restart(app, make_client, models_dir):
-    admin, bob, models = await _setup(make_client, models_dir)
+    admin, _bob, models = await _setup(make_client, models_dir)
     await admin.post("/api/admin/runtime/manual", json={"action": "load", "model_id": models["large"], "hours": 2})
     fresh = Scheduler(app.state.runtime, app.state.settings)
     await fresh.restore_manual()
@@ -126,7 +139,7 @@ async def test_manual_override_survives_restart(app, make_client, models_dir):
 
 async def test_outbox_retries_and_restores(app, make_client, models_dir):
     tg = app.state.fake_telegram
-    admin, bob, models = await _setup(make_client, models_dir)
+    admin, _bob, _models = await _setup(make_client, models_dir)
     await admin.put("/api/admin/settings", json={"telegram_bot_token": "1:x"})
     deadline = asyncio.get_running_loop().time() + 10
     while app.state.telegram.username is None and asyncio.get_running_loop().time() < deadline:
@@ -183,11 +196,30 @@ async def test_retention_rolls_up_old_usage(app, make_client):
     old = utcnow() - timedelta(days=100)
     async with SessionLocal() as db:
         for i in range(3):
-            db.add(UsageLog(user_id=uid, model_name="m1", endpoint="chat/completions", prompt_tokens=10,
-                            completion_tokens=5, duration_ms=100, status_code=500 if i == 0 else 200,
-                            created_at=old))
-        db.add(UsageLog(user_id=uid, model_name="m1", endpoint="chat/completions", prompt_tokens=1,
-                        completion_tokens=1, duration_ms=1, status_code=200, created_at=utcnow()))
+            db.add(
+                UsageLog(
+                    user_id=uid,
+                    model_name="m1",
+                    endpoint="chat/completions",
+                    prompt_tokens=10,
+                    completion_tokens=5,
+                    duration_ms=100,
+                    status_code=500 if i == 0 else 200,
+                    created_at=old,
+                )
+            )
+        db.add(
+            UsageLog(
+                user_id=uid,
+                model_name="m1",
+                endpoint="chat/completions",
+                prompt_tokens=1,
+                completion_tokens=1,
+                duration_ms=1,
+                status_code=200,
+                created_at=utcnow(),
+            )
+        )
         await db.commit()
         stats = await maintenance.apply_retention(db, app.state.settings, utcnow())
     assert stats["usage_rows"] == 3

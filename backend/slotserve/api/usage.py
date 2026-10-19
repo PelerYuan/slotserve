@@ -53,7 +53,11 @@ async def usage(
 
     users = {
         uid: UsageUserRow(
-            user_id=uid, username=names.get(uid, "?"), requests=n, prompt_tokens=p, completion_tokens=c,
+            user_id=uid,
+            username=names.get(uid, "?"),
+            requests=n,
+            prompt_tokens=p,
+            completion_tokens=c,
             reserved_hours=0.0,
         )
         for uid, n, p, c in per_user
@@ -62,7 +66,11 @@ async def usage(
         row = users.setdefault(
             uid,
             UsageUserRow(
-                user_id=uid, username=names.get(uid, "?"), requests=0, prompt_tokens=0, completion_tokens=0,
+                user_id=uid,
+                username=names.get(uid, "?"),
+                requests=0,
+                prompt_tokens=0,
+                completion_tokens=0,
                 reserved_hours=0.0,
             ),
         )
@@ -103,9 +111,7 @@ async def usage(
             UsageModelRow(model_name=m or "?", requests=n, prompt_tokens=p, completion_tokens=c)
             for m, n, p, c in sorted(per_model, key=lambda r: r[1], reverse=True)
         ],
-        daily=[
-            UsageDayRow(date=d, username=names.get(uid, "?"), requests=n, tokens=t) for d, uid, n, t in per_day
-        ],
+        daily=[UsageDayRow(date=d, username=names.get(uid, "?"), requests=n, tokens=t) for d, uid, n, t in per_day],
     )
 
 
@@ -124,22 +130,46 @@ async def export_usage(
     writer = csv.writer(buf)
     if kind == "requests":
         keys = dict((await db.execute(select(ApiKey.id, ApiKey.name))).all())
-        writer.writerow(["time", "user", "api_key", "model", "endpoint", "stream", "status", "prompt_tokens",
-                         "completion_tokens", "duration_ms"])
+        writer.writerow(
+            [
+                "time",
+                "user",
+                "api_key",
+                "model",
+                "endpoint",
+                "stream",
+                "status",
+                "prompt_tokens",
+                "completion_tokens",
+                "duration_ms",
+            ]
+        )
         tz = timezone(timedelta(minutes=tz_offset))
         rows = await db.execute(select(UsageLog).where(UsageLog.created_at >= since).order_by(UsageLog.created_at))
         for u in rows.scalars():
-            writer.writerow([
-                u.created_at.astimezone(tz).strftime("%Y-%m-%d %H:%M:%S"), names.get(u.user_id, "?"),
-                keys.get(u.api_key_id, ""), u.model_name, u.endpoint, int(u.stream), u.status_code,
-                u.prompt_tokens, u.completion_tokens, u.duration_ms,
-            ])
+            writer.writerow(
+                [
+                    u.created_at.astimezone(tz).strftime("%Y-%m-%d %H:%M:%S"),
+                    names.get(u.user_id, "?"),
+                    keys.get(u.api_key_id, ""),
+                    u.model_name,
+                    u.endpoint,
+                    int(u.stream),
+                    u.status_code,
+                    u.prompt_tokens,
+                    u.completion_tokens,
+                    u.duration_ms,
+                ]
+            )
     else:
         day = func.strftime("%Y-%m-%d", UsageLog.created_at, f"{tz_offset:+d} minutes")
         writer.writerow(["date", "user", "model", "requests", "prompt_tokens", "completion_tokens"])
         rows = await db.execute(
             select(
-                day, UsageLog.user_id, UsageLog.model_name, func.count(UsageLog.id),
+                day,
+                UsageLog.user_id,
+                UsageLog.model_name,
+                func.count(UsageLog.id),
                 func.coalesce(func.sum(UsageLog.prompt_tokens), 0),
                 func.coalesce(func.sum(UsageLog.completion_tokens), 0),
             )
@@ -151,9 +181,7 @@ async def export_usage(
         # Days older than the retention period only exist as UTC roll-ups.
         first_raw = min((r[0] for r in summary), default="9999-99-99")
         archived = await db.execute(
-            select(UsageDaily).where(
-                UsageDaily.date >= since.strftime("%Y-%m-%d"), UsageDaily.date < first_raw
-            )
+            select(UsageDaily).where(UsageDaily.date >= since.strftime("%Y-%m-%d"), UsageDaily.date < first_raw)
         )
         summary += [
             (a.date, a.user_id, a.model_name, a.requests, a.prompt_tokens, a.completion_tokens)

@@ -51,9 +51,7 @@ async def unique_name(db: AsyncSession, base: str) -> str:
     return f"{base}-{i}"
 
 
-async def register_file(
-    db: AsyncSession, path: Path, settings: Settings, created_by: int | None
-) -> LlmModel | None:
+async def register_file(db: AsyncSession, path: Path, settings: Settings, created_by: int | None) -> LlmModel | None:
     resolved = str(path.resolve())
     found = await db.execute(select(LlmModel.id).where(LlmModel.file_path == resolved, LlmModel.deleted_at.is_(None)))
     if found.first() is not None:

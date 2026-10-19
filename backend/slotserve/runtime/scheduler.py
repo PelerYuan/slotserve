@@ -28,7 +28,8 @@ class Target:
     model: LlmModel | None
     preset: ModelPreset | None
     est_load_seconds: float
-    reason: str  # reservation | exclusive | preload | preload-early | preload-exclusive | manual | fallback | default | idle
+    # reservation | exclusive | preload | preload-early | preload-exclusive | manual | fallback | default | idle
+    reason: str
     reservation: Reservation | None = None
     fallback_from: str | None = None
 
@@ -236,7 +237,7 @@ class Scheduler:
                 await self.tick()
             except asyncio.CancelledError:
                 raise
-            except Exception:  # noqa: BLE001 - keep the loop alive
+            except Exception:
                 log.exception("scheduler tick failed")
             try:
                 await asyncio.wait_for(self._wake.wait(), self.settings.scheduler_interval_seconds)

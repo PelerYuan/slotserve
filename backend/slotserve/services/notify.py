@@ -140,7 +140,7 @@ class Notifier:
                 await self.dispatch(event, data)
             except asyncio.CancelledError:
                 raise
-            except Exception:  # noqa: BLE001
+            except Exception:
                 log.exception("failed to deliver %s", event)
 
     # ---- formatting ---------------------------------------------------------
@@ -244,13 +244,17 @@ class Notifier:
         if self.bot is None or not self.bot.enabled:
             return
         due = (
-            await db.execute(
-                select(OutboxItem)
-                .where(OutboxItem.kind == "message", OutboxItem.next_attempt_at <= utcnow())
-                .order_by(OutboxItem.id)
-                .limit(20)
+            (
+                await db.execute(
+                    select(OutboxItem)
+                    .where(OutboxItem.kind == "message", OutboxItem.next_attempt_at <= utcnow())
+                    .order_by(OutboxItem.id)
+                    .limit(20)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         for item in due:
             data = json.loads(item.payload)
             buttons = [[tuple(b) for b in row] for row in data["buttons"]] if data.get("buttons") else None

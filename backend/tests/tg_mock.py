@@ -54,9 +54,7 @@ class FakeTelegram:
         )
 
     def button(self, chat_id: int, data: str) -> None:
-        self._push(
-            {"callback_query": {"id": str(self._next_id), "data": data, "message": {"chat": {"id": chat_id}}}}
-        )
+        self._push({"callback_query": {"id": str(self._next_id), "data": data, "message": {"chat": {"id": chat_id}}}})
 
     def texts(self, chat_id: int) -> list[str]:
         return [m["text"] for m in self.sent if m["chat_id"] == chat_id]

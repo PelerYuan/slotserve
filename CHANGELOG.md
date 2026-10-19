@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-20
+
+### Added
+
+- Continuous integration: lint, backend tests on Python 3.12 and 3.13, frontend typecheck and build, Playwright end-to-end tests, strict docs build and a Docker image build with a health check.
+- Release workflow: tags publish `ghcr.io/peleryuan/slotserve` and create the GitHub release from this changelog.
+- Docs deploy automatically; CodeQL scanning; Dependabot updates.
+- `docker-compose.yml` can use the prebuilt image (`docker compose pull`).
+- ruff configuration, pre-commit hooks and CODEOWNERS.
+
+### Changed
+
+- Python 3.12 or newer is required.
+
 ## [0.4.0] - 2026-10-20
 
 ### Added
@@ -77,7 +91,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - Admin CLI: `slotserve reset-password`, `slotserve set-admin`.
 - Bilingual documentation site (MkDocs Material).
 
-[Unreleased]: https://github.com/PelerYuan/slotserve/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/PelerYuan/slotserve/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/PelerYuan/slotserve/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/PelerYuan/slotserve/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/PelerYuan/slotserve/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/PelerYuan/slotserve/compare/v0.1.0...v0.2.0

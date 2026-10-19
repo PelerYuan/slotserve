@@ -1,8 +1,7 @@
 from datetime import timedelta
 
-from slotserve.db import utcnow
-
 from conftest import INVITE, make_gguf
+from slotserve.db import utcnow
 
 
 async def _admin_and_user(make_client):

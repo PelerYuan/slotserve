@@ -69,5 +69,3 @@ async def telegram_test(request: Request, user: User = Depends(current_user)):
         raise ApiError(status.HTTP_409_CONFLICT, "telegram_not_linked")
     message = "✅ SlotServe → Telegram OK" if not (user.locale or "").startswith("zh") else "✅ SlotServe 通知测试成功"
     await request.app.state.telegram.send(user.telegram_chat_id, message)
-
-

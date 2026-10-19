@@ -37,7 +37,9 @@ async def test_password_change(make_client):
     r = await c.put("/api/auth/password", json={"old_password": "secret123", "new_password": "another123"})
     assert r.status_code == 204
     fresh = await make_client()
-    assert (await fresh.post("/api/auth/login", json={"username": "alice", "password": "another123"})).status_code == 200
+    assert (
+        await fresh.post("/api/auth/login", json={"username": "alice", "password": "another123"})
+    ).status_code == 200
 
 
 async def test_api_key_lifecycle(make_client):

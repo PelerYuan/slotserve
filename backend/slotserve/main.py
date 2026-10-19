@@ -10,7 +10,20 @@ from fastapi.responses import FileResponse, JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import __version__, db
-from .api import admin, auth, calendar, downloads, keys, metrics, models, notifications, reservations, status, usage, waitlist
+from .api import (
+    admin,
+    auth,
+    calendar,
+    downloads,
+    keys,
+    metrics,
+    models,
+    notifications,
+    reservations,
+    status,
+    usage,
+    waitlist,
+)
 from .config import Settings, get_settings
 from .gateway import proxy
 from .runtime.manager import LlamaRuntime
@@ -83,8 +96,14 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
             await app.state.http.aclose()
             await db.dispose()
 
-    app = FastAPI(title="SlotServe", version=__version__, lifespan=lifespan, docs_url="/api/docs",
-                  redoc_url=None, openapi_url="/api/openapi.json")
+    app = FastAPI(
+        title="SlotServe",
+        version=__version__,
+        lifespan=lifespan,
+        docs_url="/api/docs",
+        redoc_url=None,
+        openapi_url="/api/openapi.json",
+    )
     app.add_middleware(
         SessionMiddleware,
         secret_key=settings.secret_key,
@@ -93,8 +112,20 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         same_site="lax",
         https_only=settings.cookie_secure,
     )
-    for module in (auth, notifications, keys, models, downloads, reservations, waitlist, status, usage, admin,
-                   calendar, metrics):
+    for module in (
+        auth,
+        notifications,
+        keys,
+        models,
+        downloads,
+        reservations,
+        waitlist,
+        status,
+        usage,
+        admin,
+        calendar,
+        metrics,
+    ):
         app.include_router(module.router)
     app.include_router(proxy.router)
 
@@ -121,6 +152,8 @@ def _mount_frontend(app: FastAPI, static_dir: Path) -> None:
             )
         candidate = (static_dir / full_path).resolve()
         if full_path and candidate.is_file() and candidate.is_relative_to(root):
-            headers = {"cache-control": "public, max-age=31536000, immutable"} if "/assets/" in candidate.as_posix() else None
+            headers = (
+                {"cache-control": "public, max-age=31536000, immutable"} if "/assets/" in candidate.as_posix() else None
+            )
             return FileResponse(candidate, headers=headers)
         return FileResponse(index, headers={"cache-control": "no-cache"})

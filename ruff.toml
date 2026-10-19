@@ -1,0 +1,25 @@
+# Shared lint and format settings for backend, tools and e2e.
+line-length = 120
+target-version = "py312"
+src = ["backend", "e2e", "tools"]
+
+[lint]
+select = ["E", "F", "W", "I", "B", "BLE", "UP", "ASYNC", "SIM", "RUF"]
+ignore = [
+  "B008",    # FastAPI dependencies are declared with Depends() in defaults
+  "RUF001",  # Chinese punctuation in user-facing strings is intended
+  "RUF002",
+  "RUF003",
+  "RUF012",  # mutable class attributes are fine for constants here
+  "ASYNC109",
+  "ASYNC230",  # small synchronous file reads (logs, backups) are deliberate
+  "ASYNC240",
+  "SIM105",
+  "SIM117",  # nested async with blocks read better for client + stream
+]
+
+[lint.per-file-ignores]
+"backend/tests/*" = ["ASYNC110"]  # polling loops while waiting for the mock server
+
+[lint.isort]
+known-first-party = ["slotserve"]

@@ -13,10 +13,12 @@
 </p>
 
 <p align="center">
-  <img alt="License" src="https://img.shields.io/badge/license-MIT-4f46e5">
-  <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-4f46e5">
-  <img alt="Vue" src="https://img.shields.io/badge/vue-3-4f46e5">
-  <img alt="llama.cpp" src="https://img.shields.io/badge/llama.cpp-server-4f46e5">
+  <a href="https://github.com/PelerYuan/slotserve/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/PelerYuan/slotserve/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/PelerYuan/slotserve/releases"><img alt="Release" src="https://img.shields.io/github/v/release/PelerYuan/slotserve?color=4f46e5"></a>
+  <a href="https://github.com/PelerYuan/slotserve/pkgs/container/slotserve"><img alt="Docker image" src="https://img.shields.io/badge/ghcr.io-slotserve-4f46e5?logo=docker&logoColor=white"></a>
+  <a href="https://peleryuan.github.io/slotserve/"><img alt="Docs" src="https://img.shields.io/badge/docs-online-4f46e5"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/PelerYuan/slotserve?color=4f46e5"></a>
+  <img alt="Python" src="https://img.shields.io/badge/python-3.12%2B-4f46e5">
 </p>
 
 ![SlotServe overview](docs/assets/screenshots/overview.png)

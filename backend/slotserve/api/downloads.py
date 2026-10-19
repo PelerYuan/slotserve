@@ -40,7 +40,9 @@ async def _queue(db: AsyncSession, user: User, downloader: Downloader, url: str,
         raise ApiError(status.HTTP_400_BAD_REQUEST, "invalid_filename")
     if downloader.dest_path(name).exists():
         raise ApiError(status.HTTP_409_CONFLICT, "file_exists", filename=name)
-    busy = await db.execute(select(DownloadTask.id).where(DownloadTask.filename == name, DownloadTask.status.in_(ACTIVE)))
+    busy = await db.execute(
+        select(DownloadTask.id).where(DownloadTask.filename == name, DownloadTask.status.in_(ACTIVE))
+    )
     if busy.first() is not None:
         raise ApiError(status.HTTP_409_CONFLICT, "download_in_progress", filename=name)
     task = DownloadTask(user_id=user.id, url=url, filename=name)

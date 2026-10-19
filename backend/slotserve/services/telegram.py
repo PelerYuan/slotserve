@@ -181,7 +181,7 @@ class TelegramBot:
             self.offset = max(self.offset, update["update_id"] + 1)
             try:
                 await self.handle(update)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 log.exception("telegram update failed")
 
     # ---- handling -----------------------------------------------------------
@@ -213,9 +213,7 @@ class TelegramBot:
     async def on_command(self, chat_id: int, tg_username: str | None, command: str, arg: str) -> str | None:
         async with SessionLocal() as db:
             if command == "/start" and arg:
-                user = (
-                    await db.execute(select(User).where(User.telegram_link_token == arg))
-                ).scalar_one_or_none()
+                user = (await db.execute(select(User).where(User.telegram_link_token == arg))).scalar_one_or_none()
                 if user is None or user.disabled_at is not None:
                     return reply(None, "bad_token")
                 for other in (await db.execute(select(User).where(User.telegram_chat_id == chat_id))).scalars():
@@ -286,27 +284,37 @@ class TelegramBot:
     async def _today(self, db, user: User) -> str:
         now = utcnow()
         rows = (
-            await db.execute(
-                select(Reservation)
-                .where(
-                    Reservation.status == "booked",
-                    Reservation.end_at > now,
-                    Reservation.start_at < now + timedelta(hours=24),
+            (
+                await db.execute(
+                    select(Reservation)
+                    .where(
+                        Reservation.status == "booked",
+                        Reservation.end_at > now,
+                        Reservation.start_at < now + timedelta(hours=24),
+                    )
+                    .order_by(Reservation.start_at)
                 )
-                .order_by(Reservation.start_at)
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return await self._list(db, user, list(rows)) if rows else reply(user, "none_today")
 
     async def _mine(self, db, user: User) -> str:
         rows = (
-            await db.execute(
-                select(Reservation)
-                .where(Reservation.user_id == user.id, Reservation.status == "booked", Reservation.end_at > utcnow())
-                .order_by(Reservation.start_at)
-                .limit(10)
+            (
+                await db.execute(
+                    select(Reservation)
+                    .where(
+                        Reservation.user_id == user.id, Reservation.status == "booked", Reservation.end_at > utcnow()
+                    )
+                    .order_by(Reservation.start_at)
+                    .limit(10)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return await self._list(db, user, list(rows)) if rows else reply(user, "none_mine")
 
     async def _own_reservation(self, db, user: User, reservation_id: int | None) -> Reservation | None:

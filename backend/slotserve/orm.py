@@ -90,10 +90,10 @@ class Reservation(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     # NULL = exclusive booking: llama-server is stopped and the whole GPU is free for other work.
-    model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="RESTRICT"), nullable=True, index=True)
-    preset_id: Mapped[int | None] = mapped_column(
-        ForeignKey("model_presets.id", ondelete="SET NULL"), nullable=True
+    model_id: Mapped[int | None] = mapped_column(
+        ForeignKey("models.id", ondelete="RESTRICT"), nullable=True, index=True
     )
+    preset_id: Mapped[int | None] = mapped_column(ForeignKey("model_presets.id", ondelete="SET NULL"), nullable=True)
     series_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     start_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
     end_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)

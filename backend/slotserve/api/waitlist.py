@@ -43,9 +43,7 @@ async def _out(db: AsyncSession, rows: list[WaitlistEntry]) -> list[WaitlistOut]
 
 
 @router.get("", response_model=list[WaitlistOut])
-async def list_waitlist(
-    everyone: bool = False, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
-):
+async def list_waitlist(everyone: bool = False, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
     """Open waitlist entries: your own, or everyone's with ``everyone=true``."""
     stmt = select(WaitlistEntry).where(WaitlistEntry.status.in_(OPEN), WaitlistEntry.end_at > utcnow())
     if not everyone:

@@ -2,7 +2,7 @@
 
 import asyncio
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import status
@@ -23,7 +23,7 @@ Window = tuple[datetime, datetime]
 
 
 def aware(dt: datetime) -> datetime:
-    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+    return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
 
 
 async def resolve_model(
@@ -75,9 +75,7 @@ async def find_conflict(db: AsyncSession, start: datetime, end: datetime, exclud
     return (await db.execute(stmt.order_by(Reservation.start_at).limit(1))).scalar_one_or_none()
 
 
-async def raise_if_conflicts(
-    db: AsyncSession, windows: list[Window], exclude: set[int] = frozenset()
-) -> None:
+async def raise_if_conflicts(db: AsyncSession, windows: list[Window], exclude: set[int] = frozenset()) -> None:
     clashes = [c for start, end in windows if (c := await find_conflict(db, start, end, exclude)) is not None]
     if clashes:
         first = clashes[0]
@@ -95,7 +93,7 @@ async def raise_if_conflicts(
 def _week_start(dt: datetime, tz: ZoneInfo) -> datetime:
     local = dt.astimezone(tz)
     monday = (local - timedelta(days=local.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
-    return monday.astimezone(timezone.utc)
+    return monday.astimezone(UTC)
 
 
 async def check_quota(

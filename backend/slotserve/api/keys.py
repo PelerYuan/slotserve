@@ -17,18 +17,14 @@ MAX_KEYS_PER_USER = 20
 @router.get("", response_model=list[ApiKeyOut])
 async def list_keys(user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
     stmt = (
-        select(ApiKey)
-        .where(ApiKey.user_id == user.id, ApiKey.revoked_at.is_(None))
-        .order_by(ApiKey.created_at.desc())
+        select(ApiKey).where(ApiKey.user_id == user.id, ApiKey.revoked_at.is_(None)).order_by(ApiKey.created_at.desc())
     )
     return (await db.execute(stmt)).scalars().all()
 
 
 @router.post("", response_model=ApiKeyCreatedOut, status_code=201)
 async def create_key(body: ApiKeyCreateIn, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
-    existing = (
-        await db.execute(select(ApiKey.id).where(ApiKey.user_id == user.id, ApiKey.revoked_at.is_(None)))
-    ).all()
+    existing = (await db.execute(select(ApiKey.id).where(ApiKey.user_id == user.id, ApiKey.revoked_at.is_(None)))).all()
     if len(existing) >= MAX_KEYS_PER_USER:
         raise ApiError(status.HTTP_400_BAD_REQUEST, "too_many_keys", limit=MAX_KEYS_PER_USER)
     raw = generate_api_key()

@@ -13,6 +13,7 @@ backend/            FastAPI 应用（Python 包 `slotserve`）
   tests/              pytest 测试（使用 mock 服务）
 frontend/           Vue 3 + TypeScript + Naive UI
 tools/              mock llama-server
+e2e/                Playwright 端到端测试
 docs/               本文档站（MkDocs Material，中英双语）
 ```
 
@@ -64,3 +65,26 @@ mkdocs gh-deploy   # 发布到 GitHub Pages
 - Web API 错误格式为 `{"detail": {"code": "...", "params": {...}}}`，前端负责翻译 `code`（`frontend/src/i18n`）。新增错误码时请同时添加中英文文案。
 - 网关错误遵循 OpenAI 错误格式，使用英文。
 - 所有时间以 UTC 存储和传输，由浏览器按本地时区显示。
+
+## 持续集成
+
+每次推送到 `main` 和每个 Pull Request 都会运行 `.github/workflows/ci.yml`：
+
+| 任务 | 检查内容 |
+| --- | --- |
+| Lint | `ruff check` 和 `ruff format --check` |
+| 后端测试 | 在 Python 3.12 和 3.13 上运行 `pytest` |
+| 前端 | `npm run typecheck` 和 `npm run build` |
+| 端到端 | 启动 SlotServe 和模拟 llama-server，用 Playwright 操作界面（`e2e/`） |
+| 文档 | `mkdocs build --strict` |
+| Docker 镜像 | 构建镜像并确认 `/healthz` 可访问 |
+
+CodeQL 每周以及在 PR 上扫描 Python 和 TypeScript。Dependabot 每周为 pip、npm、GitHub Actions 和 Docker 基础镜像提交更新 PR（不会自动升级 CUDA 大版本）。
+
+## 发布流程
+
+1. 把 `CHANGELOG.md` 中 **Unreleased** 的内容移到新版本标题下，并更新 `backend/pyproject.toml`、`backend/slotserve/__init__.py`、`frontend/package.json` 中的版本号。
+2. 提交后打标签并推送：`git tag v0.5.0 && git push origin main v0.5.0`。
+3. `.github/workflows/release.yml` 会构建并推送 `ghcr.io/peleryuan/slotserve`（`0.5.0`、`0.5`、`latest`），并用 CHANGELOG 中对应的段落创建 GitHub Release。
+
+`main` 上的 `docs/` 或 `mkdocs.yml` 变化时，文档站会自动部署。

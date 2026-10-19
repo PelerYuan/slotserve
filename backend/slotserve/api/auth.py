@@ -46,9 +46,7 @@ async def login(body: LoginIn, request: Request, db: AsyncSession = Depends(get_
     limiter = request.app.state.limiter
     username, ip = body.username.strip(), _client_ip(request)
     limiter.check(username=username, ip=ip)
-    user = (
-        await db.execute(select(User).where(func.lower(User.username) == username.lower()))
-    ).scalar_one_or_none()
+    user = (await db.execute(select(User).where(func.lower(User.username) == username.lower()))).scalar_one_or_none()
     if user is None or not verify_password(body.password, user.password_hash):
         limiter.failure(username=username, ip=ip)
         raise ApiError(status.HTTP_401_UNAUTHORIZED, "invalid_credentials")

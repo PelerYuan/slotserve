@@ -2,7 +2,6 @@ from datetime import timedelta
 from pathlib import Path
 
 from conftest import make_gguf
-
 from slotserve.config import get_settings
 from slotserve.db import SessionLocal, utcnow
 from slotserve.orm import LlmModel, Reservation
@@ -115,7 +114,7 @@ async def test_compute_target_rules(app):
 
 async def test_compute_target_skips_short_default_window(app):
     settings = app.state.settings
-    default_id, big_id = await _seed([("default", 15_000_000_000, True), ("big", 45_000_000_000, False)])
+    _default_id, big_id = await _seed([("default", 15_000_000_000, True), ("big", 45_000_000_000, False)])
     now = utcnow()
     # big[0..1h], gap 8 minutes, big again. Loading default (115s) then big (315s) does not fit well.
     await _reserve(big_id, now, now + timedelta(hours=1))

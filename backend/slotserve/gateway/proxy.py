@@ -75,9 +75,7 @@ async def authenticate(request: Request) -> Caller:
             await db.execute(
                 select(ApiKey, User.username)
                 .join(User, User.id == ApiKey.user_id)
-                .where(
-                    ApiKey.key_hash == hash_api_key(raw), ApiKey.revoked_at.is_(None), User.disabled_at.is_(None)
-                )
+                .where(ApiKey.key_hash == hash_api_key(raw), ApiKey.revoked_at.is_(None), User.disabled_at.is_(None))
             )
         ).first()
         if row is None:
@@ -114,8 +112,12 @@ async def admit(request: Request, caller: Caller, requested_model: str | None) -
             )
 
         snap = runtime.snapshot()
-        if active is not None and (target is None or target.reservation is None or target.reservation.id != active.id
-                                   or (snap.model_id, snap.preset_id) != target.spec):
+        if active is not None and (
+            target is None
+            or target.reservation is None
+            or target.reservation.id != active.id
+            or (snap.model_id, snap.preset_id) != target.spec
+        ):
             reserved = await db.get(LlmModel, active.model_id)
             raise _unavailable(snap, f"Your reserved model '{reserved.name if reserved else '?'}' is loading.")
         if snap.state != RuntimeState.READY:
@@ -183,7 +185,7 @@ def _record_usage(admission: Admission, endpoint: str, stream: bool, usage: dict
                     )
                 )
                 await db.commit()
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.exception("failed to record usage")
 
     task = asyncio.get_running_loop().create_task(write())

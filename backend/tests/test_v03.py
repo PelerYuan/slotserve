@@ -5,8 +5,8 @@ import sqlite3
 from datetime import datetime, timedelta
 
 import httpx
-from conftest import make_gguf, wait_for_state
 
+from conftest import make_gguf, wait_for_state
 from slotserve import db as dbmod
 from slotserve.db import utcnow
 
@@ -44,7 +44,7 @@ def _hours(h: float) -> datetime:
 
 
 async def test_exclusive_booking_stops_llama_and_blocks_gateway(make_client, models_dir):
-    admin, bob, models = await _setup(make_client, models_dir)
+    admin, bob, _models = await _setup(make_client, models_dir)
     await wait_for_state(admin, "ready", "small")
     keys = {"root": await _key(admin), "bob": await _key(bob)}
 
@@ -205,7 +205,9 @@ async def test_manual_load_unload_and_auto(make_client, models_dir):
 
 async def test_failed_booked_model_falls_back_to_default(app, make_client, models_dir):
     admin, bob, models = await _setup(make_client, models_dir)
-    bad = (await admin.post(f"/api/models/{models['large']}/presets", json={"name": "broken", "args": "--mock-fail"})).json()
+    bad = (
+        await admin.post(f"/api/models/{models['large']}/presets", json={"name": "broken", "args": "--mock-fail"})
+    ).json()
     key = await _key(bob)
     await _book(bob, utcnow(), _hours(1), models["large"], preset_id=bad["id"])
     deadline = asyncio.get_running_loop().time() + 20
@@ -299,7 +301,7 @@ async def _not(pred):
 
 
 async def test_ical_feed(make_client, models_dir):
-    admin, bob, models = await _setup(make_client, models_dir)
+    _admin, bob, models = await _setup(make_client, models_dir)
     await _book(bob, _hours(2), _hours(3), models["large"], note="eval, run; 1")
     links = (await bob.get("/api/calendar")).json()
     anon = await make_client()
@@ -312,7 +314,7 @@ async def test_ical_feed(make_client, models_dir):
 
 
 async def test_metrics_requires_token(make_client, models_dir):
-    admin, bob, models = await _setup(make_client, models_dir)
+    admin, _bob, _models = await _setup(make_client, models_dir)
     anon = await make_client()
     assert (await anon.get("/metrics")).status_code == 404
     await admin.put("/api/admin/settings", json={"metrics_token": "scrape-me"})
@@ -322,7 +324,7 @@ async def test_metrics_requires_token(make_client, models_dir):
 
 
 async def test_usage_export_and_request_log(make_client, models_dir):
-    admin, bob, models = await _setup(make_client, models_dir)
+    admin, bob, _models = await _setup(make_client, models_dir)
     await wait_for_state(admin, "ready", "small")
     key = await _key(bob)
     await bob.post("/v1/chat/completions", headers=key, json={"messages": [{"role": "user", "content": "x"}]})
@@ -337,7 +339,7 @@ async def test_usage_export_and_request_log(make_client, models_dir):
 
 
 async def test_hf_listing(monkeypatch, make_client, models_dir):
-    admin, bob, models = await _setup(make_client, models_dir)
+    _admin, bob, _models = await _setup(make_client, models_dir)
     tree = [
         {"type": "file", "path": "README.md", "size": 10},
         {"type": "file", "path": "m-Q4_K_M.gguf", "size": 5, "lfs": {"size": 4_000_000_000}},
@@ -418,4 +420,3 @@ async def test_preferences_and_registration_alert(app, make_client, models_dir):
     await asyncio.sleep(0.1)
     # not linked, so nothing is sent - but the event must not crash the notifier
     assert app.state.notifier.queue.qsize() == 0
-

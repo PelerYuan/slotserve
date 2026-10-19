@@ -149,8 +149,14 @@ async def update_reservation_core(
         if body.note is not None:
             r.note = body.note.strip()
         if r.user_id != user.id:
-            record(db, user, "reservation.update", f"#{r.id} {owner.username if owner else '?'}",
-                   start_at=start, end_at=end)
+            record(
+                db,
+                user,
+                "reservation.update",
+                f"#{r.id} {owner.username if owner else '?'}",
+                start_at=start,
+                end_at=end,
+            )
         await db.commit()
     return r, shortened
 

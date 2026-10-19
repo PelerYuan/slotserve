@@ -5,7 +5,6 @@ import json
 from datetime import timedelta
 
 from conftest import make_gguf, wait_for_state
-
 from slotserve.db import utcnow
 
 
@@ -24,7 +23,7 @@ async def _setup(make_client, models_dir):
 
 
 async def test_free_access_and_usage(make_client, models_dir):
-    admin, bob, models, keys = await _setup(make_client, models_dir)
+    admin, bob, _models, keys = await _setup(make_client, models_dir)
     await wait_for_state(admin, "ready", "small")
 
     listed = (await bob.get("/v1/models", headers=keys["bob"])).json()
@@ -72,7 +71,11 @@ async def test_reservation_is_exclusive_and_switches_model(make_client, models_d
     now = utcnow()
     r = await bob.post(
         "/api/reservations",
-        json={"model_id": models["large"], "start_at": now.isoformat(), "end_at": (now + timedelta(hours=1)).isoformat()},
+        json={
+            "model_id": models["large"],
+            "start_at": now.isoformat(),
+            "end_at": (now + timedelta(hours=1)).isoformat(),
+        },
     )
     assert r.status_code == 201
     res_id = r.json()[0]["id"]

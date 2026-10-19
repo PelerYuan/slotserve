@@ -1,7 +1,7 @@
 import asyncio
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import FileResponse
@@ -166,9 +166,7 @@ async def _ensure_other_admin(db: AsyncSession, user: User) -> None:
     """Refuses a change that would leave no active admin."""
     others = (
         await db.execute(
-            select(func.count(User.id)).where(
-                User.is_admin.is_(True), User.disabled_at.is_(None), User.id != user.id
-            )
+            select(func.count(User.id)).where(User.is_admin.is_(True), User.disabled_at.is_(None), User.id != user.id)
         )
     ).scalar_one()
     if others == 0:
@@ -179,12 +177,16 @@ async def _end_reservations(db: AsyncSession, user: User) -> int:
     """Cancels upcoming and releases the active reservation of ``user``."""
     now = utcnow()
     rows = (
-        await db.execute(
-            select(Reservation).where(
-                Reservation.user_id == user.id, Reservation.status == "booked", Reservation.end_at > now
+        (
+            await db.execute(
+                select(Reservation).where(
+                    Reservation.user_id == user.id, Reservation.status == "booked", Reservation.end_at > now
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for r in rows:
         if r.start_at > now:
             r.status = "cancelled"
@@ -391,9 +393,7 @@ async def audit_log(
     db: AsyncSession = Depends(get_db),
 ):
     total = (await db.execute(select(func.count(AuditLog.id)))).scalar_one()
-    rows = (
-        await db.execute(select(AuditLog).order_by(AuditLog.id.desc()).offset(offset).limit(limit))
-    ).scalars().all()
+    rows = (await db.execute(select(AuditLog).order_by(AuditLog.id.desc()).offset(offset).limit(limit))).scalars().all()
     return AuditPageOut(
         total=total,
         items=[
@@ -492,8 +492,6 @@ async def request_log(
     )
 
 
-
-
 # ---- backups --------------------------------------------------------------
 
 _BACKUP_NAME = re.compile(r"^slotserve-(daily|manual|v\d+)-\d{8}-\d{6}\.db$")
@@ -506,7 +504,7 @@ def _backup_out(path) -> BackupOut:
         name=path.name,
         kind=kind if kind in ("daily", "manual") else "upgrade",
         size_bytes=st.st_size,
-        created_at=datetime.fromtimestamp(st.st_mtime, timezone.utc),
+        created_at=datetime.fromtimestamp(st.st_mtime, UTC),
     )
 
 

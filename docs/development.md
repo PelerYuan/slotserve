@@ -13,6 +13,7 @@ backend/            FastAPI application (Python package `slotserve`)
   tests/              pytest suite (uses the mock server)
 frontend/           Vue 3 + TypeScript + Naive UI
 tools/              mock llama-server
+e2e/                Playwright end-to-end tests
 docs/               this site (MkDocs Material, en + zh)
 ```
 
@@ -64,3 +65,26 @@ mkdocs gh-deploy   # publish to GitHub Pages
 - Web API errors are `{"detail": {"code": "...", "params": {...}}}`; the frontend translates `code` (`frontend/src/i18n`). Add both English and Chinese strings for new codes.
 - Gateway errors follow the OpenAI error format and are in English.
 - All timestamps are stored and sent as UTC; the browser formats them in local time.
+
+## Continuous integration
+
+Every push to `main` and every pull request runs `.github/workflows/ci.yml`:
+
+| Job | What it checks |
+| --- | --- |
+| Lint | `ruff check` and `ruff format --check` |
+| Backend tests | `pytest` on Python 3.12 and 3.13 |
+| Frontend | `npm run typecheck` and `npm run build` |
+| End-to-end | starts SlotServe with the mock llama-server and drives the UI with Playwright (`e2e/`) |
+| Docs | `mkdocs build --strict` |
+| Docker image | builds the image and checks that `/healthz` answers |
+
+CodeQL scans Python and TypeScript weekly and on pull requests. Dependabot opens weekly update PRs for pip, npm, GitHub Actions and the Docker base image (CUDA major versions are not bumped automatically).
+
+## Releasing
+
+1. Move the **Unreleased** entries in `CHANGELOG.md` under a new version heading and bump the version in `backend/pyproject.toml`, `backend/slotserve/__init__.py` and `frontend/package.json`.
+2. Commit, then tag and push: `git tag v0.5.0 && git push origin main v0.5.0`.
+3. `.github/workflows/release.yml` builds and pushes `ghcr.io/peleryuan/slotserve` (`0.5.0`, `0.5`, `latest`) and creates the GitHub release from the changelog section.
+
+The documentation site deploys automatically when `docs/` or `mkdocs.yml` change on `main`.

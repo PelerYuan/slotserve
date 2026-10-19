@@ -5,7 +5,6 @@ from pathlib import Path
 
 import httpx
 import pytest
-
 from tg_mock import FakeTelegram
 
 from slotserve.config import get_settings

@@ -51,7 +51,7 @@ class Housekeeper:
                 await self.tick()
             except asyncio.CancelledError:
                 raise
-            except Exception:  # noqa: BLE001
+            except Exception:
                 log.exception("housekeeping failed")
             try:
                 await asyncio.wait_for(self._wake.wait(), INTERVAL_SECONDS)
@@ -86,7 +86,7 @@ class Housekeeper:
         try:
             path = await asyncio.to_thread(maintenance.make_backup, self.settings, "daily")
             log.info("database backup written to %s", path)
-        except Exception:  # noqa: BLE001
+        except Exception:
             self._backup_failed_at = now
             log.exception("database backup failed")
 
@@ -154,8 +154,10 @@ async def process_waitlist(db: AsyncSession, settings: Settings, notifier, now: 
 async def _process_waitlist(db: AsyncSession, settings: Settings, notifier, now: datetime) -> bool:
     booked_any = False
     entries = (
-        await db.execute(select(WaitlistEntry).where(WaitlistEntry.status == "waiting").order_by(WaitlistEntry.id))
-    ).scalars().all()
+        (await db.execute(select(WaitlistEntry).where(WaitlistEntry.status == "waiting").order_by(WaitlistEntry.id)))
+        .scalars()
+        .all()
+    )
     for e in entries:
         start = max(e.start_at, now)
         if e.end_at - start < booking.MIN_LENGTH:
@@ -182,7 +184,11 @@ async def _process_waitlist(db: AsyncSession, settings: Settings, notifier, now:
                 notifier.emit("waitlist_free", user_id=e.user_id, when=_window(notifier, start, e.end_at))
                 continue
             r = Reservation(
-                user_id=e.user_id, model_id=e.model_id, preset_id=e.preset_id, start_at=start, end_at=e.end_at,
+                user_id=e.user_id,
+                model_id=e.model_id,
+                preset_id=e.preset_id,
+                start_at=start,
+                end_at=e.end_at,
                 note=e.note,
             )
             db.add(r)

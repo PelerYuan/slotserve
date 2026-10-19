@@ -72,7 +72,7 @@ class Downloader:
                     continue
             except asyncio.CancelledError:
                 raise
-            except Exception:  # noqa: BLE001
+            except Exception:
                 log.exception("download loop error")
             try:
                 await asyncio.wait_for(self._wake.wait(), 10)
@@ -161,7 +161,9 @@ class Downloader:
                     free = shutil.disk_usage(dest.parent).free
                     needed = total - offset + int(self.settings.download_min_free_gb * 1e9)
                     if free < needed:
-                        raise RuntimeError(f"not enough disk space: {free / 1e9:.1f} GB free, need {needed / 1e9:.1f} GB")
+                        raise RuntimeError(
+                            f"not enough disk space: {free / 1e9:.1f} GB free, need {needed / 1e9:.1f} GB"
+                        )
 
                 await self._set(task_id, total_bytes=total, downloaded_bytes=offset)
                 if resp.status_code != 416:

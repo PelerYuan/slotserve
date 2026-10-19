@@ -3,7 +3,7 @@
 import logging
 import re
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy import delete, func, select
@@ -37,7 +37,7 @@ def make_backup(settings: Settings, kind: str = "daily") -> Path:
     """Consistent online copy using SQLite's backup API (safe while the app is writing)."""
     root = backup_dir(settings)
     root.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     target = root / f"slotserve-{kind}-{stamp}.db"
     src = sqlite3.connect(settings.data_dir / "slotserve.db")
     dst = sqlite3.connect(target)
@@ -68,7 +68,7 @@ def backup_due(settings: Settings, now: datetime) -> bool:
     daily = [p for p in list_backups(settings) if p.name.startswith("slotserve-daily-")]
     if not daily:
         return True
-    newest = datetime.fromtimestamp(daily[0].stat().st_mtime, timezone.utc)
+    newest = datetime.fromtimestamp(daily[0].stat().st_mtime, UTC)
     return now - newest >= timedelta(hours=24)
 
 
@@ -101,8 +101,16 @@ async def apply_retention(db: AsyncSession, settings: Settings, now: datetime) -
             model = model or ""
             existing = await db.get(UsageDaily, (d, uid, model))
             if existing is None:
-                existing = UsageDaily(date=d, user_id=uid, model_name=model, requests=0, failed=0,
-                                      prompt_tokens=0, completion_tokens=0, duration_ms=0)
+                existing = UsageDaily(
+                    date=d,
+                    user_id=uid,
+                    model_name=model,
+                    requests=0,
+                    failed=0,
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    duration_ms=0,
+                )
                 db.add(existing)
             existing.requests += n
             existing.failed += int(failed or 0)

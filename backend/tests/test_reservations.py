@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from conftest import make_gguf
 
@@ -8,7 +8,7 @@ def iso(dt: datetime) -> str:
 
 
 def hours_from_now(h: float) -> datetime:
-    now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+    now = datetime.now(UTC).replace(second=0, microsecond=0)
     return now + timedelta(hours=h)
 
 
@@ -47,10 +47,18 @@ async def test_book_and_conflict(make_client, models_dir):
 async def test_validation(make_client, models_dir):
     alice = await make_client("alice")
     mid = await _model_id(alice, models_dir)
-    assert (await book(alice, mid, hours_from_now(-3), hours_from_now(-2))).json()["detail"]["code"] == "reservation_in_past"
-    assert (await book(alice, mid, hours_from_now(1), hours_from_now(20))).json()["detail"]["code"] == "reservation_too_long"
-    assert (await book(alice, mid, hours_from_now(2), hours_from_now(1))).json()["detail"]["code"] == "reservation_too_short"
-    assert (await book(alice, mid, hours_from_now(24 * 40), hours_from_now(24 * 40 + 1))).json()["detail"]["code"] == "reservation_too_far"
+    assert (await book(alice, mid, hours_from_now(-3), hours_from_now(-2))).json()["detail"][
+        "code"
+    ] == "reservation_in_past"
+    assert (await book(alice, mid, hours_from_now(1), hours_from_now(20))).json()["detail"][
+        "code"
+    ] == "reservation_too_long"
+    assert (await book(alice, mid, hours_from_now(2), hours_from_now(1))).json()["detail"][
+        "code"
+    ] == "reservation_too_short"
+    assert (await book(alice, mid, hours_from_now(24 * 40), hours_from_now(24 * 40 + 1))).json()["detail"][
+        "code"
+    ] == "reservation_too_far"
     assert (await book(alice, 9999, hours_from_now(1), hours_from_now(2))).status_code == 404
 
 
@@ -66,7 +74,7 @@ async def test_cancel_and_release(make_client, models_dir):
     r = await bob.delete(f"/api/reservations/{upcoming['id']}")
     assert r.json()[0]["phase"] == "cancelled"
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     active = (await book(bob, mid, now, now + timedelta(hours=1))).json()[0]
     assert active["phase"] == "active"
     r = await bob.delete(f"/api/reservations/{active['id']}")
@@ -74,7 +82,7 @@ async def test_cancel_and_release(make_client, models_dir):
     assert r.json()[0]["released_at"] is not None
 
     # Slot is free again immediately.
-    later = datetime.now(timezone.utc) + timedelta(minutes=1)
+    later = datetime.now(UTC) + timedelta(minutes=1)
     assert (await book(carol, mid, later, later + timedelta(minutes=30))).status_code == 201
 
 

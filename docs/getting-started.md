@@ -60,6 +60,10 @@ docker compose up -d --build
 docker compose logs -f
 ```
 
+!!! tip "Prebuilt image"
+    Instead of building, you can run the published image: `docker compose pull && docker compose up -d`. It uses CUDA 12.8 runtime libraries, which work with llama.cpp builds for any CUDA 12.x. Pin a version with `SLOTSERVE_IMAGE=ghcr.io/peleryuan/slotserve:0.5.0` in `.env`.
+
+
 Open `http://<server>:8000`.
 
 ## 4. First steps in the UI
