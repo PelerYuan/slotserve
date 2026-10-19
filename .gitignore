@@ -1,0 +1,36 @@
+# Local configuration and data
+.env
+data/
+dev/
+*.db
+*.db-wal
+*.db-shm
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+
+# Built frontend (produced by `npm run build`)
+backend/slotserve/static/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Docs site
+site/
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

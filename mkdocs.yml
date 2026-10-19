@@ -1,0 +1,71 @@
+site_name: SlotServe
+site_description: Book GPU time slots and serve llama.cpp models behind an OpenAI-compatible gateway.
+site_url: https://peleryuan.github.io/slotserve/
+repo_url: https://github.com/PelerYuan/slotserve
+repo_name: PelerYuan/slotserve
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 SlotServe contributors
+
+theme:
+  name: material
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+  font: false
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.highlight
+    - toc.follow
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: suffix
+      fallback_to_default: true
+      languages:
+        - locale: en
+          default: true
+          name: English
+          build: true
+        - locale: zh
+          name: 简体中文
+          build: true
+          site_description: 预约 GPU 时段，通过 OpenAI 兼容网关使用 llama.cpp 模型。
+          nav_translations:
+            Home: 首页
+            Getting started: 快速开始
+            Configuration: 配置参考
+            User guide: 使用指南
+            API: 接口
+            How scheduling works: 调度原理
+            Development: 开发
+            FAQ: 常见问题
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Configuration: configuration.md
+  - User guide: user-guide.md
+  - API: api.md
+  - How scheduling works: scheduling.md
+  - Development: development.md
+  - FAQ: faq.md

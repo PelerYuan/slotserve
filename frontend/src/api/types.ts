@@ -1,0 +1,122 @@
+export interface User {
+  id: number
+  username: string
+  is_admin: boolean
+  created_at: string
+}
+
+export interface ApiKey {
+  id: number
+  name: string
+  prefix: string
+  created_at: string
+  last_used_at: string | null
+}
+
+export interface ApiKeyCreated extends ApiKey {
+  key: string
+}
+
+export interface Model {
+  id: number
+  name: string
+  file_path: string
+  file_name: string
+  file_exists: boolean
+  size_bytes: number
+  status: 'downloading' | 'ready' | 'failed'
+  is_default: boolean
+  is_loaded: boolean
+  args: string
+  description: string
+  est_load_seconds: number
+  created_by: number | null
+  created_by_name: string | null
+  created_at: string
+}
+
+export interface DownloadTask {
+  id: number
+  user_id: number | null
+  username: string | null
+  url: string
+  filename: string
+  status: 'queued' | 'running' | 'done' | 'failed' | 'cancelled'
+  downloaded_bytes: number
+  total_bytes: number | null
+  speed_bps: number
+  error: string | null
+  model_id: number | null
+  created_at: string
+  finished_at: string | null
+}
+
+export type ReservationPhase = 'upcoming' | 'active' | 'finished' | 'cancelled'
+
+export interface Reservation {
+  id: number
+  user_id: number
+  username: string
+  model_id: number
+  model_name: string
+  start_at: string
+  end_at: string
+  status: 'booked' | 'cancelled'
+  phase: ReservationPhase
+  note: string
+  released_at: string | null
+  created_at: string
+}
+
+export type RuntimeState = 'stopped' | 'loading' | 'ready' | 'stopping' | 'failed'
+
+export interface Runtime {
+  state: RuntimeState
+  model_id: number | null
+  model_name: string | null
+  load_started_at: string | null
+  ready_at: string | null
+  est_load_seconds: number | null
+  error: string | null
+}
+
+export interface Gpu {
+  index: number
+  name: string
+  memory_used_mb: number
+  memory_total_mb: number
+  utilization_pct: number
+  temperature_c: number
+  power_w: number | null
+}
+
+export interface Status {
+  now: string
+  runtime: Runtime
+  active_reservation: Reservation | null
+  upcoming: Reservation[]
+  free_access: boolean
+  default_model: string | null
+  gpus: Gpu[]
+}
+
+export interface AppConfig {
+  slot_minutes: number
+  max_reservation_hours: number
+  max_advance_days: number
+  version: string
+}
+
+export interface Usage {
+  days: number
+  users: {
+    user_id: number
+    username: string
+    requests: number
+    prompt_tokens: number
+    completion_tokens: number
+    reserved_hours: number
+  }[]
+  models: { model_name: string; requests: number; prompt_tokens: number; completion_tokens: number }[]
+  daily: { date: string; username: string; requests: number; tokens: number }[]
+}

@@ -1,0 +1,14 @@
+.git
+.env
+data
+dev
+docs
+site
+**/__pycache__
+**/*.pyc
+backend/.venv
+backend/tests
+backend/slotserve/static
+backend/*.egg-info
+frontend/node_modules
+frontend/dist

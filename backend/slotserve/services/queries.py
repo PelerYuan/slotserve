@@ -1,0 +1,124 @@
+"""Shared database queries used by the API, gateway and scheduler."""
+
+from datetime import datetime
+from pathlib import Path
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..config import Settings
+from ..orm import LlmModel, ModelLoadEvent, Reservation, User
+from ..schemas import ModelOut, ReservationOut
+
+LOAD_HISTORY = 5
+LOAD_OVERHEAD_SECONDS = 15.0
+
+
+async def active_reservation(db: AsyncSession, now: datetime) -> Reservation | None:
+    stmt = (
+        select(Reservation)
+        .where(Reservation.status == "booked", Reservation.start_at <= now, Reservation.end_at > now)
+        .order_by(Reservation.start_at)
+        .limit(1)
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def next_reservation(db: AsyncSession, now: datetime) -> Reservation | None:
+    stmt = (
+        select(Reservation)
+        .where(Reservation.status == "booked", Reservation.start_at > now)
+        .order_by(Reservation.start_at)
+        .limit(1)
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def default_model(db: AsyncSession) -> LlmModel | None:
+    stmt = (
+        select(LlmModel)
+        .where(LlmModel.is_default.is_(True), LlmModel.status == "ready", LlmModel.deleted_at.is_(None))
+        .limit(1)
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def estimate_load_seconds(db: AsyncSession, model: LlmModel, settings: Settings) -> float:
+    stmt = (
+        select(ModelLoadEvent.started_at, ModelLoadEvent.finished_at)
+        .where(ModelLoadEvent.model_id == model.id, ModelLoadEvent.success.is_(True))
+        .order_by(ModelLoadEvent.finished_at.desc())
+        .limit(LOAD_HISTORY)
+    )
+    rows = (await db.execute(stmt)).all()
+    if rows:
+        return sum((f - s).total_seconds() for s, f in rows) / len(rows)
+    return model.size_bytes / (settings.disk_read_mbps * 1_000_000) + LOAD_OVERHEAD_SECONDS
+
+
+def reservation_phase(r: Reservation, now: datetime) -> str:
+    if r.status == "cancelled":
+        return "cancelled"
+    if now < r.start_at:
+        return "upcoming"
+    if now < r.end_at:
+        return "active"
+    return "finished"
+
+
+async def reservation_out(db: AsyncSession, rows: list[Reservation], now: datetime) -> list[ReservationOut]:
+    if not rows:
+        return []
+    user_ids = {r.user_id for r in rows}
+    model_ids = {r.model_id for r in rows}
+    users = dict((await db.execute(select(User.id, User.username).where(User.id.in_(user_ids)))).all())
+    models = dict((await db.execute(select(LlmModel.id, LlmModel.name).where(LlmModel.id.in_(model_ids)))).all())
+    return [
+        ReservationOut(
+            id=r.id,
+            user_id=r.user_id,
+            username=users.get(r.user_id, "?"),
+            model_id=r.model_id,
+            model_name=models.get(r.model_id, "?"),
+            start_at=r.start_at,
+            end_at=r.end_at,
+            status=r.status,
+            phase=reservation_phase(r, now),
+            note=r.note,
+            released_at=r.released_at,
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]
+
+
+async def model_out(
+    db: AsyncSession, models: list[LlmModel], settings: Settings, loaded_model_id: int | None
+) -> list[ModelOut]:
+    creator_ids = {m.created_by for m in models if m.created_by is not None}
+    creators: dict[int, str] = {}
+    if creator_ids:
+        creators = dict((await db.execute(select(User.id, User.username).where(User.id.in_(creator_ids)))).all())
+    out = []
+    for m in models:
+        path = Path(m.file_path)
+        out.append(
+            ModelOut(
+                id=m.id,
+                name=m.name,
+                file_path=m.file_path,
+                file_name=path.name,
+                file_exists=path.is_file(),
+                size_bytes=m.size_bytes,
+                status=m.status,
+                is_default=m.is_default,
+                is_loaded=m.id == loaded_model_id,
+                args=m.args,
+                description=m.description,
+                est_load_seconds=round(await estimate_load_seconds(db, m, settings), 1),
+                created_by=m.created_by,
+                created_by_name=creators.get(m.created_by) if m.created_by else None,
+                created_at=m.created_at,
+            )
+        )
+    return out
