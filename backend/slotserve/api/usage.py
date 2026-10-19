@@ -1,13 +1,16 @@
+import csv
+import io
 from collections import defaultdict
-from datetime import timedelta
+from datetime import timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db, utcnow
 from ..deps import current_user
-from ..orm import Reservation, UsageLog, User
+from ..orm import ApiKey, Reservation, UsageLog, User
 from ..schemas import UsageDayRow, UsageModelRow, UsageOut, UsageUserRow
 
 router = APIRouter(prefix="/api/usage", tags=["usage"])
@@ -103,4 +106,53 @@ async def usage(
         daily=[
             UsageDayRow(date=d, username=names.get(uid, "?"), requests=n, tokens=t) for d, uid, n, t in per_day
         ],
+    )
+
+
+@router.get("/export")
+async def export_usage(
+    days: int = Query(default=30, ge=1, le=365),
+    kind: str = Query(default="summary", pattern="^(summary|requests)$"),
+    tz_offset: int = Query(default=0, ge=-840, le=840, description="Minutes east of UTC for dates and times"),
+    _: User = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """CSV for spreadsheets: one row per day, person and model (``summary``) or per request (``requests``)."""
+    since = utcnow() - timedelta(days=days)
+    names = dict((await db.execute(select(User.id, User.username))).all())
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    if kind == "requests":
+        keys = dict((await db.execute(select(ApiKey.id, ApiKey.name))).all())
+        writer.writerow(["time", "user", "api_key", "model", "endpoint", "stream", "status", "prompt_tokens",
+                         "completion_tokens", "duration_ms"])
+        tz = timezone(timedelta(minutes=tz_offset))
+        rows = await db.execute(select(UsageLog).where(UsageLog.created_at >= since).order_by(UsageLog.created_at))
+        for u in rows.scalars():
+            writer.writerow([
+                u.created_at.astimezone(tz).strftime("%Y-%m-%d %H:%M:%S"), names.get(u.user_id, "?"),
+                keys.get(u.api_key_id, ""), u.model_name, u.endpoint, int(u.stream), u.status_code,
+                u.prompt_tokens, u.completion_tokens, u.duration_ms,
+            ])
+    else:
+        day = func.strftime("%Y-%m-%d", UsageLog.created_at, f"{tz_offset:+d} minutes")
+        writer.writerow(["date", "user", "model", "requests", "prompt_tokens", "completion_tokens"])
+        rows = await db.execute(
+            select(
+                day, UsageLog.user_id, UsageLog.model_name, func.count(UsageLog.id),
+                func.coalesce(func.sum(UsageLog.prompt_tokens), 0),
+                func.coalesce(func.sum(UsageLog.completion_tokens), 0),
+            )
+            .where(UsageLog.created_at >= since)
+            .group_by(day, UsageLog.user_id, UsageLog.model_name)
+            .order_by(day)
+        )
+        for d, uid, model, n, p, c in rows.all():
+            writer.writerow([d, names.get(uid, "?"), model, n, p, c])
+    filename = f"slotserve-{kind}-{utcnow():%Y%m%d}.csv"
+    # BOM so Excel detects UTF-8.
+    return Response(
+        "\ufeff" + buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"content-disposition": f'attachment; filename="{filename}"'},
     )

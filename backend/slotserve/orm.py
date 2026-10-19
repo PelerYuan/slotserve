@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base, UTCDateTime, utcnow
@@ -15,6 +15,12 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     disabled_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    locale: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    telegram_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    telegram_username: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    telegram_link_token: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    notify_prefs: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON {kind: bool}
+    ical_token: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
 
 class ApiKey(Base):
@@ -47,6 +53,19 @@ class LlmModel(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
+class ModelPreset(Base):
+    """An alternative set of launch arguments for a model."""
+
+    __tablename__ = "model_presets"
+    __table_args__ = (UniqueConstraint("model_id", "name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    model_id: Mapped[int] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(64))
+    args: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
 class DownloadTask(Base):
     __tablename__ = "download_tasks"
 
@@ -70,7 +89,12 @@ class Reservation(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    model_id: Mapped[int] = mapped_column(ForeignKey("models.id", ondelete="RESTRICT"), index=True)
+    # NULL = exclusive booking: llama-server is stopped and the whole GPU is free for other work.
+    model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="RESTRICT"), nullable=True, index=True)
+    preset_id: Mapped[int | None] = mapped_column(
+        ForeignKey("model_presets.id", ondelete="SET NULL"), nullable=True
+    )
+    series_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     start_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
     end_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
     # booked | cancelled  (upcoming / active / finished is derived from time)
@@ -130,4 +154,33 @@ class AuditLog(Base):
     action: Mapped[str] = mapped_column(String(64), index=True)
     target: Mapped[str] = mapped_column(String(160), default="")
     detail: Mapped[str] = mapped_column(Text, default="{}")  # JSON
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+
+
+class WaitlistEntry(Base):
+    __tablename__ = "waitlist"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), nullable=True)
+    preset_id: Mapped[int | None] = mapped_column(ForeignKey("model_presets.id", ondelete="SET NULL"), nullable=True)
+    start_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    end_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    note: Mapped[str] = mapped_column(Text, default="")
+    auto_book: Mapped[bool] = mapped_column(Boolean, default=True)
+    # waiting | notified | booked | expired | cancelled
+    status: Mapped[str] = mapped_column(String(16), default="waiting", index=True)
+    reservation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("reservations.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    resolved_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class SentNotification(Base):
+    """De-duplicates one-off notifications (reminders, fallbacks) across scheduler ticks and restarts."""
+
+    __tablename__ = "sent_notifications"
+
+    key: Mapped[str] = mapped_column(String(128), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)

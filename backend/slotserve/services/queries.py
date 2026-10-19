@@ -7,8 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings
-from ..orm import LlmModel, ModelLoadEvent, Reservation, User
-from ..schemas import ModelOut, ReservationOut
+from ..orm import LlmModel, ModelLoadEvent, ModelPreset, Reservation, User
+from ..schemas import ModelOut, PresetOut, ReservationOut
 
 LOAD_HISTORY = 5
 LOAD_OVERHEAD_SECONDS = 15.0
@@ -77,16 +77,26 @@ async def reservation_out(db: AsyncSession, rows: list[Reservation], now: dateti
     if not rows:
         return []
     user_ids = {r.user_id for r in rows}
-    model_ids = {r.model_id for r in rows}
+    model_ids = {r.model_id for r in rows if r.model_id is not None}
+    preset_ids = {r.preset_id for r in rows if r.preset_id is not None}
     users = dict((await db.execute(select(User.id, User.username).where(User.id.in_(user_ids)))).all())
     models = dict((await db.execute(select(LlmModel.id, LlmModel.name).where(LlmModel.id.in_(model_ids)))).all())
+    presets = (
+        dict((await db.execute(select(ModelPreset.id, ModelPreset.name).where(ModelPreset.id.in_(preset_ids)))).all())
+        if preset_ids
+        else {}
+    )
     return [
         ReservationOut(
             id=r.id,
             user_id=r.user_id,
             username=users.get(r.user_id, "?"),
             model_id=r.model_id,
-            model_name=models.get(r.model_id, "?"),
+            model_name=models.get(r.model_id, "?") if r.model_id is not None else None,
+            preset_id=r.preset_id,
+            preset_name=presets.get(r.preset_id) if r.preset_id is not None else None,
+            exclusive=r.model_id is None,
+            series_id=r.series_id,
             start_at=r.start_at,
             end_at=r.end_at,
             status=r.status,
@@ -106,6 +116,13 @@ async def model_out(
     creators: dict[int, str] = {}
     if creator_ids:
         creators = dict((await db.execute(select(User.id, User.username).where(User.id.in_(creator_ids)))).all())
+    presets: dict[int, list[PresetOut]] = {}
+    if models:
+        rows = await db.execute(
+            select(ModelPreset).where(ModelPreset.model_id.in_([m.id for m in models])).order_by(ModelPreset.name)
+        )
+        for p in rows.scalars():
+            presets.setdefault(p.model_id, []).append(PresetOut.model_validate(p))
     out = []
     for m in models:
         path = Path(m.file_path)
@@ -126,6 +143,7 @@ async def model_out(
                 created_by=m.created_by,
                 created_by_name=creators.get(m.created_by) if m.created_by else None,
                 created_at=m.created_at,
+                presets=presets.get(m.id, []),
             )
         )
     return out

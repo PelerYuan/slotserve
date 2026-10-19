@@ -1,29 +1,31 @@
-import asyncio
-from datetime import datetime, timedelta, timezone
+import uuid
+from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..db import get_db, utcnow
-from ..deps import current_user, get_scheduler
+from ..deps import current_user
 from ..errors import ApiError
-from ..orm import LlmModel, Reservation, User
-from ..runtime.scheduler import Scheduler
-from ..schemas import ReservationCreateIn, ReservationOut
-from ..services import queries
+from ..orm import Reservation, User
+from ..schemas import ExtendIn, ReservationCreateIn, ReservationOut, ReservationUpdateIn
+from ..services import booking, queries
 from ..services.audit import record
 
 router = APIRouter(prefix="/api/reservations", tags=["reservations"])
 
-# Serialises the overlap check + insert (single-process deployment).
-_booking_lock = asyncio.Lock()
-CLOCK_SKEW = timedelta(minutes=2)
+
+def after_change(request: Request) -> None:
+    """Re-plan the GPU and give waitlisted people a chance at freed time."""
+    request.app.state.scheduler.poke()
+    request.app.state.housekeeper.poke()
 
 
-def _aware(dt: datetime) -> datetime:
-    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+def notify_owner(request: Request, actor: User, r: Reservation, event: str) -> None:
+    if r.user_id != actor.id:
+        request.app.state.notifier.emit(event, user_id=r.user_id, reservation_id=r.id, by=actor.username)
 
 
 @router.get("", response_model=list[ReservationOut])
@@ -36,8 +38,8 @@ async def list_reservations(
     db: AsyncSession = Depends(get_db),
 ):
     now = utcnow()
-    start = _aware(start) if start else now - timedelta(days=7)
-    end = _aware(end) if end else now + timedelta(days=30)
+    start = booking.aware(start) if start else now - timedelta(days=7)
+    end = booking.aware(end) if end else now + timedelta(days=30)
     stmt = select(Reservation).where(Reservation.end_at > start, Reservation.start_at < end)
     if not include_cancelled:
         stmt = stmt.where(Reservation.status == "booked")
@@ -47,74 +49,152 @@ async def list_reservations(
     return await queries.reservation_out(db, list(rows), now)
 
 
-@router.post("", response_model=ReservationOut, status_code=201)
+@router.post("", response_model=list[ReservationOut], status_code=201)
 async def create_reservation(
     body: ReservationCreateIn,
+    request: Request,
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-    scheduler: Scheduler = Depends(get_scheduler),
 ):
+    """Creates one booking, or a weekly series when ``repeat_weeks`` > 0. Returns every booking created."""
     settings = get_settings()
+    owner = user
+    if body.user_id is not None and body.user_id != user.id:
+        if not user.is_admin:
+            raise ApiError(status.HTTP_403_FORBIDDEN, "admin_required")
+        owner = await db.get(User, body.user_id)
+        if owner is None or owner.disabled_at is not None:
+            raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+
     now = utcnow()
-    start, end = _aware(body.start_at), _aware(body.end_at)
-    slot = timedelta(minutes=settings.slot_minutes)
-
-    if start < now - slot:
-        raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_in_past")
-    start = max(start, now)  # a slot that already began starts "now"
-    if end <= start + timedelta(minutes=5):
-        raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_too_short")
-    if end - start > timedelta(hours=settings.max_reservation_hours) + CLOCK_SKEW:
-        raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_too_long", hours=settings.max_reservation_hours)
-    if start > now + timedelta(days=settings.max_advance_days):
+    start, end = booking.check_window(settings, body.start_at, body.end_at, now)
+    windows = booking.series_windows(start, end, body.repeat_weeks)
+    if windows[-1][0] > now + timedelta(days=settings.max_advance_days):
         raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_too_far", days=settings.max_advance_days)
+    model, preset = await booking.resolve_model(db, body.model_id, body.preset_id)
 
-    model = await db.get(LlmModel, body.model_id)
-    if model is None or model.deleted_at is not None:
-        raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
-    if model.status != "ready":
-        raise ApiError(status.HTTP_400_BAD_REQUEST, "model_not_ready")
-
-    async with _booking_lock:
-        clash = (
-            await db.execute(
-                select(Reservation)
-                .where(Reservation.status == "booked", Reservation.start_at < end, Reservation.end_at > start)
-                .limit(1)
+    async with booking.booking_lock:
+        await booking.raise_if_conflicts(db, windows)
+        if owner.id == user.id:
+            await booking.check_quota(db, settings, owner, windows)
+        series = str(uuid.uuid4()) if len(windows) > 1 else None
+        created = [
+            Reservation(
+                user_id=owner.id,
+                model_id=model.id if model else None,
+                preset_id=preset.id if preset else None,
+                series_id=series,
+                start_at=s,
+                end_at=e,
+                note=body.note.strip(),
             )
-        ).scalar_one_or_none()
-        if clash is not None:
-            owner = await db.get(User, clash.user_id)
-            raise ApiError(
-                status.HTTP_409_CONFLICT,
-                "reservation_conflict",
-                username=owner.username if owner else "?",
-                start_at=clash.start_at.isoformat(),
-                end_at=clash.end_at.isoformat(),
-            )
-        reservation = Reservation(
-            user_id=user.id, model_id=model.id, start_at=start, end_at=end, note=body.note.strip()
-        )
-        db.add(reservation)
+            for s, e in windows
+        ]
+        db.add_all(created)
+        await db.flush()
+        if owner.id != user.id:
+            record(db, user, "reservation.create_for", f"#{created[0].id} {owner.username}", count=len(created))
         await db.commit()
 
-    scheduler.poke()
-    return (await queries.reservation_out(db, [reservation], utcnow()))[0]
+    for r in created:
+        notify_owner(request, user, r, "booking_created")
+    request.app.state.scheduler.poke()
+    return await queries.reservation_out(db, created, utcnow())
 
 
-@router.delete("/{reservation_id}", response_model=ReservationOut)
-async def cancel_or_release(
-    reservation_id: int,
-    user: User = Depends(current_user),
-    db: AsyncSession = Depends(get_db),
-    scheduler: Scheduler = Depends(get_scheduler),
-):
-    """Cancels an upcoming reservation, or releases (ends early) an active one."""
+async def _editable(db: AsyncSession, reservation_id: int, user: User) -> Reservation:
     r = await db.get(Reservation, reservation_id)
     if r is None:
         raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
     if r.user_id != user.id and not user.is_admin:
         raise ApiError(status.HTTP_403_FORBIDDEN, "not_owner")
+    return r
+
+
+async def update_reservation_core(
+    db: AsyncSession, user: User, r: Reservation, body: ReservationUpdateIn
+) -> tuple[Reservation, bool]:
+    """Applies an edit with the same rules as booking. Returns (reservation, shortened)."""
+    settings = get_settings()
+    now = utcnow()
+    phase = queries.reservation_phase(r, now)
+    fields = body.model_fields_set
+    if phase in ("finished", "cancelled"):
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_finished")
+    if phase == "active" and (fields & {"start_at", "model_id", "preset_id"}):
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_active_locked")
+
+    start = booking.aware(body.start_at) if body.start_at else r.start_at
+    end = booking.aware(body.end_at) if body.end_at else r.end_at
+    if phase == "upcoming" and ("start_at" in fields or "end_at" in fields):
+        start, end = booking.check_window(settings, start, end, now)
+    elif phase == "active" and "end_at" in fields:
+        if end <= now + timedelta(minutes=1):
+            raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_too_short")
+        booking.check_length(settings, start, end)
+
+    model_id = body.model_id if "model_id" in fields else r.model_id
+    preset_id = body.preset_id if ("preset_id" in fields or "model_id" in fields) else r.preset_id
+    if fields & {"model_id", "preset_id"}:
+        model, preset = await booking.resolve_model(db, model_id, preset_id)
+        model_id, preset_id = (model.id if model else None), (preset.id if preset else None)
+
+    shortened = start > r.start_at or end < r.end_at
+    async with booking.booking_lock:
+        await booking.raise_if_conflicts(db, [(start, end)], exclude={r.id})
+        owner = await db.get(User, r.user_id)
+        if owner is not None and owner.id == user.id:
+            await booking.check_quota(db, settings, owner, [(start, end)], exclude={r.id})
+        r.start_at, r.end_at, r.model_id, r.preset_id = start, end, model_id, preset_id
+        if body.note is not None:
+            r.note = body.note.strip()
+        if r.user_id != user.id:
+            record(db, user, "reservation.update", f"#{r.id} {owner.username if owner else '?'}",
+                   start_at=start, end_at=end)
+        await db.commit()
+    return r, shortened
+
+
+@router.patch("/{reservation_id}", response_model=ReservationOut)
+async def update_reservation(
+    reservation_id: int,
+    body: ReservationUpdateIn,
+    request: Request,
+    user: User = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    r = await _editable(db, reservation_id, user)
+    r, _ = await update_reservation_core(db, user, r, body)
+    notify_owner(request, user, r, "booking_changed")
+    after_change(request)
+    return (await queries.reservation_out(db, [r], utcnow()))[0]
+
+
+async def extend_core(db: AsyncSession, user: User, r: Reservation, minutes: int) -> Reservation:
+    if queries.reservation_phase(r, utcnow()) not in ("active", "upcoming"):
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_finished")
+    body = ReservationUpdateIn(end_at=r.end_at + timedelta(minutes=minutes))
+    r, _ = await update_reservation_core(db, user, r, body)
+    return r
+
+
+@router.post("/{reservation_id}/extend", response_model=ReservationOut)
+async def extend_reservation(
+    reservation_id: int,
+    body: ExtendIn,
+    request: Request,
+    user: User = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    r = await _editable(db, reservation_id, user)
+    r = await extend_core(db, user, r, body.minutes)
+    notify_owner(request, user, r, "booking_changed")
+    request.app.state.scheduler.poke()
+    return (await queries.reservation_out(db, [r], utcnow()))[0]
+
+
+async def end_core(db: AsyncSession, user: User, r: Reservation) -> str:
+    """Cancels an upcoming reservation or releases (ends early) an active one; returns the action."""
     now = utcnow()
     phase = queries.reservation_phase(r, now)
     if phase == "upcoming":
@@ -124,10 +204,38 @@ async def cancel_or_release(
         r.released_at = now
     else:
         raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_finished")
+    action = "cancel" if phase == "upcoming" else "release"
     if r.user_id != user.id:
         owner = await db.get(User, r.user_id)
-        action = "reservation.cancel" if phase == "upcoming" else "reservation.release"
-        record(db, user, action, f"#{r.id} {owner.username if owner else '?'}", start_at=r.start_at)
+        record(db, user, f"reservation.{action}", f"#{r.id} {owner.username if owner else '?'}", start_at=r.start_at)
+    return action
+
+
+@router.delete("/{reservation_id}", response_model=list[ReservationOut])
+async def cancel_or_release(
+    reservation_id: int,
+    request: Request,
+    series: bool = False,
+    user: User = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cancels an upcoming reservation, or releases an active one. ``series=true`` also cancels the rest of
+    its weekly series. Returns the affected bookings."""
+    r = await _editable(db, reservation_id, user)
+    targets = [r]
+    if series and r.series_id:
+        rest = await db.execute(
+            select(Reservation).where(
+                Reservation.series_id == r.series_id,
+                Reservation.id != r.id,
+                Reservation.status == "booked",
+                Reservation.start_at > utcnow(),
+            )
+        )
+        targets += list(rest.scalars())
+    actions = [await end_core(db, user, t) for t in targets]
     await db.commit()
-    scheduler.poke()
-    return (await queries.reservation_out(db, [r], now))[0]
+    for t, action in zip(targets, actions, strict=True):
+        notify_owner(request, user, t, "booking_cancelled" if action == "cancel" else "booking_released")
+    after_change(request)
+    return await queries.reservation_out(db, targets, utcnow())

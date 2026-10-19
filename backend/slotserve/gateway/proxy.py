@@ -90,6 +90,7 @@ async def authenticate(request: Request) -> Caller:
 
 async def admit(request: Request, caller: Caller, requested_model: str | None) -> Admission:
     runtime: LlamaRuntime = request.app.state.runtime
+    target = request.app.state.scheduler.target
     now = utcnow()
     async with SessionLocal() as db:
         active = await queries.active_reservation(db, now)
@@ -103,9 +104,18 @@ async def admit(request: Request, caller: Caller, requested_model: str | None) -
                     "gpu_reserved",
                 )
             )
+        if active is not None and active.model_id is None:
+            raise GatewayError(
+                openai_error(
+                    503,
+                    "Your booking is exclusive: llama-server is stopped so the whole GPU is free for other work.",
+                    "gpu_exclusive",
+                )
+            )
 
         snap = runtime.snapshot()
-        if active is not None and snap.model_id != active.model_id:
+        if active is not None and (target is None or target.reservation is None or target.reservation.id != active.id
+                                   or (snap.model_id, snap.preset_id) != target.spec):
             reserved = await db.get(LlmModel, active.model_id)
             raise _unavailable(snap, f"Your reserved model '{reserved.name if reserved else '?'}' is loading.")
         if snap.state != RuntimeState.READY:

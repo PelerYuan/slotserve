@@ -28,6 +28,8 @@ async def register(body: RegisterIn, request: Request, db: AsyncSession = Depend
     db.add(user)
     await db.commit()
     request.session[SESSION_USER_KEY] = user.id
+    if not first_user:
+        request.app.state.notifier.emit("user_registered", username=user.username)
     return user
 
 

@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     registration_open: bool = True
     cookie_secure: bool = False
     static_dir: Path | None = None
+    # Base URL people use to open SlotServe (e.g. http://gpu-box:8000); used in links sent by the bot.
+    public_url: str = ""
+    # IANA time zone used in notifications.
+    timezone: str = "UTC"
 
     # Storage
     data_dir: Path = Path("data")
@@ -37,9 +41,23 @@ class Settings(BaseSettings):
     max_advance_days: int = 30
     preload_buffer_seconds: int = 60
     scheduler_interval_seconds: float = 5.0
+    # Per-person limits for non-admins; 0 means unlimited.
+    quota_weekly_hours: int = 0
+    quota_upcoming: int = 0
+    reminder_minutes: int = 10
 
     # Downloads
     download_min_free_gb: float = 2.0
+    hf_endpoint: str = "https://huggingface.co"
+    hf_token: str = ""
+
+    # Telegram bot (notifications); empty token disables it.
+    telegram_bot_token: str = ""
+    telegram_proxy: str = ""
+    telegram_api_base: str = "https://api.telegram.org"
+
+    # Prometheus /metrics; empty token disables the endpoint.
+    metrics_token: str = ""
 
     @property
     def database_url(self) -> str:

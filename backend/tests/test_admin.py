@@ -57,7 +57,7 @@ async def test_disable_blocks_web_and_api_and_ends_bookings(make_client, models_
         json={"model_id": model_id, "start_at": start.isoformat(), "end_at": (start + timedelta(hours=1)).isoformat()},
     )
     assert r.status_code == 201
-    booking_id = r.json()["id"]
+    booking_id = r.json()[0]["id"]
 
     r = await admin.patch(f"/api/admin/users/{users['bob']['id']}", json={"disabled": True})
     assert r.status_code == 200 and r.json()["disabled_at"] is not None

@@ -31,6 +31,12 @@ class UserOut(ORMModel):
     username: str
     is_admin: bool
     created_at: datetime
+    locale: str | None = None
+
+
+class PreferencesIn(BaseModel):
+    locale: str | None = Field(default=None, pattern=r"^(en|zh-CN)$")
+    notify_prefs: dict[str, bool] | None = None
 
 
 class AdminUserOut(UserOut):
@@ -84,6 +90,17 @@ class AdminApiKeyOut(ApiKeyOut):
 # ---- models ---------------------------------------------------------------
 
 
+class PresetOut(ORMModel):
+    id: int
+    name: str
+    args: str
+
+
+class PresetIn(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    args: str = Field(default="", max_length=4000)
+
+
 class ModelOut(BaseModel):
     id: int
     name: str
@@ -100,6 +117,7 @@ class ModelOut(BaseModel):
     created_by: int | None
     created_by_name: str | None
     created_at: datetime
+    presets: list[PresetOut] = []
 
 
 class ModelUpdateIn(BaseModel):
@@ -119,6 +137,26 @@ class ScanResultOut(BaseModel):
 class DownloadCreateIn(BaseModel):
     url: str = Field(min_length=8, max_length=4000)
     filename: str | None = Field(default=None, max_length=255)
+
+
+class HfFileOut(BaseModel):
+    path: str  # primary file (first part for split models)
+    files: list[str]  # every file to download, primary last
+    size_bytes: int
+    parts: int
+    kind: str  # model | mmproj
+
+
+class HfFilesOut(BaseModel):
+    repo: str
+    revision: str
+    files: list[HfFileOut]
+
+
+class HfDownloadIn(BaseModel):
+    repo: str = Field(min_length=3, max_length=200, pattern=r"^[\w.\-]+/[\w.\-]+$")
+    revision: str = Field(default="main", min_length=1, max_length=100)
+    files: list[str] = Field(min_length=1, max_length=50)
 
 
 class DownloadOut(ORMModel):
@@ -141,18 +179,39 @@ class DownloadOut(ORMModel):
 
 
 class ReservationCreateIn(BaseModel):
-    model_id: int
+    model_id: int | None = None  # None = exclusive (whole GPU, no model)
+    preset_id: int | None = None
     start_at: datetime
     end_at: datetime
     note: str = Field(default="", max_length=500)
+    repeat_weeks: int = Field(default=0, ge=0, le=52)
+    user_id: int | None = None  # admins may book for someone else
+
+
+class ReservationUpdateIn(BaseModel):
+    """Only the fields that are sent change; ``model_id: null`` turns the booking exclusive."""
+
+    model_id: int | None = None
+    preset_id: int | None = None
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    note: str | None = Field(default=None, max_length=500)
+
+
+class ExtendIn(BaseModel):
+    minutes: int = Field(ge=5, le=24 * 60)
 
 
 class ReservationOut(BaseModel):
     id: int
     user_id: int
     username: str
-    model_id: int
-    model_name: str
+    model_id: int | None
+    model_name: str | None
+    preset_id: int | None = None
+    preset_name: str | None = None
+    exclusive: bool = False
+    series_id: str | None = None
     start_at: datetime
     end_at: datetime
     status: str
@@ -179,15 +238,26 @@ class RuntimeOut(BaseModel):
     state: str  # stopped | loading | ready | stopping | failed
     model_id: int | None
     model_name: str | None
+    preset_name: str | None = None
     load_started_at: datetime | None
     ready_at: datetime | None
     est_load_seconds: float | None
     error: str | None
 
 
+class ManualOut(BaseModel):
+    model_name: str | None  # None = unloaded
+    preset_name: str | None
+    until: datetime | None
+    by: str
+
+
 class StatusOut(BaseModel):
     now: datetime
     runtime: RuntimeOut
+    reason: str | None = None
+    fallback_from: str | None = None
+    manual: ManualOut | None = None
     active_reservation: ReservationOut | None
     upcoming: list[ReservationOut]
     free_access: bool
@@ -200,7 +270,82 @@ class ConfigOut(BaseModel):
     max_reservation_hours: int
     max_advance_days: int
     registration_open: bool
+    quota_weekly_hours: int = 0
+    quota_upcoming: int = 0
+    telegram_enabled: bool = False
     version: str
+
+
+class ManualIn(BaseModel):
+    action: str = Field(pattern="^(load|unload|auto)$")
+    model_id: int | None = None
+    preset_id: int | None = None
+    hours: float | None = Field(default=None, gt=0, le=24 * 7)  # None = until the next booking
+
+
+class RequestLogOut(BaseModel):
+    id: int
+    created_at: datetime
+    username: str
+    key_name: str | None
+    model_name: str
+    endpoint: str
+    stream: bool
+    status_code: int
+    duration_ms: int
+    prompt_tokens: int
+    completion_tokens: int
+
+
+class RequestPageOut(BaseModel):
+    total: int
+    items: list[RequestLogOut]
+
+
+# ---- waitlist -------------------------------------------------------------
+
+
+class WaitlistIn(BaseModel):
+    model_id: int | None = None
+    preset_id: int | None = None
+    start_at: datetime
+    end_at: datetime
+    note: str = Field(default="", max_length=500)
+    auto_book: bool = True
+
+
+class WaitlistOut(BaseModel):
+    id: int
+    user_id: int
+    username: str
+    model_id: int | None
+    model_name: str | None
+    preset_name: str | None
+    exclusive: bool
+    start_at: datetime
+    end_at: datetime
+    note: str
+    auto_book: bool
+    status: str
+    reservation_id: int | None
+    created_at: datetime
+
+
+# ---- telegram & calendar -------------------------------------------------------
+
+
+class TelegramOut(BaseModel):
+    enabled: bool
+    bot_username: str | None
+    linked: bool
+    telegram_username: str | None
+    link_url: str | None = None
+    notify_prefs: dict[str, bool]
+
+
+class CalendarOut(BaseModel):
+    mine_url: str
+    all_url: str
 
 
 # ---- admin ----------------------------------------------------------------

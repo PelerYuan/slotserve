@@ -10,7 +10,7 @@ from ..db import get_db, utcnow
 from ..deps import admin_user, get_scheduler
 from ..errors import ApiError
 from ..orm import ApiKey, AuditLog, LlmModel, ModelLoadEvent, Reservation, UsageLog, User
-from ..runtime.scheduler import Scheduler
+from ..runtime.scheduler import ManualOverride, Scheduler
 from ..schemas import (
     AdminApiKeyOut,
     AdminPasswordIn,
@@ -21,11 +21,14 @@ from ..schemas import (
     AuditOut,
     AuditPageOut,
     LoadEventOut,
+    ManualIn,
+    RequestLogOut,
+    RequestPageOut,
     ReservationOut,
     SettingOut,
 )
 from ..security import hash_password
-from ..services import app_settings, queries
+from ..services import app_settings, booking, queries
 from ..services.audit import record
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -368,6 +371,8 @@ async def put_settings(
     if applied:
         record(db, admin, "settings.update", ", ".join(applied), **applied)
     await db.commit()
+    if app_settings.TELEGRAM_KEYS & applied.keys():
+        request.app.state.telegram.reload()
     return await get_settings_view(request, admin, db)
 
 
@@ -400,3 +405,85 @@ async def audit_log(
             for r in rows
         ],
     )
+
+
+# ---- runtime control ------------------------------------------------------
+
+
+@router.post("/runtime/manual", status_code=204)
+async def manual_runtime(
+    body: ManualIn,
+    admin: User = Depends(admin_user),
+    db: AsyncSession = Depends(get_db),
+    scheduler: Scheduler = Depends(get_scheduler),
+):
+    """Load a model now, unload, or hand control back to the schedule (``auto``). Bookings always win."""
+    if body.action == "auto":
+        scheduler.set_manual(None)
+        record(db, admin, "runtime.auto")
+        await db.commit()
+        return
+    if await queries.active_reservation(db, utcnow()) is not None:
+        raise ApiError(status.HTTP_409_CONFLICT, "reservation_active")
+    model = preset = None
+    if body.action == "load":
+        if body.model_id is None:
+            raise ApiError(status.HTTP_400_BAD_REQUEST, "validation_error", field="model_id")
+        model, preset = await booking.resolve_model(db, body.model_id, body.preset_id)
+    until = utcnow() + timedelta(hours=body.hours) if body.hours else None
+    scheduler.set_manual(
+        ManualOverride(
+            model_id=model.id if model else None,
+            preset_id=preset.id if preset else None,
+            until=until,
+            by=admin.username,
+            created_at=utcnow(),
+        )
+    )
+    record(db, admin, f"runtime.{body.action}", model.name if model else "", until=until)
+    await db.commit()
+
+
+# ---- request log ----------------------------------------------------------
+
+
+@router.get("/requests", response_model=RequestPageOut)
+async def request_log(
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    user_id: int | None = None,
+    errors_only: bool = False,
+    _: User = Depends(admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    stmt = select(UsageLog)
+    count = select(func.count(UsageLog.id))
+    if user_id is not None:
+        stmt, count = stmt.where(UsageLog.user_id == user_id), count.where(UsageLog.user_id == user_id)
+    if errors_only:
+        stmt, count = stmt.where(UsageLog.status_code >= 400), count.where(UsageLog.status_code >= 400)
+    total = (await db.execute(count)).scalar_one()
+    rows = (await db.execute(stmt.order_by(UsageLog.id.desc()).offset(offset).limit(limit))).scalars().all()
+    names = dict((await db.execute(select(User.id, User.username))).all())
+    keys = dict((await db.execute(select(ApiKey.id, ApiKey.name))).all())
+    return RequestPageOut(
+        total=total,
+        items=[
+            RequestLogOut(
+                id=u.id,
+                created_at=u.created_at,
+                username=names.get(u.user_id, "?"),
+                key_name=keys.get(u.api_key_id),
+                model_name=u.model_name,
+                endpoint=u.endpoint,
+                stream=u.stream,
+                status_code=u.status_code,
+                duration_ms=u.duration_ms,
+                prompt_tokens=u.prompt_tokens,
+                completion_tokens=u.completion_tokens,
+            )
+            for u in rows
+        ],
+    )
+
+

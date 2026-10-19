@@ -11,6 +11,7 @@ import argparse
 import asyncio
 import json
 import os
+import sys
 import time
 import uuid
 
@@ -23,7 +24,10 @@ parser.add_argument("-m", "--model", default="mock.gguf")
 parser.add_argument("--host", default="127.0.0.1")
 parser.add_argument("--port", type=int, default=8081)
 parser.add_argument("-a", "--alias", default=None)
+parser.add_argument("--mock-fail", action="store_true", help="exit immediately, as if the model failed to load")
 args, unknown = parser.parse_known_args()
+if args.mock_fail:
+    sys.exit("mock: simulated load failure")
 
 ALIAS = args.alias or os.path.basename(args.model)
 LOAD_SECONDS = float(os.environ.get("MOCK_LOAD_SECONDS", "5"))

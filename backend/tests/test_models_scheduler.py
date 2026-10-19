@@ -101,15 +101,15 @@ async def test_compute_target_rules(app):
     # Reservation far away -> still default.
     await _reserve(big_id, now + timedelta(hours=3), now + timedelta(hours=4))
     async with SessionLocal() as db:
-        assert (await compute_target(db, settings, now, default_id)).model.id == default_id
+        assert (await compute_target(db, settings, now, (default_id, None))).model.id == default_id
         # 5 minutes before start (< 315s + 60s buffer) -> preload.
-        t = await compute_target(db, settings, now + timedelta(hours=3) - timedelta(minutes=5), default_id)
+        t = await compute_target(db, settings, now + timedelta(hours=3) - timedelta(minutes=5), (default_id, None))
         assert t.model.id == big_id and t.reason == "preload"
         # During the reservation -> reserved model.
-        t = await compute_target(db, settings, now + timedelta(hours=3, minutes=10), big_id)
+        t = await compute_target(db, settings, now + timedelta(hours=3, minutes=10), (big_id, None))
         assert t.model.id == big_id and t.reason == "reservation"
         # Just after -> default again.
-        t = await compute_target(db, settings, now + timedelta(hours=4, minutes=1), big_id)
+        t = await compute_target(db, settings, now + timedelta(hours=4, minutes=1), (big_id, None))
         assert t.model.id == default_id
 
 
@@ -121,5 +121,5 @@ async def test_compute_target_skips_short_default_window(app):
     await _reserve(big_id, now, now + timedelta(hours=1))
     await _reserve(big_id, now + timedelta(hours=1, minutes=8), now + timedelta(hours=2))
     async with SessionLocal() as db:
-        t = await compute_target(db, settings, now + timedelta(hours=1, seconds=10), big_id)
+        t = await compute_target(db, settings, now + timedelta(hours=1, seconds=10), (big_id, None))
         assert t.model.id == big_id and t.reason == "preload-early"

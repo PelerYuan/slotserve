@@ -32,8 +32,8 @@ async def test_book_and_conflict(make_client, models_dir):
 
     r = await book(alice, mid, hours_from_now(2), hours_from_now(4), "training")
     assert r.status_code == 201, r.text
-    assert r.json()["phase"] == "upcoming"
-    assert r.json()["username"] == "alice"
+    assert r.json()[0]["phase"] == "upcoming"
+    assert r.json()[0]["username"] == "alice"
 
     r = await book(bob, mid, hours_from_now(3), hours_from_now(5))
     assert r.status_code == 409
@@ -60,18 +60,18 @@ async def test_cancel_and_release(make_client, models_dir):
     carol = await make_client("carol")
     mid = await _model_id(alice, models_dir)
 
-    upcoming = (await book(bob, mid, hours_from_now(5), hours_from_now(6))).json()
+    upcoming = (await book(bob, mid, hours_from_now(5), hours_from_now(6))).json()[0]
     # Non-owner, non-admin cannot cancel.
     assert (await carol.delete(f"/api/reservations/{upcoming['id']}")).status_code == 403
     r = await bob.delete(f"/api/reservations/{upcoming['id']}")
-    assert r.json()["phase"] == "cancelled"
+    assert r.json()[0]["phase"] == "cancelled"
 
     now = datetime.now(timezone.utc)
-    active = (await book(bob, mid, now, now + timedelta(hours=1))).json()
+    active = (await book(bob, mid, now, now + timedelta(hours=1))).json()[0]
     assert active["phase"] == "active"
     r = await bob.delete(f"/api/reservations/{active['id']}")
-    assert r.json()["phase"] == "finished"
-    assert r.json()["released_at"] is not None
+    assert r.json()[0]["phase"] == "finished"
+    assert r.json()[0]["released_at"] is not None
 
     # Slot is free again immediately.
     later = datetime.now(timezone.utc) + timedelta(minutes=1)
@@ -82,7 +82,7 @@ async def test_admin_can_cancel_any(make_client, models_dir):
     admin = await make_client("alice")
     bob = await make_client("bob")
     mid = await _model_id(admin, models_dir)
-    res = (await book(bob, mid, hours_from_now(2), hours_from_now(3))).json()
+    res = (await book(bob, mid, hours_from_now(2), hours_from_now(3))).json()[0]
     assert (await admin.delete(f"/api/reservations/{res['id']}")).status_code == 200
 
 

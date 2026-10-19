@@ -45,6 +45,7 @@ class Downloader:
         self._wake = asyncio.Event()
         self._cancel: set[int] = set()
         self.current_id: int | None = None
+        self.events = None  # Notifier, set by the app
 
     def poke(self) -> None:
         self._wake.set()
@@ -106,6 +107,7 @@ class Downloader:
         except Exception as exc:  # noqa: BLE001
             log.warning("download %s failed: %s", task_id, exc)
             await self._set(task_id, status="failed", error=str(exc)[:1000], speed_bps=0.0, finished_at=utcnow())
+            self._emit("download_failed", user_id=user_id, filename=filename, error=str(exc)[:200])
             return
         finally:
             self.current_id = None
@@ -118,6 +120,18 @@ class Downloader:
                 await db.commit()
                 model_id = model.id if model else None
         await self._set(task_id, status="done", speed_bps=0.0, finished_at=utcnow(), model_id=model_id)
+        self._emit("download_done", user_id=user_id, filename=filename)
+
+    def _emit(self, event: str, **data) -> None:
+        if self.events is not None and data.get("user_id") is not None:
+            self.events.emit(event, **data)
+
+    def auth_headers(self, url: str) -> dict[str, str]:
+        """Sends the Hugging Face token only to the configured Hugging Face endpoint."""
+        endpoint = self.settings.hf_endpoint.rstrip("/")
+        if self.settings.hf_token and (url == endpoint or url.startswith(endpoint + "/")):
+            return {"Authorization": f"Bearer {self.settings.hf_token}"}
+        return {}
 
     async def _download(self, task_id: int, url: str, filename: str) -> None:
         dest = self.dest_path(filename)
@@ -128,6 +142,7 @@ class Downloader:
 
         offset = part.stat().st_size if part.exists() else 0
         headers = {"Range": f"bytes={offset}-"} if offset else {}
+        headers.update(self.auth_headers(url))
         timeout = httpx.Timeout(30.0, read=120.0)
         async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as client:
             async with client.stream("GET", url, headers=headers) as resp:

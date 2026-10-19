@@ -3,61 +3,125 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Any, Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings
 from ..db import SessionLocal, utcnow
-from ..orm import LlmModel
+from ..orm import LlmModel, ModelPreset, Reservation
 from ..services import queries
-from .manager import LlamaRuntime
+from .manager import FAIL_BACKOFF_SECONDS, LlamaRuntime, RuntimeState
 
 log = logging.getLogger(__name__)
+
+Spec = tuple[int, int | None]
+
+
+class EventSink(Protocol):
+    def emit(self, event: str, **data: Any) -> None: ...
 
 
 @dataclass
 class Target:
     model: LlmModel | None
+    preset: ModelPreset | None
     est_load_seconds: float
-    reason: str
+    reason: str  # reservation | exclusive | preload | preload-early | preload-exclusive | manual | fallback | default | idle
+    reservation: Reservation | None = None
+    fallback_from: str | None = None
+
+    @property
+    def spec(self) -> Spec | None:
+        return (self.model.id, self.preset.id if self.preset else None) if self.model else None
+
+
+@dataclass
+class ManualOverride:
+    """An admin's "load this now" / "unload" request; ``model_id`` ``None`` means unload."""
+
+    model_id: int | None
+    preset_id: int | None
+    until: datetime | None  # None = until the next booking starts
+    by: str
+    created_at: datetime
+
+
+async def _model_and_preset(
+    db: AsyncSession, model_id: int | None, preset_id: int | None
+) -> tuple[LlmModel | None, ModelPreset | None]:
+    model = await db.get(LlmModel, model_id) if model_id is not None else None
+    if model is None or model.deleted_at is not None:
+        return None, None
+    preset = await db.get(ModelPreset, preset_id) if preset_id is not None else None
+    if preset is not None and preset.model_id != model.id:
+        preset = None
+    return model, preset
 
 
 async def compute_target(
-    db: AsyncSession, settings: Settings, now: datetime, current_model_id: int | None
+    db: AsyncSession,
+    settings: Settings,
+    now: datetime,
+    current: Spec | None,
+    manual: ManualOverride | None = None,
 ) -> Target:
     """Pure decision logic (see docs: "Scheduling and preloading")."""
     buffer = settings.preload_buffer_seconds
 
     active = await queries.active_reservation(db, now)
     if active is not None:
-        model = await db.get(LlmModel, active.model_id)
-        return Target(model, await queries.estimate_load_seconds(db, model, settings), "reservation")
+        if active.model_id is None:
+            return Target(None, None, 0.0, "exclusive", active)
+        model, preset = await _model_and_preset(db, active.model_id, active.preset_id)
+        if model is not None:
+            est = await queries.estimate_load_seconds(db, model, settings)
+            return Target(model, preset, est, "reservation", active)
 
     default = await queries.default_model(db)
+    default_spec = (default.id, None) if default else None
     est_default = await queries.estimate_load_seconds(db, default, settings) if default else 0.0
 
     upcoming = await queries.next_reservation(db, now)
     if upcoming is not None:
-        model = await db.get(LlmModel, upcoming.model_id)
-        est_next = await queries.estimate_load_seconds(db, model, settings)
         gap = (upcoming.start_at - now).total_seconds()
-        if default is None or model.id != default.id:
-            if gap <= est_next + buffer:
-                return Target(model, est_next, "preload")
-            # Switching back to the default would leave it usable only briefly before the next switch.
-            if current_model_id != (default.id if default else None) and gap <= est_default + est_next + 2 * buffer:
-                return Target(model, est_next, "preload-early")
+        if upcoming.model_id is None:
+            # Free the GPU a little early so the booker gets all of it from the first minute.
+            if gap <= settings.stop_timeout_seconds + buffer:
+                return Target(None, None, 0.0, "preload-exclusive", upcoming)
+        else:
+            model, preset = await _model_and_preset(db, upcoming.model_id, upcoming.preset_id)
+            if model is not None:
+                spec = (model.id, preset.id if preset else None)
+                est_next = await queries.estimate_load_seconds(db, model, settings)
+                if spec != default_spec:
+                    if gap <= est_next + buffer:
+                        return Target(model, preset, est_next, "preload", upcoming)
+                    # Switching back to the default would leave it usable only briefly before the next switch.
+                    if current != default_spec and gap <= est_default + est_next + 2 * buffer:
+                        return Target(model, preset, est_next, "preload-early", upcoming)
 
-    return Target(default, est_default, "default" if default else "idle")
+    if manual is not None and (manual.until is None or manual.until > now):
+        model, preset = await _model_and_preset(db, manual.model_id, manual.preset_id)
+        est = await queries.estimate_load_seconds(db, model, settings) if model else 0.0
+        return Target(model, preset, est, "manual")
+
+    return Target(default, None, est_default, "default" if default else "idle")
 
 
 class Scheduler:
-    def __init__(self, runtime: LlamaRuntime, settings: Settings):
+    def __init__(self, runtime: LlamaRuntime, settings: Settings, events: EventSink | None = None):
         self.runtime = runtime
         self.settings = settings
+        self.events = events
+        self.target: Target | None = None
+        self.manual: ManualOverride | None = None
         self._wake = asyncio.Event()
         self._force_restart = False
+        self._failures: dict[Spec, tuple[int, datetime]] = {}
+        self._seen_failure: datetime | None = None
+        self._fallback_notified: set[int] = set()
         self.last_reason: str | None = None
 
     def poke(self) -> None:
@@ -68,14 +132,70 @@ class Scheduler:
         self._force_restart = True
         self._wake.set()
 
+    def set_manual(self, override: ManualOverride | None) -> None:
+        self.manual = override
+        self.poke()
+
+    def _emit(self, event: str, **data: Any) -> None:
+        if self.events is not None:
+            self.events.emit(event, **data)
+
+    def _observe_runtime(self) -> None:
+        """Learns from the runtime's last outcome: failed specs back off, successful ones are forgiven."""
+        rt = self.runtime
+        if rt.state == RuntimeState.FAILED and rt.spec and rt._failed_at and rt._failed_at != self._seen_failure:
+            self._seen_failure = rt._failed_at
+            count = self._failures.get(rt.spec, (0, rt._failed_at))[0] + 1
+            self._failures[rt.spec] = (count, rt._failed_at)
+            self._emit("load_failed", model=rt.model_name, preset=rt.preset_name, error=rt.error)
+        elif rt.state == RuntimeState.READY and rt.spec in self._failures:
+            del self._failures[rt.spec]
+
+    async def _apply_fallback(self, db: AsyncSession, target: Target, now: datetime) -> Target:
+        """While a booked model is backing off after a failed load, serve the default model instead."""
+        if target.reason not in ("reservation", "preload", "preload-early", "manual") or target.spec is None:
+            return target
+        failure = self._failures.get(target.spec)
+        if failure is None:
+            return target
+        count, failed_at = failure
+        wait = FAIL_BACKOFF_SECONDS[min(count, len(FAIL_BACKOFF_SECONDS)) - 1]
+        if now - failed_at >= timedelta(seconds=wait):
+            return target  # time to try the booked model again
+        default = await queries.default_model(db)
+        if default is None or (default.id, None) == target.spec:
+            return target
+        est = await queries.estimate_load_seconds(db, default, self.settings)
+        res = target.reservation
+        if res is not None and res.id not in self._fallback_notified:
+            self._fallback_notified.add(res.id)
+            self._emit(
+                "fallback",
+                reservation_id=res.id,
+                user_id=res.user_id,
+                model=target.model.name if target.model else None,
+                default=default.name,
+            )
+        return Target(default, None, est, "fallback", res, fallback_from=target.model.name if target.model else None)
+
     async def tick(self) -> None:
+        now = utcnow()
+        self._observe_runtime()
         async with SessionLocal() as db:
-            target = await compute_target(db, self.settings, utcnow(), self.runtime.model_id)
+            target = await compute_target(db, self.settings, now, self.runtime.spec, self.manual)
+            if self.manual is not None:
+                expired = self.manual.until is not None and self.manual.until <= now
+                booked = target.reason in ("reservation", "exclusive") and self.manual.until is None
+                if expired or booked:
+                    log.info("manual override by %s ended", self.manual.by)
+                    self.manual = None
+            target = await self._apply_fallback(db, target, now)
         if target.reason != self.last_reason:
             log.info("scheduler target: %s (%s)", target.model.name if target.model else None, target.reason)
             self.last_reason = target.reason
+        self.target = target
         force, self._force_restart = self._force_restart, False
-        await self.runtime.ensure(target.model, target.est_load_seconds, force=force)
+        await self.runtime.ensure(target.model, target.est_load_seconds, force=force, preset=target.preset)
 
     async def run(self) -> None:
         while True:

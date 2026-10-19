@@ -18,7 +18,7 @@ import httpx
 
 from ..config import Settings
 from ..db import SessionLocal, utcnow
-from ..orm import LlmModel, ModelLoadEvent
+from ..orm import LlmModel, ModelLoadEvent, ModelPreset
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +40,8 @@ class RuntimeSnapshot:
     state: RuntimeState
     model_id: int | None
     model_name: str | None
+    preset_id: int | None
+    preset_name: str | None
     load_started_at: datetime | None
     ready_at: datetime | None
     est_load_seconds: float | None
@@ -81,6 +83,8 @@ class LlamaRuntime:
         self.state = RuntimeState.STOPPED
         self.model_id: int | None = None
         self.model_name: str | None = None
+        self.preset_id: int | None = None
+        self.preset_name: str | None = None
         self.load_started_at: datetime | None = None
         self.ready_at: datetime | None = None
         self.est_load_seconds: float | None = None
@@ -95,22 +99,35 @@ class LlamaRuntime:
             state=self.state,
             model_id=self.model_id,
             model_name=self.model_name,
+            preset_id=self.preset_id,
+            preset_name=self.preset_name,
             load_started_at=self.load_started_at,
             ready_at=self.ready_at,
             est_load_seconds=self.est_load_seconds,
             error=self.error,
         )
 
-    async def ensure(self, model: LlmModel | None, est_load_seconds: float = 0.0, force: bool = False) -> None:
-        """Make the running process match ``model`` (``None`` = nothing loaded)."""
+    @property
+    def spec(self) -> tuple[int, int | None] | None:
+        """What is (or is being) loaded: ``(model_id, preset_id)``."""
+        return (self.model_id, self.preset_id) if self.model_id is not None else None
+
+    async def ensure(
+        self,
+        model: LlmModel | None,
+        est_load_seconds: float = 0.0,
+        force: bool = False,
+        preset: ModelPreset | None = None,
+    ) -> None:
+        """Make the running process match ``model`` with ``preset`` (``None`` = nothing loaded)."""
         async with self._lock:
             if model is None:
-                if self.state != RuntimeState.STOPPED:
+                if self.state != RuntimeState.STOPPED or self.model_id is not None:
                     await self._stop()
                     self._reset_identity()
                 return
 
-            same = self.model_id == model.id
+            same = self.spec == (model.id, preset.id if preset else None)
             if not force and same and self.state in (RuntimeState.LOADING, RuntimeState.READY):
                 return
             if not force and same and self.state == RuntimeState.FAILED and not self._retry_due():
@@ -118,7 +135,7 @@ class LlamaRuntime:
             if not same:
                 self._fail_count = 0
             await self._stop()
-            self._start(model, est_load_seconds)
+            self._start(model, est_load_seconds, preset)
 
     async def shutdown(self) -> None:
         async with self._lock:
@@ -137,8 +154,8 @@ class LlamaRuntime:
         tail = deque(data.decode("utf-8", errors="replace").splitlines(), maxlen=lines)
         return list(tail)
 
-    def build_command(self, model: LlmModel) -> list[str]:
-        user_args = strip_managed_flags(split_args(model.args or ""))
+    def build_command(self, model: LlmModel, preset: ModelPreset | None = None) -> list[str]:
+        user_args = strip_managed_flags(split_args((preset.args if preset else model.args) or ""))
         base = split_args(self.settings.llama_server_cmd)
         if base:
             exe = Path(base[0])
@@ -170,6 +187,8 @@ class LlamaRuntime:
     def _reset_identity(self) -> None:
         self.model_id = None
         self.model_name = None
+        self.preset_id = None
+        self.preset_name = None
         self.load_started_at = None
         self.ready_at = None
         self.est_load_seconds = None
@@ -177,8 +196,8 @@ class LlamaRuntime:
         self._fail_count = 0
         self._failed_at = None
 
-    def _start(self, model: LlmModel, est_load_seconds: float) -> None:
-        cmd = self.build_command(model)
+    def _start(self, model: LlmModel, est_load_seconds: float, preset: ModelPreset | None = None) -> None:
+        cmd = self.build_command(model, preset)
         self.settings.log_dir.mkdir(parents=True, exist_ok=True)
         self._rotate_log()
         self._log_file = self.log_path.open("ab")
@@ -188,6 +207,8 @@ class LlamaRuntime:
 
         self.model_id = model.id
         self.model_name = model.name
+        self.preset_id = preset.id if preset else None
+        self.preset_name = preset.name if preset else None
         self.load_started_at = started
         self.ready_at = None
         self.est_load_seconds = est_load_seconds

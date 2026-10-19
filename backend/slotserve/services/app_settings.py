@@ -8,6 +8,7 @@ of ``get_settings()`` (and the runtime) sees it immediately.
 import json
 from dataclasses import dataclass
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,8 +31,20 @@ EDITABLE: dict[str, Editable] = {
     "invite_code": Editable(str, min=1, max=128, secret=True),
     "max_reservation_hours": Editable(int, min=1, max=24 * 7),
     "max_advance_days": Editable(int, min=1, max=365),
+    "quota_weekly_hours": Editable(int, min=0, max=24 * 7),
+    "quota_upcoming": Editable(int, min=0, max=100),
     "default_llama_args": Editable(str, max=4000),
+    "timezone": Editable(str, min=1, max=64),
+    "public_url": Editable(str, max=300),
+    "telegram_bot_token": Editable(str, max=200, secret=True),
+    "telegram_proxy": Editable(str, max=300),
+    "hf_endpoint": Editable(str, min=1, max=300),
+    "hf_token": Editable(str, max=200, secret=True),
+    "metrics_token": Editable(str, max=200, secret=True),
 }
+
+# Changing one of these restarts the Telegram bot.
+TELEGRAM_KEYS = {"telegram_bot_token", "telegram_proxy"}
 
 
 class InvalidSetting(ValueError):
@@ -65,6 +78,15 @@ def validate(key: str, value: Any) -> Any:
             split_args(value)
         except ValueError as exc:
             raise InvalidSetting(key, str(exc)) from exc
+    elif key == "timezone":
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise InvalidSetting(key, "unknown time zone") from exc
+    elif key in ("public_url", "hf_endpoint", "telegram_proxy") and value:
+        if not value.lower().startswith(("http://", "https://", "socks5://", "socks5h://")):
+            raise InvalidSetting(key, "expected a URL")
+        value = value.rstrip("/")
     return value
 
 

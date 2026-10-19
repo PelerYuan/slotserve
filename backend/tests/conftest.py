@@ -6,6 +6,8 @@ from pathlib import Path
 import httpx
 import pytest
 
+from tg_mock import FakeTelegram
+
 from slotserve.config import get_settings
 from slotserve.main import create_app
 
@@ -39,6 +41,8 @@ async def app(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)  # never pick up a developer's .env
     get_settings.cache_clear()
     application = create_app()
+    application.state.fake_telegram = FakeTelegram()
+    application.state.telegram_transport = httpx.ASGITransport(app=application.state.fake_telegram.app)
     async with application.router.lifespan_context(application):
         yield application
     get_settings.cache_clear()

@@ -75,7 +75,7 @@ async def test_reservation_is_exclusive_and_switches_model(make_client, models_d
         json={"model_id": models["large"], "start_at": now.isoformat(), "end_at": (now + timedelta(hours=1)).isoformat()},
     )
     assert r.status_code == 201
-    res_id = r.json()["id"]
+    res_id = r.json()[0]["id"]
 
     # Alice is locked out right away, even while the model is switching.
     r = await admin.post("/v1/chat/completions", headers=keys["alice"], json={"messages": []})

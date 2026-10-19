@@ -8,10 +8,10 @@ from ..config import get_settings
 from ..db import get_db, utcnow
 from ..deps import admin_user, current_user, get_runtime, get_scheduler
 from ..errors import ApiError
-from ..orm import LlmModel, Reservation, User
+from ..orm import LlmModel, ModelPreset, Reservation, User
 from ..runtime.manager import LlamaRuntime, split_args
 from ..runtime.scheduler import Scheduler
-from ..schemas import ModelOut, ModelUpdateIn, ScanResultOut
+from ..schemas import ModelOut, ModelUpdateIn, PresetIn, PresetOut, ScanResultOut
 from ..services import queries, scanner
 from ..services.audit import record
 
@@ -139,4 +139,72 @@ async def delete_model(
         root = get_settings().models_dir.resolve()
         if path.is_file() and path.resolve().is_relative_to(root):
             path.unlink()
+    await db.commit()
+
+
+# ---- launch-argument presets ------------------------------------------------
+
+
+def _check_args(args: str) -> str:
+    try:
+        split_args(args)
+    except ValueError as exc:
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "invalid_args", reason=str(exc)) from exc
+    return args.strip()
+
+
+async def _get_preset(db: AsyncSession, model: LlmModel, preset_id: int) -> ModelPreset:
+    preset = await db.get(ModelPreset, preset_id)
+    if preset is None or preset.model_id != model.id:
+        raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    return preset
+
+
+async def _name_free(db: AsyncSession, model: LlmModel, name: str, exclude: int | None = None) -> None:
+    stmt = select(ModelPreset.id).where(ModelPreset.model_id == model.id, ModelPreset.name == name)
+    if exclude is not None:
+        stmt = stmt.where(ModelPreset.id != exclude)
+    if (await db.execute(stmt)).first() is not None:
+        raise ApiError(status.HTTP_409_CONFLICT, "preset_name_taken")
+
+
+@router.post("/{model_id}/presets", response_model=PresetOut, status_code=201)
+async def create_preset(
+    model_id: int, body: PresetIn, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
+):
+    model = await _get_model(db, model_id)
+    _check_owner(model, user)
+    await _name_free(db, model, body.name.strip())
+    preset = ModelPreset(model_id=model.id, name=body.name.strip(), args=_check_args(body.args))
+    db.add(preset)
+    await db.commit()
+    return preset
+
+
+@router.patch("/{model_id}/presets/{preset_id}", response_model=PresetOut)
+async def update_preset(
+    model_id: int,
+    preset_id: int,
+    body: PresetIn,
+    user: User = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    model = await _get_model(db, model_id)
+    _check_owner(model, user)
+    preset = await _get_preset(db, model, preset_id)
+    await _name_free(db, model, body.name.strip(), exclude=preset.id)
+    preset.name, preset.args = body.name.strip(), _check_args(body.args)
+    await db.commit()
+    return preset
+
+
+@router.delete("/{model_id}/presets/{preset_id}", status_code=204)
+async def delete_preset(
+    model_id: int, preset_id: int, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
+):
+    """Bookings that used the preset fall back to the model's own arguments."""
+    model = await _get_model(db, model_id)
+    _check_owner(model, user)
+    preset = await _get_preset(db, model, preset_id)
+    await db.delete(preset)
     await db.commit()
