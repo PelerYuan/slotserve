@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Questions & ideas / 提问与讨论
+    url: https://github.com/PelerYuan/slotserve/discussions
+    about: Ask how to set something up or share an idea before opening an issue.
   - name: Documentation / 文档
     url: https://peleryuan.github.io/slotserve/
     about: Setup, configuration and FAQ.
