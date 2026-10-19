@@ -307,6 +307,7 @@ function eta(d: DownloadTask) {
               <span v-if="m.is_default" class="badge brand"><Star :size="11" />{{ t('models.default') }}</span>
               <span v-if="m.is_loaded" class="badge ok">{{ t('models.loaded') }}</span>
               <span v-if="!m.file_exists" class="badge danger">{{ t('models.missingFile') }}</span>
+              <span v-if="m.exceeds_vram" class="badge warn" :title="t('models.exceedsVramHint')">{{ t('models.exceedsVram') }}</span>
             </div>
             <div class="m-file mono faint" :title="m.file_path">{{ m.file_name }}</div>
             <div v-if="m.description" class="m-desc muted">{{ m.description }}</div>

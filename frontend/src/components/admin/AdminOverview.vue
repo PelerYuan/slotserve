@@ -6,10 +6,10 @@ import { CalendarClock, Boxes, Coins, KeyRound, Activity, Users } from 'lucide-v
 import LogDrawer from '@/components/LogDrawer.vue'
 import StatusDot from '@/components/StatusDot.vue'
 import { api } from '@/api/client'
-import type { AdminStats, Model } from '@/api/types'
+import type { AdminStats, Backup, Model } from '@/api/types'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { useStatus } from '@/composables/useStatus'
-import { formatCompact, formatDateTime, formatDuration, formatNumber, formatTime } from '@/utils/format'
+import { formatBytes, formatCompact, formatDateTime, formatDuration, formatNumber, formatTime } from '@/utils/format'
 
 const emit = defineEmits<{ navigate: [tab: 'users' | 'reservations' | 'keys'] }>()
 const { t } = useI18n()
@@ -21,11 +21,27 @@ const stats = ref<AdminStats | null>(null)
 const logs = ref(false)
 const restarting = ref(false)
 
+const backups = ref<Backup[]>([])
+const backingUp = ref(false)
+
 async function load() {
   try {
-    stats.value = await api.admin.stats()
+    ;[stats.value, backups.value] = await Promise.all([api.admin.stats(), api.admin.backups()])
   } catch (e) {
     showError(e)
+  }
+}
+
+async function backupNow() {
+  backingUp.value = true
+  try {
+    await api.admin.createBackup()
+    backups.value = await api.admin.backups()
+    message.success(t('admin.backups.done'))
+  } catch (e) {
+    showError(e)
+  } finally {
+    backingUp.value = false
   }
 }
 onMounted(load)
@@ -225,6 +241,32 @@ const seconds = (a: string, b: string) => (new Date(b).getTime() - new Date(a).g
     </div>
   </section>
 
+  <section class="card backups">
+    <div class="card-header">
+      <div>
+        <h3 class="card-title">{{ t('admin.backups.title') }}</h3>
+        <div class="card-sub">{{ t('admin.backups.subtitle') }}</div>
+      </div>
+      <NButton size="small" secondary :loading="backingUp" @click="backupNow">{{ t('admin.backups.now') }}</NButton>
+    </div>
+    <div v-if="!backups.length" class="empty">{{ t('admin.backups.empty') }}</div>
+    <div v-else class="table-wrap">
+      <table class="table">
+        <tbody>
+          <tr v-for="b in backups.slice(0, 10)" :key="b.name">
+            <td class="muted num nowrap">{{ formatDateTime(b.created_at) }}</td>
+            <td><span class="badge" :class="{ brand: b.kind === 'manual' }">{{ t(`admin.backups.kinds.${b.kind}`) }}</span></td>
+            <td class="mono small">{{ b.name }}</td>
+            <td class="right num muted nowrap">{{ formatBytes(b.size_bytes) }}</td>
+            <td class="right">
+              <a :href="api.admin.backupUrl(b.name)" download>{{ t('admin.backups.download') }}</a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <LogDrawer v-model:show="logs" />
 </template>
 
@@ -282,6 +324,15 @@ const seconds = (a: string, b: string) => (new Date(b).getTime() - new Date(a).g
 }
 .wrap {
   flex-wrap: wrap;
+}
+.backups {
+  margin-top: 16px;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.small {
+  font-size: 12px;
 }
 .manual-note {
   margin: 0 20px 16px;

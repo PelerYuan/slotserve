@@ -87,6 +87,7 @@ The first account is the admin. Admins see an **Admin** entry in the sidebar.
 | Users | Create users (no invite code needed), reset passwords, grant or remove admin, disable, enable or delete accounts |
 | Bookings | Every booking, filtered by status or person; edit, cancel or end any booking; book for someone else |
 | Requests | Every API request with person, key, model, status, duration and tokens; filter to errors |
+| Overview → Backups | Daily database copies; back up now and download |
 | API keys | Every active key with its owner and last use; revoke any key |
 | System settings | Open registration, invite code, longest booking, booking horizon, default launch arguments |
 | Audit log | Who did what and when, for every admin action |

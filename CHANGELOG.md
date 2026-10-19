@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-20
+
+### Added
+
+- Model switches wait for running requests to finish (`SLOTSERVE_DRAIN_SECONDS`); new requests get `503 model_switching` meanwhile.
+- Models larger than GPU memory are flagged, and out-of-memory load failures explain how to fix them.
+- Sign-in throttling: 10 failures per account or 30 per address in 15 minutes return `429`.
+- Daily database backups with a backup list, on-demand backup and download in the admin overview.
+- Retention: per-request rows older than `SLOTSERVE_USAGE_RETENTION_DAYS` are folded into daily totals; old audit, download, waitlist and load records are cleaned up.
+- Undelivered Telegram messages are retried with back-off; pending notifications and the admin's manual model choice survive restarts.
+
+### Changed
+
+- `slotserve_requests_total` is labelled by `outcome` (`ok`/`error`) instead of the HTTP status, and includes archived totals.
+
 ## [0.3.0] - 2026-10-20
 
 ### Added
@@ -62,7 +77,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - Admin CLI: `slotserve reset-password`, `slotserve set-admin`.
 - Bilingual documentation site (MkDocs Material).
 
-[Unreleased]: https://github.com/PelerYuan/slotserve/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/PelerYuan/slotserve/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/PelerYuan/slotserve/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/PelerYuan/slotserve/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/PelerYuan/slotserve/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/PelerYuan/slotserve/releases/tag/v0.1.0

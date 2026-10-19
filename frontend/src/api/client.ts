@@ -7,6 +7,7 @@ import type {
   ApiKeyCreated,
   AppConfig,
   AuditEntry,
+  Backup,
   BookingInput,
   CalendarLinks,
   HfFile,
@@ -191,6 +192,9 @@ export const api = {
         offset,
         errors_only: errorsOnly || undefined,
       }),
+    backups: () => request<Backup[]>('GET', '/api/admin/backups'),
+    createBackup: () => request<Backup>('POST', '/api/admin/backups'),
+    backupUrl: (name: string) => `/api/admin/backups/${encodeURIComponent(name)}`,
     manual: (body: { action: 'load' | 'unload' | 'auto'; model_id?: number; preset_id?: number | null; hours?: number | null }) =>
       request<void>('POST', '/api/admin/runtime/manual', body),
   },

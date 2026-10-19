@@ -3,15 +3,15 @@
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 
 from ..config import Settings
-from ..db import SessionLocal
-from ..orm import LlmModel, ModelPreset, Reservation, User
+from ..db import SessionLocal, utcnow
+from ..orm import LlmModel, ModelPreset, OutboxItem, Reservation, User
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +46,7 @@ EVENT_PREF = {
 }
 
 ADMIN_EVENTS = {"load_failed", "user_registered", "disk_low"}
+RETRY_SECONDS = (30, 120, 600, 1800, 7200)  # then the message is dropped
 
 MESSAGES: dict[str, dict[str, str]] = {
     "en": {
@@ -221,8 +222,70 @@ class Notifier:
             return
         self.sent.append((user.telegram_chat_id, message))
         del self.sent[:-200]
-        if self.bot is not None:
-            await self.bot.send(user.telegram_chat_id, message, buttons)
+        if self.bot is not None and not await self.bot.send(user.telegram_chat_id, message, buttons):
+            await self._queue_retry(user.telegram_chat_id, message, buttons)
+
+    # ---- outbox: retries and restarts ----------------------------------------
+
+    async def _queue_retry(self, chat_id: int, message: str, buttons, attempts: int = 1) -> None:
+        async with SessionLocal() as db:
+            db.add(
+                OutboxItem(
+                    kind="message",
+                    payload=json.dumps({"chat_id": chat_id, "text": message, "buttons": buttons}),
+                    attempts=attempts,
+                    next_attempt_at=utcnow() + timedelta(seconds=RETRY_SECONDS[0]),
+                )
+            )
+            await db.commit()
+
+    async def retry_due(self, db) -> None:
+        """Re-sends messages whose earlier delivery failed (called by the housekeeper)."""
+        if self.bot is None or not self.bot.enabled:
+            return
+        due = (
+            await db.execute(
+                select(OutboxItem)
+                .where(OutboxItem.kind == "message", OutboxItem.next_attempt_at <= utcnow())
+                .order_by(OutboxItem.id)
+                .limit(20)
+            )
+        ).scalars().all()
+        for item in due:
+            data = json.loads(item.payload)
+            buttons = [[tuple(b) for b in row] for row in data["buttons"]] if data.get("buttons") else None
+            if await self.bot.send(data["chat_id"], data["text"], buttons):
+                await db.delete(item)
+            elif item.attempts >= len(RETRY_SECONDS):
+                log.warning("dropping notification after %s attempts", item.attempts)
+                await db.delete(item)
+            else:
+                item.next_attempt_at = utcnow() + timedelta(seconds=RETRY_SECONDS[item.attempts])
+                item.attempts += 1
+        await db.commit()
+
+    async def save_pending(self) -> int:
+        """At shutdown: keeps events that were not delivered yet."""
+        items = []
+        while not self.queue.empty():
+            event, data = self.queue.get_nowait()
+            items.append(OutboxItem(kind="event", payload=json.dumps({"event": event, "data": data}, default=str)))
+        if items:
+            async with SessionLocal() as db:
+                db.add_all(items)
+                await db.commit()
+        return len(items)
+
+    async def restore_pending(self) -> int:
+        """At startup: puts events saved by the previous process back on the queue."""
+        async with SessionLocal() as db:
+            rows = (await db.execute(select(OutboxItem).where(OutboxItem.kind == "event"))).scalars().all()
+            for row in rows:
+                payload = json.loads(row.payload)
+                self.emit(payload["event"], **payload["data"])
+                await db.delete(row)
+            await db.commit()
+        return len(rows)
 
 
 def _clean(data: dict) -> dict:

@@ -146,8 +146,9 @@ async function restart() {
             {{ t('overview.readySince', { time: formatTime(runtime.ready_at) }) }}
           </template>
           <template v-else-if="runtime?.state === 'failed'">
-            <span class="err">{{ runtime.error }}</span>
+            <span class="err">{{ runtime.error_hint === 'oom' ? t('overview.oomHint') : runtime.error }}</span>
           </template>
+          <template v-else-if="runtime?.draining">{{ t('overview.draining') }}</template>
           <template v-else-if="exclusive">{{ t('overview.exclusiveHint') }}</template>
           <template v-else-if="!runtime?.model_name">{{ t('overview.noModelHint') }}</template>
         </div>

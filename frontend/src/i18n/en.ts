@@ -69,6 +69,8 @@ export default {
     cancelled: 'Cancelled',
   },
   overview: {
+    oomHint: 'The model did not fit in GPU memory. Offload fewer layers (-ngl) or lower the context size (-c).',
+    draining: 'Waiting for running requests to finish before switching models…',
     fallbackBanner: '{model} failed to load. {current} is serving in the meantime; SlotServe keeps retrying.',
     manualLoad: '{user} loaded {model} manually',
     manualUnload: '{user} unloaded the model manually',
@@ -160,6 +162,8 @@ export default {
     noModels: 'No ready models yet. Add one on the Models page first.',
   },
   models: {
+    exceedsVram: 'Larger than GPU memory',
+    exceedsVramHint: 'The file is larger than the GPU memory, so full offload (-ngl 99) will fail. Offload fewer layers with a smaller -ngl.',
     presets: 'Presets',
     presetsHint: 'Alternative argument sets people can pick when booking, e.g. a long-context variant.',
     addPreset: 'Add preset',
@@ -304,6 +308,15 @@ export default {
     apiDocs: 'API reference',
   },
   admin: {
+    backups: {
+      title: 'Backups',
+      subtitle: 'Copies of the database in data/backups. A daily copy is made automatically.',
+      now: 'Back up now',
+      done: 'Backup created',
+      empty: 'No backups yet.',
+      download: 'Download',
+      kinds: { daily: 'Daily', manual: 'Manual', upgrade: 'Before upgrade' },
+    },
     manual: {
       load: 'Load a model…',
       unload: 'Unload',
@@ -420,7 +433,16 @@ export default {
       empty: 'No active API keys.',
     },
     settings: {
+      drain_seconds: 'Switch wait (seconds)',
+      drain_seconds_desc: 'Before switching models, wait this long for running requests to finish. New requests get 503 meanwhile.',
+      usage_retention_days: 'Keep request details (days)',
+      usage_retention_days_desc: 'Older requests are folded into daily totals, which are kept forever. 0 = keep everything; otherwise at least 90.',
+      audit_retention_days: 'Keep audit log (days)',
+      audit_retention_days_desc: '0 = keep forever.',
+      backup_keep: 'Daily backups to keep',
+      backup_keep_desc: 'A database copy is made every 24 hours. 0 turns automatic backups off.',
       groups: {
+        maintenance: 'Maintenance',
         access: 'Accounts',
         booking: 'Bookings & quotas',
         models: 'Models & downloads',
@@ -474,6 +496,7 @@ export default {
       empty: 'Nothing logged yet.',
       system: 'system',
       actions: {
+        backup_create: 'Created backup',
         reservation_create_for: 'Booked for someone',
         reservation_update: 'Changed booking',
         runtime_load: 'Loaded model manually',
@@ -505,6 +528,7 @@ export default {
     cancelled: 'Cancelled',
   },
   errors: {
+    too_many_attempts: 'Too many failed attempts. Try again in {minutes} minutes.',
     preset_without_model: 'Choose a model for this preset.',
     reservation_active_locked: 'A running booking can only be extended or shortened.',
     quota_upcoming: 'You can have at most {limit} open bookings.',

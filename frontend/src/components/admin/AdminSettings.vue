@@ -54,6 +54,7 @@ const GROUPS: { id: string; keys: string[] }[] = [
   { id: 'models', keys: ['default_llama_args', 'hf_endpoint', 'hf_token'] },
   { id: 'notify', keys: ['telegram_bot_token', 'telegram_proxy', 'public_url', 'timezone'] },
   { id: 'monitor', keys: ['metrics_token'] },
+  { id: 'maintenance', keys: ['drain_seconds', 'usage_retention_days', 'audit_retention_days', 'backup_keep'] },
 ]
 const groups = computed(() =>
   GROUPS.map((g) => ({
@@ -61,7 +62,8 @@ const groups = computed(() =>
     items: g.keys.map((k) => settings.value.find((s) => s.key === k)).filter((s): s is AdminSetting => !!s),
   })).filter((g) => g.items.length),
 )
-const minFor = (key: string) => (key.startsWith('quota_') ? 0 : 1)
+const ZERO_OK = new Set(['drain_seconds', 'usage_retention_days', 'audit_retention_days', 'backup_keep'])
+const minFor = (key: string) => (key.startsWith('quota_') || ZERO_OK.has(key) ? 0 : 1)
 
 const display = (s: AdminSetting, v: SettingValue) =>
   typeof v === 'boolean'

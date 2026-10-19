@@ -36,7 +36,13 @@ Free use of the idle GPU is best-effort: it may be interrupted when the next boo
 
 Loading can only start after the previous booking ends. If two adjacent bookings use different models, the second booking spends the start of its slot loading. When both use the same model there is no reload at all. The booking dialog points this out.
 
+## Switching without cutting requests off
+
+When the target model changes, SlotServe first lets requests that are already running finish (up to `SLOTSERVE_DRAIN_SECONDS`, 30 s by default). Meanwhile new requests get `503 model_switching` with a `Retry-After` header. Then llama-server is stopped and the next model loads. **Reload model** restarts immediately.
+
 ## Failures
+
+- If the log shows that the GPU ran out of memory, the error says so and suggests lowering `-ngl` or `-c`. Models whose file is larger than the GPU's memory are marked **Larger than GPU memory** in the model list and the booking dialog.
 
 - If llama-server exits or does not become healthy within `SLOTSERVE_LOAD_TIMEOUT_SECONDS`, the runtime is marked **failed** with the reason, and the scheduler retries with a growing back-off (30 s → 10 min).
 - **Fallback**: while a booked model is waiting for its next retry, the default model serves the booking so the booker is not left without a model. The overview shows a banner, and the booker and admins are notified. When the retry succeeds, the booked model takes over again.

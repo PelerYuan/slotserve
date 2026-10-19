@@ -71,6 +71,7 @@ SlotServe 在 `/v1` 提供 **OpenAI 兼容**接口。任何可以设置 base URL
 | 403 | `gpu_reserved` | 当前 GPU 被其他人预约，消息中包含结束时间 |
 | 409 | `model_not_loaded` | 请求了一个已登记但未加载的模型 |
 | 503 | `gpu_exclusive` | 你自己的整卡预约正在进行，不提供模型服务 |
+| 503 | `model_switching` | 即将切换模型，正在等待进行中的请求完成；请按 `Retry-After` 重试 |
 | 503 | `model_unavailable` | 模型加载中或启动失败；请按 `Retry-After` 重试 |
 | 502 | `upstream_error` | llama-server 没有响应 |
 
@@ -80,4 +81,4 @@ SlotServe 在 `/v1` 提供 **OpenAI 兼容**接口。任何可以设置 base URL
 
 ## Web API
 
-网页使用 `/api` 下独立的 JSON 接口（Cookie 会话），交互式文档位于 `/api/docs`。管理接口位于 `/api/admin` 下（`stats`、`users`、`keys`、`reservations`、`settings`、`audit`），需要管理员登录。
+网页使用 `/api` 下独立的 JSON 接口（Cookie 会话），交互式文档位于 `/api/docs`。同一账号 15 分钟内登录失败 10 次（或同一地址 30 次）后，登录接口返回 `429 too_many_attempts`，需等待一段时间。管理接口位于 `/api/admin` 下（`stats`、`users`、`keys`、`reservations`、`settings`、`audit`），需要管理员登录。

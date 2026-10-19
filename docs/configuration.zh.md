@@ -50,6 +50,10 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_TELEGRAM_BOT_TOKEN` | *空* | Telegram 机器人 Token，留空则不启用 |
 | `SLOTSERVE_TELEGRAM_PROXY` | *空* | 连接 Telegram 的 `http://` 或 `socks5://` 代理 |
 | `SLOTSERVE_METRICS_TOKEN` | *空* | `/metrics` 的 Bearer Token，留空则关闭 |
+| `SLOTSERVE_DRAIN_SECONDS` | `30` | 切换模型前等待进行中请求完成的最长时间 |
+| `SLOTSERVE_USAGE_RETENTION_DAYS` | `365` | 逐条请求记录保留天数，之后合并为按天汇总（0 表示永久；否则至少 90） |
+| `SLOTSERVE_AUDIT_RETENTION_DAYS` | `730` | 审计日志保留天数（0 表示永久） |
+| `SLOTSERVE_BACKUP_KEEP` | `7` | 保留的每日数据库备份份数（0 表示关闭自动备份） |
 
 其中大部分可由管理员在**管理 → 系统设置**中直接修改，无需重启：注册、邀请码、预约限制与配额、默认启动参数、时区、访问地址、Hugging Face、Telegram 和监控设置。修改保存在数据库中，优先于 `.env`；点**恢复默认**即可取消覆盖。
 
@@ -74,6 +78,21 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | KV 缓存量化 | `-ctk q8_0 -ctv q8_0` |
 
 完整列表见 `llama-server --help`。修改了当前已加载模型的参数后，在总览页点击**重新加载模型**即可生效。
+
+## 备份与恢复
+
+SlotServe 每 24 小时把数据库复制到 `data/backups/`（使用 SQLite 在线备份，运行中也安全），保留最新的 `SLOTSERVE_BACKUP_KEEP` 份。**管理 → 概览 → 备份**中可以查看、立即备份和下载。每次数据库升级前也会自动备份一次，这类备份不会被自动删除。
+
+恢复时先停止容器，用备份文件替换 `data/slotserve.db`，再启动：
+
+```bash
+docker compose stop
+cp data/backups/slotserve-daily-20261020-030000.db data/slotserve.db
+rm -f data/slotserve.db-wal data/slotserve.db-shm
+docker compose start
+```
+
+请另外把 `data/` 复制到其他地方保存：与数据库在同一块盘上的备份挡不住硬盘损坏。
 
 ## 管理员命令行
 

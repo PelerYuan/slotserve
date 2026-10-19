@@ -50,6 +50,10 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | `SLOTSERVE_TELEGRAM_BOT_TOKEN` | *empty* | Telegram bot token; empty disables the bot |
 | `SLOTSERVE_TELEGRAM_PROXY` | *empty* | `http://` or `socks5://` proxy for Telegram |
 | `SLOTSERVE_METRICS_TOKEN` | *empty* | Bearer token for `/metrics`; empty disables it |
+| `SLOTSERVE_DRAIN_SECONDS` | `30` | Before a model switch, wait this long for running requests to finish |
+| `SLOTSERVE_USAGE_RETENTION_DAYS` | `365` | Keep per-request rows this long, then fold them into daily totals (0 = forever; otherwise ≥ 90) |
+| `SLOTSERVE_AUDIT_RETENTION_DAYS` | `730` | Keep audit log entries this long (0 = forever) |
+| `SLOTSERVE_BACKUP_KEEP` | `7` | Daily database backups to keep (0 = no automatic backups) |
 
 Admins can override most of these in **Admin → System settings** without a restart: registration, invite code, booking limits and quotas, default launch arguments, time zone, public URL, Hugging Face, Telegram and metrics settings. Overrides live in the database and win over `.env`; **Use default** removes an override.
 
@@ -74,6 +78,21 @@ Each model has a free-form argument string that is appended to the command:
 | KV cache quantization | `-ctk q8_0 -ctv q8_0` |
 
 Run `llama-server --help` for the full list. After editing the arguments of the loaded model, press **Reload model** on the overview page.
+
+## Backups and restore
+
+SlotServe copies its database to `data/backups/` every 24 hours (SQLite's online backup, safe while running) and keeps the newest `SLOTSERVE_BACKUP_KEEP` copies. **Admin → Overview → Backups** lists them, makes one on demand and downloads them. A copy is also taken automatically before every database upgrade; those are never deleted.
+
+To restore, stop the container, replace `data/slotserve.db` with a backup file and start it again:
+
+```bash
+docker compose stop
+cp data/backups/slotserve-daily-20261020-030000.db data/slotserve.db
+rm -f data/slotserve.db-wal data/slotserve.db-shm
+docker compose start
+```
+
+Keep a copy of `data/` somewhere else as well - backups on the same disk do not survive a disk failure.
 
 ## Admin command line
 

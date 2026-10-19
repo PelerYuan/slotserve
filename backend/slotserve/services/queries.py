@@ -116,6 +116,9 @@ async def model_out(
     creators: dict[int, str] = {}
     if creator_ids:
         creators = dict((await db.execute(select(User.id, User.username).where(User.id.in_(creator_ids)))).all())
+    from ..runtime.gpu import gpu_stats  # local import: runtime imports this module
+
+    vram_bytes = sum(g.memory_total_mb for g in await gpu_stats()) * 1024 * 1024
     presets: dict[int, list[PresetOut]] = {}
     if models:
         rows = await db.execute(
@@ -144,6 +147,7 @@ async def model_out(
                 created_by_name=creators.get(m.created_by) if m.created_by else None,
                 created_at=m.created_at,
                 presets=presets.get(m.id, []),
+                exceeds_vram=bool(vram_bytes) and m.size_bytes > vram_bytes * 0.95,
             )
         )
     return out

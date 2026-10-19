@@ -35,6 +35,7 @@ export interface Model {
   created_by_name: string | null
   created_at: string
   presets: Preset[]
+  exceeds_vram: boolean
 }
 
 export interface Preset {
@@ -91,6 +92,8 @@ export interface Runtime {
   ready_at: string | null
   est_load_seconds: number | null
   error: string | null
+  error_hint: 'oom' | null
+  draining: boolean
 }
 
 export interface Gpu {
@@ -271,4 +274,11 @@ export interface HfFile {
   size_bytes: number
   parts: number
   kind: 'model' | 'mmproj'
+}
+
+export interface Backup {
+  name: string
+  kind: 'daily' | 'manual' | 'upgrade'
+  size_bytes: number
+  created_at: string
 }

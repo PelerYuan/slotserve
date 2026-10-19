@@ -41,6 +41,10 @@ EDITABLE: dict[str, Editable] = {
     "hf_endpoint": Editable(str, min=1, max=300),
     "hf_token": Editable(str, max=200, secret=True),
     "metrics_token": Editable(str, max=200, secret=True),
+    "drain_seconds": Editable(int, min=0, max=600),
+    "usage_retention_days": Editable(int, min=0, max=3650),
+    "audit_retention_days": Editable(int, min=0, max=3650),
+    "backup_keep": Editable(int, min=0, max=100),
 }
 
 # Changing one of these restarts the Telegram bot.
@@ -67,6 +71,8 @@ def validate(key: str, value: Any) -> Any:
             raise InvalidSetting(key, "expected an integer")
         if (spec.min is not None and value < spec.min) or (spec.max is not None and value > spec.max):
             raise InvalidSetting(key, f"must be between {spec.min} and {spec.max}")
+        if key == "usage_retention_days" and 0 < value < 90:
+            raise InvalidSetting(key, "must be 0 (keep forever) or at least 90")
         return value
     if not isinstance(value, str):
         raise InvalidSetting(key, "expected text")

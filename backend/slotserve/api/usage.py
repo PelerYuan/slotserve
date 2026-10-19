@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db, utcnow
 from ..deps import current_user
-from ..orm import ApiKey, Reservation, UsageLog, User
+from ..orm import ApiKey, Reservation, UsageDaily, UsageLog, User
 from ..schemas import UsageDayRow, UsageModelRow, UsageOut, UsageUserRow
 
 router = APIRouter(prefix="/api/usage", tags=["usage"])
@@ -147,7 +147,19 @@ async def export_usage(
             .group_by(day, UsageLog.user_id, UsageLog.model_name)
             .order_by(day)
         )
-        for d, uid, model, n, p, c in rows.all():
+        summary = [(d, uid, model, n, p, c) for d, uid, model, n, p, c in rows.all()]
+        # Days older than the retention period only exist as UTC roll-ups.
+        first_raw = min((r[0] for r in summary), default="9999-99-99")
+        archived = await db.execute(
+            select(UsageDaily).where(
+                UsageDaily.date >= since.strftime("%Y-%m-%d"), UsageDaily.date < first_raw
+            )
+        )
+        summary += [
+            (a.date, a.user_id, a.model_name, a.requests, a.prompt_tokens, a.completion_tokens)
+            for a in archived.scalars()
+        ]
+        for d, uid, model, n, p, c in sorted(summary, key=lambda r: (r[0], names.get(r[1], ""), r[2])):
             writer.writerow([d, names.get(uid, "?"), model, n, p, c])
     filename = f"slotserve-{kind}-{utcnow():%Y%m%d}.csv"
     # BOM so Excel detects UTF-8.

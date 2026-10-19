@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     default_llama_args: str = "-ngl 99 -c 8192"
     load_timeout_seconds: int = 1800
     stop_timeout_seconds: int = 20
+    # How long a model switch waits for in-flight requests to finish.
+    drain_seconds: int = 30
     disk_read_mbps: float = 150.0
 
     # Scheduling
@@ -58,6 +60,11 @@ class Settings(BaseSettings):
 
     # Prometheus /metrics; empty token disables the endpoint.
     metrics_token: str = ""
+
+    # Housekeeping: 0 keeps forever / disables.
+    usage_retention_days: int = 365
+    audit_retention_days: int = 730
+    backup_keep: int = 7
 
     @property
     def database_url(self) -> str:

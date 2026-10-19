@@ -26,8 +26,12 @@ parser.add_argument("--port", type=int, default=8081)
 parser.add_argument("-a", "--alias", default=None)
 parser.add_argument("--mock-fail", action="store_true", help="exit immediately, as if the model failed to load")
 args, unknown = parser.parse_known_args()
+oom_requested = "--mock-oom" in unknown
 if args.mock_fail:
     sys.exit("mock: simulated load failure")
+if oom_requested:
+    print("ggml_backend_cuda_buffer_type_alloc_buffer: allocating 20480.00 MiB on device 0: cudaMalloc failed: out of memory", file=sys.stderr)
+    sys.exit(1)
 
 ALIAS = args.alias or os.path.basename(args.model)
 LOAD_SECONDS = float(os.environ.get("MOCK_LOAD_SECONDS", "5"))

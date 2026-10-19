@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, ForeignKey, Integer, PrimaryKeyConstraint, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base, UTCDateTime, utcnow
@@ -184,3 +184,42 @@ class SentNotification(Base):
 
     key: Mapped[str] = mapped_column(String(128), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+
+
+class UsageDaily(Base):
+    """Per-day roll-up of usage_logs rows that are past the retention period (UTC dates)."""
+
+    __tablename__ = "usage_daily"
+    __table_args__ = (PrimaryKeyConstraint("date", "user_id", "model_name"),)
+
+    date: Mapped[str] = mapped_column(String(10))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    model_name: Mapped[str] = mapped_column(String(128))
+    requests: Mapped[int] = mapped_column(Integer, default=0)
+    failed: Mapped[int] = mapped_column(Integer, default=0)
+    prompt_tokens: Mapped[int] = mapped_column(BigInteger, default=0)
+    completion_tokens: Mapped[int] = mapped_column(BigInteger, default=0)
+    duration_ms: Mapped[int] = mapped_column(BigInteger, default=0)
+
+
+class KeyValue(Base):
+    """Small runtime state that must survive restarts (e.g. the admin's manual model choice)."""
+
+    __tablename__ = "kv_store"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text)  # JSON
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class OutboxItem(Base):
+    """Notifications waiting to be (re)sent: undelivered messages and events saved at shutdown."""
+
+    __tablename__ = "notification_outbox"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16))  # message | event
+    payload: Mapped[str] = mapped_column(Text)  # JSON
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_attempt_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

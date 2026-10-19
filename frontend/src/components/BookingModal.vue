@@ -297,6 +297,10 @@ async function joinWaitlist() {
           <div class="fact num">{{ formatBytes(selected.size_bytes) }}</div>
         </div>
       </div>
+      <div v-if="kind === 'model' && selected?.exceeds_vram" class="hint adjacent">
+        <TriangleAlert :size="15" />
+        <span>{{ t('models.exceedsVramHint') }}</span>
+      </div>
       <div v-if="loadHint" class="hint" :class="loadHint.kind">
         <TriangleAlert v-if="loadHint.kind === 'adjacent'" :size="15" />
         <Cpu v-else-if="loadHint.kind === 'exclusive'" :size="15" />

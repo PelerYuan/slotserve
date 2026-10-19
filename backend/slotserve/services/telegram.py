@@ -126,9 +126,10 @@ class TelegramBot:
             raise TelegramError(f"{method}: {data.get('description') or resp.status_code}")
         return data.get("result")
 
-    async def send(self, chat_id: int, message: str, buttons: list[list[tuple[str, str]]] | None = None) -> None:
+    async def send(self, chat_id: int, message: str, buttons: list[list[tuple[str, str]]] | None = None) -> bool:
+        """Returns ``False`` when Telegram could not be reached, so the caller can retry later."""
         if not self.enabled:
-            return
+            return True
         params: dict[str, Any] = {"chat_id": chat_id, "text": message, "disable_web_page_preview": True}
         if buttons:
             params["reply_markup"] = {
@@ -136,8 +137,13 @@ class TelegramBot:
             }
         try:
             await self.call("sendMessage", **params)
-        except (httpx.HTTPError, TelegramError, ValueError) as exc:
+        except TelegramError as exc:
+            # Telegram answered but refused (blocked bot, deleted chat): retrying will not help.
+            log.warning("telegram refused message: %s", exc)
+        except (httpx.HTTPError, ValueError) as exc:
             log.warning("telegram send failed: %s", exc)
+            return False
+        return True
 
     async def close(self) -> None:
         if self._client is not None:

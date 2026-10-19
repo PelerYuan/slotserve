@@ -73,6 +73,8 @@ async def get_status(
             ready_at=snap.ready_at,
             est_load_seconds=snap.est_load_seconds,
             error=snap.error,
+            error_hint=snap.error_hint,
+            draining=snap.draining,
         ),
         reason=target.reason if target else None,
         fallback_from=target.fallback_from if target else None,

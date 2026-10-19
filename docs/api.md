@@ -71,6 +71,7 @@ Errors use the OpenAI shape: `{"error": {"message", "type", "code"}}`.
 | 403 | `gpu_reserved` | Someone else has booked the GPU right now; the message says until when |
 | 409 | `model_not_loaded` | You asked for a registered model that is not loaded |
 | 503 | `gpu_exclusive` | Your own whole-GPU booking is running, so no model is served |
+| 503 | `model_switching` | Running requests are finishing before a model switch; honour `Retry-After` |
 | 503 | `model_unavailable` | The model is loading or failed to start; honour `Retry-After` |
 | 502 | `upstream_error` | llama-server did not answer |
 
@@ -80,4 +81,4 @@ Every request is logged with its user, key, model, token counts and duration. Fo
 
 ## Web API
 
-The browser UI uses a separate JSON API under `/api` with cookie sessions. Its interactive reference is served at `/api/docs`. Admin endpoints live under `/api/admin` (`stats`, `users`, `keys`, `reservations`, `settings`, `audit`) and require an admin session.
+The browser UI uses a separate JSON API under `/api` with cookie sessions. After 10 failed sign-ins for one account (or 30 from one address) within 15 minutes, sign-in returns `429 too_many_attempts` until the window passes. Its interactive reference is served at `/api/docs`. Admin endpoints live under `/api/admin` (`stats`, `users`, `keys`, `reservations`, `settings`, `audit`) and require an admin session.

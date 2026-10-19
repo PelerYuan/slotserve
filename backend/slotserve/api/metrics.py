@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 
 from ..config import get_settings
 from ..db import SessionLocal, utcnow
-from ..orm import DownloadTask, LlmModel, ModelLoadEvent, Reservation, UsageLog, User
+from ..orm import DownloadTask, LlmModel, ModelLoadEvent, Reservation, UsageDaily, UsageLog, User
 from ..runtime.gpu import gpu_stats
 from ..runtime.manager import RuntimeState
 from ..security import constant_time_equals
@@ -69,23 +69,39 @@ async def metrics(request: Request):
         ).scalar_one()
         w.metric("slotserve_reservations_upcoming", "gauge", "Bookings that have not started.", [({}, upcoming)])
 
-        rows = (
-            await db.execute(
-                select(
-                    UsageLog.user_id,
-                    UsageLog.model_name,
-                    UsageLog.status_code,
-                    func.count(UsageLog.id),
-                    func.coalesce(func.sum(UsageLog.prompt_tokens), 0),
-                    func.coalesce(func.sum(UsageLog.completion_tokens), 0),
-                    func.coalesce(func.sum(UsageLog.duration_ms), 0),
-                ).group_by(UsageLog.user_id, UsageLog.model_name, UsageLog.status_code)
-            )
-        ).all()
+        # (user, model) -> [ok, error, prompt, completion, ms]; live rows plus rolled-up history
+        totals: dict[tuple[int, str], list[int]] = {}
+        live = await db.execute(
+            select(
+                UsageLog.user_id,
+                UsageLog.model_name,
+                func.count(UsageLog.id),
+                func.coalesce(func.sum(UsageLog.status_code >= 400), 0),
+                func.coalesce(func.sum(UsageLog.prompt_tokens), 0),
+                func.coalesce(func.sum(UsageLog.completion_tokens), 0),
+                func.coalesce(func.sum(UsageLog.duration_ms), 0),
+            ).group_by(UsageLog.user_id, UsageLog.model_name)
+        )
+        archived = await db.execute(
+            select(
+                UsageDaily.user_id,
+                UsageDaily.model_name,
+                func.sum(UsageDaily.requests),
+                func.sum(UsageDaily.failed),
+                func.sum(UsageDaily.prompt_tokens),
+                func.sum(UsageDaily.completion_tokens),
+                func.sum(UsageDaily.duration_ms),
+            ).group_by(UsageDaily.user_id, UsageDaily.model_name)
+        )
+        for uid, model, n, failed, prompt, completion, ms in [*live.all(), *archived.all()]:
+            t = totals.setdefault((uid, model or "?"), [0, 0, 0, 0, 0])
+            for i, v in enumerate((n - failed, failed, prompt, completion, ms)):
+                t[i] += int(v or 0)
         requests, tokens, seconds = [], [], []
-        for uid, model, code, n, prompt, completion, ms in rows:
-            labels = {"user": users.get(uid, "?"), "model": model or "?"}
-            requests.append(({**labels, "status": code}, n))
+        for (uid, model), (ok, err, prompt, completion, ms) in sorted(totals.items()):
+            labels = {"user": users.get(uid, "?"), "model": model}
+            requests.append(({**labels, "outcome": "ok"}, ok))
+            requests.append(({**labels, "outcome": "error"}, err))
             tokens.append(({**labels, "type": "prompt"}, prompt))
             tokens.append(({**labels, "type": "completion"}, completion))
             seconds.append((labels, round(ms / 1000, 3)))

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import Settings
 from ..db import SessionLocal, utcnow
 from ..orm import LlmModel, ModelPreset, Reservation
-from ..services import queries
+from ..services import kv, queries
 from .manager import FAIL_BACKOFF_SECONDS, LlamaRuntime, RuntimeState
 
 log = logging.getLogger(__name__)
@@ -37,6 +37,9 @@ class Target:
         return (self.model.id, self.preset.id if self.preset else None) if self.model else None
 
 
+MANUAL_KEY = "manual_override"
+
+
 @dataclass
 class ManualOverride:
     """An admin's "load this now" / "unload" request; ``model_id`` ``None`` means unload."""
@@ -46,6 +49,25 @@ class ManualOverride:
     until: datetime | None  # None = until the next booking starts
     by: str
     created_at: datetime
+
+    def to_json(self) -> dict:
+        return {
+            "model_id": self.model_id,
+            "preset_id": self.preset_id,
+            "until": self.until.isoformat() if self.until else None,
+            "by": self.by,
+            "created_at": self.created_at.isoformat(),
+        }
+
+    @classmethod
+    def from_json(cls, data: dict) -> "ManualOverride":
+        return cls(
+            model_id=data.get("model_id"),
+            preset_id=data.get("preset_id"),
+            until=datetime.fromisoformat(data["until"]) if data.get("until") else None,
+            by=data.get("by", "?"),
+            created_at=datetime.fromisoformat(data["created_at"]),
+        )
 
 
 async def _model_and_preset(
@@ -136,6 +158,15 @@ class Scheduler:
         self.manual = override
         self.poke()
 
+    async def restore_manual(self) -> None:
+        """Picks up an admin's manual choice saved before a restart."""
+        async with SessionLocal() as db:
+            data = await kv.get(db, MANUAL_KEY)
+        if data:
+            override = ManualOverride.from_json(data)
+            if override.until is None or override.until > utcnow():
+                self.manual = override
+
     def _emit(self, event: str, **data: Any) -> None:
         if self.events is not None:
             self.events.emit(event, **data)
@@ -189,6 +220,8 @@ class Scheduler:
                 if expired or booked:
                     log.info("manual override by %s ended", self.manual.by)
                     self.manual = None
+                    await kv.put(db, MANUAL_KEY, None)
+                    await db.commit()
             target = await self._apply_fallback(db, target, now)
         if target.reason != self.last_reason:
             log.info("scheduler target: %s (%s)", target.model.name if target.model else None, target.reason)

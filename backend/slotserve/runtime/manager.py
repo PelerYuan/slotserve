@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import logging
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -25,6 +26,8 @@ log = logging.getLogger(__name__)
 # Flags that SlotServe always sets itself; user-supplied copies are dropped.
 MANAGED_FLAGS = {"-m", "--model", "--host", "--port", "-a", "--alias"}
 FAIL_BACKOFF_SECONDS = (30, 60, 120, 300, 600)
+# llama.cpp / CUDA messages that mean the model did not fit in GPU memory.
+OOM_RE = re.compile(r"out of memory|cudaMalloc failed|failed to allocate .*buffer|unable to allocate .*CUDA", re.I)
 
 
 class RuntimeState(StrEnum):
@@ -46,6 +49,9 @@ class RuntimeSnapshot:
     ready_at: datetime | None
     est_load_seconds: float | None
     error: str | None
+    error_hint: str | None = None  # "oom" when the log shows GPU memory exhaustion
+    draining: bool = False
+    inflight: int = 0
 
 
 def split_args(text: str) -> list[str]:
@@ -89,8 +95,14 @@ class LlamaRuntime:
         self.ready_at: datetime | None = None
         self.est_load_seconds: float | None = None
         self.error: str | None = None
+        self.error_hint: str | None = None
         self._failed_at: datetime | None = None
         self._fail_count = 0
+        # Gateway requests currently being served; a switch waits for them ("draining").
+        self.inflight = 0
+        self.draining = False
+        self._idle = asyncio.Event()
+        self._idle.set()
 
     # ---- public -----------------------------------------------------------
 
@@ -105,7 +117,32 @@ class LlamaRuntime:
             ready_at=self.ready_at,
             est_load_seconds=self.est_load_seconds,
             error=self.error,
+            error_hint=self.error_hint,
+            draining=self.draining,
+            inflight=self.inflight,
         )
+
+    def begin_request(self) -> None:
+        self.inflight += 1
+        self._idle.clear()
+
+    def end_request(self) -> None:
+        self.inflight = max(0, self.inflight - 1)
+        if self.inflight == 0:
+            self._idle.set()
+
+    async def _drain(self) -> None:
+        """Lets requests in flight finish before the process is stopped (new ones are refused meanwhile)."""
+        if self.state != RuntimeState.READY or self.inflight == 0 or self.settings.drain_seconds <= 0:
+            return
+        self.draining = True
+        log.info("waiting up to %ss for %s request(s) to finish", self.settings.drain_seconds, self.inflight)
+        try:
+            await asyncio.wait_for(self._idle.wait(), self.settings.drain_seconds)
+        except TimeoutError:
+            log.info("drain timed out with %s request(s) still running", self.inflight)
+        finally:
+            self.draining = False
 
     @property
     def spec(self) -> tuple[int, int | None] | None:
@@ -123,6 +160,7 @@ class LlamaRuntime:
         async with self._lock:
             if model is None:
                 if self.state != RuntimeState.STOPPED or self.model_id is not None:
+                    await self._drain()
                     await self._stop()
                     self._reset_identity()
                 return
@@ -134,6 +172,7 @@ class LlamaRuntime:
                 return
             if not same:
                 self._fail_count = 0
+                await self._drain()
             await self._stop()
             self._start(model, est_load_seconds, preset)
 
@@ -193,6 +232,7 @@ class LlamaRuntime:
         self.ready_at = None
         self.est_load_seconds = None
         self.error = None
+        self.error_hint = None
         self._fail_count = 0
         self._failed_at = None
 
@@ -213,6 +253,7 @@ class LlamaRuntime:
         self.ready_at = None
         self.est_load_seconds = est_load_seconds
         self.error = None
+        self.error_hint = None
 
         kwargs: dict = {}
         if os.name == "nt":
@@ -275,6 +316,15 @@ class LlamaRuntime:
             self._mark_failed(f"llama-server exited unexpectedly with code {proc.returncode}")
 
     def _mark_failed(self, message: str) -> None:
+        if self._log_file is not None:
+            with contextlib.suppress(OSError):
+                self._log_file.flush()
+        lines = self.tail_log(200)
+        starts = [i for i, line in enumerate(lines) if line.startswith("===== ") and " start: " in line]
+        current = lines[starts[-1]:] if starts else lines  # only this launch's output
+        if any(OOM_RE.search(line) for line in current):
+            self.error_hint = "oom"
+            message += " (GPU out of memory: offload fewer layers with -ngl, or lower the context size -c)"
         log.warning(message)
         self.state = RuntimeState.FAILED
         self.error = message

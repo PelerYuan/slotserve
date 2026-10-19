@@ -120,6 +120,15 @@ async def admit(request: Request, caller: Caller, requested_model: str | None) -
             raise _unavailable(snap, f"Your reserved model '{reserved.name if reserved else '?'}' is loading.")
         if snap.state != RuntimeState.READY:
             raise _unavailable(snap, _state_message(snap))
+        if snap.draining:
+            raise GatewayError(
+                openai_error(
+                    503,
+                    "The model is about to be switched; waiting for running requests to finish.",
+                    "model_switching",
+                    headers={"Retry-After": str(max(5, request.app.state.settings.drain_seconds))},
+                )
+            )
 
         if requested_model and requested_model != snap.model_name:
             other = (
@@ -246,6 +255,26 @@ async def proxy(path: str, request: Request):
     except GatewayError as e:
         return e.response
 
+    runtime: LlamaRuntime = request.app.state.runtime
+    runtime.begin_request()
+    released = False
+
+    def release() -> None:
+        nonlocal released
+        if not released:
+            released = True
+            runtime.end_request()
+
+    try:
+        return await _forward(request, path, body, raw, admission, started, release)
+    except BaseException:
+        release()
+        raise
+
+
+async def _forward(request: Request, path: str, body, raw: bytes, admission: Admission, started: float, release):
+    """Relays one admitted request; ``release`` is called once the response is complete."""
+
     stream = isinstance(body, dict) and bool(body.get("stream"))
     if stream and path in USAGE_STREAM_ENDPOINTS:
         opts = body.get("stream_options") or {}
@@ -262,6 +291,7 @@ async def proxy(path: str, request: Request):
     try:
         upstream = await client.send(upstream_req, stream=True)
     except httpx.HTTPError as exc:
+        release()
         _record_usage(admission, path, stream, None, started, 502)
         return openai_error(502, f"Upstream llama-server error: {exc.__class__.__name__}", "upstream_error")
 
@@ -275,6 +305,7 @@ async def proxy(path: str, request: Request):
                     sniffer.feed(chunk)
                     yield chunk
             finally:
+                release()
                 await upstream.aclose()
                 _record_usage(admission, path, True, sniffer.usage, started, upstream.status_code)
 
@@ -296,5 +327,6 @@ async def proxy(path: str, request: Request):
             usage = parsed.get("usage") if isinstance(parsed, dict) else None
         except ValueError:
             pass
+    release()
     _record_usage(admission, path, False, usage, started, upstream.status_code)
     return Response(content=content, status_code=upstream.status_code, media_type=content_type)

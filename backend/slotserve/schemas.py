@@ -118,6 +118,8 @@ class ModelOut(BaseModel):
     created_by_name: str | None
     created_at: datetime
     presets: list[PresetOut] = []
+    # The weights alone are larger than the GPU memory: full offload (-ngl 99) will not fit.
+    exceeds_vram: bool = False
 
 
 class ModelUpdateIn(BaseModel):
@@ -243,6 +245,8 @@ class RuntimeOut(BaseModel):
     ready_at: datetime | None
     est_load_seconds: float | None
     error: str | None
+    error_hint: str | None = None
+    draining: bool = False
 
 
 class ManualOut(BaseModel):
@@ -427,3 +431,10 @@ class UsageOut(BaseModel):
     users: list[UsageUserRow]
     models: list[UsageModelRow]
     daily: list[UsageDayRow]
+
+
+class BackupOut(BaseModel):
+    name: str
+    kind: str  # daily | manual | upgrade
+    size_bytes: int
+    created_at: datetime

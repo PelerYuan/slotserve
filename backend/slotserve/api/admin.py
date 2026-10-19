@@ -1,7 +1,10 @@
+import asyncio
 import json
-from datetime import timedelta
+import re
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,7 +13,7 @@ from ..db import get_db, utcnow
 from ..deps import admin_user, get_scheduler
 from ..errors import ApiError
 from ..orm import ApiKey, AuditLog, LlmModel, ModelLoadEvent, Reservation, UsageLog, User
-from ..runtime.scheduler import ManualOverride, Scheduler
+from ..runtime.scheduler import MANUAL_KEY, ManualOverride, Scheduler
 from ..schemas import (
     AdminApiKeyOut,
     AdminPasswordIn,
@@ -20,6 +23,7 @@ from ..schemas import (
     AdminUserUpdateIn,
     AuditOut,
     AuditPageOut,
+    BackupOut,
     LoadEventOut,
     ManualIn,
     RequestLogOut,
@@ -28,7 +32,7 @@ from ..schemas import (
     SettingOut,
 )
 from ..security import hash_password
-from ..services import app_settings, booking, queries
+from ..services import app_settings, booking, kv, maintenance, queries
 from ..services.audit import record
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -420,6 +424,7 @@ async def manual_runtime(
     """Load a model now, unload, or hand control back to the schedule (``auto``). Bookings always win."""
     if body.action == "auto":
         scheduler.set_manual(None)
+        await kv.put(db, MANUAL_KEY, None)
         record(db, admin, "runtime.auto")
         await db.commit()
         return
@@ -431,15 +436,15 @@ async def manual_runtime(
             raise ApiError(status.HTTP_400_BAD_REQUEST, "validation_error", field="model_id")
         model, preset = await booking.resolve_model(db, body.model_id, body.preset_id)
     until = utcnow() + timedelta(hours=body.hours) if body.hours else None
-    scheduler.set_manual(
-        ManualOverride(
-            model_id=model.id if model else None,
-            preset_id=preset.id if preset else None,
-            until=until,
-            by=admin.username,
-            created_at=utcnow(),
-        )
+    override = ManualOverride(
+        model_id=model.id if model else None,
+        preset_id=preset.id if preset else None,
+        until=until,
+        by=admin.username,
+        created_at=utcnow(),
     )
+    scheduler.set_manual(override)
+    await kv.put(db, MANUAL_KEY, override.to_json())
     record(db, admin, f"runtime.{body.action}", model.name if model else "", until=until)
     await db.commit()
 
@@ -487,3 +492,42 @@ async def request_log(
     )
 
 
+
+
+# ---- backups --------------------------------------------------------------
+
+_BACKUP_NAME = re.compile(r"^slotserve-(daily|manual|v\d+)-\d{8}-\d{6}\.db$")
+
+
+def _backup_out(path) -> BackupOut:
+    kind = path.name.split("-")[1]
+    st = path.stat()
+    return BackupOut(
+        name=path.name,
+        kind=kind if kind in ("daily", "manual") else "upgrade",
+        size_bytes=st.st_size,
+        created_at=datetime.fromtimestamp(st.st_mtime, timezone.utc),
+    )
+
+
+@router.get("/backups", response_model=list[BackupOut])
+async def list_backups(_: User = Depends(admin_user)):
+    return [_backup_out(p) for p in maintenance.list_backups(get_settings()) if _BACKUP_NAME.match(p.name)]
+
+
+@router.post("/backups", response_model=BackupOut, status_code=201)
+async def create_backup(admin: User = Depends(admin_user), db: AsyncSession = Depends(get_db)):
+    path = await asyncio.to_thread(maintenance.make_backup, get_settings(), "manual")
+    record(db, admin, "backup.create", path.name)
+    await db.commit()
+    return _backup_out(path)
+
+
+@router.get("/backups/{name}")
+async def download_backup(name: str, _: User = Depends(admin_user)):
+    if not _BACKUP_NAME.match(name):
+        raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    path = maintenance.backup_dir(get_settings()) / name
+    if not path.is_file():
+        raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    return FileResponse(path, media_type="application/vnd.sqlite3", filename=name)

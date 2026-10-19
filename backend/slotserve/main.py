@@ -19,6 +19,7 @@ from .services import app_settings
 from .services.downloader import Downloader
 from .services.housekeeper import Housekeeper
 from .services.notify import Notifier
+from .services.ratelimit import AttemptLimiter
 from .services.telegram import TelegramBot
 
 log = logging.getLogger("slotserve")
@@ -47,6 +48,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         async with db.SessionLocal() as session:
             await app_settings.load_overrides(session, settings)
         app.state.http = httpx.AsyncClient(timeout=httpx.Timeout(None, connect=10.0))
+        app.state.limiter = AttemptLimiter()
         app.state.notifier = Notifier(settings)
         app.state.runtime = LlamaRuntime(settings)
         app.state.scheduler = Scheduler(app.state.runtime, settings, app.state.notifier)
@@ -55,6 +57,9 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         app.state.housekeeper = Housekeeper(app.state)
         app.state.telegram = TelegramBot(app, transport=getattr(app.state, "telegram_transport", None))
         app.state.notifier.bot = app.state.telegram
+        await app.state.scheduler.restore_manual()
+        if restored := await app.state.notifier.restore_pending():
+            log.info("re-queued %s notification(s) saved at the last shutdown", restored)
         tasks = []
         if start_background:
             tasks = [
@@ -72,6 +77,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
             for t in tasks:
                 with contextlib.suppress(asyncio.CancelledError):
                     await t
+            await app.state.notifier.save_pending()
             await app.state.runtime.shutdown()
             await app.state.telegram.close()
             await app.state.http.aclose()

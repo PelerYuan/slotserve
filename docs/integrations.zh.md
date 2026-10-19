@@ -67,7 +67,7 @@ scrape_configs:
 | `slotserve_runtime_model_info` | gauge | `model`、`preset` |
 | `slotserve_reservation_active` | gauge | `user` |
 | `slotserve_reservations_upcoming` | gauge | |
-| `slotserve_requests_total` | counter | `user`、`model`、`status` |
+| `slotserve_requests_total` | counter | `user`、`model`、`outcome`（`ok` / `error`） |
 | `slotserve_tokens_total` | counter | `user`、`model`、`type` |
 | `slotserve_request_seconds_total` | counter | `user`、`model` |
 | `slotserve_model_loads_total` | counter | `model`、`result` |

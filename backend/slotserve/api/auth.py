@@ -18,7 +18,11 @@ async def register(body: RegisterIn, request: Request, db: AsyncSession = Depend
     settings = get_settings()
     if not settings.registration_open:
         raise ApiError(status.HTTP_403_FORBIDDEN, "registration_closed")
+    limiter = request.app.state.limiter
+    ip = _client_ip(request)
+    limiter.check(ip=ip)
     if not constant_time_equals(body.invite_code.strip(), settings.invite_code):
+        limiter.failure(ip=ip)
         raise ApiError(status.HTTP_403_FORBIDDEN, "invalid_invite_code")
     taken = await db.execute(select(User.id).where(func.lower(User.username) == body.username.lower()))
     if taken.first() is not None:
@@ -33,13 +37,22 @@ async def register(body: RegisterIn, request: Request, db: AsyncSession = Depend
     return user
 
 
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
 @router.post("/login", response_model=UserOut)
 async def login(body: LoginIn, request: Request, db: AsyncSession = Depends(get_db)):
+    limiter = request.app.state.limiter
+    username, ip = body.username.strip(), _client_ip(request)
+    limiter.check(username=username, ip=ip)
     user = (
-        await db.execute(select(User).where(func.lower(User.username) == body.username.strip().lower()))
+        await db.execute(select(User).where(func.lower(User.username) == username.lower()))
     ).scalar_one_or_none()
     if user is None or not verify_password(body.password, user.password_hash):
+        limiter.failure(username=username, ip=ip)
         raise ApiError(status.HTTP_401_UNAUTHORIZED, "invalid_credentials")
+    limiter.success(username=username)
     if user.disabled_at is not None:
         raise ApiError(status.HTTP_403_FORBIDDEN, "account_disabled")
     request.session[SESSION_USER_KEY] = user.id

@@ -13,7 +13,7 @@ from ..db import SessionLocal, utcnow
 from ..errors import ApiError
 from ..orm import Reservation, SentNotification, User, WaitlistEntry
 from ..runtime.manager import RuntimeState
-from . import booking
+from . import booking, maintenance
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +35,8 @@ class Housekeeper:
         self.settings: Settings = app_state.settings
         self._wake = asyncio.Event()
         self._last_disk_check: datetime | None = None
+        self._last_retention: datetime | None = None
+        self._backup_failed_at: datetime | None = None
 
     def poke(self) -> None:
         self._wake.set()
@@ -66,8 +68,27 @@ class Housekeeper:
             await self._disk(db, now)
             await db.execute(delete(SentNotification).where(SentNotification.created_at < now - timedelta(days=60)))
             await db.commit()
+            await self.notifier.retry_due(db)
+            if self._last_retention is None or now - self._last_retention >= timedelta(hours=6):
+                self._last_retention = now
+                stats = await maintenance.apply_retention(db, self.settings, now)
+                if any(stats.values()):
+                    log.info("retention cleanup: %s", stats)
         if booked:
             self.state.scheduler.poke()
+        await self._backup(now)
+
+    async def _backup(self, now: datetime) -> None:
+        if self._backup_failed_at and now - self._backup_failed_at < timedelta(hours=1):
+            return
+        if not maintenance.backup_due(self.settings, now):
+            return
+        try:
+            path = await asyncio.to_thread(maintenance.make_backup, self.settings, "daily")
+            log.info("database backup written to %s", path)
+        except Exception:  # noqa: BLE001
+            self._backup_failed_at = now
+            log.exception("database backup failed")
 
     async def _reminders(self, db: AsyncSession, now: datetime) -> None:
         lead = timedelta(minutes=self.settings.reminder_minutes)

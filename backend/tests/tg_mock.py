@@ -3,6 +3,7 @@
 import asyncio
 
 from fastapi import FastAPI, Request
+from fastapi.responses import PlainTextResponse
 
 
 class FakeTelegram:
@@ -11,6 +12,7 @@ class FakeTelegram:
         self.updates: list[dict] = []
         self.sent: list[dict] = []
         self.answers: list[dict] = []
+        self.fail_sends = False  # simulate Telegram being unreachable
         self._next_id = 1
 
         @self.app.post("/bot{token}/{method}")
@@ -25,6 +27,8 @@ class FakeTelegram:
                     await asyncio.sleep(0.05)
                 return {"ok": True, "result": pending}
             if method == "sendMessage":
+                if self.fail_sends:
+                    return PlainTextResponse("bad gateway", status_code=502)
                 self.sent.append(params)
                 return {"ok": True, "result": {"message_id": len(self.sent)}}
             if method == "answerCallbackQuery":

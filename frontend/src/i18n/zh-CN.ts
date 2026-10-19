@@ -71,6 +71,8 @@ const zh: typeof en = {
     cancelled: '已取消',
   },
   overview: {
+    oomHint: '模型放不进显存。请调小 -ngl（少放几层到 GPU）或 -c（上下文长度）。',
+    draining: '正在等待进行中的请求完成，随后切换模型…',
     fallbackBanner: '{model} 加载失败，暂由 {current} 提供服务，系统会自动重试。',
     manualLoad: '{user} 手动加载了 {model}',
     manualUnload: '{user} 手动卸载了模型',
@@ -162,6 +164,8 @@ const zh: typeof en = {
     noModels: '还没有可用的模型，请先到“模型”页面添加。',
   },
   models: {
+    exceedsVram: '超出显存',
+    exceedsVramHint: '文件比显存大，全部放进 GPU（-ngl 99）会失败。请调小 -ngl，只把部分层放到 GPU。',
     presets: '参数预设',
     presetsHint: '预约时可选的其他参数组合，例如长上下文版本。',
     addPreset: '添加预设',
@@ -306,6 +310,15 @@ const zh: typeof en = {
     apiDocs: '接口文档',
   },
   admin: {
+    backups: {
+      title: '备份',
+      subtitle: '数据库副本保存在 data/backups，每天自动备份一次。',
+      now: '立即备份',
+      done: '备份已创建',
+      empty: '暂无备份。',
+      download: '下载',
+      kinds: { daily: '每日', manual: '手动', upgrade: '升级前' },
+    },
     manual: {
       load: '加载模型…',
       unload: '卸载',
@@ -422,7 +435,16 @@ const zh: typeof en = {
       empty: '没有有效的 API 密钥。',
     },
     settings: {
+      drain_seconds: '切换等待时间（秒）',
+      drain_seconds_desc: '切换模型前最多等待这么久，让进行中的请求完成；期间新请求返回 503。',
+      usage_retention_days: '请求明细保留天数',
+      usage_retention_days_desc: '更早的请求会合并为按天汇总，汇总永久保留。0 表示全部保留；否则至少 90 天。',
+      audit_retention_days: '审计日志保留天数',
+      audit_retention_days_desc: '0 表示永久保留。',
+      backup_keep: '保留的每日备份数',
+      backup_keep_desc: '每 24 小时自动备份一次数据库。0 表示关闭自动备份。',
       groups: {
+        maintenance: '维护',
         access: '账号',
         booking: '预约与配额',
         models: '模型与下载',
@@ -476,6 +498,7 @@ const zh: typeof en = {
       empty: '暂无记录。',
       system: '系统',
       actions: {
+        backup_create: '创建备份',
         reservation_create_for: '替他人预约',
         reservation_update: '修改预约',
         runtime_load: '手动加载模型',
@@ -507,6 +530,7 @@ const zh: typeof en = {
     cancelled: '已取消',
   },
   errors: {
+    too_many_attempts: '失败次数过多，请 {minutes} 分钟后再试。',
     preset_without_model: '请先为这个预设选择模型。',
     reservation_active_locked: '进行中的预约只能延长或缩短。',
     quota_upcoming: '每人最多同时持有 {limit} 个未结束的预约。',
