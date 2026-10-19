@@ -75,7 +75,9 @@ async def authenticate(request: Request) -> Caller:
             await db.execute(
                 select(ApiKey, User.username)
                 .join(User, User.id == ApiKey.user_id)
-                .where(ApiKey.key_hash == hash_api_key(raw), ApiKey.revoked_at.is_(None))
+                .where(
+                    ApiKey.key_hash == hash_api_key(raw), ApiKey.revoked_at.is_(None), User.disabled_at.is_(None)
+                )
             )
         ).first()
         if row is None:

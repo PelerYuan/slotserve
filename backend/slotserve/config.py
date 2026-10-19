@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     port: int = 8000
     secret_key: str = "change-me"
     invite_code: str = "change-me"
+    registration_open: bool = True
     cookie_secure: bool = False
     static_dir: Path | None = None
 

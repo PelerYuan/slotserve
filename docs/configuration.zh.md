@@ -19,6 +19,7 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `SLOTSERVE_INVITE_CODE` | `change-me` | 注册所需邀请码 |
+| `SLOTSERVE_REGISTRATION_OPEN` | `true` | 是否允许凭邀请码注册 |
 | `SLOTSERVE_SECRET_KEY` | `change-me` | 会话 Cookie 签名密钥 |
 | `SLOTSERVE_HOST` | `0.0.0.0` | 监听地址 |
 | `SLOTSERVE_PORT` | `8000` | 监听端口 |
@@ -39,6 +40,8 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_PRELOAD_BUFFER_SECONDS` | `60` | 预加载时额外预留的时间 |
 | `SLOTSERVE_SCHEDULER_INTERVAL_SECONDS` | `5` | 调度器重新评估的间隔 |
 | `SLOTSERVE_DOWNLOAD_MIN_FREE_GB` | `2` | 下载完成后磁盘至少保留的空间 |
+
+其中五项可由管理员在**管理 → 系统设置**中直接修改，无需重启：`REGISTRATION_OPEN`、`INVITE_CODE`、`MAX_RESERVATION_HOURS`、`MAX_ADVANCE_DAYS` 和 `DEFAULT_LLAMA_ARGS`。修改保存在数据库中，优先于 `.env`；点**恢复默认**即可取消覆盖。
 
 ## 每个模型的启动参数
 
@@ -63,6 +66,8 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 完整列表见 `llama-server --help`。修改了当前已加载模型的参数后，在总览页点击**重新加载模型**即可生效。
 
 ## 管理员命令行
+
+日常的账号管理在**管理 → 用户**中完成。命令行用于没有管理员能登录的情况：
 
 ```bash
 docker compose exec slotserve slotserve reset-password <用户名>

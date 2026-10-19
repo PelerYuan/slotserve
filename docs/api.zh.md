@@ -79,4 +79,4 @@ SlotServe 在 `/v1` 提供 **OpenAI 兼容**接口。任何可以设置 base URL
 
 ## Web API
 
-网页使用 `/api` 下独立的 JSON 接口（Cookie 会话），交互式文档位于 `/api/docs`。
+网页使用 `/api` 下独立的 JSON 接口（Cookie 会话），交互式文档位于 `/api/docs`。管理接口位于 `/api/admin` 下（`stats`、`users`、`keys`、`reservations`、`settings`、`audit`），需要管理员登录。

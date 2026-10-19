@@ -13,7 +13,7 @@ async def current_user(request: Request, db: AsyncSession = Depends(get_db)) -> 
     if uid is None:
         raise ApiError(status.HTTP_401_UNAUTHORIZED, "not_authenticated")
     user = await db.get(User, uid)
-    if user is None:
+    if user is None or user.disabled_at is not None:
         request.session.clear()
         raise ApiError(status.HTTP_401_UNAUTHORIZED, "not_authenticated")
     return user

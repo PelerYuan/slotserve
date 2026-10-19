@@ -45,3 +45,25 @@ Downloads run one at a time, write to `<file>.part` and resume from where they s
 **Usage** shows requests, tokens and booked hours per person and per model for the last 7, 30 or 90 days.
 
 ![Usage](assets/screenshots/usage.png)
+
+## Administration
+
+The first account is the admin. Admins see an **Admin** entry in the sidebar.
+
+![Admin](assets/screenshots/admin.png)
+
+| Tab | What you can do |
+| --- | --- |
+| Overview | Counts of users, keys, open bookings, requests and tokens in the last 24 h; recent model loads with failures; restart llama-server and read its log |
+| Users | Create users (no invite code needed), reset passwords, grant or remove admin, disable, enable or delete accounts |
+| Bookings | Every booking, filtered by status or person; cancel an upcoming one or end a running one |
+| API keys | Every active key with its owner and last use; revoke any key |
+| System settings | Open registration, invite code, longest booking, booking horizon, default launch arguments |
+| Audit log | Who did what and when, for every admin action |
+
+Rules that protect the system:
+
+- You cannot disable, demote or delete your own account, and at least one active admin always remains.
+- Disabling an account signs it out, refuses its API keys and cancels its open bookings. Enabling it again restores the keys.
+- Deleting an account also deletes its keys, bookings and usage history. Disable instead if you want to keep the history.
+- System settings take effect immediately and are stored in the database, overriding `.env`.

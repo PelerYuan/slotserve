@@ -13,6 +13,7 @@ from ..orm import LlmModel, Reservation, User
 from ..runtime.scheduler import Scheduler
 from ..schemas import ReservationCreateIn, ReservationOut
 from ..services import queries
+from ..services.audit import record
 
 router = APIRouter(prefix="/api/reservations", tags=["reservations"])
 
@@ -123,6 +124,10 @@ async def cancel_or_release(
         r.released_at = now
     else:
         raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_finished")
+    if r.user_id != user.id:
+        owner = await db.get(User, r.user_id)
+        action = "reservation.cancel" if phase == "upcoming" else "reservation.release"
+        record(db, user, action, f"#{r.id} {owner.username if owner else '?'}", start_at=r.start_at)
     await db.commit()
     scheduler.poke()
     return (await queries.reservation_out(db, [r], now))[0]

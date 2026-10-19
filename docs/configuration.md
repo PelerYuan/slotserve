@@ -19,6 +19,7 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | Variable | Default | Description |
 | --- | --- | --- |
 | `SLOTSERVE_INVITE_CODE` | `change-me` | Code required to sign up |
+| `SLOTSERVE_REGISTRATION_OPEN` | `true` | Allow sign-up with the invite code |
 | `SLOTSERVE_SECRET_KEY` | `change-me` | Session cookie signing key |
 | `SLOTSERVE_HOST` | `0.0.0.0` | Listen address |
 | `SLOTSERVE_PORT` | `8000` | Listen port |
@@ -39,6 +40,8 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | `SLOTSERVE_PRELOAD_BUFFER_SECONDS` | `60` | Extra margin when preloading before a booking |
 | `SLOTSERVE_SCHEDULER_INTERVAL_SECONDS` | `5` | How often the scheduler re-evaluates |
 | `SLOTSERVE_DOWNLOAD_MIN_FREE_GB` | `2` | Disk space that must remain free after a download |
+
+Admins can override five of these in **Admin → System settings** without a restart: `REGISTRATION_OPEN`, `INVITE_CODE`, `MAX_RESERVATION_HOURS`, `MAX_ADVANCE_DAYS` and `DEFAULT_LLAMA_ARGS`. Overrides live in the database and win over `.env`; **Use default** removes an override.
 
 ## Per-model launch arguments
 
@@ -63,6 +66,8 @@ Each model has a free-form argument string that is appended to the command:
 Run `llama-server --help` for the full list. After editing the arguments of the loaded model, press **Reload model** on the overview page.
 
 ## Admin command line
+
+Most account tasks are done in **Admin → Users**. The command line is for when no admin can sign in:
 
 ```bash
 docker compose exec slotserve slotserve reset-password <username>

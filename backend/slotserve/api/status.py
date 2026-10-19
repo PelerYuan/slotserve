@@ -13,6 +13,7 @@ from ..runtime.manager import LlamaRuntime
 from ..runtime.scheduler import Scheduler
 from ..schemas import ConfigOut, RuntimeOut, StatusOut
 from ..services import queries
+from ..services.audit import record
 
 router = APIRouter(prefix="/api", tags=["status"])
 
@@ -24,6 +25,7 @@ async def config():
         slot_minutes=s.slot_minutes,
         max_reservation_hours=s.max_reservation_hours,
         max_advance_days=s.max_advance_days,
+        registration_open=s.registration_open,
         version=__version__,
     )
 
@@ -85,5 +87,7 @@ async def runtime_restart(
     active = await queries.active_reservation(db, utcnow())
     if not user.is_admin and active is not None and active.user_id != user.id:
         raise ApiError(status.HTTP_403_FORBIDDEN, "gpu_reserved_by_other")
+    record(db, user, "runtime.restart")
+    await db.commit()
     scheduler.request_restart()
     return {"ok": True}

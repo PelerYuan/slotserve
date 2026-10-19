@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-20
+
+### Added
+
+- Admin panel (`/admin`) with six tabs: overview, users, bookings, API keys, system settings and audit log.
+- User management in the browser: create users without an invite code, reset passwords, grant or remove admin, disable, enable and delete accounts.
+- Disabled accounts are signed out, their API keys are refused, and their open bookings are cancelled.
+- System settings editable at runtime: open registration, invite code, longest booking, booking horizon and default launch arguments. Overrides are stored in the database; each can be reset to the `.env` value.
+- Audit log of admin actions.
+- `SLOTSERVE_REGISTRATION_OPEN` setting.
+- Animated sign-in page with a live schedule demo and a sign-in / sign-up switch.
+
+### Changed
+
+- Existing databases gain new columns automatically on startup.
+
 ## [0.1.0] - 2026-10-20
 
 ### Added
@@ -21,5 +37,6 @@ All notable changes to this project are documented here. The format follows [Kee
 - Admin CLI: `slotserve reset-password`, `slotserve set-admin`.
 - Bilingual documentation site (MkDocs Material).
 
-[Unreleased]: https://github.com/PelerYuan/slotserve/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/PelerYuan/slotserve/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/PelerYuan/slotserve/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/PelerYuan/slotserve/releases/tag/v0.1.0

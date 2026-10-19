@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { NButton, NForm, NFormItem, NInput } from 'naive-ui'
 import { CalendarClock, Plug, RefreshCw } from 'lucide-vue-next'
 import BrandMark from '@/components/BrandMark.vue'
+import AuthShowcase from '@/components/AuthShowcase.vue'
 import { api } from '@/api/client'
 import { session } from '@/composables/session'
 import { useErrorMessage } from '@/composables/useErrorMessage'
@@ -19,6 +20,9 @@ const mode = ref<'login' | 'register'>('login')
 const form = reactive({ username: '', password: '', invite: '' })
 const busy = ref(false)
 const error = ref('')
+const shake = ref(0)
+
+const registrationOpen = computed(() => session.config?.registration_open !== false)
 
 const canSubmit = computed(
   () => form.username.trim() && form.password && (mode.value === 'login' || form.invite.trim()),
@@ -37,13 +41,14 @@ async function submit() {
     router.replace(next)
   } catch (e) {
     error.value = describe(e)
+    shake.value++
   } finally {
     busy.value = false
   }
 }
 
-function toggle() {
-  mode.value = mode.value === 'login' ? 'register' : 'login'
+function setMode(m: 'login' | 'register') {
+  mode.value = m
   error.value = ''
 }
 </script>
@@ -51,18 +56,28 @@ function toggle() {
 <template>
   <div class="auth">
     <section class="hero">
-      <BrandMark />
-      <div class="hero-body">
-        <h2>{{ t('app.tagline') }}</h2>
-        <p>{{ t('auth.subtitle') }}</p>
-        <ul>
-          <li><CalendarClock :size="18" :stroke-width="1.8" /><span>{{ t('auth.feature1') }}</span></li>
-          <li><RefreshCw :size="18" :stroke-width="1.8" /><span>{{ t('auth.feature2') }}</span></li>
-          <li><Plug :size="18" :stroke-width="1.8" /><span>{{ t('auth.feature3') }}</span></li>
-        </ul>
+      <div class="aurora" aria-hidden="true">
+        <span class="blob b1" />
+        <span class="blob b2" />
+        <span class="blob b3" />
       </div>
-      <div class="slots" aria-hidden="true">
-        <span v-for="i in 7" :key="i" :class="['slot', `s${i}`]" />
+      <div class="dots" aria-hidden="true" />
+      <BrandMark class="rise" />
+      <div class="hero-body">
+        <h2 class="rise" style="--d: 0.05s">{{ t('app.tagline') }}</h2>
+        <p class="rise" style="--d: 0.1s">{{ t('auth.subtitle') }}</p>
+        <ul>
+          <li class="rise" style="--d: 0.15s">
+            <span class="ic"><CalendarClock :size="16" :stroke-width="1.9" /></span>{{ t('auth.feature1') }}
+          </li>
+          <li class="rise" style="--d: 0.2s">
+            <span class="ic"><RefreshCw :size="16" :stroke-width="1.9" /></span>{{ t('auth.feature2') }}
+          </li>
+          <li class="rise" style="--d: 0.25s">
+            <span class="ic"><Plug :size="16" :stroke-width="1.9" /></span>{{ t('auth.feature3') }}
+          </li>
+        </ul>
+        <AuthShowcase class="rise showcase" style="--d: 0.35s" />
       </div>
     </section>
 
@@ -73,9 +88,27 @@ function toggle() {
         <button :class="{ on: locale === 'en' }" @click="setLocale('en')">EN</button>
       </div>
       <div class="form-wrap">
-        <BrandMark class="mobile-brand" />
-        <h1>{{ mode === 'login' ? t('auth.welcome') : t('auth.createAccount') }}</h1>
-        <NForm class="form" :show-require-mark="false" @submit.prevent="submit">
+        <BrandMark class="mobile-brand rise" />
+        <div class="title rise" style="--d: 0.05s">
+          <Transition name="title" mode="out-in">
+            <h1 :key="mode">{{ mode === 'login' ? t('auth.welcome') : t('auth.createAccount') }}</h1>
+          </Transition>
+        </div>
+        <div v-if="registrationOpen" class="seg rise" style="--d: 0.1s" role="tablist">
+          <span class="pill" :class="mode" />
+          <button role="tab" :aria-selected="mode === 'login'" :class="{ on: mode === 'login' }" @click="setMode('login')">
+            {{ t('auth.login') }}
+          </button>
+          <button
+            role="tab"
+            :aria-selected="mode === 'register'"
+            :class="{ on: mode === 'register' }"
+            @click="setMode('register')"
+          >
+            {{ t('auth.register') }}
+          </button>
+        </div>
+        <NForm class="form rise" style="--d: 0.15s" :show-require-mark="false" @submit.prevent="submit">
           <NFormItem :label="t('auth.username')" :feedback="mode === 'register' ? t('auth.usernameRule') : undefined">
             <NInput v-model:value="form.username" size="large" autofocus :input-props="{ autocomplete: 'username' }" />
           </NFormItem>
@@ -89,18 +122,34 @@ function toggle() {
               @keyup.enter="submit"
             />
           </NFormItem>
-          <NFormItem v-if="mode === 'register'" :label="t('auth.inviteCode')">
-            <NInput v-model:value="form.invite" size="large" @keyup.enter="submit" />
-          </NFormItem>
-          <div v-if="error" class="error">{{ error }}</div>
-          <NButton type="primary" size="large" block attr-type="submit" :loading="busy" :disabled="!canSubmit">
+          <div class="collapse" :class="{ open: mode === 'register' }">
+            <div>
+              <NFormItem :label="t('auth.inviteCode')">
+                <NInput
+                  v-model:value="form.invite"
+                  size="large"
+                  :disabled="mode !== 'register'"
+                  @keyup.enter="submit"
+                />
+              </NFormItem>
+            </div>
+          </div>
+          <Transition name="err">
+            <div v-if="error" :key="shake" class="error">{{ error }}</div>
+          </Transition>
+          <NButton
+            class="submit"
+            type="primary"
+            size="large"
+            block
+            attr-type="submit"
+            :loading="busy"
+            :disabled="!canSubmit"
+          >
             {{ mode === 'login' ? t('auth.login') : t('auth.register') }}
           </NButton>
         </NForm>
-        <p class="switch">
-          {{ mode === 'login' ? t('auth.noAccount') : t('auth.haveAccount') }}
-          <a href="#" @click.prevent="toggle">{{ mode === 'login' ? t('auth.register') : t('auth.login') }}</a>
-        </p>
+        <p v-if="!registrationOpen" class="closed faint rise" style="--d: 0.2s">{{ t('auth.registrationClosed') }}</p>
       </div>
     </section>
   </div>
@@ -109,44 +158,95 @@ function toggle() {
 <style scoped>
 .auth {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
   min-height: 100vh;
   background: var(--surface);
 }
+
+/* ---------- hero ---------- */
 .hero {
   position: relative;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 40px 48px;
-  background: radial-gradient(1200px 600px at 0% 0%, #eef0ff 0%, transparent 60%),
-    radial-gradient(900px 500px at 100% 100%, #f1efff 0%, transparent 55%), var(--bg);
+  padding: 40px 56px;
+  background: #f7f7fc;
   border-right: 1px solid var(--border);
+  isolation: isolate;
+}
+.aurora {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  filter: blur(60px);
+}
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.55;
+  will-change: transform;
+}
+.b1 {
+  width: 520px;
+  height: 520px;
+  left: -120px;
+  top: -140px;
+  background: #c7d2fe;
+  animation: drift1 22s ease-in-out infinite;
+}
+.b2 {
+  width: 460px;
+  height: 460px;
+  right: -140px;
+  top: 30%;
+  background: #ddd6fe;
+  animation: drift2 26s ease-in-out infinite;
+}
+.b3 {
+  width: 420px;
+  height: 420px;
+  left: 20%;
+  bottom: -200px;
+  background: #bae6fd;
+  opacity: 0.45;
+  animation: drift3 30s ease-in-out infinite;
+}
+.dots {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: radial-gradient(rgba(79, 70, 229, 0.16) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse 70% 60% at 40% 40%, #000 20%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 40% 40%, #000 20%, transparent 75%);
 }
 .hero-body {
   margin: auto 0;
-  max-width: 440px;
-  position: relative;
-  z-index: 1;
+  max-width: 480px;
+  padding: 32px 0 8px;
 }
 .hero h2 {
-  font-size: 34px;
-  line-height: 1.15;
-  letter-spacing: -0.03em;
-  font-weight: 680;
+  font-size: 36px;
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+  font-weight: 700;
   margin: 0 0 14px;
+  background: linear-gradient(120deg, #17171c 30%, #4f46e5 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .hero p {
   color: var(--text-2);
   font-size: 15px;
-  margin: 0 0 28px;
+  margin: 0 0 24px;
 }
 .hero ul {
   list-style: none;
   padding: 0;
-  margin: 0;
+  margin: 0 0 36px;
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 .hero li {
   display: flex;
@@ -155,50 +255,19 @@ function toggle() {
   color: var(--text);
   font-weight: 500;
 }
-.hero li svg {
-  color: var(--brand);
-  flex: none;
-}
-.slots {
-  position: absolute;
-  right: -40px;
-  bottom: 56px;
-  width: 340px;
+.ic {
   display: grid;
-  gap: 10px;
-  opacity: 0.9;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 8px;
+  color: var(--brand);
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 1px 2px rgba(40, 40, 110, 0.08), 0 0 0 1px rgba(79, 70, 229, 0.08);
 }
-.slot {
-  height: 14px;
-  border-radius: 7px;
-  background: #e4e6fb;
-}
-.s2 {
-  width: 70%;
-  margin-left: 20%;
-  background: var(--brand);
-  opacity: 0.85;
-}
-.s3 {
-  width: 50%;
-}
-.s4 {
-  width: 80%;
-  margin-left: 10%;
-  background: #c7cbf7;
-}
-.s5 {
-  width: 40%;
-  margin-left: 45%;
-}
-.s6 {
-  width: 65%;
-  background: #a5abf3;
-}
-.s7 {
-  width: 30%;
-  margin-left: 30%;
-}
+
+/* ---------- panel ---------- */
 .panel {
   position: relative;
   display: flex;
@@ -222,9 +291,13 @@ function toggle() {
   cursor: pointer;
   font: inherit;
   padding: 0;
+  transition: color 0.2s;
 }
+.lang button:hover,
 .lang button.on {
   color: var(--text);
+}
+.lang button.on {
   font-weight: 600;
 }
 .form-wrap {
@@ -235,11 +308,71 @@ function toggle() {
   display: none !important;
   margin-bottom: 28px;
 }
+.title {
+  min-height: 36px;
+  margin-bottom: 20px;
+}
 h1 {
-  font-size: 24px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-  margin: 0 0 28px;
+  font-size: 26px;
+  font-weight: 680;
+  letter-spacing: -0.025em;
+  margin: 0;
+}
+.seg {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+  margin-bottom: 24px;
+  border-radius: 10px;
+  background: #f1f1f5;
+}
+.seg button {
+  position: relative;
+  z-index: 1;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 550;
+  color: var(--text-2);
+  padding: 7px 0;
+  cursor: pointer;
+  transition: color 0.25s;
+}
+.seg button.on {
+  color: var(--text);
+}
+.pill {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: 7px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(20, 20, 50, 0.1), 0 1px 1px rgba(20, 20, 50, 0.04);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.pill.register {
+  transform: translateX(100%);
+}
+.closed {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 13px;
+}
+.collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s;
+}
+.collapse > div {
+  overflow: hidden;
+}
+.collapse.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
 }
 .error {
   color: var(--danger);
@@ -248,11 +381,104 @@ h1 {
   padding: 8px 12px;
   margin-bottom: 16px;
   font-size: 13px;
+  animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97);
 }
-.switch {
-  margin-top: 24px;
-  color: var(--text-2);
-  text-align: center;
+.submit {
+  transition: transform 0.15s, box-shadow 0.25s;
+}
+.submit:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px -8px rgba(79, 70, 229, 0.6);
+}
+.submit:not(:disabled):active {
+  transform: translateY(0);
+}
+
+/* ---------- motion ---------- */
+.rise {
+  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--d, 0s);
+}
+.title-enter-active,
+.title-leave-active {
+  transition: opacity 0.2s, transform 0.2s;
+}
+.title-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.title-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+.err-leave-active {
+  transition: opacity 0.2s;
+}
+.err-leave-to {
+  opacity: 0;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes shake {
+  10%,
+  90% {
+    transform: translateX(-1px);
+  }
+  20%,
+  80% {
+    transform: translateX(2px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-4px);
+  }
+  40%,
+  60% {
+    transform: translateX(4px);
+  }
+}
+@keyframes drift1 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(120px, 80px) scale(1.15);
+  }
+}
+@keyframes drift2 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-140px, -60px) scale(0.9);
+  }
+}
+@keyframes drift3 {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(100px, -90px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .blob,
+  .rise,
+  .error {
+    animation: none;
+  }
 }
 
 @media (max-width: 900px) {

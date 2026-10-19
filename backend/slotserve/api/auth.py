@@ -15,7 +15,10 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 @router.post("/register", response_model=UserOut, status_code=201)
 async def register(body: RegisterIn, request: Request, db: AsyncSession = Depends(get_db)):
-    if not constant_time_equals(body.invite_code.strip(), get_settings().invite_code):
+    settings = get_settings()
+    if not settings.registration_open:
+        raise ApiError(status.HTTP_403_FORBIDDEN, "registration_closed")
+    if not constant_time_equals(body.invite_code.strip(), settings.invite_code):
         raise ApiError(status.HTTP_403_FORBIDDEN, "invalid_invite_code")
     taken = await db.execute(select(User.id).where(func.lower(User.username) == body.username.lower()))
     if taken.first() is not None:
@@ -35,6 +38,8 @@ async def login(body: LoginIn, request: Request, db: AsyncSession = Depends(get_
     ).scalar_one_or_none()
     if user is None or not verify_password(body.password, user.password_hash):
         raise ApiError(status.HTTP_401_UNAUTHORIZED, "invalid_credentials")
+    if user.disabled_at is not None:
+        raise ApiError(status.HTTP_403_FORBIDDEN, "account_disabled")
     request.session[SESSION_USER_KEY] = user.id
     return user
 

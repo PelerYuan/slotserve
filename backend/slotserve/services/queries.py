@@ -1,6 +1,6 @@
 """Shared database queries used by the API, gateway and scheduler."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy import select
@@ -12,6 +12,13 @@ from ..schemas import ModelOut, ReservationOut
 
 LOAD_HISTORY = 5
 LOAD_OVERHEAD_SECONDS = 15.0
+
+
+def as_utc(value: datetime | str) -> datetime:
+    """Normalises a timestamp from an aggregate query (which may skip the column type) to aware UTC."""
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value)
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
 async def active_reservation(db: AsyncSession, now: datetime) -> Reservation | None:

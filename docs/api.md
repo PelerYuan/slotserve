@@ -79,4 +79,4 @@ Every request is logged with its user, key, model, token counts and duration. Fo
 
 ## Web API
 
-The browser UI uses a separate JSON API under `/api` with cookie sessions. Its interactive reference is served at `/api/docs`.
+The browser UI uses a separate JSON API under `/api` with cookie sessions. Its interactive reference is served at `/api/docs`. Admin endpoints live under `/api/admin` (`stats`, `users`, `keys`, `reservations`, `settings`, `audit`) and require an admin session.

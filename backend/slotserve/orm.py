@@ -14,6 +14,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    disabled_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
 class ApiKey(Base):
@@ -107,3 +108,26 @@ class ModelLoadEvent(Base):
     finished_at: Mapped[datetime] = mapped_column(UTCDateTime)
     success: Mapped[bool] = mapped_column(Boolean)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class AppSetting(Base):
+    """Admin-edited overrides for a subset of Settings (see services/app_settings.py)."""
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text)  # JSON
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    # Kept so the log still reads well after the actor is deleted.
+    actor_name: Mapped[str] = mapped_column(String(32), default="")
+    action: Mapped[str] = mapped_column(String(64), index=True)
+    target: Mapped[str] = mapped_column(String(160), default="")
+    detail: Mapped[str] = mapped_column(Text, default="{}")  # JSON
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)

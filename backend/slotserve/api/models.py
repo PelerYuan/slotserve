@@ -13,6 +13,7 @@ from ..runtime.manager import LlamaRuntime, split_args
 from ..runtime.scheduler import Scheduler
 from ..schemas import ModelOut, ModelUpdateIn, ScanResultOut
 from ..services import queries, scanner
+from ..services.audit import record
 
 router = APIRouter(prefix="/api/models", tags=["models"])
 
@@ -75,7 +76,7 @@ async def update_model(
 @router.post("/{model_id}/default", response_model=ModelOut)
 async def set_default(
     model_id: int,
-    _: User = Depends(admin_user),
+    admin: User = Depends(admin_user),
     db: AsyncSession = Depends(get_db),
     runtime: LlamaRuntime = Depends(get_runtime),
     scheduler: Scheduler = Depends(get_scheduler),
@@ -85,6 +86,7 @@ async def set_default(
         raise ApiError(status.HTTP_400_BAD_REQUEST, "model_not_ready")
     await db.execute(update(LlmModel).values(is_default=False))
     model.is_default = True
+    record(db, admin, "model.set_default", model.name)
     await db.commit()
     scheduler.poke()
     return (await queries.model_out(db, [model], get_settings(), runtime.model_id))[0]
@@ -93,12 +95,13 @@ async def set_default(
 @router.delete("/{model_id}/default", status_code=204)
 async def clear_default(
     model_id: int,
-    _: User = Depends(admin_user),
+    admin: User = Depends(admin_user),
     db: AsyncSession = Depends(get_db),
     scheduler: Scheduler = Depends(get_scheduler),
 ):
     model = await _get_model(db, model_id)
     model.is_default = False
+    record(db, admin, "model.clear_default", model.name)
     await db.commit()
     scheduler.poke()
 
@@ -122,6 +125,7 @@ async def delete_model(
     )
     if future.first() is not None:
         raise ApiError(status.HTTP_409_CONFLICT, "model_has_reservations")
+    record(db, user, "model.delete", model.name, delete_file=delete_file)
     past = await db.execute(select(Reservation.id).where(Reservation.model_id == model.id).limit(1))
     if past.first() is not None:
         # Keep usage history intact: soft-delete and free the name.

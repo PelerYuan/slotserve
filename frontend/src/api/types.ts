@@ -104,6 +104,7 @@ export interface AppConfig {
   slot_minutes: number
   max_reservation_hours: number
   max_advance_days: number
+  registration_open: boolean
   version: string
 }
 
@@ -119,4 +120,62 @@ export interface Usage {
   }[]
   models: { model_name: string; requests: number; prompt_tokens: number; completion_tokens: number }[]
   daily: { date: string; username: string; requests: number; tokens: number }[]
+}
+
+// ---- admin ----------------------------------------------------------------
+
+export interface AdminUser extends User {
+  disabled_at: string | null
+  last_active_at: string | null
+  key_count: number
+  tokens_30d: number
+  requests_30d: number
+  upcoming_reservations: number
+}
+
+export interface AdminApiKey extends ApiKey {
+  user_id: number
+  username: string
+}
+
+export interface LoadEvent {
+  id: number
+  model_name: string | null
+  started_at: string
+  finished_at: string
+  success: boolean
+  error: string | null
+}
+
+export interface AdminStats {
+  users: number
+  disabled_users: number
+  admins: number
+  active_keys: number
+  upcoming_reservations: number
+  requests_24h: number
+  tokens_24h: number
+  failed_requests_24h: number
+  models: number
+  load_events: LoadEvent[]
+}
+
+export type SettingValue = boolean | number | string
+
+export interface AdminSetting {
+  key: string
+  value: SettingValue
+  default: SettingValue
+  overridden: boolean
+  secret: boolean
+}
+
+export interface AuditEntry {
+  id: number
+  actor_id: number | null
+  actor_name: string
+  action: string
+  target: string
+  detail: Record<string, unknown>
+  created_at: string
 }

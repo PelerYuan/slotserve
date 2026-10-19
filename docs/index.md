@@ -23,6 +23,7 @@ A lab or small team often shares a single big GPU. Without coordination people s
 | Preloading | Load times are learned per model; the next booking's model is loaded ahead of time |
 | Model downloads | Paste a direct link (e.g. a Hugging Face `resolve` URL); resumable, one at a time |
 | Usage | Requests, prompt/completion tokens and booked hours per person and per model |
+| Admin panel | Manage users, bookings and API keys, change settings at runtime, audit log |
 | GPU status | Memory, utilization, temperature and power from `nvidia-smi` |
 | Bilingual UI | English and Simplified Chinese |
 | Simple deployment | One container, SQLite, three bind mounts |

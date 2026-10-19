@@ -60,6 +60,20 @@ async def create_all() -> None:
     assert _engine is not None
     async with _engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_add_missing_columns)
+
+
+def _add_missing_columns(conn) -> None:
+    """Minimal forward migration: add nullable columns that newer versions introduced."""
+    for table in Base.metadata.sorted_tables:
+        existing = {row[1] for row in conn.exec_driver_sql(f'PRAGMA table_info("{table.name}")')}
+        for column in table.columns:
+            if column.name in existing:
+                continue
+            if not column.nullable:
+                raise RuntimeError(f"cannot auto-migrate NOT NULL column {table.name}.{column.name}")
+            ddl = column.type.compile(dialect=conn.dialect)
+            conn.exec_driver_sql(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {ddl}')
 
 
 async def dispose() -> None:

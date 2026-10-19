@@ -10,11 +10,12 @@ from fastapi.responses import FileResponse, JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import __version__, db
-from .api import auth, downloads, keys, models, reservations, status, usage
+from .api import admin, auth, downloads, keys, models, reservations, status, usage
 from .config import Settings, get_settings
 from .gateway import proxy
 from .runtime.manager import LlamaRuntime
 from .runtime.scheduler import Scheduler
+from .services import app_settings
 from .services.downloader import Downloader
 
 log = logging.getLogger("slotserve")
@@ -34,6 +35,9 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         await db.create_all()
 
         app.state.settings = settings
+        app.state.settings_defaults = app_settings.snapshot_defaults(settings)
+        async with db.SessionLocal() as session:
+            await app_settings.load_overrides(session, settings)
         app.state.http = httpx.AsyncClient(timeout=httpx.Timeout(None, connect=10.0))
         app.state.runtime = LlamaRuntime(settings)
         app.state.scheduler = Scheduler(app.state.runtime, settings)
@@ -66,7 +70,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         same_site="lax",
         https_only=settings.cookie_secure,
     )
-    for module in (auth, keys, models, downloads, reservations, status, usage):
+    for module in (auth, keys, models, downloads, reservations, status, usage, admin):
         app.include_router(module.router)
     app.include_router(proxy.router)
 

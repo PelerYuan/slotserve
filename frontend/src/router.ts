@@ -15,6 +15,7 @@ export const router = createRouter({
         { path: 'keys', name: 'keys', component: () => import('@/views/KeysView.vue') },
         { path: 'usage', name: 'usage', component: () => import('@/views/UsageView.vue') },
         { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
+        { path: 'admin', name: 'admin', component: () => import('@/views/AdminView.vue'), meta: { admin: true } },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },
@@ -25,4 +26,5 @@ router.beforeEach(async (to) => {
   if (!session.checked) await loadSession()
   if (!to.meta.public && !session.user) return { name: 'login', query: to.fullPath !== '/' ? { next: to.fullPath } : {} }
   if (to.name === 'login' && session.user) return { name: 'overview' }
+  if (to.meta.admin && !session.user?.is_admin) return { name: 'overview' }
 })

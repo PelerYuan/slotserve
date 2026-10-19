@@ -1,8 +1,14 @@
 import type {
+  AdminApiKey,
+  AdminSetting,
+  AdminStats,
+  AdminUser,
   ApiKey,
   ApiKeyCreated,
   AppConfig,
+  AuditEntry,
   DownloadTask,
+  SettingValue,
   Model,
   Reservation,
   Status,
@@ -120,4 +126,26 @@ export const api = {
   // usage
   usage: (days: number) =>
     request<Usage>('GET', '/api/usage', undefined, { days, tz_offset: -new Date().getTimezoneOffset() }),
+
+  // admin
+  admin: {
+    stats: () => request<AdminStats>('GET', '/api/admin/stats'),
+    users: () => request<AdminUser[]>('GET', '/api/admin/users'),
+    createUser: (username: string, password: string, is_admin: boolean) =>
+      request<AdminUser>('POST', '/api/admin/users', { username, password, is_admin }),
+    updateUser: (id: number, patch: { is_admin?: boolean; disabled?: boolean }) =>
+      request<AdminUser>('PATCH', `/api/admin/users/${id}`, patch),
+    resetPassword: (id: number, password: string) =>
+      request<void>('POST', `/api/admin/users/${id}/password`, { password }),
+    deleteUser: (id: number) => request<void>('DELETE', `/api/admin/users/${id}`),
+    keys: () => request<AdminApiKey[]>('GET', '/api/admin/keys'),
+    revokeKey: (id: number) => request<void>('DELETE', `/api/admin/keys/${id}`),
+    reservations: (phase?: string, user_id?: number) =>
+      request<Reservation[]>('GET', '/api/admin/reservations', undefined, { phase, user_id }),
+    settings: () => request<AdminSetting[]>('GET', '/api/admin/settings'),
+    saveSettings: (changes: Record<string, SettingValue | null>) =>
+      request<AdminSetting[]>('PUT', '/api/admin/settings', changes),
+    audit: (limit: number, offset: number) =>
+      request<{ total: number; items: AuditEntry[] }>('GET', '/api/admin/audit', undefined, { limit, offset }),
+  },
 }

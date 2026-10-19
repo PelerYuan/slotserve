@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Menu,
   Settings,
+  ShieldCheck,
 } from 'lucide-vue-next'
 import BrandMark from '@/components/BrandMark.vue'
 import StatusDot from '@/components/StatusDot.vue'
@@ -32,6 +33,7 @@ const nav = computed(() => [
   { name: 'keys', label: t('nav.keys'), icon: KeyRound },
   { name: 'usage', label: t('nav.usage'), icon: BarChart3 },
   { name: 'settings', label: t('nav.settings'), icon: Settings },
+  ...(session.user?.is_admin ? [{ name: 'admin', label: t('nav.admin'), icon: ShieldCheck }] : []),
 ])
 
 watch(() => route.fullPath, () => (drawer.value = false))

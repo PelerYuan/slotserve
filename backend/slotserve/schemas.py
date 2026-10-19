@@ -33,6 +33,30 @@ class UserOut(ORMModel):
     created_at: datetime
 
 
+class AdminUserOut(UserOut):
+    disabled_at: datetime | None
+    last_active_at: datetime | None
+    key_count: int
+    tokens_30d: int
+    requests_30d: int
+    upcoming_reservations: int
+
+
+class AdminUserCreateIn(BaseModel):
+    username: str = Field(min_length=3, max_length=32, pattern=r"^[A-Za-z0-9_.\-]+$")
+    password: str = Field(min_length=6, max_length=128)
+    is_admin: bool = False
+
+
+class AdminUserUpdateIn(BaseModel):
+    is_admin: bool | None = None
+    disabled: bool | None = None
+
+
+class AdminPasswordIn(BaseModel):
+    password: str = Field(min_length=6, max_length=128)
+
+
 # ---- api keys -------------------------------------------------------------
 
 
@@ -50,6 +74,11 @@ class ApiKeyOut(ORMModel):
 
 class ApiKeyCreatedOut(ApiKeyOut):
     key: str
+
+
+class AdminApiKeyOut(ApiKeyOut):
+    user_id: int
+    username: str
 
 
 # ---- models ---------------------------------------------------------------
@@ -170,7 +199,56 @@ class ConfigOut(BaseModel):
     slot_minutes: int
     max_reservation_hours: int
     max_advance_days: int
+    registration_open: bool
     version: str
+
+
+# ---- admin ----------------------------------------------------------------
+
+
+class LoadEventOut(BaseModel):
+    id: int
+    model_name: str | None
+    started_at: datetime
+    finished_at: datetime
+    success: bool
+    error: str | None
+
+
+class AdminStatsOut(BaseModel):
+    users: int
+    disabled_users: int
+    admins: int
+    active_keys: int
+    upcoming_reservations: int
+    requests_24h: int
+    tokens_24h: int
+    failed_requests_24h: int
+    models: int
+    load_events: list[LoadEventOut]
+
+
+class SettingOut(BaseModel):
+    key: str
+    value: bool | int | str
+    default: bool | int | str
+    overridden: bool
+    secret: bool
+
+
+class AuditOut(BaseModel):
+    id: int
+    actor_id: int | None
+    actor_name: str
+    action: str
+    target: str
+    detail: dict
+    created_at: datetime
+
+
+class AuditPageOut(BaseModel):
+    total: int
+    items: list[AuditOut]
 
 
 # ---- usage ----------------------------------------------------------------
