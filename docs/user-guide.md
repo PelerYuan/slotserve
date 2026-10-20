@@ -30,6 +30,10 @@ Open **Schedule** and drag across the calendar, or press **New booking**. Choose
 
 If the time you want is taken, the dialog offers **Join waitlist**. When that time frees up (a cancellation or an early end), SlotServe books it for you automatically, or just notifies you if you unticked **Book automatically**. Your open waitlist entries appear under **My bookings**.
 
+### Lanes and approval
+
+With several GPU groups ("lanes"), the calendar shows a tab per lane and the booking dialog asks which lane to book. When approval mode is on, the dialog says if your booking needs an admin's approval; it then shows as **Awaiting approval** and you are notified of the decision. See [GPUs, lanes & engines](gpus-and-engines.md).
+
 ### Quotas
 
 Admins can limit how many hours one person may book per calendar week and how many open bookings they may hold. The limits do not apply to admins.

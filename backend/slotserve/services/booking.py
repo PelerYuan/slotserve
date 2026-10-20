@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import Settings
 from ..db import utcnow
 from ..errors import ApiError
-from ..orm import HOLDING_STATUSES, LlmModel, ModelPreset, Reservation, User
+from ..orm import HOLDING_STATUSES, Lane, LlmModel, ModelPreset, Reservation, User
 
 # Serialises every overlap check + write (single-process deployment).
 booking_lock = asyncio.Lock()
@@ -66,17 +66,35 @@ def check_length(settings: Settings, start: datetime, end: datetime) -> None:
         raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_too_long", hours=settings.max_reservation_hours)
 
 
-async def find_conflict(db: AsyncSession, start: datetime, end: datetime, exclude: set[int] = frozenset()):
+async def resolve_lane(db: AsyncSession, lane_id: int | None) -> Lane:
+    """The lane a booking goes to (``None``: the first lane)."""
+    if lane_id is None:
+        lane = (await db.execute(select(Lane).order_by(Lane.position, Lane.id).limit(1))).scalar_one_or_none()
+    else:
+        lane = await db.get(Lane, lane_id)
+    if lane is None:
+        raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    return lane
+
+
+async def find_conflict(
+    db: AsyncSession, start: datetime, end: datetime, exclude: set[int] = frozenset(), lane_id: int | None = None
+):
+    """An overlapping booking on the same lane (any lane when ``lane_id`` is ``None``)."""
     stmt = select(Reservation).where(
         Reservation.status.in_(HOLDING_STATUSES), Reservation.start_at < end, Reservation.end_at > start
     )
+    if lane_id is not None:
+        stmt = stmt.where(Reservation.lane_id == lane_id)
     if exclude:
         stmt = stmt.where(Reservation.id.not_in(exclude))
     return (await db.execute(stmt.order_by(Reservation.start_at).limit(1))).scalar_one_or_none()
 
 
-async def raise_if_conflicts(db: AsyncSession, windows: list[Window], exclude: set[int] = frozenset()) -> None:
-    clashes = [c for start, end in windows if (c := await find_conflict(db, start, end, exclude)) is not None]
+async def raise_if_conflicts(
+    db: AsyncSession, windows: list[Window], exclude: set[int] = frozenset(), lane_id: int | None = None
+) -> None:
+    clashes = [c for start, end in windows if (c := await find_conflict(db, start, end, exclude, lane_id)) is not None]
     if clashes:
         first = clashes[0]
         owner = await db.get(User, first.user_id)

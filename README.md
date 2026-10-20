@@ -35,6 +35,8 @@ SlotServe turns one GPU into a shared, bookable service for a lab or small team.
 - **Model downloads**: paste a direct `.gguf` link (Hugging Face `resolve` URLs work). Downloads are resumable and run one at a time.
 - **Usage dashboard**: requests, prompt/completion tokens and booked hours per person and per model.
 - **Admin panel**: manage users, bookings and API keys, change settings at runtime, and review an audit log.
+- **Multiple GPUs and engines**: split GPUs into independently booked lanes; serve models with llama.cpp, vLLM, SGLang or any OpenAI-compatible server.
+- **Approval mode** for teams that want an admin to sign off long bookings.
 - **Flexible bookings**: whole-GPU slots for training, argument presets, weekly repeats, extensions, a waitlist and per-person quotas.
 - **Telegram notifications** with reminders and one-tap extend, plus **calendar feeds**, **CSV export** and **Prometheus metrics**.
 - **GPU status**: live memory, utilization, temperature and power.

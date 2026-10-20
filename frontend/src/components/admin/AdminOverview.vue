@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NFormItem, NModal, NSelect, useMessage } from 'naive-ui'
+import { useLanes } from '@/composables/lanes'
 import { CalendarClock, Boxes, Coins, KeyRound, Activity, Users } from 'lucide-vue-next'
 import LogDrawer from '@/components/LogDrawer.vue'
 import StatusDot from '@/components/StatusDot.vue'
@@ -46,7 +47,13 @@ async function backupNow() {
 }
 onMounted(load)
 
-const runtime = computed(() => status.value?.runtime)
+const { lanes, multi } = useLanes()
+const laneId = ref<number | null>(null)
+const laneOptions = computed(() => lanes.value.map((l) => ({ label: l.name, value: l.id })))
+const lane = computed(
+  () => status.value?.lanes.find((l) => l.id === laneId.value) ?? status.value?.lanes[0] ?? null,
+)
+const runtime = computed(() => lane.value?.runtime ?? status.value?.runtime)
 
 const tiles = computed(() => {
   const s = stats.value
@@ -81,7 +88,7 @@ const tiles = computed(() => {
 async function restart() {
   restarting.value = true
   try {
-    await api.restart()
+    await api.restart(lane.value?.id)
     message.success(t('overview.restartDone'))
     refresh()
   } catch (e) {
@@ -92,7 +99,7 @@ async function restart() {
 }
 
 // ---- manual control ----------------------------------------------------------
-const manual = computed(() => status.value?.manual ?? null)
+const manual = computed(() => lane.value?.manual ?? null)
 const loadForm = ref({ open: false, modelId: null as number | null, presetId: null as number | null, hours: 0 })
 const models = ref<Model[]>([])
 const busyManual = ref(false)
@@ -120,6 +127,7 @@ async function manualAction(action: 'load' | 'unload' | 'auto') {
   try {
     await api.admin.manual({
       action,
+      lane_id: lane.value?.id ?? null,
       model_id: action === 'load' ? loadForm.value.modelId ?? undefined : undefined,
       preset_id: action === 'load' ? loadForm.value.presetId : undefined,
       hours: action === 'auto' ? undefined : loadForm.value.hours || null,
@@ -160,6 +168,14 @@ const seconds = (a: string, b: string) => (new Date(b).getTime() - new Date(a).g
     <div class="card-header">
       <div class="row">
         <h3 class="card-title">{{ t('admin.runtime') }}</h3>
+        <NSelect
+          v-if="multi"
+          :value="lane?.id ?? null"
+          :options="laneOptions"
+          size="small"
+          class="lane-select"
+          @update:value="(v: number) => (laneId = v)"
+        />
         <StatusDot v-if="runtime" :state="runtime.state" />
         <span v-if="runtime?.model_name" class="muted mono">{{ runtime.model_name }}</span>
       </div>
@@ -268,7 +284,7 @@ const seconds = (a: string, b: string) => (new Date(b).getTime() - new Date(a).g
     </div>
   </section>
 
-  <LogDrawer v-model:show="logs" />
+  <LogDrawer v-model:show="logs" :lane-id="lane?.id" />
 </template>
 
 <style scoped>
@@ -325,6 +341,9 @@ const seconds = (a: string, b: string) => (new Date(b).getTime() - new Date(a).g
 }
 .wrap {
   flex-wrap: wrap;
+}
+.lane-select {
+  width: 150px;
 }
 .backups {
   margin-top: 16px;

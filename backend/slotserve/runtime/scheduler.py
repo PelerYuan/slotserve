@@ -41,6 +41,11 @@ class Target:
 MANUAL_KEY = "manual_override"
 
 
+def manual_key(lane_id: int | None) -> str:
+    """kv key of a lane's manual override (lane 1 keeps the pre-lane key)."""
+    return MANUAL_KEY if lane_id in (None, 1) else f"{MANUAL_KEY}:{lane_id}"
+
+
 @dataclass
 class ManualOverride:
     """An admin's "load this now" / "unload" request; ``model_id`` ``None`` means unload."""
@@ -89,11 +94,12 @@ async def compute_target(
     now: datetime,
     current: Spec | None,
     manual: ManualOverride | None = None,
+    lane_id: int | None = None,
 ) -> Target:
     """Pure decision logic (see docs: "Scheduling and preloading")."""
     buffer = settings.preload_buffer_seconds
 
-    active = await queries.active_reservation(db, now)
+    active = await queries.active_reservation(db, now, lane_id)
     if active is not None:
         if active.model_id is None:
             return Target(None, None, 0.0, "exclusive", active)
@@ -102,11 +108,11 @@ async def compute_target(
             est = await queries.estimate_load_seconds(db, model, settings)
             return Target(model, preset, est, "reservation", active)
 
-    default = await queries.default_model(db)
+    default = await queries.default_model(db, lane_id)
     default_spec = (default.id, None) if default else None
     est_default = await queries.estimate_load_seconds(db, default, settings) if default else 0.0
 
-    upcoming = await queries.next_reservation(db, now)
+    upcoming = await queries.next_reservation(db, now, lane_id)
     if upcoming is not None:
         gap = (upcoming.start_at - now).total_seconds()
         if upcoming.model_id is None:
@@ -135,7 +141,10 @@ async def compute_target(
 
 
 class Scheduler:
-    def __init__(self, runtime: LlamaRuntime, settings: Settings, events: EventSink | None = None):
+    def __init__(
+        self, runtime: LlamaRuntime, settings: Settings, events: EventSink | None = None, lane_id: int | None = None
+    ):
+        self.lane_id = lane_id
         self.runtime = runtime
         self.settings = settings
         self.events = events
@@ -160,10 +169,14 @@ class Scheduler:
         self.manual = override
         self.poke()
 
+    @property
+    def manual_key(self) -> str:
+        return manual_key(self.lane_id)
+
     async def restore_manual(self) -> None:
         """Picks up an admin's manual choice saved before a restart."""
         async with SessionLocal() as db:
-            data = await kv.get(db, MANUAL_KEY)
+            data = await kv.get(db, self.manual_key)
         if data:
             override = ManualOverride.from_json(data)
             if override.until is None or override.until > utcnow():
@@ -180,7 +193,7 @@ class Scheduler:
             self._seen_failure = rt._failed_at
             count = self._failures.get(rt.spec, (0, rt._failed_at))[0] + 1
             self._failures[rt.spec] = (count, rt._failed_at)
-            self._emit("load_failed", model=rt.model_name, preset=rt.preset_name, error=rt.error)
+            self._emit("load_failed", model=rt.model_name, preset=rt.preset_name, error=rt.error, lane_id=self.lane_id)
         elif rt.state == RuntimeState.READY and rt.spec in self._failures:
             del self._failures[rt.spec]
 
@@ -195,7 +208,7 @@ class Scheduler:
         wait = FAIL_BACKOFF_SECONDS[min(count, len(FAIL_BACKOFF_SECONDS)) - 1]
         if now - failed_at >= timedelta(seconds=wait):
             return target  # time to try the booked model again
-        default = await queries.default_model(db)
+        default = await queries.default_model(db, self.lane_id)
         if default is None or (default.id, None) == target.spec:
             return target
         est = await queries.estimate_load_seconds(db, default, self.settings)
@@ -215,14 +228,14 @@ class Scheduler:
         now = utcnow()
         self._observe_runtime()
         async with SessionLocal() as db:
-            target = await compute_target(db, self.settings, now, self.runtime.spec, self.manual)
+            target = await compute_target(db, self.settings, now, self.runtime.spec, self.manual, self.lane_id)
             if self.manual is not None:
                 expired = self.manual.until is not None and self.manual.until <= now
                 booked = target.reason in ("reservation", "exclusive") and self.manual.until is None
                 if expired or booked:
                     log.info("manual override by %s ended", self.manual.by)
                     self.manual = None
-                    await kv.put(db, MANUAL_KEY, None)
+                    await kv.put(db, self.manual_key, None)
                     await db.commit()
             target = await self._apply_fallback(db, target, now)
         if target.reason != self.last_reason:

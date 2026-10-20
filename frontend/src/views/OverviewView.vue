@@ -25,6 +25,7 @@ const holder = computed(() => status.value?.active_reservation ?? null)
 const mine = computed(() => holder.value?.user_id === session.user?.id)
 const canRestart = computed(() => !holder.value || mine.value || session.user?.is_admin)
 const manual = computed(() => status.value?.manual ?? null)
+const multiLane = computed(() => (status.value?.lanes.length ?? 0) > 1)
 const fallbackFrom = computed(() => (status.value?.reason === 'fallback' ? status.value.fallback_from : null))
 const exclusive = computed(() => !!holder.value?.exclusive)
 const modelLabel = computed(() => {
@@ -125,9 +126,34 @@ async function restart() {
       </span>
     </div>
 
-    <div class="top">
+    <div class="top" :class="{ multi: multiLane }">
+      <!-- One card per lane when there are several GPU groups -->
+      <template v-if="multiLane">
+      <section v-for="l in status!.lanes" :key="l.id" class="card card-pad lane">
+        <div class="row">
+          <span class="lane-name">{{ l.name }}</span>
+          <span v-if="l.gpus?.length" class="faint small">GPU {{ l.gpus.join(',') }}</span>
+          <span class="spacer" />
+          <StatusDot :state="l.runtime.state" />
+        </div>
+        <div class="lane-model mono">
+          {{ l.active_reservation?.exclusive ? t('schedule.kindExclusive') : (l.runtime.model_name ?? t('overview.noModel')) }}
+        </div>
+        <div class="muted small">
+          <template v-if="l.active_reservation">
+            <Lock :size="12" />
+            {{ l.active_reservation.user_id === session.user?.id ? t('overview.reservedByYou') : t('overview.reservedBy', { user: l.active_reservation.username }) }}
+            · {{ t('overview.until', { time: formatTime(l.active_reservation.end_at) }) }}
+          </template>
+          <template v-else>
+            <ShieldCheck :size="12" /> {{ t('overview.freeAccess') }}
+            <template v-if="l.next_reservation"> · {{ t('overview.nextAt', { time: formatTime(l.next_reservation.start_at) }) }}</template>
+          </template>
+        </div>
+      </section>
+      </template>
       <!-- Current model -->
-      <section class="card card-pad model-card">
+      <section v-if="!multiLane" class="card card-pad model-card">
         <div class="row">
           <span class="label">{{ t('overview.currentModel') }}</span>
           <span class="spacer" />
@@ -175,7 +201,7 @@ async function restart() {
       </section>
 
       <!-- Access -->
-      <section class="card card-pad access" :class="{ reserved: holder }">
+      <section v-if="!multiLane" class="card card-pad access" :class="{ reserved: holder }">
         <span class="label">{{ t('overview.access') }}</span>
         <div class="access-body">
           <div class="access-icon">
@@ -302,6 +328,29 @@ async function restart() {
 </template>
 
 <style scoped>
+.top.multi {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+.lane {
+  display: grid;
+  gap: 6px;
+}
+.lane-name {
+  font-weight: 650;
+}
+.lane-model {
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lane .small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+}
 .banner {
   display: flex;
   align-items: center;

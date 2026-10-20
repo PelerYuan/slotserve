@@ -11,6 +11,7 @@ import { session } from '@/composables/session'
 import { useNow } from '@/composables/useNow'
 import { useStatus } from '@/composables/useStatus'
 import { useErrorMessage } from '@/composables/useErrorMessage'
+import { loadLanes, useLanes } from '@/composables/lanes'
 import { formatDate, formatRange, relativeFromNow } from '@/utils/format'
 
 const { t } = useI18n()
@@ -51,12 +52,15 @@ const mine = ref<Reservation[]>([])
 const waiting = ref<WaitlistEntry[]>([])
 const models = ref<Model[]>([])
 const slotMinutes = computed(() => session.config?.slot_minutes ?? 30)
+const { lanes, multi } = useLanes()
+const laneId = ref<number | null>(null)
+const currentLane = computed(() => laneId.value ?? lanes.value[0]?.id ?? null)
 
 async function load() {
   try {
     const horizon = new Date(Date.now() + (session.config?.max_advance_days ?? 30) * 86_400_000)
     const [all, my, wl] = await Promise.all([
-      api.reservations(rangeStart.value, rangeEnd.value),
+      api.reservations(rangeStart.value, rangeEnd.value, false, multi.value ? currentLane.value : null),
       api.reservations(new Date(Date.now() - 86_400_000), horizon, true),
       api.waitlist(),
     ])
@@ -72,6 +76,7 @@ let timer: number | undefined
 onMounted(async () => {
   window.addEventListener('resize', onResize)
   models.value = await api.models().catch(() => [])
+  await loadLanes()
   await load()
   timer = window.setInterval(load, 30_000)
 })
@@ -79,7 +84,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize)
   window.clearInterval(timer)
 })
-watch(rangeStart, load)
+watch([rangeStart, currentLane], load)
 
 function shift(n: number) {
   const x = new Date(anchor.value)
@@ -195,6 +200,17 @@ const what = (r: Reservation) =>
 
     <div class="layout">
       <section class="card cal-card">
+        <div v-if="multi" class="lane-tabs">
+          <button
+            v-for="l in lanes"
+            :key="l.id"
+            class="lane-tab"
+            :class="{ on: l.id === currentLane }"
+            @click="laneId = l.id"
+          >
+            {{ l.name }}<span v-if="l.gpus.length" class="faint"> · GPU {{ l.gpus.join(',') }}</span>
+          </button>
+        </div>
         <div class="toolbar">
           <NButtonGroup size="small">
             <NButton @click="shift(-1)"><ChevronLeft :size="16" /></NButton>
@@ -229,6 +245,7 @@ const what = (r: Reservation) =>
           <li v-for="r in mine" :key="r.id" :class="{ active: r.phase === 'active' }">
             <div class="row">
               <span class="phase" :class="r.phase">{{ t(`phase.${r.phase}`) }}</span>
+              <span v-if="multi && r.lane_name" class="badge lane-badge">{{ r.lane_name }}</span>
               <span class="spacer" />
               <span class="faint small">{{ relativeFromNow(r.phase === 'active' ? r.end_at : r.start_at) }}</span>
             </div>
@@ -278,6 +295,7 @@ const what = (r: Reservation) =>
       :models="models"
       :reservations="reservations"
       :editing="editing"
+      :lane-id="currentLane"
       @done="onBooked"
     />
 
@@ -334,6 +352,34 @@ const what = (r: Reservation) =>
 }
 .cal-card {
   overflow: hidden;
+}
+.lane-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 12px 0;
+  overflow-x: auto;
+}
+.lane-tab {
+  border: 1px solid transparent;
+  background: none;
+  font: inherit;
+  font-weight: 550;
+  color: var(--text-2);
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.lane-tab:hover {
+  background: var(--hover);
+}
+.lane-tab.on {
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+.lane-badge {
+  height: 20px;
+  font-size: 11px;
 }
 .toolbar {
   display: flex;

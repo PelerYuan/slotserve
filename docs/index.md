@@ -25,6 +25,7 @@ A lab or small team often shares a single big GPU. Without coordination people s
 | Usage | Requests, prompt/completion tokens and booked hours per person and per model |
 | Admin panel | Manage users, bookings and API keys, change settings at runtime, audit log |
 | Flexible bookings | Whole-GPU slots, argument presets, weekly repeats, extensions, waitlist, quotas |
+| Multiple GPUs & engines | Lanes of GPUs booked independently; llama.cpp, vLLM, SGLang or custom servers; optional approval mode |
 | Integrations | Telegram notifications and bot, calendar feeds, CSV export, Prometheus metrics |
 | GPU status | Memory, utilization, temperature and power from `nvidia-smi` |
 | Bilingual UI | English and Simplified Chinese |

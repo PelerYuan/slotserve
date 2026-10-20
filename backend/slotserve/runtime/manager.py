@@ -323,7 +323,12 @@ class LlamaRuntime:
             async with SessionLocal() as db:
                 db.add(
                     ModelLoadEvent(
-                        model_id=model_id, started_at=started, finished_at=utcnow(), success=success, error=error
+                        model_id=model_id,
+                        started_at=started,
+                        finished_at=utcnow(),
+                        success=success,
+                        error=error,
+                        lane_id=self.lane_id,
                     )
                 )
                 await db.commit()

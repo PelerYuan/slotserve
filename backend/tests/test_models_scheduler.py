@@ -7,7 +7,7 @@ from slotserve.db import SessionLocal, utcnow
 from slotserve.orm import LlmModel, Reservation
 from slotserve.runtime.manager import strip_managed_flags
 from slotserve.runtime.scheduler import compute_target
-from slotserve.services import scanner
+from slotserve.services import queries, scanner
 
 
 def test_split_and_mmproj_detection():
@@ -72,6 +72,8 @@ async def _seed(names_sizes):
             db.add(m)
             models.append(m)
         await db.flush()
+        lane = await queries.primary_lane(db)
+        lane.default_model_id = next((m.id for m in models if m.is_default), lane.default_model_id)
         await db.commit()
         return [m.id for m in models]
 

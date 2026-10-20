@@ -37,6 +37,7 @@ export interface Model {
   presets: Preset[]
   exceeds_vram: boolean
   engine: Engine
+  default_lane_ids: number[]
 }
 
 export type Engine = 'llama.cpp' | 'vllm' | 'sglang' | 'custom'
@@ -75,6 +76,8 @@ export interface Reservation {
   preset_name: string | null
   exclusive: boolean
   series_id: string | null
+  lane_id: number | null
+  lane_name: string | null
   start_at: string
   end_at: string
   status: 'booked' | 'pending' | 'cancelled' | 'rejected' | 'expired'
@@ -118,8 +121,31 @@ export interface ManualOverride {
   by: string
 }
 
+export interface LaneStatus {
+  id: number
+  name: string
+  gpus: number[] | null
+  runtime: Runtime
+  reason: string | null
+  fallback_from: string | null
+  manual: ManualOverride | null
+  active_reservation: Reservation | null
+  next_reservation: Reservation | null
+  default_model: string | null
+}
+
+export interface Lane {
+  id: number
+  name: string
+  gpus: number[]
+  default_model_id: number | null
+  default_model_name: string | null
+  position: number
+}
+
 export interface Status {
   now: string
+  lanes: LaneStatus[]
   runtime: Runtime
   reason: string | null
   fallback_from: string | null
@@ -239,6 +265,7 @@ export interface RequestLog {
 // ---- booking extras -------------------------------------------------------
 
 export interface BookingInput {
+  lane_id?: number | null
   model_id: number | null
   preset_id?: number | null
   start_at: string
@@ -250,6 +277,8 @@ export interface BookingInput {
 
 export interface WaitlistEntry {
   id: number
+  lane_id: number | null
+  lane_name: string | null
   user_id: number
   username: string
   model_id: number | null

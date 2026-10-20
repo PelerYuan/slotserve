@@ -18,8 +18,8 @@ router = APIRouter(prefix="/api/reservations", tags=["reservations"])
 
 
 def after_change(request: Request) -> None:
-    """Re-plan the GPU and give waitlisted people a chance at freed time."""
-    request.app.state.scheduler.poke()
+    """Re-plan the GPUs and give waitlisted people a chance at freed time."""
+    request.app.state.lanes.poke()
     request.app.state.housekeeper.poke()
 
 
@@ -38,6 +38,7 @@ async def list_reservations(
     end: datetime | None = Query(default=None),
     mine: bool = False,
     include_cancelled: bool = False,
+    lane_id: int | None = None,
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -49,6 +50,8 @@ async def list_reservations(
         stmt = stmt.where(Reservation.status.in_(HOLDING_STATUSES))
     if mine:
         stmt = stmt.where(Reservation.user_id == user.id)
+    if lane_id is not None:
+        stmt = stmt.where(Reservation.lane_id == lane_id)
     rows = (await db.execute(stmt.order_by(Reservation.start_at))).scalars().all()
     return await queries.reservation_out(db, list(rows), now)
 
@@ -76,10 +79,11 @@ async def create_reservation(
     if windows[-1][0] > now + timedelta(days=settings.max_advance_days):
         raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_too_far", days=settings.max_advance_days)
     model, preset = await booking.resolve_model(db, body.model_id, body.preset_id)
+    lane = await booking.resolve_lane(db, body.lane_id)
 
     pending = booking.needs_approval(settings, user, windows)
     async with booking.booking_lock:
-        await booking.raise_if_conflicts(db, windows)
+        await booking.raise_if_conflicts(db, windows, lane_id=lane.id)
         if owner.id == user.id:
             await booking.check_quota(db, settings, owner, windows)
         series = str(uuid.uuid4()) if len(windows) > 1 else None
@@ -89,6 +93,7 @@ async def create_reservation(
                 model_id=model.id if model else None,
                 preset_id=preset.id if preset else None,
                 series_id=series,
+                lane_id=lane.id,
                 start_at=s,
                 end_at=e,
                 note=body.note.strip(),
@@ -106,7 +111,7 @@ async def create_reservation(
         notify_owner(request, user, r, "booking_created")
     if pending:
         request_review(request, created[0], len(created))
-    request.app.state.scheduler.poke()
+    request.app.state.lanes.poke(lane.id)
     return await queries.reservation_out(db, created, utcnow())
 
 
@@ -129,7 +134,7 @@ async def update_reservation_core(
     fields = body.model_fields_set
     if phase not in ("upcoming", "active", "pending"):
         raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_finished")
-    if phase == "active" and (fields & {"start_at", "model_id", "preset_id"}):
+    if phase == "active" and (fields & {"start_at", "model_id", "preset_id", "lane_id"}):
         raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_active_locked")
 
     start = booking.aware(body.start_at) if body.start_at else r.start_at
@@ -147,15 +152,16 @@ async def update_reservation_core(
         model, preset = await booking.resolve_model(db, model_id, preset_id)
         model_id, preset_id = (model.id if model else None), (preset.id if preset else None)
 
+    lane_id = (await booking.resolve_lane(db, body.lane_id)).id if "lane_id" in fields else r.lane_id
     # Changing a not-yet-started booking is judged like a new one in approval mode.
     review = phase != "active" and r.user_id == user.id and booking.needs_approval(settings, user, [(start, end)])
     newly_pending = review and r.status != "pending"
     async with booking.booking_lock:
-        await booking.raise_if_conflicts(db, [(start, end)], exclude={r.id})
+        await booking.raise_if_conflicts(db, [(start, end)], exclude={r.id}, lane_id=lane_id)
         owner = await db.get(User, r.user_id)
         if owner is not None and owner.id == user.id:
             await booking.check_quota(db, settings, owner, [(start, end)], exclude={r.id})
-        r.start_at, r.end_at, r.model_id, r.preset_id = start, end, model_id, preset_id
+        r.start_at, r.end_at, r.model_id, r.preset_id, r.lane_id = start, end, model_id, preset_id, lane_id
         if body.note is not None:
             r.note = body.note.strip()
         if review:
@@ -209,7 +215,7 @@ async def extend_reservation(
     r = await _editable(db, reservation_id, user)
     r = await extend_core(db, user, r, body.minutes)
     notify_owner(request, user, r, "booking_changed")
-    request.app.state.scheduler.poke()
+    request.app.state.lanes.poke(r.lane_id)
     return (await queries.reservation_out(db, [r], utcnow()))[0]
 
 

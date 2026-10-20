@@ -25,12 +25,8 @@ async def admin_user(user: User = Depends(current_user)) -> User:
     return user
 
 
-def get_runtime(request: Request):
-    return request.app.state.runtime
-
-
-def get_scheduler(request: Request):
-    return request.app.state.scheduler
+def get_lanes(request: Request):
+    return request.app.state.lanes
 
 
 def get_downloader(request: Request):

@@ -44,30 +44,35 @@ async def metrics(request: Request):
         return PlainTextResponse("unauthorized\n", 401, headers={"WWW-Authenticate": "Bearer"})
 
     w = _Writer()
-    snap = request.app.state.runtime.snapshot()
+    lanes = request.app.state.lanes.ordered()
+    snaps = [(ctx, ctx.runtime.snapshot()) for ctx in lanes]
     w.metric(
         "slotserve_runtime_state",
         "gauge",
-        "1 for the current llama-server state.",
-        [({"state": s.value}, 1 if snap.state == s else 0) for s in RuntimeState],
+        "1 for the current state of each lane's model server.",
+        [({"lane": c.name, "state": s.value}, 1 if snap.state == s else 0) for c, snap in snaps for s in RuntimeState],
     )
     w.metric(
         "slotserve_runtime_model_info",
         "gauge",
-        "The loaded model (value is always 1).",
-        [({"model": snap.model_name, "preset": snap.preset_name or "default"}, 1)] if snap.model_name else [],
+        "The model loaded on each lane (value is always 1).",
+        [
+            ({"lane": c.name, "model": snap.model_name, "preset": snap.preset_name or "default"}, 1)
+            for c, snap in snaps
+            if snap.model_name
+        ],
     )
 
     now = utcnow()
     async with SessionLocal() as db:
-        active = await queries.active_reservation(db, now)
         users = dict((await db.execute(select(User.id, User.username))).all())
-        w.metric(
-            "slotserve_reservation_active",
-            "gauge",
-            "1 while a booking is running.",
-            [({"user": users.get(active.user_id, "?") if active else ""}, 1 if active else 0)],
-        )
+        running = []
+        for ctx in lanes:
+            active = await queries.active_reservation(db, now, ctx.id)
+            running.append(
+                ({"lane": ctx.name, "user": users.get(active.user_id, "?") if active else ""}, int(bool(active)))
+            )
+        w.metric("slotserve_reservation_active", "gauge", "1 while a booking is running on the lane.", running)
         upcoming = (
             await db.execute(
                 select(func.count(Reservation.id)).where(Reservation.status == "booked", Reservation.start_at > now)

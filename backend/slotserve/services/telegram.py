@@ -268,15 +268,21 @@ class TelegramBot:
     # ---- commands -----------------------------------------------------------
 
     async def _status(self, db, user: User) -> str:
-        snap = self.app.state.runtime.snapshot()
-        active = await queries.active_reservation(db, utcnow())
         notifier = self.app.state.notifier
-        if active is None:
-            holder = reply(user, "holder_free")
-        else:
-            owner = await db.get(User, active.user_id)
-            holder = reply(user, "holder", user=owner.username if owner else "?", end=notifier.fmt_time(active.end_at))
-        return reply(user, "state", model=snap.model_name or "—", state=snap.state.value, holder=holder)
+        lanes = self.app.state.lanes.ordered()
+        parts = []
+        for ctx in lanes:
+            snap = ctx.runtime.snapshot()
+            active = await queries.active_reservation(db, utcnow(), ctx.id)
+            if active is None:
+                holder = reply(user, "holder_free")
+            else:
+                owner = await db.get(User, active.user_id)
+                end = notifier.fmt_time(active.end_at)
+                holder = reply(user, "holder", user=owner.username if owner else "?", end=end)
+            text = reply(user, "state", model=snap.model_name or "—", state=snap.state.value, holder=holder)
+            parts.append(f"[{ctx.name}]\n{text}" if len(lanes) > 1 else text)
+        return "\n\n".join(parts)
 
     async def _list(self, db, user: User, rows: list[Reservation]) -> str:
         notifier = self.app.state.notifier
@@ -327,8 +333,15 @@ class TelegramBot:
 
     async def _own_reservation(self, db, user: User, reservation_id: int | None) -> Reservation | None:
         if reservation_id is None:
-            r = await queries.active_reservation(db, utcnow())
-            return r if r is not None and r.user_id == user.id else None
+            rows = await db.execute(
+                select(Reservation).where(
+                    Reservation.user_id == user.id,
+                    Reservation.status == "booked",
+                    Reservation.start_at <= utcnow(),
+                    Reservation.end_at > utcnow(),
+                )
+            )
+            return rows.scalars().first()
         r = await db.get(Reservation, reservation_id)
         return r if r is not None and (r.user_id == user.id or user.is_admin) else None
 
@@ -342,7 +355,7 @@ class TelegramBot:
             r = await extend_core(db, user, r, max(5, min(minutes, 24 * 60)))
         except ApiError as exc:
             return reply(user, "error", code=exc.detail.get("code"))
-        self.app.state.scheduler.poke()
+        self.app.state.lanes.poke()
         return reply(user, "extended", end=self.app.state.notifier.fmt_time(r.end_at))
 
     async def _review(self, db, user: User, reservation_id: int, approve: bool) -> str:
@@ -359,7 +372,7 @@ class TelegramBot:
             return reply(user, "error", code=exc.detail.get("code"))
         event = "booking_approved" if approve else "booking_rejected"
         self.app.state.notifier.emit(event, user_id=r.user_id, reservation_id=r.id, count=len(done))
-        self.app.state.scheduler.poke()
+        self.app.state.lanes.poke()
         self.app.state.housekeeper.poke()
         return reply(user, "approved" if approve else "rejected", count=len(done))
 
@@ -374,7 +387,7 @@ class TelegramBot:
             await db.commit()
         except ApiError as exc:
             return reply(user, "error", code=exc.detail.get("code"))
-        self.app.state.scheduler.poke()
+        self.app.state.lanes.poke()
         self.app.state.housekeeper.poke()
         return reply(user, "released")
 

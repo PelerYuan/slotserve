@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from ..config import Settings
 from ..db import SessionLocal, utcnow
-from ..orm import LlmModel, ModelPreset, OutboxItem, Reservation, User
+from ..orm import Lane, LlmModel, ModelPreset, OutboxItem, Reservation, User
 
 log = logging.getLogger(__name__)
 
@@ -179,11 +179,15 @@ class Notifier:
 
     async def describe(self, db, r: Reservation, user: User | None) -> str:
         if r.model_id is None:
-            return text(user, "exclusive")
-        model = await db.get(LlmModel, r.model_id)
-        name = model.name if model else "?"
-        if r.preset_id is not None and (preset := await db.get(ModelPreset, r.preset_id)) is not None:
-            name = f"{name} ({preset.name})"
+            name = text(user, "exclusive")
+        else:
+            model = await db.get(LlmModel, r.model_id)
+            name = model.name if model else "?"
+            if r.preset_id is not None and (preset := await db.get(ModelPreset, r.preset_id)) is not None:
+                name = f"{name} ({preset.name})"
+        lanes = (await db.execute(select(Lane.id, Lane.name))).all()
+        if len(lanes) > 1 and r.lane_id is not None:
+            name = f"{dict(lanes).get(r.lane_id, '?')} · {name}"
         return name
 
     # ---- delivery -----------------------------------------------------------

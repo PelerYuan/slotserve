@@ -9,12 +9,14 @@ import type { AdminUser, Model, Reservation } from '@/api/types'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { useStatus } from '@/composables/useStatus'
 import { formatRange } from '@/utils/format'
+import { useLanes } from '@/composables/lanes'
 
 const { t } = useI18n()
 const dialog = useDialog()
 const { showError } = useErrorMessage()
 const { refresh: refreshStatus } = useStatus()
 
+const { multi } = useLanes()
 const PHASES = ['pending', 'upcoming', 'active', 'finished', 'cancelled', 'rejected', 'expired'] as const
 const phase = ref<string>('all')
 const userId = ref<number | null>(null)
@@ -166,6 +168,7 @@ function end(r: Reservation) {
         <thead>
           <tr>
             <th>{{ t('admin.reservations.user') }}</th>
+            <th v-if="multi">{{ t('schedule.lane') }}</th>
             <th>{{ t('admin.reservations.model') }}</th>
             <th>{{ t('admin.reservations.time') }}</th>
             <th>{{ t('admin.reservations.status') }}</th>
@@ -176,6 +179,7 @@ function end(r: Reservation) {
         <tbody>
           <tr v-for="r in rows" :key="r.id">
             <td class="strong">{{ r.username }}</td>
+            <td v-if="multi" class="small nowrap">{{ r.lane_name }}</td>
             <td :class="{ mono: !r.exclusive }" class="small">
               {{ what(r) }}<span v-if="r.series_id" class="faint"> ↻</span>
             </td>

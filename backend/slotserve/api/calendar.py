@@ -12,7 +12,7 @@ from ..config import get_settings
 from ..db import get_db, utcnow
 from ..deps import current_user
 from ..errors import ApiError
-from ..orm import HOLDING_STATUSES, LlmModel, ModelPreset, Reservation, User
+from ..orm import HOLDING_STATUSES, Lane, LlmModel, ModelPreset, Reservation, User
 from ..schemas import CalendarOut
 
 router = APIRouter(tags=["calendar"])
@@ -87,6 +87,7 @@ async def ical_feed(token: str, request: Request, scope: str = "mine", db: Async
     names = dict((await db.execute(select(User.id, User.username))).all())
     models = dict((await db.execute(select(LlmModel.id, LlmModel.name))).all())
     presets = dict((await db.execute(select(ModelPreset.id, ModelPreset.name))).all())
+    lane_names = dict((await db.execute(select(Lane.id, Lane.name))).all())
     host = request.url.hostname or "slotserve"
     zh = (user.locale or "").startswith("zh")
     lines = [
@@ -105,6 +106,8 @@ async def ical_feed(token: str, request: Request, scope: str = "mine", db: Async
             what = models.get(r.model_id, "?")
             if r.preset_id in presets:
                 what += f" ({presets[r.preset_id]})"
+        if len(lane_names) > 1 and r.lane_id in lane_names:
+            what = f"{lane_names[r.lane_id]} · {what}"
         owner = names.get(r.user_id, "?")
         summary = f"GPU · {what}" if scope != "all" else f"GPU · {owner} · {what}"
         lines += [

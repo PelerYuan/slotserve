@@ -1,6 +1,7 @@
 """Exclusive bookings, presets, edits, series, quotas, waitlist, manual control, fallback, exports."""
 
 import asyncio
+import re
 import sqlite3
 from datetime import datetime, timedelta
 
@@ -320,7 +321,8 @@ async def test_metrics_requires_token(make_client, models_dir):
     await admin.put("/api/admin/settings", json={"metrics_token": "scrape-me"})
     assert (await anon.get("/metrics")).status_code == 401
     r = await anon.get("/metrics", headers={"Authorization": "Bearer scrape-me"})
-    assert r.status_code == 200 and 'slotserve_runtime_state{state="ready"}' in r.text
+    assert r.status_code == 200
+    assert re.search(r'slotserve_runtime_state\{lane="[^"]+",state="ready"\} [01]$', r.text, re.M)
 
 
 async def test_usage_export_and_request_log(make_client, models_dir):

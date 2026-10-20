@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings
-from ..orm import LlmModel, ModelLoadEvent, ModelPreset, Reservation, User
+from ..orm import Lane, LlmModel, ModelLoadEvent, ModelPreset, Reservation, User
 from ..schemas import ModelOut, PresetOut, ReservationOut
 
 LOAD_HISTORY = 5
@@ -29,33 +29,40 @@ def as_utc(value: datetime | str) -> datetime:
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
-async def active_reservation(db: AsyncSession, now: datetime) -> Reservation | None:
-    stmt = (
-        select(Reservation)
-        .where(Reservation.status == "booked", Reservation.start_at <= now, Reservation.end_at > now)
-        .order_by(Reservation.start_at)
-        .limit(1)
+async def active_reservation(db: AsyncSession, now: datetime, lane_id: int | None = None) -> Reservation | None:
+    """The running booking of a lane (``lane_id`` ``None``: of any lane)."""
+    stmt = select(Reservation).where(
+        Reservation.status == "booked", Reservation.start_at <= now, Reservation.end_at > now
     )
-    return (await db.execute(stmt)).scalar_one_or_none()
+    if lane_id is not None:
+        stmt = stmt.where(Reservation.lane_id == lane_id)
+    return (await db.execute(stmt.order_by(Reservation.start_at).limit(1))).scalar_one_or_none()
 
 
-async def next_reservation(db: AsyncSession, now: datetime) -> Reservation | None:
-    stmt = (
-        select(Reservation)
-        .where(Reservation.status == "booked", Reservation.start_at > now)
-        .order_by(Reservation.start_at)
-        .limit(1)
-    )
-    return (await db.execute(stmt)).scalar_one_or_none()
+async def next_reservation(db: AsyncSession, now: datetime, lane_id: int | None = None) -> Reservation | None:
+    stmt = select(Reservation).where(Reservation.status == "booked", Reservation.start_at > now)
+    if lane_id is not None:
+        stmt = stmt.where(Reservation.lane_id == lane_id)
+    return (await db.execute(stmt.order_by(Reservation.start_at).limit(1))).scalar_one_or_none()
 
 
-async def default_model(db: AsyncSession) -> LlmModel | None:
-    stmt = (
-        select(LlmModel)
-        .where(LlmModel.is_default.is_(True), LlmModel.status == "ready", LlmModel.deleted_at.is_(None))
-        .limit(1)
-    )
-    return (await db.execute(stmt)).scalar_one_or_none()
+async def lanes(db: AsyncSession) -> list[Lane]:
+    return list((await db.execute(select(Lane).order_by(Lane.position, Lane.id))).scalars())
+
+
+async def primary_lane(db: AsyncSession) -> Lane | None:
+    return (await db.execute(select(Lane).order_by(Lane.position, Lane.id).limit(1))).scalar_one_or_none()
+
+
+async def default_model(db: AsyncSession, lane_id: int | None = None) -> LlmModel | None:
+    """The model a lane serves when nobody has it booked (``lane_id`` ``None``: the first lane)."""
+    lane = await db.get(Lane, lane_id) if lane_id is not None else await primary_lane(db)
+    if lane is None or lane.default_model_id is None:
+        return None
+    model = await db.get(LlmModel, lane.default_model_id)
+    if model is None or model.status != "ready" or model.deleted_at is not None:
+        return None
+    return model
 
 
 async def estimate_load_seconds(db: AsyncSession, model: LlmModel, settings: Settings) -> float:
@@ -89,6 +96,7 @@ async def reservation_out(db: AsyncSession, rows: list[Reservation], now: dateti
     preset_ids = {r.preset_id for r in rows if r.preset_id is not None}
     users = dict((await db.execute(select(User.id, User.username).where(User.id.in_(user_ids)))).all())
     models = dict((await db.execute(select(LlmModel.id, LlmModel.name).where(LlmModel.id.in_(model_ids)))).all())
+    lane_names = dict((await db.execute(select(Lane.id, Lane.name))).all())
     presets = (
         dict((await db.execute(select(ModelPreset.id, ModelPreset.name).where(ModelPreset.id.in_(preset_ids)))).all())
         if preset_ids
@@ -105,6 +113,8 @@ async def reservation_out(db: AsyncSession, rows: list[Reservation], now: dateti
             preset_name=presets.get(r.preset_id) if r.preset_id is not None else None,
             exclusive=r.model_id is None,
             series_id=r.series_id,
+            lane_id=r.lane_id,
+            lane_name=lane_names.get(r.lane_id),
             start_at=r.start_at,
             end_at=r.end_at,
             status=r.status,
@@ -120,8 +130,13 @@ async def reservation_out(db: AsyncSession, rows: list[Reservation], now: dateti
 
 
 async def model_out(
-    db: AsyncSession, models: list[LlmModel], settings: Settings, loaded_model_id: int | None
+    db: AsyncSession, models: list[LlmModel], settings: Settings, loaded: set[int] | int | None
 ) -> list[ModelOut]:
+    loaded_ids = loaded if isinstance(loaded, set) else ({loaded} if loaded is not None else set())
+    lane_defaults: dict[int, list[int]] = {}
+    for lane_id, model_id in (await db.execute(select(Lane.id, Lane.default_model_id))).all():
+        if model_id is not None:
+            lane_defaults.setdefault(model_id, []).append(lane_id)
     creator_ids = {m.created_by for m in models if m.created_by is not None}
     creators: dict[int, str] = {}
     if creator_ids:
@@ -148,8 +163,8 @@ async def model_out(
                 file_exists=_model_source_exists(m),
                 size_bytes=m.size_bytes,
                 status=m.status,
-                is_default=m.is_default,
-                is_loaded=m.id == loaded_model_id,
+                is_default=m.id in lane_defaults,
+                is_loaded=m.id in loaded_ids,
                 args=m.args,
                 description=m.description,
                 est_load_seconds=round(await estimate_load_seconds(db, m, settings), 1),
@@ -158,6 +173,7 @@ async def model_out(
                 created_at=m.created_at,
                 presets=presets.get(m.id, []),
                 engine=m.engine or "llama.cpp",
+                default_lane_ids=sorted(lane_defaults.get(m.id, [])),
                 exceeds_vram=bool(vram_bytes) and m.size_bytes > vram_bytes * 0.95,
             )
         )

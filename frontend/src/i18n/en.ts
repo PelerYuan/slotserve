@@ -72,6 +72,7 @@ export default {
     cancelled: 'Cancelled',
   },
   overview: {
+    nextAt: 'next booking at {time}',
     oomHint: 'The model did not fit in GPU memory. Offload fewer layers (-ngl) or lower the context size (-c).',
     draining: 'Waiting for running requests to finish before switching models…',
     fallbackBanner: '{model} failed to load. {current} is serving in the meantime; SlotServe keeps retrying.',
@@ -111,6 +112,7 @@ export default {
     viewLogs: 'Server log',
   },
   schedule: {
+    lane: 'Lane',
     needsApproval: 'This booking needs an admin\'s approval. The time is held for you meanwhile.',
     submittedForApproval: 'Submitted. An admin will review it; you will be notified.',
     reviewNote: 'Review note',
@@ -168,6 +170,7 @@ export default {
     noModels: 'No ready models yet. Add one on the Models page first.',
   },
   models: {
+    setDefaultLane: 'Set as default for {lane}',
     add: 'Add model',
     addTitle: 'Add model',
     engine: 'Engine',
@@ -324,6 +327,24 @@ export default {
     apiDocs: 'API reference',
   },
   admin: {
+    lanes: {
+      intro: 'A lane is a group of GPUs with its own model server and booking calendar. One lane with every GPU behaves like a single big GPU; one lane per GPU lets several people work at once.',
+      gpus: 'Detected GPUs',
+      noGpus: 'No GPUs detected (nvidia-smi is not available). Lanes then do not restrict which GPUs a model server sees.',
+      unassigned: 'Not in a lane',
+      title: 'Lanes',
+      add: 'Add lane',
+      edit: 'Edit lane',
+      name: 'Name',
+      defaultModel: 'Default model',
+      noDefault: 'None (idle)',
+      now: 'Now',
+      allGpus: 'all visible',
+      delete: 'Delete lane',
+      deleteConfirm: 'Delete lane {name}? Its past bookings stay in the history.',
+      saved: 'Lane saved. Its model server restarts if the GPUs changed.',
+      gpuHint: 'A GPU can belong to one lane only. For tensor parallelism across the lane, add e.g. --tensor-parallel-size to the model arguments (vLLM).',
+    },
     backups: {
       title: 'Backups',
       subtitle: 'Copies of the database in data/backups. A daily copy is made automatically.',
@@ -358,6 +379,7 @@ export default {
     title: 'Admin',
     subtitle: 'Manage people, bookings, keys and system settings.',
     tabs: {
+      lanes: 'GPUs & lanes',
       requests: 'Requests',
       overview: 'Overview',
       users: 'Users',
@@ -558,6 +580,9 @@ export default {
       empty: 'Nothing logged yet.',
       system: 'system',
       actions: {
+        lane_create: 'Created lane',
+        lane_update: 'Changed lane',
+        lane_delete: 'Deleted lane',
         reservation_approve: 'Approved booking',
         reservation_reject: 'Rejected booking',
         backup_create: 'Created backup',
@@ -592,6 +617,11 @@ export default {
     cancelled: 'Cancelled',
   },
   errors: {
+    lane_name_taken: 'Another lane already has that name.',
+    lane_gpus_invalid: 'Pick each GPU once, from the detected GPUs.',
+    lane_gpus_overlap: 'A GPU already belongs to lane {lane}.',
+    last_lane: 'At least one lane must remain.',
+    lane_has_reservations: 'The lane still has bookings that have not ended.',
     model_path_invalid: 'For llama.cpp, give the path of an existing .gguf file on the server.',
     not_pending: 'This booking is no longer waiting for approval.',
     too_many_attempts: 'Too many failed attempts. Try again in {minutes} minutes.',

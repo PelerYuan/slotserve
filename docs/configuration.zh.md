@@ -29,7 +29,7 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_STATIC_DIR` | *内置* | 前端构建产物目录 |
 | `SLOTSERVE_LLAMA_SERVER_CMD` | `llama-server` | 启动 llama-server 的命令，可带前缀，如 `taskset -c 0-15 llama-server` |
 | `SLOTSERVE_LLAMA_HOST` | `127.0.0.1` | llama-server 监听地址（请保持本地） |
-| `SLOTSERVE_LLAMA_PORT` | `8081` | llama-server 监听端口 |
+| `SLOTSERVE_LLAMA_PORT` | `8081` | 第一个通道推理进程的端口；第 *N* 个通道为此值 + *N* - 1 |
 | `SLOTSERVE_DEFAULT_LLAMA_ARGS` | `-ngl 99 -c 8192` | 新登记模型的默认启动参数 |
 | `SLOTSERVE_LOAD_TIMEOUT_SECONDS` | `1800` | 超过此时间仍未就绪则判定加载失败 |
 | `SLOTSERVE_STOP_TIMEOUT_SECONDS` | `20` | 强制结束 llama-server 前的等待时间 |
@@ -39,6 +39,12 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_MAX_ADVANCE_DAYS` | `30` | 最多可提前几天预约 |
 | `SLOTSERVE_PRELOAD_BUFFER_SECONDS` | `60` | 预加载时额外预留的时间 |
 | `SLOTSERVE_PRELOAD_MIN_MINUTES` | `3` | 预约的模型至少提前多少分钟开始加载 |
+| `SLOTSERVE_APPROVAL_MODE` | `off` | `off`、`long` 或 `all`：哪些预约需要管理员审批 |
+| `SLOTSERVE_APPROVAL_HOURS` | `4` | `long` 模式下，超过这个时长的预约需要审批 |
+| `SLOTSERVE_VLLM_CMD` | `vllm serve` | vLLM 后端的启动命令 |
+| `SLOTSERVE_SGLANG_CMD` | `python -m sglang.launch_server` | SGLang 后端的启动命令 |
+| `SLOTSERVE_CUSTOM_ENGINE_CMD` | *空* | 自定义后端命令模板：`{model}` `{host}` `{port}` `{name}` |
+| `SLOTSERVE_CUSTOM_ENGINE_HEALTH` | `/health` | 轮询判断自定义后端就绪的路径 |
 | `SLOTSERVE_SCHEDULER_INTERVAL_SECONDS` | `5` | 调度器重新评估的间隔 |
 | `SLOTSERVE_DOWNLOAD_MIN_FREE_GB` | `2` | 下载完成后磁盘至少保留的空间 |
 | `SLOTSERVE_PUBLIC_URL` | *空* | 大家访问 SlotServe 的地址，用于日历订阅链接 |

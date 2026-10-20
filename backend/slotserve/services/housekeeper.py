@@ -76,7 +76,7 @@ class Housekeeper:
                 if any(stats.values()):
                     log.info("retention cleanup: %s", stats)
         if booked:
-            self.state.scheduler.poke()
+            self.state.lanes.poke()
         await self._backup(now)
 
     async def _backup(self, now: datetime) -> None:
@@ -126,11 +126,13 @@ class Housekeeper:
                 self.notifier.emit("reminder_end", user_id=r.user_id, reservation_id=r.id)
 
     async def _ready(self, db: AsyncSession) -> None:
-        target = self.state.scheduler.target
+        for ctx in self.state.lanes.ordered():
+            await self._lane_ready(db, ctx.scheduler.target, ctx.runtime)
+
+    async def _lane_ready(self, db: AsyncSession, target, runtime) -> None:
         if target is None or target.reservation is None:
             return
         r = target.reservation
-        runtime = self.state.runtime
         if target.reason == "exclusive" and runtime.state == RuntimeState.STOPPED:
             if await once(db, f"res:{r.id}:exclusive"):
                 self.notifier.emit("exclusive_ready", user_id=r.user_id, reservation_id=r.id)
@@ -175,7 +177,7 @@ async def _process_waitlist(db: AsyncSession, settings: Settings, notifier, now:
         if e.end_at - start < booking.MIN_LENGTH:
             e.status, e.resolved_at = "expired", now
             continue
-        if await booking.find_conflict(db, start, e.end_at) is not None:
+        if await booking.find_conflict(db, start, e.end_at, lane_id=e.lane_id) is not None:
             continue
         user = await db.get(User, e.user_id)
         if user is None or user.disabled_at is not None:
@@ -186,7 +188,7 @@ async def _process_waitlist(db: AsyncSession, settings: Settings, notifier, now:
             notifier.emit("waitlist_free", user_id=e.user_id, when=_window(notifier, start, e.end_at))
             continue
         async with booking.booking_lock:
-            if await booking.find_conflict(db, start, e.end_at) is not None:
+            if await booking.find_conflict(db, start, e.end_at, lane_id=e.lane_id) is not None:
                 continue  # taken in the meantime; keep waiting
             try:
                 await booking.resolve_model(db, e.model_id, e.preset_id)
@@ -196,6 +198,7 @@ async def _process_waitlist(db: AsyncSession, settings: Settings, notifier, now:
                 notifier.emit("waitlist_free", user_id=e.user_id, when=_window(notifier, start, e.end_at))
                 continue
             r = Reservation(
+                lane_id=e.lane_id,
                 user_id=e.user_id,
                 model_id=e.model_id,
                 preset_id=e.preset_id,

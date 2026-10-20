@@ -39,6 +39,7 @@ import { api } from '@/api/client'
 import type { DownloadTask, HfFile, Model } from '@/api/types'
 import { session } from '@/composables/session'
 import { useErrorMessage } from '@/composables/useErrorMessage'
+import { useLanes } from '@/composables/lanes'
 import { formatBytes, formatDateTime, formatDuration } from '@/utils/format'
 
 const { t } = useI18n()
@@ -86,6 +87,10 @@ async function scan() {
   }
 }
 
+const { lanes, multi, nameOf } = useLanes()
+const defaultLabel = (m: Model) =>
+  multi.value ? `${t('models.default')} · ${m.default_lane_ids.map(nameOf).join(', ')}` : t('models.default')
+
 const canEdit = (m: Model) => session.user?.is_admin || m.created_by === session.user?.id
 
 function menuFor(m: Model) {
@@ -95,7 +100,11 @@ function menuFor(m: Model) {
     items.push(
       m.is_default
         ? { key: 'unset-default', label: t('models.unsetDefault') }
-        : { key: 'default', label: t('models.setDefault'), disabled: m.status !== 'ready' || !m.file_exists },
+        : {
+            key: 'default',
+            label: multi.value ? t('models.setDefaultLane', { lane: lanes.value[0]?.name }) : t('models.setDefault'),
+            disabled: m.status !== 'ready' || !m.file_exists,
+          },
     )
   if (canEdit(m)) items.push({ type: 'divider', key: 'd' }, { key: 'delete', label: t('common.delete'), props: { style: 'color:var(--danger)' } })
   return items
@@ -120,6 +129,15 @@ const form = reactive({ name: '', args: '', description: '', engine: 'llama.cpp'
 const creating = ref(false)
 const ENGINE_OPTIONS = ['llama.cpp', 'vllm', 'sglang', 'custom'] as const
 const engineLabel: Record<string, string> = { 'llama.cpp': 'llama.cpp', vllm: 'vLLM', sglang: 'SGLang', custom: 'Custom' }
+const argsPlaceholder = computed(
+  () =>
+    ({
+      'llama.cpp': '-ngl 99 -c 8192 --flash-attn on',
+      vllm: '--max-model-len 32768 --gpu-memory-utilization 0.9',
+      sglang: '--context-length 32768 --mem-fraction-static 0.85',
+      custom: '--max-batch-size 8',
+    })[form.engine],
+)
 const pathPlaceholder = computed(() =>
   form.engine === 'llama.cpp' ? '/models/Qwen3-8B-Q4_K_M.gguf' : 'Qwen/Qwen3-8B  ·  /models/qwen3-8b',
 )
@@ -359,7 +377,7 @@ function eta(d: DownloadTask) {
           <div class="m-main">
             <div class="m-name">
               <span>{{ m.name }}</span>
-              <span v-if="m.is_default" class="badge brand"><Star :size="11" />{{ t('models.default') }}</span>
+              <span v-if="m.is_default" class="badge brand"><Star :size="11" />{{ defaultLabel(m) }}</span>
               <span v-if="m.engine !== 'llama.cpp'" class="badge">{{ engineLabel[m.engine] }}</span>
               <span v-if="m.is_loaded" class="badge ok">{{ t('models.loaded') }}</span>
               <span v-if="!m.file_exists" class="badge danger">{{ t('models.missingFile') }}</span>
@@ -498,7 +516,7 @@ function eta(d: DownloadTask) {
           <NInput v-model:value="form.path" class="mono-input" :placeholder="pathPlaceholder" />
         </NFormItem>
         <NFormItem :label="t('models.args')" :feedback="t('models.argsHint')">
-          <NInput v-model:value="form.args" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" class="mono-input" placeholder="-ngl 99 -c 8192 --flash-attn on" />
+          <NInput v-model:value="form.args" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" class="mono-input" :placeholder="argsPlaceholder" />
         </NFormItem>
         <NFormItem :label="t('models.description')">
           <NInput v-model:value="form.description" type="textarea" :autosize="{ minRows: 2, maxRows: 5 }" />

@@ -74,6 +74,7 @@ const zh: typeof en = {
     cancelled: '已取消',
   },
   overview: {
+    nextAt: '下一个预约 {time}',
     oomHint: '模型放不进显存。请调小 -ngl（少放几层到 GPU）或 -c（上下文长度）。',
     draining: '正在等待进行中的请求完成，随后切换模型…',
     fallbackBanner: '{model} 加载失败，暂由 {current} 提供服务，系统会自动重试。',
@@ -113,6 +114,7 @@ const zh: typeof en = {
     viewLogs: '运行日志',
   },
   schedule: {
+    lane: '通道',
     needsApproval: '这个预约需要管理员审批，审批期间时段会为你保留。',
     submittedForApproval: '已提交，等待管理员审批，结果会通知你。',
     reviewNote: '审批意见',
@@ -170,6 +172,7 @@ const zh: typeof en = {
     noModels: '还没有可用的模型，请先到“模型”页面添加。',
   },
   models: {
+    setDefaultLane: '设为 {lane} 的默认模型',
     add: '添加模型',
     addTitle: '添加模型',
     engine: '推理后端',
@@ -326,6 +329,24 @@ const zh: typeof en = {
     apiDocs: '接口文档',
   },
   admin: {
+    lanes: {
+      intro: '通道是一组 GPU，拥有自己的推理进程和预约日历。把所有 GPU 放在一个通道里就相当于一张大卡；每张卡一个通道则可以多人同时使用。',
+      gpus: '检测到的 GPU',
+      noGpus: '未检测到 GPU（无法运行 nvidia-smi）。此时通道不会限制推理进程可见的 GPU。',
+      unassigned: '未分配',
+      title: '通道',
+      add: '新建通道',
+      edit: '编辑通道',
+      name: '名称',
+      defaultModel: '默认模型',
+      noDefault: '无（空闲）',
+      now: '当前',
+      allGpus: '全部可见 GPU',
+      delete: '删除通道',
+      deleteConfirm: '删除通道 {name}？它的历史预约会保留。',
+      saved: '通道已保存。如果改了 GPU，该通道的推理进程会重启。',
+      gpuHint: '一张 GPU 只能属于一个通道。要在通道内多卡并行，请在模型参数里加上如 --tensor-parallel-size（vLLM）。',
+    },
     backups: {
       title: '备份',
       subtitle: '数据库副本保存在 data/backups，每天自动备份一次。',
@@ -360,6 +381,7 @@ const zh: typeof en = {
     title: '管理',
     subtitle: '管理用户、预约、密钥和系统设置。',
     tabs: {
+      lanes: 'GPU 与通道',
       requests: '请求',
       overview: '概览',
       users: '用户',
@@ -560,6 +582,9 @@ const zh: typeof en = {
       empty: '暂无记录。',
       system: '系统',
       actions: {
+        lane_create: '新建通道',
+        lane_update: '修改通道',
+        lane_delete: '删除通道',
         reservation_approve: '通过预约',
         reservation_reject: '拒绝预约',
         backup_create: '创建备份',
@@ -594,6 +619,11 @@ const zh: typeof en = {
     cancelled: '已取消',
   },
   errors: {
+    lane_name_taken: '已有同名通道。',
+    lane_gpus_invalid: '请从检测到的 GPU 中选择，每张只能选一次。',
+    lane_gpus_overlap: '有 GPU 已属于通道 {lane}。',
+    last_lane: '至少需要保留一个通道。',
+    lane_has_reservations: '该通道还有未结束的预约。',
     model_path_invalid: 'llama.cpp 需要填写服务器上已存在的 .gguf 文件路径。',
     not_pending: '这个预约已不在待审批状态。',
     too_many_attempts: '失败次数过多，请 {minutes} 分钟后再试。',

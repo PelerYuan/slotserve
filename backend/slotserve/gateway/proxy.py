@@ -58,6 +58,7 @@ class Admission:
     reservation_id: int | None
     model_name: str
     runtime: LlamaRuntime
+    lane_id: int | None = None
 
 
 def _bearer(request: Request) -> str | None:
@@ -87,27 +88,76 @@ async def authenticate(request: Request) -> Caller:
         return Caller(user_id=key.user_id, username=username, api_key_id=key.id)
 
 
+def _reserved(owner: User | None, active) -> GatewayError:
+    return GatewayError(
+        openai_error(
+            403,
+            f"The GPU is reserved by '{owner.username if owner else '?'}' until "
+            f"{active.end_at.isoformat()}. Book a slot to use it.",
+            "gpu_reserved",
+        )
+    )
+
+
 async def admit(request: Request, caller: Caller, requested_model: str | None) -> Admission:
-    runtime: LlamaRuntime = request.app.state.runtime
-    target = request.app.state.scheduler.target
+    """Picks the lane that serves this caller and checks it is ready.
+
+    A lane is usable when it is free or booked by the caller. A requested model name selects the lane
+    that serves it; otherwise the caller's own booked lane wins, then the first free ready lane.
+    """
+    lanes = request.app.state.lanes
     now = utcnow()
     async with SessionLocal() as db:
-        active = await queries.active_reservation(db, now)
-        if active is not None and active.user_id != caller.user_id:
-            owner = await db.get(User, active.user_id)
-            raise GatewayError(
-                openai_error(
-                    403,
-                    f"The GPU is reserved by '{owner.username if owner else '?'}' until "
-                    f"{active.end_at.isoformat()}. Book a slot to use it.",
-                    "gpu_reserved",
-                )
+        views = [(ctx, await queries.active_reservation(db, now, ctx.id)) for ctx in lanes.ordered()]
+        own = [(c, a) for c, a in views if a is not None and a.user_id == caller.user_id]
+        free = [(c, a) for c, a in views if a is None]
+        blocked = [(c, a) for c, a in views if a is not None and a.user_id != caller.user_id]
+
+        def serving(ctx, name: str) -> bool:
+            return ctx.runtime.model_name == name and ctx.runtime.state in (RuntimeState.READY, RuntimeState.LOADING)
+
+        chosen = None
+        if requested_model:
+            chosen = next(((c, a) for c, a in own + free if serving(c, requested_model)), None)
+            if chosen is None:
+                hit = next(((c, a) for c, a in blocked if serving(c, requested_model)), None)
+                if hit is not None:
+                    raise _reserved(await db.get(User, hit[1].user_id), hit[1])
+                registered = (
+                    await db.execute(
+                        select(LlmModel.id).where(LlmModel.name == requested_model, LlmModel.deleted_at.is_(None))
+                    )
+                ).first()
+                if registered is not None and (own or free):
+                    current = ", ".join(sorted({c.runtime.model_name for c, _ in own + free if c.runtime.model_name}))
+                    raise GatewayError(
+                        openai_error(
+                            409,
+                            f"Model '{requested_model}' is not loaded (available: '{current or 'none'}'). "
+                            "Reserve a slot to switch models.",
+                            "model_not_loaded",
+                        )
+                    )
+        if chosen is None:
+            candidates = (
+                [(c, a) for c, a in own if a.model_id is not None]
+                or [(c, a) for c, a in free if c.runtime.state == RuntimeState.READY]
+                or free
+                or own
             )
+            if not candidates:
+                owner = await db.get(User, blocked[0][1].user_id)
+                raise _reserved(owner, blocked[0][1])
+            chosen = candidates[0]
+
+        ctx, active = chosen
+        runtime: LlamaRuntime = ctx.runtime
+        target = ctx.scheduler.target
         if active is not None and active.model_id is None:
             raise GatewayError(
                 openai_error(
                     503,
-                    "Your booking is exclusive: llama-server is stopped so the whole GPU is free for other work.",
+                    "Your booking is exclusive: the model server is stopped so the GPU is free for other work.",
                     "gpu_exclusive",
                 )
             )
@@ -132,24 +182,12 @@ async def admit(request: Request, caller: Caller, requested_model: str | None) -
                     headers={"Retry-After": str(max(5, request.app.state.settings.drain_seconds))},
                 )
             )
-
-        if requested_model and requested_model != snap.model_name:
-            other = (
-                await db.execute(
-                    select(LlmModel.id).where(LlmModel.name == requested_model, LlmModel.deleted_at.is_(None))
-                )
-            ).first()
-            if other is not None:
-                raise GatewayError(
-                    openai_error(
-                        409,
-                        f"Model '{requested_model}' is not loaded (current: '{snap.model_name}'). "
-                        "Reserve a slot to switch models.",
-                        "model_not_loaded",
-                    )
-                )
         return Admission(
-            caller=caller, reservation_id=active.id if active else None, model_name=snap.model_name, runtime=runtime
+            caller=caller,
+            reservation_id=active.id if active else None,
+            model_name=snap.model_name,
+            runtime=runtime,
+            lane_id=ctx.id,
         )
 
 
@@ -178,6 +216,7 @@ def _record_usage(admission: Admission, endpoint: str, stream: bool, usage: dict
                         user_id=admission.caller.user_id,
                         api_key_id=admission.caller.api_key_id,
                         reservation_id=admission.reservation_id,
+                        lane_id=admission.lane_id,
                         model_name=admission.model_name or "",
                         endpoint=endpoint,
                         stream=stream,
@@ -224,21 +263,29 @@ class _SSEUsageSniffer:
 @router.get("/models")
 async def list_models(request: Request):
     try:
-        await authenticate(request)
+        caller = await authenticate(request)
     except GatewayError as e:
         return e.response
-    snap = request.app.state.runtime.snapshot()
-    data = []
-    if snap.model_name and snap.state in (RuntimeState.READY, RuntimeState.LOADING):
-        data.append(
-            {
-                "id": snap.model_name,
-                "object": "model",
-                "created": int((snap.load_started_at or utcnow()).timestamp()),
-                "owned_by": "slotserve",
-                "status": snap.state.value,
-            }
-        )
+    now = utcnow()
+    data, seen = [], set()
+    async with SessionLocal() as db:
+        for ctx in request.app.state.lanes.ordered():
+            active = await queries.active_reservation(db, now, ctx.id)
+            snap = ctx.runtime.snapshot()
+            usable = active is None or active.user_id == caller.user_id
+            if not usable or not snap.model_name or snap.model_name in seen:
+                continue
+            if snap.state in (RuntimeState.READY, RuntimeState.LOADING):
+                seen.add(snap.model_name)
+                data.append(
+                    {
+                        "id": snap.model_name,
+                        "object": "model",
+                        "created": int((snap.load_started_at or now).timestamp()),
+                        "owned_by": "slotserve",
+                        "status": snap.state.value,
+                    }
+                )
     return {"object": "list", "data": data}
 
 

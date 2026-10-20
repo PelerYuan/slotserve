@@ -6,7 +6,7 @@ from ..config import get_settings
 from ..db import get_db, utcnow
 from ..deps import current_user
 from ..errors import ApiError
-from ..orm import LlmModel, ModelPreset, User, WaitlistEntry
+from ..orm import Lane, LlmModel, ModelPreset, User, WaitlistEntry
 from ..schemas import WaitlistIn, WaitlistOut
 from ..services import booking
 
@@ -21,9 +21,12 @@ async def _out(db: AsyncSession, rows: list[WaitlistEntry]) -> list[WaitlistOut]
         user = await db.get(User, e.user_id)
         model = await db.get(LlmModel, e.model_id) if e.model_id else None
         preset = await db.get(ModelPreset, e.preset_id) if e.preset_id else None
+        lane = await db.get(Lane, e.lane_id) if e.lane_id else None
         out.append(
             WaitlistOut(
                 id=e.id,
+                lane_id=e.lane_id,
+                lane_name=lane.name if lane else None,
                 user_id=e.user_id,
                 username=user.username if user else "?",
                 model_id=e.model_id,
@@ -58,8 +61,10 @@ async def join_waitlist(
 ):
     start, end = booking.check_window(get_settings(), body.start_at, body.end_at, utcnow())
     model, preset = await booking.resolve_model(db, body.model_id, body.preset_id)
+    lane = await booking.resolve_lane(db, body.lane_id)
     entry = WaitlistEntry(
         user_id=user.id,
+        lane_id=lane.id,
         model_id=model.id if model else None,
         preset_id=preset.id if preset else None,
         start_at=start,

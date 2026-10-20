@@ -6,13 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..db import get_db, utcnow
-from ..deps import admin_user, current_user, get_runtime, get_scheduler
+from ..deps import admin_user, current_user, get_lanes
 from ..errors import ApiError
-from ..orm import HOLDING_STATUSES, LlmModel, ModelPreset, Reservation, User
-from ..runtime.manager import LlamaRuntime, split_args
-from ..runtime.scheduler import Scheduler
+from ..orm import HOLDING_STATUSES, Lane, LlmModel, ModelPreset, Reservation, User
+from ..runtime.engines import split_args
+from ..runtime.lanes import LaneManager
 from ..schemas import ModelCreateIn, ModelOut, ModelUpdateIn, PresetIn, PresetOut, ScanResultOut
-from ..services import queries, scanner
+from ..services import booking, queries, scanner
 from ..services.audit import record
 
 router = APIRouter(prefix="/api/models", tags=["models"])
@@ -34,7 +34,7 @@ def _check_owner(model: LlmModel, user: User) -> None:
 async def list_models(
     _: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-    runtime: LlamaRuntime = Depends(get_runtime),
+    lanes: LaneManager = Depends(get_lanes),
 ):
     models = (
         (
@@ -47,7 +47,7 @@ async def list_models(
         .scalars()
         .all()
     )
-    return await queries.model_out(db, list(models), get_settings(), runtime.model_id)
+    return await queries.model_out(db, list(models), get_settings(), lanes.loaded_model_ids())
 
 
 @router.post("/scan", response_model=ScanResultOut)
@@ -75,7 +75,7 @@ async def create_model(
     body: ModelCreateIn,
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-    runtime: LlamaRuntime = Depends(get_runtime),
+    lanes: LaneManager = Depends(get_lanes),
 ):
     """Registers a model by hand: a GGUF file for llama.cpp, or a directory / repository id for other engines."""
     taken = await db.execute(select(LlmModel.id).where(LlmModel.name == body.name))
@@ -98,7 +98,7 @@ async def create_model(
     )
     db.add(model)
     await db.commit()
-    return (await queries.model_out(db, [model], get_settings(), runtime.model_id))[0]
+    return (await queries.model_out(db, [model], get_settings(), lanes.loaded_model_ids()))[0]
 
 
 @router.patch("/{model_id}", response_model=ModelOut)
@@ -107,7 +107,7 @@ async def update_model(
     body: ModelUpdateIn,
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-    runtime: LlamaRuntime = Depends(get_runtime),
+    lanes: LaneManager = Depends(get_lanes),
 ):
     model = await _get_model(db, model_id)
     _check_owner(model, user)
@@ -129,40 +129,56 @@ async def update_model(
         model.file_path, model.size_bytes = _source(engine, body.path or model.file_path)
         model.engine = None if engine == "llama.cpp" else engine
     await db.commit()
-    return (await queries.model_out(db, [model], get_settings(), runtime.model_id))[0]
+    return (await queries.model_out(db, [model], get_settings(), lanes.loaded_model_ids()))[0]
+
+
+async def sync_default_flags(db: AsyncSession) -> None:
+    """Keeps ``models.is_default`` (used for sorting) in line with the lanes' default models."""
+    ids = {mid for mid in (await db.execute(select(Lane.default_model_id))).scalars() if mid is not None}
+    await db.execute(update(LlmModel).values(is_default=False))
+    if ids:
+        await db.execute(update(LlmModel).where(LlmModel.id.in_(ids)).values(is_default=True))
 
 
 @router.post("/{model_id}/default", response_model=ModelOut)
 async def set_default(
     model_id: int,
+    lane_id: int | None = None,
     admin: User = Depends(admin_user),
     db: AsyncSession = Depends(get_db),
-    runtime: LlamaRuntime = Depends(get_runtime),
-    scheduler: Scheduler = Depends(get_scheduler),
+    lanes: LaneManager = Depends(get_lanes),
 ):
+    """Makes the model the one a lane serves when nobody has booked it (``lane_id`` omitted: the first lane)."""
     model = await _get_model(db, model_id)
     if model.status != "ready":
         raise ApiError(status.HTTP_400_BAD_REQUEST, "model_not_ready")
-    await db.execute(update(LlmModel).values(is_default=False))
-    model.is_default = True
-    record(db, admin, "model.set_default", model.name)
+    lane = await booking.resolve_lane(db, lane_id)
+    lane.default_model_id = model.id
+    await sync_default_flags(db)
+    record(db, admin, "model.set_default", model.name, lane=lane.name)
     await db.commit()
-    scheduler.poke()
-    return (await queries.model_out(db, [model], get_settings(), runtime.model_id))[0]
+    lanes.poke(lane.id)
+    return (await queries.model_out(db, [model], get_settings(), lanes.loaded_model_ids()))[0]
 
 
 @router.delete("/{model_id}/default", status_code=204)
 async def clear_default(
     model_id: int,
+    lane_id: int | None = None,
     admin: User = Depends(admin_user),
     db: AsyncSession = Depends(get_db),
-    scheduler: Scheduler = Depends(get_scheduler),
+    lanes: LaneManager = Depends(get_lanes),
 ):
+    """Stops serving the model by default (on one lane, or on every lane when ``lane_id`` is omitted)."""
     model = await _get_model(db, model_id)
-    model.is_default = False
+    stmt = update(Lane).where(Lane.default_model_id == model.id)
+    if lane_id is not None:
+        stmt = stmt.where(Lane.id == lane_id)
+    await db.execute(stmt.values(default_model_id=None))
+    await sync_default_flags(db)
     record(db, admin, "model.clear_default", model.name)
     await db.commit()
-    scheduler.poke()
+    lanes.poke()
 
 
 @router.delete("/{model_id}", status_code=204)
@@ -171,11 +187,11 @@ async def delete_model(
     delete_file: bool = False,
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
-    runtime: LlamaRuntime = Depends(get_runtime),
+    lanes: LaneManager = Depends(get_lanes),
 ):
     model = await _get_model(db, model_id)
     _check_owner(model, user)
-    if runtime.model_id == model.id:
+    if model.id in lanes.loaded_model_ids():
         raise ApiError(status.HTTP_409_CONFLICT, "model_in_use")
     future = await db.execute(
         select(Reservation.id).where(
@@ -192,6 +208,7 @@ async def delete_model(
         # Keep usage history intact: soft-delete and free the name.
         model.deleted_at = utcnow()
         model.is_default = False
+        await db.execute(update(Lane).where(Lane.default_model_id == model.id).values(default_model_id=None))
         model.name = f"{model.name}#deleted-{model.id}"
     else:
         await db.delete(model)

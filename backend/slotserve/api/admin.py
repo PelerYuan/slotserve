@@ -10,10 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..db import get_db, utcnow
-from ..deps import admin_user, get_scheduler
+from ..deps import admin_user, get_lanes
 from ..errors import ApiError
 from ..orm import HOLDING_STATUSES, ApiKey, AuditLog, LlmModel, ModelLoadEvent, Reservation, UsageLog, User
-from ..runtime.scheduler import MANUAL_KEY, ManualOverride, Scheduler
+from ..runtime.lanes import LaneManager
+from ..runtime.scheduler import ManualOverride
 from ..schemas import (
     AdminApiKeyOut,
     AdminPasswordIn,
@@ -228,7 +229,7 @@ async def update_user(
     body: AdminUserUpdateIn,
     admin: User = Depends(admin_user),
     db: AsyncSession = Depends(get_db),
-    scheduler: Scheduler = Depends(get_scheduler),
+    lanes: LaneManager = Depends(get_lanes),
 ):
     user = await _get_user(db, user_id)
     if user.id == admin.id:
@@ -249,7 +250,7 @@ async def update_user(
             user.disabled_at = None
             record(db, admin, "user.enable", user.username)
     await db.commit()
-    scheduler.poke()
+    lanes.poke()
     return (await _user_rows(db, [user]))[0]
 
 
@@ -268,7 +269,7 @@ async def delete_user(
     user_id: int,
     admin: User = Depends(admin_user),
     db: AsyncSession = Depends(get_db),
-    scheduler: Scheduler = Depends(get_scheduler),
+    lanes: LaneManager = Depends(get_lanes),
 ):
     """Deletes the account with its keys, reservations and usage history."""
     user = await _get_user(db, user_id)
@@ -279,7 +280,7 @@ async def delete_user(
     record(db, admin, "user.delete", user.username)
     await db.delete(user)
     await db.commit()
-    scheduler.poke()
+    lanes.poke()
 
 
 # ---- api keys -------------------------------------------------------------
@@ -431,16 +432,18 @@ async def manual_runtime(
     body: ManualIn,
     admin: User = Depends(admin_user),
     db: AsyncSession = Depends(get_db),
-    scheduler: Scheduler = Depends(get_scheduler),
+    lanes: LaneManager = Depends(get_lanes),
 ):
     """Load a model now, unload, or hand control back to the schedule (``auto``). Bookings always win."""
+    ctx = lanes.get(body.lane_id)
+    scheduler = ctx.scheduler
     if body.action == "auto":
         scheduler.set_manual(None)
-        await kv.put(db, MANUAL_KEY, None)
-        record(db, admin, "runtime.auto")
+        await kv.put(db, scheduler.manual_key, None)
+        record(db, admin, "runtime.auto", ctx.name)
         await db.commit()
         return
-    if await queries.active_reservation(db, utcnow()) is not None:
+    if await queries.active_reservation(db, utcnow(), ctx.id) is not None:
         raise ApiError(status.HTTP_409_CONFLICT, "reservation_active")
     model = preset = None
     if body.action == "load":
@@ -456,7 +459,7 @@ async def manual_runtime(
         created_at=utcnow(),
     )
     scheduler.set_manual(override)
-    await kv.put(db, MANUAL_KEY, override.to_json())
+    await kv.put(db, scheduler.manual_key, override.to_json())
     record(db, admin, f"runtime.{body.action}", model.name if model else "", until=until)
     await db.commit()
 
@@ -553,7 +556,7 @@ async def _review(request: Request, reservation_id: int, body: ReviewIn, admin: 
     done = await review(db, admin, r, approve, body.note, body.series)
     event = "booking_approved" if approve else "booking_rejected"
     request.app.state.notifier.emit(event, user_id=r.user_id, reservation_id=r.id, count=len(done))
-    request.app.state.scheduler.poke()
+    request.app.state.lanes.poke()
     request.app.state.housekeeper.poke()
     return await queries.reservation_out(db, done, utcnow())
 

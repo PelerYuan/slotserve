@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-20
+
+### Added
+
+- Multiple GPUs: admins split GPUs into lanes, each with its own model server (`CUDA_VISIBLE_DEVICES`), scheduler, default model and booking calendar. The gateway routes requests to the right lane; single-GPU setups look exactly as before.
+- Inference engines per model: llama.cpp, vLLM, SGLang, or a custom command template. Models can be added by hand; `Dockerfile.vllm` builds SlotServe on the vLLM image.
+- Approval mode (off / long bookings / all): pending bookings hold their time, admins approve or reject on the web or from Telegram, and unreviewed requests expire.
+
+### Changed
+
+- Metrics `slotserve_runtime_state`, `slotserve_runtime_model_info` and `slotserve_reservation_active` carry a `lane` label.
+- `POST /api/models/{id}/default` takes an optional `lane_id`; the default model is now a property of a lane.
+
+### Fixed
+
+- Notifications whose text contains `{user}` (fallback alerts for admins) failed to send.
+
 ## [0.6.0] - 2026-10-20
 
 ### Added
@@ -99,7 +116,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - Admin CLI: `slotserve reset-password`, `slotserve set-admin`.
 - Bilingual documentation site (MkDocs Material).
 
-[Unreleased]: https://github.com/PelerYuan/slotserve/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/PelerYuan/slotserve/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/PelerYuan/slotserve/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/PelerYuan/slotserve/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/PelerYuan/slotserve/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/PelerYuan/slotserve/compare/v0.3.0...v0.4.0

@@ -119,6 +119,7 @@ class ModelOut(BaseModel):
     created_at: datetime
     presets: list[PresetOut] = []
     engine: str = "llama.cpp"
+    default_lane_ids: list[int] = []
     # The weights alone are larger than the GPU memory: full offload (-ngl 99) will not fit.
     exceeds_vram: bool = False
 
@@ -199,6 +200,7 @@ class ReservationCreateIn(BaseModel):
     note: str = Field(default="", max_length=500)
     repeat_weeks: int = Field(default=0, ge=0, le=52)
     user_id: int | None = None  # admins may book for someone else
+    lane_id: int | None = None  # None = the first lane
 
 
 class ReservationUpdateIn(BaseModel):
@@ -209,6 +211,7 @@ class ReservationUpdateIn(BaseModel):
     start_at: datetime | None = None
     end_at: datetime | None = None
     note: str | None = Field(default=None, max_length=500)
+    lane_id: int | None = None
 
 
 class ReviewIn(BaseModel):
@@ -230,6 +233,8 @@ class ReservationOut(BaseModel):
     preset_name: str | None = None
     exclusive: bool = False
     series_id: str | None = None
+    lane_id: int | None = None
+    lane_name: str | None = None
     start_at: datetime
     end_at: datetime
     status: str
@@ -274,8 +279,38 @@ class ManualOut(BaseModel):
     by: str
 
 
+class LaneStatusOut(BaseModel):
+    id: int
+    name: str
+    gpus: list[int] | None
+    runtime: RuntimeOut
+    reason: str | None = None
+    fallback_from: str | None = None
+    manual: ManualOut | None = None
+    active_reservation: ReservationOut | None = None
+    next_reservation: ReservationOut | None = None
+    default_model: str | None = None
+
+
+class LaneOut(BaseModel):
+    id: int
+    name: str
+    gpus: list[int]
+    default_model_id: int | None
+    default_model_name: str | None
+    position: int
+
+
+class LaneIn(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    gpus: list[int] = Field(default_factory=list, max_length=64)
+    default_model_id: int | None = None
+    position: int | None = None
+
+
 class StatusOut(BaseModel):
     now: datetime
+    lanes: list[LaneStatusOut] = []
     runtime: RuntimeOut
     reason: str | None = None
     fallback_from: str | None = None
@@ -302,6 +337,7 @@ class ConfigOut(BaseModel):
 
 class ManualIn(BaseModel):
     action: str = Field(pattern="^(load|unload|auto)$")
+    lane_id: int | None = None
     model_id: int | None = None
     preset_id: int | None = None
     hours: float | None = Field(default=None, gt=0, le=24 * 7)  # None = until the next booking
@@ -330,6 +366,7 @@ class RequestPageOut(BaseModel):
 
 
 class WaitlistIn(BaseModel):
+    lane_id: int | None = None
     model_id: int | None = None
     preset_id: int | None = None
     start_at: datetime
@@ -340,6 +377,8 @@ class WaitlistIn(BaseModel):
 
 class WaitlistOut(BaseModel):
     id: int
+    lane_id: int | None = None
+    lane_name: str | None = None
     user_id: int
     username: str
     model_id: int | None

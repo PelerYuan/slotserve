@@ -7,6 +7,7 @@ import type {
   ApiKeyCreated,
   AppConfig,
   AuditEntry,
+  Lane,
   Backup,
   BookingInput,
   CalendarLinks,
@@ -101,8 +102,11 @@ export const api = {
   // config & status
   config: () => request<AppConfig>('GET', '/api/config'),
   status: () => request<Status>('GET', '/api/status'),
-  logs: (lines = 300) => request<{ lines: string[] }>('GET', '/api/runtime/logs', undefined, { lines }),
-  restart: () => request<{ ok: boolean }>('POST', '/api/runtime/restart'),
+  logs: (lines = 300, laneId?: number | null) =>
+    request<{ lines: string[] }>('GET', '/api/runtime/logs', undefined, { lines, lane_id: laneId ?? undefined }),
+  restart: (laneId?: number | null) =>
+    request<{ ok: boolean }>('POST', '/api/runtime/restart', undefined, { lane_id: laneId ?? undefined }),
+  lanes: () => request<Lane[]>('GET', '/api/lanes'),
 
   // keys
   keys: () => request<ApiKey[]>('GET', '/api/keys'),
@@ -118,7 +122,8 @@ export const api = {
   ) => request<Model>('PATCH', `/api/models/${id}`, patch),
   createModel: (body: { name: string; engine: string; path: string; args: string; description: string }) =>
     request<Model>('POST', '/api/models', body),
-  setDefault: (id: number) => request<Model>('POST', `/api/models/${id}/default`),
+  setDefault: (id: number, laneId?: number | null) =>
+    request<Model>('POST', `/api/models/${id}/default`, undefined, { lane_id: laneId ?? undefined }),
   clearDefault: (id: number) => request<void>('DELETE', `/api/models/${id}/default`),
   deleteModel: (id: number, deleteFile: boolean) =>
     request<void>('DELETE', `/api/models/${id}`, undefined, { delete_file: deleteFile }),
@@ -143,11 +148,12 @@ export const api = {
     request<DownloadTask[]>('POST', '/api/downloads/hf', { repo, revision, files }),
 
   // reservations
-  reservations: (start: Date, end: Date, mine = false) =>
+  reservations: (start: Date, end: Date, mine = false, laneId?: number | null) =>
     request<Reservation[]>('GET', '/api/reservations', undefined, {
       start: start.toISOString(),
       end: end.toISOString(),
       mine: mine || undefined,
+      lane_id: laneId ?? undefined,
     }),
   createReservation: (body: BookingInput) => request<Reservation[]>('POST', '/api/reservations', body),
   updateReservation: (id: number, body: Partial<BookingInput>) =>
@@ -203,7 +209,18 @@ export const api = {
     backups: () => request<Backup[]>('GET', '/api/admin/backups'),
     createBackup: () => request<Backup>('POST', '/api/admin/backups'),
     backupUrl: (name: string) => `/api/admin/backups/${encodeURIComponent(name)}`,
-    manual: (body: { action: 'load' | 'unload' | 'auto'; model_id?: number; preset_id?: number | null; hours?: number | null }) =>
+    createLane: (body: { name: string; gpus: number[]; default_model_id: number | null }) =>
+      request<Lane>('POST', '/api/admin/lanes', body),
+    updateLane: (id: number, body: { name: string; gpus: number[]; default_model_id: number | null }) =>
+      request<Lane>('PATCH', `/api/admin/lanes/${id}`, body),
+    deleteLane: (id: number) => request<void>('DELETE', `/api/admin/lanes/${id}`),
+    manual: (body: {
+      action: 'load' | 'unload' | 'auto'
+      lane_id?: number | null
+      model_id?: number
+      preset_id?: number | null
+      hours?: number | null
+    }) =>
       request<void>('POST', '/api/admin/runtime/manual', body),
   },
 }

@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NDrawer, NDrawerContent } from 'naive-ui'
+import { NButton, NDrawer, NDrawerContent, NSelect } from 'naive-ui'
 import { RefreshCw } from 'lucide-vue-next'
 import { api } from '@/api/client'
+import { useLanes } from '@/composables/lanes'
 
 const show = defineModel<boolean>('show', { default: false })
+const props = defineProps<{ laneId?: number | null }>()
 const { t } = useI18n()
+const { lanes, multi } = useLanes()
+const lane = ref<number | null>(null)
+const laneOptions = () => lanes.value.map((l) => ({ label: l.name, value: l.id }))
 const lines = ref<string[]>([])
 const loading = ref(false)
 const box = ref<HTMLElement | null>(null)
@@ -15,7 +20,7 @@ let timer: number | undefined
 async function load() {
   loading.value = true
   try {
-    lines.value = (await api.logs(400)).lines
+    lines.value = (await api.logs(400, lane.value)).lines
     await nextTick()
     box.value?.scrollTo({ top: box.value.scrollHeight })
   } finally {
@@ -26,6 +31,7 @@ async function load() {
 watch(show, (open) => {
   window.clearInterval(timer)
   if (open) {
+    lane.value = props.laneId ?? lanes.value[0]?.id ?? null
     load()
     timer = window.setInterval(load, 4000)
   }
@@ -38,6 +44,14 @@ watch(show, (open) => {
       <template #header>
         <div class="row">
           <span>{{ t('models.logsTitle') }}</span>
+          <NSelect
+            v-if="multi"
+            v-model:value="lane"
+            :options="laneOptions()"
+            size="small"
+            style="width: 160px"
+            @update:value="load"
+          />
           <NButton quaternary circle size="small" :loading="loading" @click="load">
             <template #icon><RefreshCw :size="15" /></template>
           </NButton>

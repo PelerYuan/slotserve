@@ -97,6 +97,7 @@ class Reservation(Base):
     )
     preset_id: Mapped[int | None] = mapped_column(ForeignKey("model_presets.id", ondelete="SET NULL"), nullable=True)
     series_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    lane_id: Mapped[int | None] = mapped_column(ForeignKey("lanes.id", ondelete="SET NULL"), nullable=True, index=True)
     start_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
     end_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
     # booked | pending (awaiting approval) | cancelled | rejected | expired
@@ -119,6 +120,7 @@ class UsageLog(Base):
         ForeignKey("reservations.id", ondelete="SET NULL"), nullable=True
     )
     model_name: Mapped[str] = mapped_column(String(128), default="")
+    lane_id: Mapped[int | None] = mapped_column(ForeignKey("lanes.id", ondelete="SET NULL"), nullable=True)
     endpoint: Mapped[str] = mapped_column(String(128))
     stream: Mapped[bool] = mapped_column(Boolean, default=False)
     prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
@@ -137,6 +139,7 @@ class ModelLoadEvent(Base):
     finished_at: Mapped[datetime] = mapped_column(UTCDateTime)
     success: Mapped[bool] = mapped_column(Boolean)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    lane_id: Mapped[int | None] = mapped_column(ForeignKey("lanes.id", ondelete="SET NULL"), nullable=True)
 
 
 class AppSetting(Base):
@@ -169,6 +172,7 @@ class WaitlistEntry(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), nullable=True)
     preset_id: Mapped[int | None] = mapped_column(ForeignKey("model_presets.id", ondelete="SET NULL"), nullable=True)
+    lane_id: Mapped[int | None] = mapped_column(ForeignKey("lanes.id", ondelete="SET NULL"), nullable=True)
     start_at: Mapped[datetime] = mapped_column(UTCDateTime)
     end_at: Mapped[datetime] = mapped_column(UTCDateTime)
     note: Mapped[str] = mapped_column(Text, default="")
@@ -232,3 +236,21 @@ class OutboxItem(Base):
 
 # Statuses that occupy calendar time (and count towards quotas).
 HOLDING_STATUSES = ("booked", "pending")
+
+
+class Lane(Base):
+    """A group of GPUs with its own inference process, scheduler and booking calendar."""
+
+    __tablename__ = "lanes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True)
+    # Comma-separated CUDA indices ("0,1"); empty = do not restrict (no GPUs detected).
+    gpu_indices: Mapped[str] = mapped_column(String(64), default="")
+    default_model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="SET NULL"), nullable=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+    @property
+    def devices(self) -> list[int] | None:
+        return [int(i) for i in self.gpu_indices.split(",") if i.strip()] if self.gpu_indices else None

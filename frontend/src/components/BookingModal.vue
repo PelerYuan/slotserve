@@ -21,6 +21,7 @@ import { Cpu, Info, TriangleAlert } from 'lucide-vue-next'
 import { ApiError, api } from '@/api/client'
 import type { AdminUser, BookingInput, Model, Reservation } from '@/api/types'
 import { session } from '@/composables/session'
+import { useLanes } from '@/composables/lanes'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { formatBytes, formatDuration } from '@/utils/format'
 
@@ -31,6 +32,7 @@ const props = defineProps<{
   models: Model[]
   reservations: Reservation[]
   editing?: Reservation | null
+  laneId?: number | null
 }>()
 const emit = defineEmits<{ done: [] }>()
 
@@ -38,6 +40,11 @@ const { t } = useI18n()
 const message = useMessage()
 const { describe } = useErrorMessage()
 
+const { lanes, multi } = useLanes()
+const lane = ref<number | null>(null)
+const laneOptions = computed(() =>
+  lanes.value.map((l) => ({ label: l.gpus.length ? `${l.name}  ·  GPU ${l.gpus.join(',')}` : l.name, value: l.id })),
+)
 const kind = ref<'model' | 'exclusive'>('model')
 const modelId = ref<number | null>(null)
 const presetId = ref<number | null>(null)
@@ -77,6 +84,7 @@ watch(show, async (open) => {
   repeat.value = false
   forUser.value = null
   const r = editing.value
+  lane.value = r?.lane_id ?? props.laneId ?? lanes.value[0]?.id ?? null
   if (r) {
     kind.value = r.exclusive ? 'exclusive' : 'model'
     modelId.value = r.model_id ?? modelId.value
@@ -157,6 +165,7 @@ function startNow() {
 function payload(): BookingInput {
   const exclusive = kind.value === 'exclusive'
   return {
+    lane_id: lane.value,
     model_id: exclusive ? null : modelId.value,
     preset_id: exclusive ? null : presetId.value,
     start_at: new Date(startTs.value!).toISOString(),
@@ -220,6 +229,9 @@ async function joinWaitlist() {
     :bordered="false"
   >
     <NForm :show-require-mark="false" @submit.prevent="submit">
+      <NFormItem v-if="multi" :label="t('schedule.lane')">
+        <NSelect v-model:value="lane" :options="laneOptions" :disabled="isActive" />
+      </NFormItem>
       <NFormItem :label="t('schedule.kind')">
         <NRadioGroup v-model:value="kind" :disabled="isActive" class="kind">
           <NRadioButton value="model">{{ t('schedule.kindModel') }}</NRadioButton>
@@ -237,6 +249,7 @@ async function joinWaitlist() {
             <NSelect
               v-model:value="presetId"
               :options="presetOptions"
+              :placeholder="t('schedule.presetDefault')"
               :disabled="isActive || !selected?.presets.length"
             />
           </NFormItem>

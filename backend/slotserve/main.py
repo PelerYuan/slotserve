@@ -16,6 +16,7 @@ from .api import (
     calendar,
     downloads,
     keys,
+    lanes,
     metrics,
     models,
     notifications,
@@ -26,8 +27,7 @@ from .api import (
 )
 from .config import Settings, get_settings
 from .gateway import proxy
-from .runtime.manager import LlamaRuntime
-from .runtime.scheduler import Scheduler
+from .runtime.lanes import LaneManager, ensure_default_lane
 from .services import app_settings
 from .services.downloader import Downloader
 from .services.housekeeper import Housekeeper
@@ -63,20 +63,22 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         app.state.http = httpx.AsyncClient(timeout=httpx.Timeout(None, connect=10.0))
         app.state.limiter = AttemptLimiter()
         app.state.notifier = Notifier(settings)
-        app.state.runtime = LlamaRuntime(settings)
-        app.state.scheduler = Scheduler(app.state.runtime, settings, app.state.notifier)
+        await ensure_default_lane()
+        app.state.lanes = LaneManager(settings, app.state.notifier)
+        await app.state.lanes.start(run=start_background)
+        # The first lane, for code paths that only ever deal with one GPU group.
+        app.state.runtime = app.state.lanes.primary.runtime
+        app.state.scheduler = app.state.lanes.primary.scheduler
         app.state.downloader = Downloader(settings)
         app.state.downloader.events = app.state.notifier
         app.state.housekeeper = Housekeeper(app.state)
         app.state.telegram = TelegramBot(app, transport=getattr(app.state, "telegram_transport", None))
         app.state.notifier.bot = app.state.telegram
-        await app.state.scheduler.restore_manual()
         if restored := await app.state.notifier.restore_pending():
             log.info("re-queued %s notification(s) saved at the last shutdown", restored)
         tasks = []
         if start_background:
             tasks = [
-                asyncio.create_task(app.state.scheduler.run(), name="scheduler"),
                 asyncio.create_task(app.state.downloader.run(), name="downloader"),
                 asyncio.create_task(app.state.notifier.run(), name="notifier"),
                 asyncio.create_task(app.state.housekeeper.run(), name="housekeeper"),
@@ -91,7 +93,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
                 with contextlib.suppress(asyncio.CancelledError):
                     await t
             await app.state.notifier.save_pending()
-            await app.state.runtime.shutdown()
+            await app.state.lanes.shutdown()
             await app.state.telegram.close()
             await app.state.http.aclose()
             await db.dispose()
@@ -125,6 +127,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         admin,
         calendar,
         metrics,
+        lanes,
     ):
         app.include_router(module.router)
     app.include_router(proxy.router)

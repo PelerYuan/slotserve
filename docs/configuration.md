@@ -29,7 +29,7 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | `SLOTSERVE_STATIC_DIR` | *bundled* | Built frontend directory |
 | `SLOTSERVE_LLAMA_SERVER_CMD` | `llama-server` | Command used to start llama-server; may include a prefix such as `taskset -c 0-15 llama-server` |
 | `SLOTSERVE_LLAMA_HOST` | `127.0.0.1` | Address llama-server binds to (keep it local) |
-| `SLOTSERVE_LLAMA_PORT` | `8081` | Port llama-server binds to |
+| `SLOTSERVE_LLAMA_PORT` | `8081` | Port of the first lane's model server; lane *N* uses this + *N* - 1 |
 | `SLOTSERVE_DEFAULT_LLAMA_ARGS` | `-ngl 99 -c 8192` | Arguments given to newly registered models |
 | `SLOTSERVE_LOAD_TIMEOUT_SECONDS` | `1800` | Give up if a model is not ready after this long |
 | `SLOTSERVE_STOP_TIMEOUT_SECONDS` | `20` | Grace period before llama-server is killed |
@@ -39,6 +39,12 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | `SLOTSERVE_MAX_ADVANCE_DAYS` | `30` | How far ahead people can book |
 | `SLOTSERVE_PRELOAD_BUFFER_SECONDS` | `60` | Extra margin when preloading before a booking |
 | `SLOTSERVE_PRELOAD_MIN_MINUTES` | `3` | Start loading a booked model at least this many minutes early |
+| `SLOTSERVE_APPROVAL_MODE` | `off` | `off`, `long` or `all`: which bookings need an admin's approval |
+| `SLOTSERVE_APPROVAL_HOURS` | `4` | With `long`, bookings longer than this need approval |
+| `SLOTSERVE_VLLM_CMD` | `vllm serve` | Command for the vLLM engine |
+| `SLOTSERVE_SGLANG_CMD` | `python -m sglang.launch_server` | Command for the SGLang engine |
+| `SLOTSERVE_CUSTOM_ENGINE_CMD` | *empty* | Template for the custom engine: `{model}` `{host}` `{port}` `{name}` |
+| `SLOTSERVE_CUSTOM_ENGINE_HEALTH` | `/health` | Path polled until the custom engine is ready |
 | `SLOTSERVE_SCHEDULER_INTERVAL_SECONDS` | `5` | How often the scheduler re-evaluates |
 | `SLOTSERVE_DOWNLOAD_MIN_FREE_GB` | `2` | Disk space that must remain free after a download |
 | `SLOTSERVE_PUBLIC_URL` | *empty* | Address people use to reach SlotServe; used in calendar links |
