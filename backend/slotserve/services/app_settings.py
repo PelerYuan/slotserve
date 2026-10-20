@@ -21,18 +21,33 @@ from ..runtime.manager import split_args
 @dataclass(frozen=True)
 class Editable:
     type: type
-    min: int | None = None
-    max: int | None = None
+    min: float | None = None
+    max: float | None = None
     secret: bool = False
+    unit: str | None = None  # s | min | h | d | GB | MB/s - shown next to the input
+    choices: tuple | None = None
+
+    @property
+    def kind(self) -> str:
+        return {bool: "bool", int: "int", float: "float"}.get(self.type, "str")
 
 
 EDITABLE: dict[str, Editable] = {
     "registration_open": Editable(bool),
     "invite_code": Editable(str, min=1, max=128, secret=True),
-    "max_reservation_hours": Editable(int, min=1, max=24 * 7),
-    "max_advance_days": Editable(int, min=1, max=365),
-    "quota_weekly_hours": Editable(int, min=0, max=24 * 7),
+    "max_reservation_hours": Editable(int, min=1, max=24 * 7, unit="h"),
+    "max_advance_days": Editable(int, min=1, max=365, unit="d"),
+    "slot_minutes": Editable(int, unit="min", choices=(5, 10, 15, 20, 30, 60)),
+    "reminder_minutes": Editable(int, min=1, max=120, unit="min"),
+    "quota_weekly_hours": Editable(int, min=0, max=24 * 7, unit="h"),
     "quota_upcoming": Editable(int, min=0, max=100),
+    "preload_min_minutes": Editable(int, min=0, max=120, unit="min"),
+    "preload_buffer_seconds": Editable(int, min=0, max=3600, unit="s"),
+    "load_timeout_seconds": Editable(int, min=30, max=7200, unit="s"),
+    "stop_timeout_seconds": Editable(int, min=1, max=300, unit="s"),
+    "disk_read_mbps": Editable(float, min=1, max=100_000, unit="MB/s"),
+    "scheduler_interval_seconds": Editable(float, min=1, max=60, unit="s"),
+    "download_min_free_gb": Editable(float, min=0, max=10_000, unit="GB"),
     "default_llama_args": Editable(str, max=4000),
     "timezone": Editable(str, min=1, max=64),
     "public_url": Editable(str, max=300),
@@ -41,9 +56,9 @@ EDITABLE: dict[str, Editable] = {
     "hf_endpoint": Editable(str, min=1, max=300),
     "hf_token": Editable(str, max=200, secret=True),
     "metrics_token": Editable(str, max=200, secret=True),
-    "drain_seconds": Editable(int, min=0, max=600),
-    "usage_retention_days": Editable(int, min=0, max=3650),
-    "audit_retention_days": Editable(int, min=0, max=3650),
+    "drain_seconds": Editable(int, min=0, max=600, unit="s"),
+    "usage_retention_days": Editable(int, min=0, max=3650, unit="d"),
+    "audit_retention_days": Editable(int, min=0, max=3650, unit="d"),
     "backup_keep": Editable(int, min=0, max=100),
 }
 
@@ -66,11 +81,15 @@ def validate(key: str, value: Any) -> Any:
         if not isinstance(value, bool):
             raise InvalidSetting(key, "expected true or false")
         return value
-    if spec.type is int:
-        if isinstance(value, bool) or not isinstance(value, int):
-            raise InvalidSetting(key, "expected an integer")
+    if spec.type in (int, float):
+        numeric = (int, float) if spec.type is float else (int,)
+        if isinstance(value, bool) or not isinstance(value, numeric):
+            raise InvalidSetting(key, "expected a number" if spec.type is float else "expected an integer")
+        value = spec.type(value)
+        if spec.choices is not None and value not in spec.choices:
+            raise InvalidSetting(key, "must be one of " + ", ".join(str(c) for c in spec.choices))
         if (spec.min is not None and value < spec.min) or (spec.max is not None and value > spec.max):
-            raise InvalidSetting(key, f"must be between {spec.min} and {spec.max}")
+            raise InvalidSetting(key, f"must be between {_fmt(spec.min)} and {_fmt(spec.max)}")
         if key == "usage_retention_days" and 0 < value < 90:
             raise InvalidSetting(key, "must be 0 (keep forever) or at least 90")
         return value
@@ -94,6 +113,10 @@ def validate(key: str, value: Any) -> Any:
             raise InvalidSetting(key, "expected a URL")
         value = value.rstrip("/")
     return value
+
+
+def _fmt(n: float | None) -> str:
+    return "" if n is None else (str(int(n)) if float(n).is_integer() else str(n))
 
 
 def snapshot_defaults(settings: Settings) -> dict[str, Any]:

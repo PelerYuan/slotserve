@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-20
+
+### Added
+
+- Minimum preload time (`SLOTSERVE_PRELOAD_MIN_MINUTES`, default 3 minutes): a booked model starts loading at least this early even when its learned load time is shorter.
+- Every operational setting can be changed in **Admin → System settings**: calendar slot, reminder lead time, preload timing, load and stop timeouts, disk read speed, scheduler interval and minimum free disk space. Only deployment settings stay in `.env`.
+- The settings page shows units, ranges and choices from the server, and lists new settings automatically.
+
 ## [0.5.0] - 2026-10-20
 
 ### Added
@@ -91,7 +99,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - Admin CLI: `slotserve reset-password`, `slotserve set-admin`.
 - Bilingual documentation site (MkDocs Material).
 
-[Unreleased]: https://github.com/PelerYuan/slotserve/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/PelerYuan/slotserve/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/PelerYuan/slotserve/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/PelerYuan/slotserve/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/PelerYuan/slotserve/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/PelerYuan/slotserve/compare/v0.2.0...v0.3.0

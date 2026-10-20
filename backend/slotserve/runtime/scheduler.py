@@ -118,11 +118,12 @@ async def compute_target(
             if model is not None:
                 spec = (model.id, preset.id if preset else None)
                 est_next = await queries.estimate_load_seconds(db, model, settings)
+                lead = max(est_next + buffer, settings.preload_min_minutes * 60)
                 if spec != default_spec:
-                    if gap <= est_next + buffer:
+                    if gap <= lead:
                         return Target(model, preset, est_next, "preload", upcoming)
                     # Switching back to the default would leave it usable only briefly before the next switch.
-                    if current != default_spec and gap <= est_default + est_next + 2 * buffer:
+                    if current != default_spec and gap <= est_default + lead + buffer:
                         return Target(model, preset, est_next, "preload-early", upcoming)
 
     if manual is not None and (manual.until is None or manual.until > now):

@@ -5,7 +5,7 @@ SlotServe keeps exactly one `llama-server` process. Every few seconds - and imme
 ## Choosing the target model
 
 1. **A booking is in progress** → that booking's model and preset. For a *whole GPU* booking: nothing (llama-server stopped).
-2. **The next booking starts within its model's estimated load time + 60 s** → preload the next booking's model now. Before a whole-GPU booking, llama-server is stopped `SLOTSERVE_STOP_TIMEOUT_SECONDS` + 60 s early.
+2. **The next booking starts within its model's estimated load time + 60 s, or within the minimum preload time (3 minutes by default), whichever is earlier** → preload the next booking's model now. Before a whole-GPU booking, llama-server is stopped `SLOTSERVE_STOP_TIMEOUT_SECONDS` + 60 s early.
 3. **The next booking is so close that loading the default model would only be usable briefly** (gap < default load + next load + 2 × buffer) → skip the default and load the next booking's model directly.
 4. **An admin chose a model (or unloading) manually** → that, until its time is up or the next booking starts.
 5. **Otherwise** → the default model (or nothing, if no default is set).

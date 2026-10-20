@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NInput, NInputNumber, NSwitch, useMessage } from 'naive-ui'
+import { NButton, NInput, NInputNumber, NSelect, NSwitch, useMessage } from 'naive-ui'
 import { api } from '@/api/client'
 import type { AdminSetting, SettingValue } from '@/api/types'
 import { session } from '@/composables/session'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const message = useMessage()
 const { showError } = useErrorMessage()
 
@@ -50,20 +50,51 @@ async function save(payload: Record<string, SettingValue | null>) {
 
 const GROUPS: { id: string; keys: string[] }[] = [
   { id: 'access', keys: ['registration_open', 'invite_code'] },
-  { id: 'booking', keys: ['max_reservation_hours', 'max_advance_days', 'quota_weekly_hours', 'quota_upcoming'] },
-  { id: 'models', keys: ['default_llama_args', 'hf_endpoint', 'hf_token'] },
+  {
+    id: 'booking',
+    keys: [
+      'slot_minutes',
+      'max_reservation_hours',
+      'max_advance_days',
+      'quota_weekly_hours',
+      'quota_upcoming',
+      'reminder_minutes',
+    ],
+  },
+  {
+    id: 'runtime',
+    keys: [
+      'preload_min_minutes',
+      'preload_buffer_seconds',
+      'load_timeout_seconds',
+      'stop_timeout_seconds',
+      'drain_seconds',
+      'disk_read_mbps',
+      'scheduler_interval_seconds',
+    ],
+  },
+  { id: 'models', keys: ['default_llama_args', 'download_min_free_gb', 'hf_endpoint', 'hf_token'] },
   { id: 'notify', keys: ['telegram_bot_token', 'telegram_proxy', 'public_url', 'timezone'] },
   { id: 'monitor', keys: ['metrics_token'] },
-  { id: 'maintenance', keys: ['drain_seconds', 'usage_retention_days', 'audit_retention_days', 'backup_keep'] },
+  { id: 'maintenance', keys: ['usage_retention_days', 'audit_retention_days', 'backup_keep'] },
 ]
-const groups = computed(() =>
-  GROUPS.map((g) => ({
+const groups = computed(() => {
+  const known = new Set(GROUPS.flatMap((g) => g.keys))
+  const list = GROUPS.map((g) => ({
     id: g.id,
     items: g.keys.map((k) => settings.value.find((s) => s.key === k)).filter((s): s is AdminSetting => !!s),
-  })).filter((g) => g.items.length),
-)
-const ZERO_OK = new Set(['drain_seconds', 'usage_retention_days', 'audit_retention_days', 'backup_keep'])
-const minFor = (key: string) => (key.startsWith('quota_') || ZERO_OK.has(key) ? 0 : 1)
+  }))
+  // Settings added on the server later still show up, under "Other".
+  list.push({ id: 'other', items: settings.value.filter((s) => !known.has(s.key)) })
+  return list.filter((g) => g.items.length)
+})
+
+const label = (s: AdminSetting) => (te(`admin.settings.${s.key}`) ? t(`admin.settings.${s.key}`) : s.key)
+const desc = (s: AdminSetting) => (te(`admin.settings.${s.key}_desc`) ? t(`admin.settings.${s.key}_desc`) : '')
+const unit = (s: AdminSetting) =>
+  s.unit ? (te(`admin.settings.units.${s.unit}`) ? t(`admin.settings.units.${s.unit}`) : s.unit) : ''
+const choiceOptions = (s: AdminSetting) =>
+  (s.choices ?? []).map((c) => ({ label: `${c} ${unit(s)}`.trim(), value: c }))
 
 const display = (s: AdminSetting, v: SettingValue) =>
   typeof v === 'boolean'
@@ -74,7 +105,7 @@ const display = (s: AdminSetting, v: SettingValue) =>
       ? t('admin.settings.notSet')
       : s.secret
         ? '••••••'
-        : String(v)
+        : `${v}${s.unit ? ' ' + unit(s) : ''}`
 </script>
 
 <template>
@@ -84,24 +115,34 @@ const display = (s: AdminSetting, v: SettingValue) =>
     <div v-for="s in g.items" :key="s.key" class="item">
       <div class="text">
         <div class="title">
-          {{ t(`admin.settings.${s.key}`) }}
+          {{ label(s) }}
           <span v-if="s.overridden" class="badge brand">{{ t('admin.settings.overridden') }}</span>
         </div>
-        <div class="muted desc">{{ t(`admin.settings.${s.key}_desc`) }}</div>
+        <div v-if="desc(s)" class="muted desc">{{ desc(s) }}</div>
         <div class="faint def">
           {{ t('admin.settings.default', { value: display(s, s.default) }) }}
           <a v-if="s.overridden" href="#" @click.prevent="save({ [s.key]: null })">{{ t('admin.settings.reset') }}</a>
         </div>
       </div>
       <div class="control">
-        <NSwitch v-if="typeof s.value === 'boolean'" v-model:value="draft[s.key] as boolean" />
-        <NInputNumber
-          v-else-if="typeof s.value === 'number'"
+        <NSwitch v-if="s.kind === 'bool'" v-model:value="draft[s.key] as boolean" />
+        <NSelect
+          v-else-if="s.choices"
           v-model:value="draft[s.key] as number"
-          :min="minFor(s.key)"
-          :precision="0"
+          :options="choiceOptions(s)"
           class="num-input"
         />
+        <NInputNumber
+          v-else-if="s.kind === 'int' || s.kind === 'float'"
+          v-model:value="draft[s.key] as number"
+          :min="s.min ?? undefined"
+          :max="s.max ?? undefined"
+          :precision="s.kind === 'int' ? 0 : undefined"
+          :step="s.kind === 'float' ? 0.5 : 1"
+          class="num-input"
+        >
+          <template v-if="s.unit" #suffix>{{ unit(s) }}</template>
+        </NInputNumber>
         <NInput
           v-else-if="s.secret"
           v-model:value="draft[s.key] as string"
@@ -152,7 +193,7 @@ const display = (s: AdminSetting, v: SettingValue) =>
   justify-content: flex-end;
 }
 .num-input {
-  width: 140px;
+  width: 170px;
 }
 .mono-input :deep(input) {
   font-family: var(--mono);

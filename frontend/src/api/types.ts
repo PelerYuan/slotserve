@@ -197,6 +197,11 @@ export interface AdminSetting {
   default: SettingValue
   overridden: boolean
   secret: boolean
+  kind: 'bool' | 'int' | 'float' | 'str'
+  unit: string | null
+  min: number | null
+  max: number | null
+  choices: number[] | null
 }
 
 export interface AuditEntry {

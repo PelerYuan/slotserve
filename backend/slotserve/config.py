@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     max_reservation_hours: int = 8
     max_advance_days: int = 30
     preload_buffer_seconds: int = 60
+    # Start loading a booked model at least this many minutes before the booking (on top of the learned estimate).
+    preload_min_minutes: int = 3
     scheduler_interval_seconds: float = 5.0
     # Per-person limits for non-admins; 0 means unlimited.
     quota_weekly_hours: int = 0

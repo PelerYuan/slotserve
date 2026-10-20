@@ -122,3 +122,36 @@ async def test_compute_target_skips_short_default_window(app):
     async with SessionLocal() as db:
         t = await compute_target(db, settings, now + timedelta(hours=1, seconds=10), (big_id, None))
         assert t.model.id == big_id and t.reason == "preload-early"
+
+
+async def test_minimum_preload_lead(app, monkeypatch):
+    settings = app.state.settings
+    # "fast" loads in ~16 s, so without a minimum it would only start ~76 s before the booking.
+    default_id, fast_id = await _seed([("base", 150_000_000, True), ("fast", 150_000_000, False)])
+    now = utcnow()
+    await _reserve(fast_id, now + timedelta(hours=2), now + timedelta(hours=3))
+    start = now + timedelta(hours=2)
+    monkeypatch.setattr(settings, "preload_min_minutes", 10)
+    async with SessionLocal() as db:
+        t = await compute_target(db, settings, start - timedelta(minutes=11), (default_id, None))
+        assert t.model.id == default_id
+        t = await compute_target(db, settings, start - timedelta(minutes=9), (default_id, None))
+        assert t.model.id == fast_id and t.reason == "preload"
+
+
+async def test_runtime_settings_are_editable(make_client):
+    admin = await make_client("root")
+    view = {s["key"]: s for s in (await admin.get("/api/admin/settings")).json()}
+    assert view["disk_read_mbps"]["kind"] == "float" and view["disk_read_mbps"]["unit"] == "MB/s"
+    assert view["slot_minutes"]["choices"] == [5, 10, 15, 20, 30, 60]
+    r = await admin.put(
+        "/api/admin/settings", json={"disk_read_mbps": 480.5, "slot_minutes": 15, "preload_min_minutes": 10}
+    )
+    assert r.status_code == 200, r.text
+    view = {s["key"]: s for s in r.json()}
+    assert view["disk_read_mbps"]["value"] == 480.5 and view["preload_min_minutes"]["value"] == 10
+    assert (await admin.get("/api/config")).json()["slot_minutes"] == 15
+    r = await admin.put("/api/admin/settings", json={"slot_minutes": 7})
+    assert r.json()["detail"]["code"] == "invalid_setting"
+    r = await admin.put("/api/admin/settings", json={"load_timeout_seconds": 5})
+    assert r.json()["detail"]["code"] == "invalid_setting"

@@ -379,10 +379,15 @@ class AdminStatsOut(BaseModel):
 
 class SettingOut(BaseModel):
     key: str
-    value: bool | int | str
-    default: bool | int | str
+    value: bool | int | float | str
+    default: bool | int | float | str
     overridden: bool
     secret: bool
+    kind: str = "str"  # bool | int | float | str
+    unit: str | None = None
+    min: float | None = None
+    max: float | None = None
+    choices: list[int | float] | None = None
 
 
 class AuditOut(BaseModel):

@@ -38,6 +38,7 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | `SLOTSERVE_MAX_RESERVATION_HOURS` | `8` | Longest single booking |
 | `SLOTSERVE_MAX_ADVANCE_DAYS` | `30` | How far ahead people can book |
 | `SLOTSERVE_PRELOAD_BUFFER_SECONDS` | `60` | Extra margin when preloading before a booking |
+| `SLOTSERVE_PRELOAD_MIN_MINUTES` | `3` | Start loading a booked model at least this many minutes early |
 | `SLOTSERVE_SCHEDULER_INTERVAL_SECONDS` | `5` | How often the scheduler re-evaluates |
 | `SLOTSERVE_DOWNLOAD_MIN_FREE_GB` | `2` | Disk space that must remain free after a download |
 | `SLOTSERVE_PUBLIC_URL` | *empty* | Address people use to reach SlotServe; used in calendar links |
@@ -55,7 +56,7 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | `SLOTSERVE_AUDIT_RETENTION_DAYS` | `730` | Keep audit log entries this long (0 = forever) |
 | `SLOTSERVE_BACKUP_KEEP` | `7` | Daily database backups to keep (0 = no automatic backups) |
 
-Admins can override most of these in **Admin → System settings** without a restart: registration, invite code, booking limits and quotas, default launch arguments, time zone, public URL, Hugging Face, Telegram and metrics settings. Overrides live in the database and win over `.env`; **Use default** removes an override.
+Admins can change every setting in **Admin → System settings** without a restart, except the deployment ones (`HOST`, `PORT`, `SECRET_KEY`, `COOKIE_SECURE`, `STATIC_DIR`, `DATA_DIR`, `MODELS_DIR`, `LLAMA_SERVER_CMD`, `LLAMA_HOST`, `LLAMA_PORT`, `TELEGRAM_API_BASE`), which need a restart and therefore stay in `.env`. Overrides live in the database and win over `.env`; **Use default** removes an override.
 
 ## Per-model launch arguments
 

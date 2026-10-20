@@ -38,6 +38,7 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_MAX_RESERVATION_HOURS` | `8` | 单次预约最长时长 |
 | `SLOTSERVE_MAX_ADVANCE_DAYS` | `30` | 最多可提前几天预约 |
 | `SLOTSERVE_PRELOAD_BUFFER_SECONDS` | `60` | 预加载时额外预留的时间 |
+| `SLOTSERVE_PRELOAD_MIN_MINUTES` | `3` | 预约的模型至少提前多少分钟开始加载 |
 | `SLOTSERVE_SCHEDULER_INTERVAL_SECONDS` | `5` | 调度器重新评估的间隔 |
 | `SLOTSERVE_DOWNLOAD_MIN_FREE_GB` | `2` | 下载完成后磁盘至少保留的空间 |
 | `SLOTSERVE_PUBLIC_URL` | *空* | 大家访问 SlotServe 的地址，用于日历订阅链接 |
@@ -55,7 +56,7 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_AUDIT_RETENTION_DAYS` | `730` | 审计日志保留天数（0 表示永久） |
 | `SLOTSERVE_BACKUP_KEEP` | `7` | 保留的每日数据库备份份数（0 表示关闭自动备份） |
 
-其中大部分可由管理员在**管理 → 系统设置**中直接修改，无需重启：注册、邀请码、预约限制与配额、默认启动参数、时区、访问地址、Hugging Face、Telegram 和监控设置。修改保存在数据库中，优先于 `.env`；点**恢复默认**即可取消覆盖。
+除部署相关的几项（`HOST`、`PORT`、`SECRET_KEY`、`COOKIE_SECURE`、`STATIC_DIR`、`DATA_DIR`、`MODELS_DIR`、`LLAMA_SERVER_CMD`、`LLAMA_HOST`、`LLAMA_PORT`、`TELEGRAM_API_BASE`，修改需要重启，因此只在 `.env` 中设置）外，其余所有设置都可由管理员在**管理 → 系统设置**中直接修改，无需重启。修改保存在数据库中，优先于 `.env`；点**恢复默认**即可取消覆盖。
 
 ## 每个模型的启动参数
 

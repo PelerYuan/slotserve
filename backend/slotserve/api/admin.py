@@ -357,6 +357,11 @@ async def get_settings_view(request: Request, _: User = Depends(admin_user), db:
             default=defaults[key],
             overridden=key in overridden,
             secret=spec.secret,
+            kind=spec.kind,
+            unit=spec.unit,
+            min=spec.min,
+            max=spec.max,
+            choices=list(spec.choices) if spec.choices else None,
         )
         for key, spec in app_settings.EDITABLE.items()
     ]
@@ -364,7 +369,7 @@ async def get_settings_view(request: Request, _: User = Depends(admin_user), db:
 
 @router.put("/settings", response_model=list[SettingOut])
 async def put_settings(
-    changes: dict[str, bool | int | str | None],
+    changes: dict[str, bool | int | float | str | None],
     request: Request,
     admin: User = Depends(admin_user),
     db: AsyncSession = Depends(get_db),
