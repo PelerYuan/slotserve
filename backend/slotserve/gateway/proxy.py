@@ -57,6 +57,7 @@ class Admission:
     caller: Caller
     reservation_id: int | None
     model_name: str
+    runtime: LlamaRuntime
 
 
 def _bearer(request: Request) -> str | None:
@@ -147,7 +148,9 @@ async def admit(request: Request, caller: Caller, requested_model: str | None) -
                         "model_not_loaded",
                     )
                 )
-        return Admission(caller=caller, reservation_id=active.id if active else None, model_name=snap.model_name)
+        return Admission(
+            caller=caller, reservation_id=active.id if active else None, model_name=snap.model_name, runtime=runtime
+        )
 
 
 def _state_message(snap) -> str:
@@ -257,7 +260,7 @@ async def proxy(path: str, request: Request):
     except GatewayError as e:
         return e.response
 
-    runtime: LlamaRuntime = request.app.state.runtime
+    runtime = admission.runtime
     runtime.begin_request()
     released = False
 
@@ -278,14 +281,21 @@ async def _forward(request: Request, path: str, body, raw: bytes, admission: Adm
     """Relays one admitted request; ``release`` is called once the response is complete."""
 
     stream = isinstance(body, dict) and bool(body.get("stream"))
+    changed = False
+    # Engines such as vLLM insist on their served model name; route by name, then send the real one.
+    if isinstance(body, dict) and admission.model_name and body.get("model") != admission.model_name:
+        body["model"] = admission.model_name
+        changed = True
     if stream and path in USAGE_STREAM_ENDPOINTS:
         opts = body.get("stream_options") or {}
         if isinstance(opts, dict) and "include_usage" not in opts:
             body["stream_options"] = {**opts, "include_usage": True}
+            changed = True
+    if changed:
         raw = json.dumps(body).encode()
 
     client: httpx.AsyncClient = request.app.state.http
-    url = f"{request.app.state.settings.llama_base_url}/v1/{path}"
+    url = f"{admission.runtime.base_url}/v1/{path}"
     headers = {"content-type": request.headers.get("content-type", "application/json")}
     if accept := request.headers.get("accept"):
         headers["accept"] = accept
@@ -295,7 +305,7 @@ async def _forward(request: Request, path: str, body, raw: bytes, admission: Adm
     except httpx.HTTPError as exc:
         release()
         _record_usage(admission, path, stream, None, started, 502)
-        return openai_error(502, f"Upstream llama-server error: {exc.__class__.__name__}", "upstream_error")
+        return openai_error(502, f"Upstream model server error: {exc.__class__.__name__}", "upstream_error")
 
     content_type = upstream.headers.get("content-type", "application/json")
     if "text/event-stream" in content_type:

@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings
 from ..orm import AppSetting
-from ..runtime.manager import split_args
+from ..runtime.engines import split_args
 
 
 @dataclass(frozen=True)
@@ -51,6 +51,10 @@ EDITABLE: dict[str, Editable] = {
     "scheduler_interval_seconds": Editable(float, min=1, max=60, unit="s"),
     "download_min_free_gb": Editable(float, min=0, max=10_000, unit="GB"),
     "default_llama_args": Editable(str, max=4000),
+    "vllm_cmd": Editable(str, min=1, max=1000),
+    "sglang_cmd": Editable(str, min=1, max=1000),
+    "custom_engine_cmd": Editable(str, max=2000),
+    "custom_engine_health": Editable(str, min=1, max=200),
     "timezone": Editable(str, min=1, max=64),
     "public_url": Editable(str, max=300),
     "telegram_bot_token": Editable(str, max=200, secret=True),
@@ -102,12 +106,14 @@ def validate(key: str, value: Any) -> Any:
         raise InvalidSetting(key, "must be one of " + ", ".join(spec.choices))
     if (spec.min is not None and len(value) < spec.min) or (spec.max is not None and len(value) > spec.max):
         raise InvalidSetting(key, "invalid length")
-    if key == "default_llama_args":
+    if key in ("default_llama_args", "vllm_cmd", "sglang_cmd", "custom_engine_cmd"):
         try:
             split_args(value)
         except ValueError as exc:
             raise InvalidSetting(key, str(exc)) from exc
-    elif key == "timezone":
+    if key == "custom_engine_health" and not value.startswith("/"):
+        raise InvalidSetting(key, "must start with /")
+    if key == "timezone":
         try:
             ZoneInfo(value)
         except (ZoneInfoNotFoundError, ValueError) as exc:

@@ -1,4 +1,4 @@
-"""Owns the single llama-server child process."""
+"""Owns one inference server child process (one per lane)."""
 
 import asyncio
 import contextlib
@@ -6,7 +6,6 @@ import logging
 import os
 import re
 import shlex
-import shutil
 import subprocess
 from collections import deque
 from dataclasses import dataclass
@@ -20,11 +19,12 @@ import httpx
 from ..config import Settings
 from ..db import SessionLocal, utcnow
 from ..orm import LlmModel, ModelLoadEvent, ModelPreset
+from .engines import ENGINES, Engine, engine_for, split_args, strip_flags
 
 log = logging.getLogger(__name__)
 
-# Flags that SlotServe always sets itself; user-supplied copies are dropped.
-MANAGED_FLAGS = {"-m", "--model", "--host", "--port", "-a", "--alias"}
+# Flags that SlotServe always sets itself for llama.cpp; user-supplied copies are dropped.
+MANAGED_FLAGS = ENGINES["llama.cpp"].managed
 FAIL_BACKOFF_SECONDS = (30, 60, 120, 300, 600)
 # llama.cpp / CUDA messages that mean the model did not fit in GPU memory.
 OOM_RE = re.compile(r"out of memory|cudaMalloc failed|failed to allocate .*buffer|unable to allocate .*CUDA", re.I)
@@ -54,32 +54,21 @@ class RuntimeSnapshot:
     inflight: int = 0
 
 
-def split_args(text: str) -> list[str]:
-    if os.name != "nt":
-        return shlex.split(text)
-    # Non-POSIX mode keeps backslashes in Windows paths but also keeps the quotes.
-    return [t[1:-1] if len(t) >= 2 and t[0] == t[-1] and t[0] in "\"'" else t for t in shlex.split(text, posix=False)]
-
-
 def strip_managed_flags(args: list[str]) -> list[str]:
-    out: list[str] = []
-    skip = False
-    for arg in args:
-        if skip:
-            skip = False
-            continue
-        flag = arg.split("=", 1)[0]
-        if flag in MANAGED_FLAGS:
-            skip = "=" not in arg
-            continue
-        out.append(arg)
-    return out
+    return strip_flags(args, MANAGED_FLAGS)
+
+
+__all__ = ["LlamaRuntime", "RuntimeState", "split_args", "strip_managed_flags"]
 
 
 class LlamaRuntime:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, lane_id: int = 1, devices: list[int] | None = None):
         self.settings = settings
-        self.log_path: Path = settings.log_dir / "llama-server.log"
+        self.lane_id = lane_id
+        # GPUs this process may see (CUDA_VISIBLE_DEVICES); None leaves the environment untouched.
+        self.devices = devices
+        name = "llama-server.log" if lane_id == 1 else f"llama-server-lane{lane_id}.log"
+        self.log_path: Path = settings.log_dir / name
         self._lock = asyncio.Lock()
         self._proc: subprocess.Popen | None = None
         self._log_file: IO[bytes] | None = None
@@ -145,6 +134,14 @@ class LlamaRuntime:
             self.draining = False
 
     @property
+    def port(self) -> int:
+        return self.settings.llama_port + self.lane_id - 1
+
+    @property
+    def base_url(self) -> str:
+        return f"http://{self.settings.llama_host}:{self.port}"
+
+    @property
     def spec(self) -> tuple[int, int | None] | None:
         """What is (or is being) loaded: ``(model_id, preset_id)``."""
         return (self.model_id, self.preset_id) if self.model_id is not None else None
@@ -194,26 +191,10 @@ class LlamaRuntime:
         return list(tail)
 
     def build_command(self, model: LlmModel, preset: ModelPreset | None = None) -> list[str]:
-        user_args = strip_managed_flags(split_args((preset.args if preset else model.args) or ""))
-        base = split_args(self.settings.llama_server_cmd)
-        if base:
-            exe = Path(base[0])
-            if exe.exists():
-                base[0] = str(exe.resolve())
-            elif found := shutil.which(base[0]):
-                base[0] = found
-        return [
-            *base,
-            "-m",
-            model.file_path,
-            "--host",
-            self.settings.llama_host,
-            "--port",
-            str(self.settings.llama_port),
-            "--alias",
-            model.name,
-            *user_args,
-        ]
+        args = (preset.args if preset else model.args) or ""
+        return engine_for(model).command(
+            self.settings, model.file_path, model.name, args, self.settings.llama_host, self.port
+        )
 
     # ---- internals --------------------------------------------------------
 
@@ -256,6 +237,8 @@ class LlamaRuntime:
         self.error_hint = None
 
         kwargs: dict = {}
+        if self.devices is not None:
+            kwargs["env"] = {**os.environ, "CUDA_VISIBLE_DEVICES": ",".join(str(d) for d in self.devices)}
         if os.name == "nt":
             kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
         else:
@@ -270,9 +253,10 @@ class LlamaRuntime:
             self._schedule_event(model.id, started, False, self.error)
             return
 
-        log.info("llama-server starting (pid %s) for model %s", self._proc.pid, model.name)
+        engine = engine_for(model)
+        log.info("%s starting (pid %s, lane %s) for model %s", engine.label, self._proc.pid, self.lane_id, model.name)
         self.state = RuntimeState.LOADING
-        self._watch_task = asyncio.create_task(self._watch(self._proc, model.id, started))
+        self._watch_task = asyncio.create_task(self._watch(self._proc, model.id, started, engine))
 
     def _rotate_log(self, max_bytes: int = 20 * 1024 * 1024) -> None:
         if self.log_path.is_file() and self.log_path.stat().st_size > max_bytes:
@@ -281,13 +265,13 @@ class LlamaRuntime:
                 old.unlink(missing_ok=True)
                 self.log_path.rename(old)
 
-    async def _watch(self, proc: subprocess.Popen, model_id: int, started: datetime) -> None:
+    async def _watch(self, proc: subprocess.Popen, model_id: int, started: datetime, engine: Engine) -> None:
         deadline = started.timestamp() + self.settings.load_timeout_seconds
-        health = f"{self.settings.llama_base_url}/health"
+        health = f"{self.base_url}{engine.health_path(self.settings)}"
         while True:
             code = proc.poll()
             if code is not None:
-                self._mark_failed(f"llama-server exited with code {code} while loading")
+                self._mark_failed(f"{engine.label} server exited with code {code} while loading")
                 await self._record_event(model_id, started, False, self.error)
                 return
             try:
@@ -312,7 +296,7 @@ class LlamaRuntime:
 
         await asyncio.to_thread(proc.wait)
         if self._proc is proc:
-            self._mark_failed(f"llama-server exited unexpectedly with code {proc.returncode}")
+            self._mark_failed(f"{engine.label} server exited unexpectedly with code {proc.returncode}")
 
     def _mark_failed(self, message: str) -> None:
         if self._log_file is not None:

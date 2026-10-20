@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     llama_host: str = "127.0.0.1"
     llama_port: int = 8081
     default_llama_args: str = "-ngl 99 -c 8192"
+    # Other engines (see runtime/engines.py); the command must be available where SlotServe runs.
+    vllm_cmd: str = "vllm serve"
+    sglang_cmd: str = "python -m sglang.launch_server"
+    # Placeholders: {model} {host} {port} {name}
+    custom_engine_cmd: str = ""
+    custom_engine_health: str = "/health"
     load_timeout_seconds: int = 1800
     stop_timeout_seconds: int = 20
     # How long a model switch waits for in-flight requests to finish.

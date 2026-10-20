@@ -14,6 +14,14 @@ LOAD_HISTORY = 5
 LOAD_OVERHEAD_SECONDS = 15.0
 
 
+def _model_source_exists(m: LlmModel) -> bool:
+    """GGUF files must exist; other engines may name a local directory or a repository id."""
+    path = Path(m.file_path)
+    if (m.engine or "llama.cpp") == "llama.cpp":
+        return path.is_file()
+    return path.exists() or not path.is_absolute()
+
+
 def as_utc(value: datetime | str) -> datetime:
     """Normalises a timestamp from an aggregate query (which may skip the column type) to aware UTC."""
     if isinstance(value, str):
@@ -137,7 +145,7 @@ async def model_out(
                 name=m.name,
                 file_path=m.file_path,
                 file_name=path.name,
-                file_exists=path.is_file(),
+                file_exists=_model_source_exists(m),
                 size_bytes=m.size_bytes,
                 status=m.status,
                 is_default=m.is_default,
@@ -149,6 +157,7 @@ async def model_out(
                 created_by_name=creators.get(m.created_by) if m.created_by else None,
                 created_at=m.created_at,
                 presets=presets.get(m.id, []),
+                engine=m.engine or "llama.cpp",
                 exceeds_vram=bool(vram_bytes) and m.size_bytes > vram_bytes * 0.95,
             )
         )

@@ -11,7 +11,7 @@ from ..errors import ApiError
 from ..orm import HOLDING_STATUSES, LlmModel, ModelPreset, Reservation, User
 from ..runtime.manager import LlamaRuntime, split_args
 from ..runtime.scheduler import Scheduler
-from ..schemas import ModelOut, ModelUpdateIn, PresetIn, PresetOut, ScanResultOut
+from ..schemas import ModelCreateIn, ModelOut, ModelUpdateIn, PresetIn, PresetOut, ScanResultOut
 from ..services import queries, scanner
 from ..services.audit import record
 
@@ -56,6 +56,51 @@ async def scan_models(user: User = Depends(current_user), db: AsyncSession = Dep
     return ScanResultOut(added=added, skipped=skipped)
 
 
+def _source(engine: str, path: str) -> tuple[str, int]:
+    """Validates where a model comes from; returns (stored path, size in bytes)."""
+    path = path.strip()
+    local = Path(path)
+    if engine == "llama.cpp":
+        if not local.is_file() or not path.lower().endswith(".gguf"):
+            raise ApiError(status.HTTP_400_BAD_REQUEST, "model_path_invalid")
+        return str(local.resolve()), scanner.total_size(local)
+    if local.is_dir():
+        size = sum(f.stat().st_size for f in local.rglob("*") if f.is_file())
+        return str(local.resolve()), size
+    return path, 0  # repository id (for example Qwen/Qwen3-8B) or a path the engine resolves itself
+
+
+@router.post("", response_model=ModelOut, status_code=201)
+async def create_model(
+    body: ModelCreateIn,
+    user: User = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+    runtime: LlamaRuntime = Depends(get_runtime),
+):
+    """Registers a model by hand: a GGUF file for llama.cpp, or a directory / repository id for other engines."""
+    taken = await db.execute(select(LlmModel.id).where(LlmModel.name == body.name))
+    if taken.first() is not None:
+        raise ApiError(status.HTTP_409_CONFLICT, "model_name_taken")
+    try:
+        split_args(body.args)
+    except ValueError as exc:
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "invalid_args", reason=str(exc)) from exc
+    path, size = _source(body.engine, body.path)
+    model = LlmModel(
+        name=body.name,
+        file_path=path,
+        size_bytes=size,
+        status="ready",
+        args=body.args.strip() or (get_settings().default_llama_args if body.engine == "llama.cpp" else ""),
+        description=body.description,
+        engine=None if body.engine == "llama.cpp" else body.engine,
+        created_by=user.id,
+    )
+    db.add(model)
+    await db.commit()
+    return (await queries.model_out(db, [model], get_settings(), runtime.model_id))[0]
+
+
 @router.patch("/{model_id}", response_model=ModelOut)
 async def update_model(
     model_id: int,
@@ -79,6 +124,10 @@ async def update_model(
         model.args = body.args.strip()
     if body.description is not None:
         model.description = body.description
+    if body.engine is not None or body.path is not None:
+        engine = body.engine or model.engine or "llama.cpp"
+        model.file_path, model.size_bytes = _source(engine, body.path or model.file_path)
+        model.engine = None if engine == "llama.cpp" else engine
     await db.commit()
     return (await queries.model_out(db, [model], get_settings(), runtime.model_id))[0]
 

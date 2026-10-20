@@ -1,8 +1,39 @@
+async function save() {
+  saving.value = true
+  try {
+    if (creating.value) {
+      await api.createModel({
+        name: form.name.trim(),
+        engine: form.engine,
+        path: form.path.trim(),
+        args: form.args,
+        description: form.description,
+      })
+      creating.value = false
+    } else if (editing.value) {
+      const moved = form.engine !== editing.value.engine || form.path.trim() !== editing.value.file_path
+      await api.updateModel(editing.value.id, {
+        name: form.name.trim(),
+        args: form.args,
+        description: form.description,
+        ...(moved ? { engine: form.engine, path: form.path.trim() } : {}),
+      })
+      editing.value = null
+    }
+    await loadModels()
+  } catch (e) {
+    showError(e)
+  } finally {
+    saving.value = false
+  }
+}
+
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NCheckbox, NDropdown, NForm, NFormItem, NInput, NModal, NProgress, NTabPane, NTabs, useDialog } from 'naive-ui'
 import { Download, FolderSearch, MoreHorizontal, Plus, RotateCw, ScrollText, Search, Star, Trash2, X } from 'lucide-vue-next'
+import { NRadioButton, NRadioGroup } from 'naive-ui'
 import LogDrawer from '@/components/LogDrawer.vue'
 import { api } from '@/api/client'
 import type { DownloadTask, HfFile, Model } from '@/api/types'
@@ -85,7 +116,19 @@ async function onMenu(key: string, m: Model) {
 // ---- edit ----
 
 const editing = ref<Model | null>(null)
-const form = reactive({ name: '', args: '', description: '' })
+const form = reactive({ name: '', args: '', description: '', engine: 'llama.cpp' as Model['engine'], path: '' })
+const creating = ref(false)
+const ENGINE_OPTIONS = ['llama.cpp', 'vllm', 'sglang', 'custom'] as const
+const engineLabel: Record<string, string> = { 'llama.cpp': 'llama.cpp', vllm: 'vLLM', sglang: 'SGLang', custom: 'Custom' }
+const pathPlaceholder = computed(() =>
+  form.engine === 'llama.cpp' ? '/models/Qwen3-8B-Q4_K_M.gguf' : 'Qwen/Qwen3-8B  ·  /models/qwen3-8b',
+)
+
+function openCreate() {
+  Object.assign(form, { name: '', args: '', description: '', engine: 'llama.cpp', path: '' })
+  presetRows.value = []
+  creating.value = true
+}
 const saving = ref(false)
 
 function openEdit(m: Model) {
@@ -93,6 +136,8 @@ function openEdit(m: Model) {
   form.name = m.name
   form.args = m.args
   form.description = m.description
+  form.engine = m.engine
+  form.path = m.file_path
   presetRows.value = m.presets.map((p) => ({ id: p.id, name: p.name, args: p.args, saved: { ...p } }))
 }
 
@@ -145,7 +190,13 @@ async function save() {
   if (!editing.value) return
   saving.value = true
   try {
-    await api.updateModel(editing.value.id, { name: form.name.trim(), args: form.args, description: form.description })
+    const moved = form.engine !== editing.value.engine || form.path.trim() !== editing.value.file_path
+    await api.updateModel(editing.value.id, {
+      name: form.name.trim(),
+      args: form.args,
+      description: form.description,
+      ...(moved ? { engine: form.engine, path: form.path.trim() } : {}),
+    })
     editing.value = null
     await loadModels()
   } catch (e) {
@@ -290,6 +341,10 @@ function eta(d: DownloadTask) {
           <template #icon><ScrollText :size="16" /></template>
           {{ t('overview.viewLogs') }}
         </NButton>
+        <NButton secondary @click="openCreate">
+          <template #icon><Plus :size="16" /></template>
+          {{ t('models.add') }}
+        </NButton>
         <NButton secondary :loading="scanning" @click="scan">
           <template #icon><FolderSearch :size="16" /></template>
           {{ t('models.scan') }}
@@ -305,6 +360,7 @@ function eta(d: DownloadTask) {
             <div class="m-name">
               <span>{{ m.name }}</span>
               <span v-if="m.is_default" class="badge brand"><Star :size="11" />{{ t('models.default') }}</span>
+              <span v-if="m.engine !== 'llama.cpp'" class="badge">{{ engineLabel[m.engine] }}</span>
               <span v-if="m.is_loaded" class="badge ok">{{ t('models.loaded') }}</span>
               <span v-if="!m.file_exists" class="badge danger">{{ t('models.missingFile') }}</span>
               <span v-if="m.exceeds_vram" class="badge warn" :title="t('models.exceedsVramHint')">{{ t('models.exceedsVram') }}</span>
@@ -422,16 +478,24 @@ function eta(d: DownloadTask) {
     </section>
 
     <NModal
-      :show="!!editing"
+      :show="!!editing || creating"
       preset="card"
-      :title="t('models.editTitle')"
+      :title="creating ? t('models.addTitle') : t('models.editTitle')"
       style="width: 600px; max-width: calc(100vw - 32px)"
       :bordered="false"
-      @update:show="(v: boolean) => !v && (editing = null)"
+      @update:show="(v: boolean) => !v && ((editing = null), (creating = false))"
     >
       <NForm :show-require-mark="false">
         <NFormItem :label="t('models.name')">
           <NInput v-model:value="form.name" />
+        </NFormItem>
+        <NFormItem :label="t('models.engine')">
+          <NRadioGroup v-model:value="form.engine" size="small">
+            <NRadioButton v-for="e in ENGINE_OPTIONS" :key="e" :value="e">{{ engineLabel[e] }}</NRadioButton>
+          </NRadioGroup>
+        </NFormItem>
+        <NFormItem :label="t('models.path')" :feedback="t(`models.pathHint.${form.engine}`)">
+          <NInput v-model:value="form.path" class="mono-input" :placeholder="pathPlaceholder" />
         </NFormItem>
         <NFormItem :label="t('models.args')" :feedback="t('models.argsHint')">
           <NInput v-model:value="form.args" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" class="mono-input" placeholder="-ngl 99 -c 8192 --flash-attn on" />
@@ -441,7 +505,7 @@ function eta(d: DownloadTask) {
         </NFormItem>
         <p v-if="editing?.is_loaded" class="faint small">{{ t('models.reloadHint') }}</p>
       </NForm>
-      <div class="presets">
+      <div v-if="!creating" class="presets">
         <div class="presets-head">
           <div>
             <div class="presets-title">{{ t('models.presets') }}</div>
@@ -463,8 +527,8 @@ function eta(d: DownloadTask) {
       </div>
       <template #footer>
         <div class="footer">
-          <NButton @click="editing = null">{{ t('common.cancel') }}</NButton>
-          <NButton type="primary" :loading="saving" :disabled="!form.name.trim()" @click="save">{{ t('common.save') }}</NButton>
+          <NButton @click="(editing = null), (creating = false)">{{ t('common.cancel') }}</NButton>
+          <NButton type="primary" :loading="saving" :disabled="!form.name.trim() || !form.path.trim()" @click="save">{{ t('common.save') }}</NButton>
         </div>
       </template>
     </NModal>

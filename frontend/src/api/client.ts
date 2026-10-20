@@ -112,8 +112,12 @@ export const api = {
   // models
   models: () => request<Model[]>('GET', '/api/models'),
   scanModels: () => request<{ added: string[]; skipped: number }>('POST', '/api/models/scan'),
-  updateModel: (id: number, patch: Partial<Pick<Model, 'name' | 'args' | 'description'>>) =>
-    request<Model>('PATCH', `/api/models/${id}`, patch),
+  updateModel: (
+    id: number,
+    patch: Partial<Pick<Model, 'name' | 'args' | 'description' | 'engine'>> & { path?: string },
+  ) => request<Model>('PATCH', `/api/models/${id}`, patch),
+  createModel: (body: { name: string; engine: string; path: string; args: string; description: string }) =>
+    request<Model>('POST', '/api/models', body),
   setDefault: (id: number) => request<Model>('POST', `/api/models/${id}/default`),
   clearDefault: (id: number) => request<void>('DELETE', `/api/models/${id}/default`),
   deleteModel: (id: number, deleteFile: boolean) =>

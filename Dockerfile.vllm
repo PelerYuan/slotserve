@@ -1,0 +1,49 @@
+# syntax=docker/dockerfile:1
+#
+# SlotServe on top of the official vLLM image, for serving models with the vLLM engine.
+# llama.cpp can still be mounted at /opt/llama.cpp as with the default image.
+#
+#   docker build -f Dockerfile.vllm -t slotserve-vllm .
+#   SLOTSERVE_IMAGE=slotserve-vllm docker compose up -d
+#
+# Pin VLLM_IMAGE to a version that supports your GPU and CUDA driver.
+ARG VLLM_IMAGE=vllm/vllm-openai:latest
+
+# ---- frontend ---------------------------------------------------------------
+FROM node:26-alpine AS web
+WORKDIR /src/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY frontend/ ./
+RUN npm run build
+
+# ---- runtime ----------------------------------------------------------------
+FROM ${VLLM_IMAGE}
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app
+COPY backend/pyproject.toml /app/backend/pyproject.toml
+COPY backend/slotserve /app/backend/slotserve
+COPY --from=web /src/backend/slotserve/static /app/static
+RUN python3 -m pip install /app/backend
+
+ENV SLOTSERVE_HOST=0.0.0.0 \
+    SLOTSERVE_PORT=8000 \
+    SLOTSERVE_DATA_DIR=/data \
+    SLOTSERVE_MODELS_DIR=/models \
+    SLOTSERVE_STATIC_DIR=/app/static \
+    SLOTSERVE_LLAMA_SERVER_CMD=/opt/llama.cpp/llama-server \
+    SLOTSERVE_VLLM_CMD="vllm serve" \
+    LD_LIBRARY_PATH=/opt/llama.cpp:/usr/local/nvidia/lib:/usr/local/nvidia/lib64
+
+VOLUME ["/data", "/models"]
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
+  CMD python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)" || exit 1
+
+# The vLLM image starts its own API server by default.
+ENTRYPOINT []
+CMD ["slotserve"]

@@ -48,6 +48,8 @@ class LlmModel(Base):
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
     args: Mapped[str] = mapped_column(Text, default="")
     description: Mapped[str] = mapped_column(Text, default="")
+    # llama.cpp (NULL) | vllm | sglang | custom; file_path is then a directory or repository id
+    engine: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)

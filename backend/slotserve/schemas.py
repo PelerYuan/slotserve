@@ -118,6 +118,7 @@ class ModelOut(BaseModel):
     created_by_name: str | None
     created_at: datetime
     presets: list[PresetOut] = []
+    engine: str = "llama.cpp"
     # The weights alone are larger than the GPU memory: full offload (-ngl 99) will not fit.
     exceeds_vram: bool = False
 
@@ -126,6 +127,16 @@ class ModelUpdateIn(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=128, pattern=r"^[^\s/]+$")
     args: str | None = Field(default=None, max_length=4000)
     description: str | None = Field(default=None, max_length=2000)
+    engine: str | None = Field(default=None, pattern=r"^(llama\.cpp|vllm|sglang|custom)$")
+    path: str | None = Field(default=None, min_length=1, max_length=1000)
+
+
+class ModelCreateIn(BaseModel):
+    name: str = Field(min_length=1, max_length=128, pattern=r"^[^\s/]+$")
+    engine: str = Field(default="llama.cpp", pattern=r"^(llama\.cpp|vllm|sglang|custom)$")
+    path: str = Field(min_length=1, max_length=1000)
+    args: str = Field(default="", max_length=4000)
+    description: str = Field(default="", max_length=2000)
 
 
 class ScanResultOut(BaseModel):

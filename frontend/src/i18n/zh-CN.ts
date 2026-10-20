@@ -170,6 +170,16 @@ const zh: typeof en = {
     noModels: '还没有可用的模型，请先到“模型”页面添加。',
   },
   models: {
+    add: '添加模型',
+    addTitle: '添加模型',
+    engine: '推理后端',
+    path: '模型',
+    pathHint: {
+      'llama.cpp': '服务器上 .gguf 文件的路径。',
+      vllm: 'Hugging Face 仓库名，或服务器上的模型目录。',
+      sglang: 'Hugging Face 仓库名，或服务器上的模型目录。',
+      custom: "自定义命令中 {'{'}model{'}'} 需要的内容。",
+    },
     exceedsVram: '超出显存',
     exceedsVramHint: '文件比显存大，全部放进 GPU（-ngl 99）会失败。请调小 -ngl，只把部分层放到 GPU。',
     presets: '参数预设',
@@ -450,6 +460,14 @@ const zh: typeof en = {
       empty: '没有有效的 API 密钥。',
     },
     settings: {
+      vllm_cmd: 'vLLM 启动命令',
+      vllm_cmd_desc: '实际执行：<命令> <模型> --host --port --served-model-name <名称> <参数>。',
+      sglang_cmd: 'SGLang 启动命令',
+      sglang_cmd_desc: '实际执行：<命令> --model-path <模型> --host --port --served-model-name <名称> <参数>。',
+      custom_engine_cmd: '自定义后端命令',
+      custom_engine_cmd_desc: "任意 OpenAI 兼容服务。占位符：{'{'}model{'}'} {'{'}host{'}'} {'{'}port{'}'} {'{'}name{'}'}。",
+      custom_engine_health: '自定义后端健康检查路径',
+      custom_engine_health_desc: '轮询直到返回 200，此时认为模型已就绪。',
       approval_mode: '审批',
       approval_mode_desc: '预约是否需要管理员审批。管理员自己的预约不需要。',
       approval_hours: '超过多久需审批',
@@ -485,6 +503,7 @@ const zh: typeof en = {
       backup_keep: '保留的每日备份数',
       backup_keep_desc: '每 24 小时自动备份一次数据库。0 表示关闭自动备份。',
       groups: {
+        engines: '推理后端',
         runtime: '模型运行',
         other: '其他',
         maintenance: '维护',
@@ -575,6 +594,7 @@ const zh: typeof en = {
     cancelled: '已取消',
   },
   errors: {
+    model_path_invalid: 'llama.cpp 需要填写服务器上已存在的 .gguf 文件路径。',
     not_pending: '这个预约已不在待审批状态。',
     too_many_attempts: '失败次数过多，请 {minutes} 分钟后再试。',
     preset_without_model: '请先为这个预设选择模型。',

@@ -168,6 +168,16 @@ export default {
     noModels: 'No ready models yet. Add one on the Models page first.',
   },
   models: {
+    add: 'Add model',
+    addTitle: 'Add model',
+    engine: 'Engine',
+    path: 'Model',
+    pathHint: {
+      'llama.cpp': 'Path to a .gguf file on the server.',
+      vllm: 'Hugging Face repository id or a model directory on the server.',
+      sglang: 'Hugging Face repository id or a model directory on the server.',
+      custom: "Whatever your custom command expects in {'{'}model{'}'}.",
+    },
     exceedsVram: 'Larger than GPU memory',
     exceedsVramHint: 'The file is larger than the GPU memory, so full offload (-ngl 99) will fail. Offload fewer layers with a smaller -ngl.',
     presets: 'Presets',
@@ -448,6 +458,14 @@ export default {
       empty: 'No active API keys.',
     },
     settings: {
+      vllm_cmd: 'vLLM command',
+      vllm_cmd_desc: 'Started as: <command> <model> --host --port --served-model-name <name> <arguments>.',
+      sglang_cmd: 'SGLang command',
+      sglang_cmd_desc: 'Started as: <command> --model-path <model> --host --port --served-model-name <name> <arguments>.',
+      custom_engine_cmd: 'Custom engine command',
+      custom_engine_cmd_desc: "Any OpenAI-compatible server. Placeholders: {'{'}model{'}'} {'{'}host{'}'} {'{'}port{'}'} {'{'}name{'}'}.",
+      custom_engine_health: 'Custom engine health path',
+      custom_engine_health_desc: 'Polled until it answers 200; the model counts as ready then.',
       approval_mode: 'Approval',
       approval_mode_desc: 'Whether bookings need an admin\'s approval. Admins\' own bookings never do.',
       approval_hours: 'Approval needed above',
@@ -483,6 +501,7 @@ export default {
       backup_keep: 'Daily backups to keep',
       backup_keep_desc: 'A database copy is made every 24 hours. 0 turns automatic backups off.',
       groups: {
+        engines: 'Inference engines',
         runtime: 'Model runtime',
         other: 'Other',
         maintenance: 'Maintenance',
@@ -573,6 +592,7 @@ export default {
     cancelled: 'Cancelled',
   },
   errors: {
+    model_path_invalid: 'For llama.cpp, give the path of an existing .gguf file on the server.',
     not_pending: 'This booking is no longer waiting for approval.',
     too_many_attempts: 'Too many failed attempts. Try again in {minutes} minutes.',
     preset_without_model: 'Choose a model for this preset.',

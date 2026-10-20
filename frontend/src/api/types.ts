@@ -36,7 +36,10 @@ export interface Model {
   created_at: string
   presets: Preset[]
   exceeds_vram: boolean
+  engine: Engine
 }
+
+export type Engine = 'llama.cpp' | 'vllm' | 'sglang' | 'custom'
 
 export interface Preset {
   id: number

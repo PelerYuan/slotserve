@@ -74,6 +74,7 @@ const GROUPS: { id: string; keys: string[] }[] = [
     ],
   },
   { id: 'models', keys: ['default_llama_args', 'download_min_free_gb', 'hf_endpoint', 'hf_token'] },
+  { id: 'engines', keys: ['vllm_cmd', 'sglang_cmd', 'custom_engine_cmd', 'custom_engine_health'] },
   { id: 'notify', keys: ['telegram_bot_token', 'telegram_proxy', 'public_url', 'timezone'] },
   { id: 'monitor', keys: ['metrics_token'] },
   { id: 'maintenance', keys: ['usage_retention_days', 'audit_retention_days', 'backup_keep'] },

@@ -24,6 +24,10 @@ parser.add_argument("-m", "--model", default="mock.gguf")
 parser.add_argument("--host", default="127.0.0.1")
 parser.add_argument("--port", type=int, default=8081)
 parser.add_argument("-a", "--alias", default=None)
+# vLLM (`serve PATH --served-model-name`) and SGLang (`--model-path --served-model-name`) styles
+parser.add_argument("positional", nargs="*")
+parser.add_argument("--model-path", default=None)
+parser.add_argument("--served-model-name", default=None)
 parser.add_argument("--mock-fail", action="store_true", help="exit immediately, as if the model failed to load")
 args, unknown = parser.parse_known_args()
 oom_requested = "--mock-oom" in unknown
@@ -37,7 +41,10 @@ if oom_requested:
     )
     sys.exit(1)
 
-ALIAS = args.alias or os.path.basename(args.model)
+source = args.model_path or (args.positional[-1] if args.positional else None) or args.model
+ALIAS = args.alias or args.served_model_name or os.path.basename(source)
+# Like vLLM, a server started with --served-model-name rejects requests for any other model name.
+STRICT_MODEL = args.served_model_name is not None
 LOAD_SECONDS = float(os.environ.get("MOCK_LOAD_SECONDS", "5"))
 TOKEN_DELAY = float(os.environ.get("MOCK_TOKEN_DELAY", "0.03"))
 STARTED = time.monotonic()
@@ -71,9 +78,17 @@ def _usage(prompt: str, completion: str) -> dict:
     return {"prompt_tokens": p, "completion_tokens": c, "total_tokens": p + c}
 
 
+def _wrong_model(body: dict):
+    if STRICT_MODEL and body.get("model") != ALIAS:
+        return JSONResponse({"error": {"message": f"model {body.get('model')!r} does not exist"}}, status_code=404)
+    return None
+
+
 @app.post("/v1/chat/completions")
 async def chat(request: Request):
     body = await request.json()
+    if (err := _wrong_model(body)) is not None:
+        return err
     messages = body.get("messages") or []
     prompt = " ".join(str(m.get("content", "")) for m in messages if isinstance(m, dict))
     return await _complete(body, prompt, chat=True)
