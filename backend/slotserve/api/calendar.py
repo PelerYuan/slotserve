@@ -12,7 +12,7 @@ from ..config import get_settings
 from ..db import get_db, utcnow
 from ..deps import current_user
 from ..errors import ApiError
-from ..orm import LlmModel, ModelPreset, Reservation, User
+from ..orm import HOLDING_STATUSES, LlmModel, ModelPreset, Reservation, User
 from ..schemas import CalendarOut
 
 router = APIRouter(tags=["calendar"])
@@ -76,7 +76,7 @@ async def ical_feed(token: str, request: Request, scope: str = "mine", db: Async
 
     now = utcnow()
     stmt = select(Reservation).where(
-        Reservation.status == "booked",
+        Reservation.status.in_(HOLDING_STATUSES),
         Reservation.end_at > now - timedelta(days=30),
         Reservation.start_at < now + timedelta(days=366),
     )
@@ -114,6 +114,7 @@ async def ical_feed(token: str, request: Request, scope: str = "mine", db: Async
             f"DTSTART:{_stamp(r.start_at)}",
             f"DTEND:{_stamp(r.end_at)}",
             f"SUMMARY:{_escape(summary)}",
+            f"STATUS:{'TENTATIVE' if r.status == 'pending' else 'CONFIRMED'}",
         ]
         if r.note:
             lines.append(f"DESCRIPTION:{_escape(r.note)}")

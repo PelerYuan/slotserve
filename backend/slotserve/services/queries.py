@@ -64,8 +64,8 @@ async def estimate_load_seconds(db: AsyncSession, model: LlmModel, settings: Set
 
 
 def reservation_phase(r: Reservation, now: datetime) -> str:
-    if r.status == "cancelled":
-        return "cancelled"
+    if r.status != "booked":
+        return r.status  # pending | cancelled | rejected | expired
     if now < r.start_at:
         return "upcoming"
     if now < r.end_at:
@@ -102,6 +102,8 @@ async def reservation_out(db: AsyncSession, rows: list[Reservation], now: dateti
             status=r.status,
             phase=reservation_phase(r, now),
             note=r.note,
+            review_note=r.review_note,
+            reviewed_by=r.reviewed_by,
             released_at=r.released_at,
             created_at=r.created_at,
         )

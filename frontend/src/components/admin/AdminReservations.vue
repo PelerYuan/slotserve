@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NRadioButton, NRadioGroup, NSelect, useDialog } from 'naive-ui'
+import { NButton, NInput, NModal, NRadioButton, NRadioGroup, NSelect, useDialog } from 'naive-ui'
 import { Plus } from 'lucide-vue-next'
 import BookingModal from '@/components/BookingModal.vue'
 import { api } from '@/api/client'
@@ -15,7 +15,7 @@ const dialog = useDialog()
 const { showError } = useErrorMessage()
 const { refresh: refreshStatus } = useStatus()
 
-const PHASES = ['upcoming', 'active', 'finished', 'cancelled'] as const
+const PHASES = ['pending', 'upcoming', 'active', 'finished', 'cancelled', 'rejected', 'expired'] as const
 const phase = ref<string>('all')
 const userId = ref<number | null>(null)
 const users = ref<AdminUser[]>([])
@@ -72,7 +72,48 @@ onMounted(async () => {
 })
 watch([phase, userId], load)
 
-const tone: Record<string, string> = { upcoming: 'brand', active: 'ok', finished: '', cancelled: 'danger' }
+const tone: Record<string, string> = {
+  pending: 'warn',
+  upcoming: 'brand',
+  active: 'ok',
+  finished: '',
+  cancelled: 'danger',
+  rejected: 'danger',
+  expired: '',
+}
+
+// ---- approval ----
+const rejecting = ref<Reservation | null>(null)
+const rejectNote = ref('')
+
+async function decide(r: Reservation, approve: boolean, series: boolean) {
+  try {
+    if (approve) await api.admin.approve(r.id, series)
+    else await api.admin.reject(r.id, rejectNote.value, series)
+    rejecting.value = null
+    refreshStatus()
+    await load()
+  } catch (e) {
+    showError(e)
+  }
+}
+
+function approve(r: Reservation) {
+  if (!r.series_id) return decide(r, true, false)
+  dialog.info({
+    title: t('admin.reservations.approve'),
+    content: t('admin.reservations.seriesQuestion'),
+    positiveText: t('admin.reservations.wholeSeries'),
+    negativeText: t('admin.reservations.onlyThis'),
+    onPositiveClick: () => decide(r, true, true),
+    onNegativeClick: () => decide(r, true, false),
+  })
+}
+
+function openReject(r: Reservation) {
+  rejectNote.value = ''
+  rejecting.value = r
+}
 
 function end(r: Reservation) {
   const active = r.phase === 'active'
@@ -142,6 +183,10 @@ function end(r: Reservation) {
             <td><span class="badge" :class="tone[r.phase]">{{ t(`phase.${r.phase}`) }}</span></td>
             <td class="muted note" :title="r.note">{{ r.note || '—' }}</td>
             <td class="right nowrap">
+              <template v-if="r.phase === 'pending'">
+                <NButton size="small" type="primary" secondary @click="approve(r)">{{ t('admin.reservations.approve') }}</NButton>
+                <NButton size="small" quaternary type="error" @click="openReject(r)">{{ t('admin.reservations.reject') }}</NButton>
+              </template>
               <NButton v-if="r.phase === 'upcoming' || r.phase === 'active'" size="small" quaternary @click="openEdit(r)">
                 {{ t('common.edit') }}
               </NButton>
@@ -161,6 +206,26 @@ function end(r: Reservation) {
     </div>
   </section>
 
+  <NModal
+    :show="!!rejecting"
+    preset="card"
+    :title="t('admin.reservations.rejectTitle', { name: rejecting?.username })"
+    :bordered="false"
+    style="width: 440px; max-width: calc(100vw - 32px)"
+    @update:show="(v: boolean) => !v && (rejecting = null)"
+  >
+    <NInput v-model:value="rejectNote" type="textarea" :placeholder="t('admin.reservations.rejectNote')" maxlength="500" />
+    <template #footer>
+      <div class="footer">
+        <NButton @click="rejecting = null">{{ t('common.cancel') }}</NButton>
+        <NButton v-if="rejecting?.series_id" type="error" secondary @click="decide(rejecting!, false, true)">
+          {{ t('admin.reservations.rejectSeries') }}
+        </NButton>
+        <NButton type="error" @click="decide(rejecting!, false, false)">{{ t('admin.reservations.reject') }}</NButton>
+      </div>
+    </template>
+  </NModal>
+
   <BookingModal
     v-model:show="modal"
     :start="draftStart"
@@ -173,6 +238,11 @@ function end(r: Reservation) {
 </template>
 
 <style scoped>
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 .toolbar {
   display: flex;
   flex-wrap: wrap;

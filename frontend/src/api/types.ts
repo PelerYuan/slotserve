@@ -60,7 +60,7 @@ export interface DownloadTask {
   finished_at: string | null
 }
 
-export type ReservationPhase = 'upcoming' | 'active' | 'finished' | 'cancelled'
+export type ReservationPhase = 'upcoming' | 'active' | 'finished' | 'cancelled' | 'pending' | 'rejected' | 'expired'
 
 export interface Reservation {
   id: number
@@ -74,9 +74,11 @@ export interface Reservation {
   series_id: string | null
   start_at: string
   end_at: string
-  status: 'booked' | 'cancelled'
+  status: 'booked' | 'pending' | 'cancelled' | 'rejected' | 'expired'
   phase: ReservationPhase
   note: string
+  review_note: string | null
+  reviewed_by: string | null
   released_at: string | null
   created_at: string
 }
@@ -133,6 +135,8 @@ export interface AppConfig {
   registration_open: boolean
   quota_weekly_hours: number
   quota_upcoming: number
+  approval_mode: 'off' | 'long' | 'all'
+  approval_hours: number
   telegram_enabled: boolean
   version: string
 }
@@ -182,6 +186,7 @@ export interface AdminStats {
   admins: number
   active_keys: number
   upcoming_reservations: number
+  pending_reservations: number
   requests_24h: number
   tokens_24h: number
   failed_requests_24h: number
@@ -201,7 +206,7 @@ export interface AdminSetting {
   unit: string | null
   min: number | null
   max: number | null
-  choices: number[] | null
+  choices: (number | string)[] | null
 }
 
 export interface AuditEntry {

@@ -8,7 +8,7 @@ from ..config import get_settings
 from ..db import get_db, utcnow
 from ..deps import admin_user, current_user, get_runtime, get_scheduler
 from ..errors import ApiError
-from ..orm import LlmModel, ModelPreset, Reservation, User
+from ..orm import HOLDING_STATUSES, LlmModel, ModelPreset, Reservation, User
 from ..runtime.manager import LlamaRuntime, split_args
 from ..runtime.scheduler import Scheduler
 from ..schemas import ModelOut, ModelUpdateIn, PresetIn, PresetOut, ScanResultOut
@@ -130,7 +130,9 @@ async def delete_model(
         raise ApiError(status.HTTP_409_CONFLICT, "model_in_use")
     future = await db.execute(
         select(Reservation.id).where(
-            Reservation.model_id == model.id, Reservation.status == "booked", Reservation.end_at > utcnow()
+            Reservation.model_id == model.id,
+            Reservation.status.in_(HOLDING_STATUSES),
+            Reservation.end_at > utcnow(),
         )
     )
     if future.first() is not None:

@@ -119,6 +119,13 @@ const previous = computed(() => {
   )
 })
 
+const needsApproval = computed(() => {
+  const cfg = session.config
+  if (!cfg || cfg.approval_mode === 'off' || isAdmin.value || isActive.value) return false
+  if (cfg.approval_mode === 'all') return true
+  return !!startTs.value && !!endTs.value && endTs.value - startTs.value > cfg.approval_hours * 3_600_000
+})
+
 const loadHint = computed(() => {
   if (kind.value === 'exclusive') return { kind: 'exclusive' as const }
   if (!selected.value) return null
@@ -176,7 +183,8 @@ async function submit() {
         repeat_weeks: repeat.value ? repeatWeeks.value : 0,
         user_id: forUser.value,
       })
-      if (created.length > 1) message.success(t('schedule.seriesCreated', { n: created.length }))
+      if (created[0]?.status === 'pending') message.info(t('schedule.submittedForApproval'))
+      else if (created.length > 1) message.success(t('schedule.seriesCreated', { n: created.length }))
     }
     emit('done')
     show.value = false
@@ -300,6 +308,10 @@ async function joinWaitlist() {
       <div v-if="kind === 'model' && selected?.exceeds_vram" class="hint adjacent">
         <TriangleAlert :size="15" />
         <span>{{ t('models.exceedsVramHint') }}</span>
+      </div>
+      <div v-if="needsApproval" class="hint adjacent">
+        <Info :size="15" />
+        <span>{{ t('schedule.needsApproval') }}</span>
       </div>
       <div v-if="loadHint" class="hint" :class="loadHint.kind">
         <TriangleAlert v-if="loadHint.kind === 'adjacent'" :size="15" />

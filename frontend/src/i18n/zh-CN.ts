@@ -65,6 +65,9 @@ const zh: typeof en = {
     failed: '失败',
   },
   phase: {
+    pending: '待审批',
+    rejected: '已拒绝',
+    expired: '已过期',
     upcoming: '未开始',
     active: '进行中',
     finished: '已结束',
@@ -110,6 +113,9 @@ const zh: typeof en = {
     viewLogs: '运行日志',
   },
   schedule: {
+    needsApproval: '这个预约需要管理员审批，审批期间时段会为你保留。',
+    submittedForApproval: '已提交，等待管理员审批，结果会通知你。',
+    reviewNote: '审批意见',
     presetDefault: '模型默认参数',
     editTitle: '修改预约',
     saved: '预约已更新',
@@ -353,6 +359,7 @@ const zh: typeof en = {
       audit: '审计日志',
     },
     stats: {
+      pendingSub: '{n} 个待审批',
       users: '用户',
       usersSub: '{admins} 位管理员 · {disabled} 位已停用',
       keys: '有效 API 密钥',
@@ -410,6 +417,14 @@ const zh: typeof en = {
       deleted: '已删除用户',
     },
     reservations: {
+      approve: '通过',
+      reject: '拒绝',
+      rejectTitle: '拒绝 {name} 的预约？',
+      rejectNote: '理由（可选，会发送给对方）',
+      rejectSeries: '拒绝整个系列',
+      seriesQuestion: '这是每周重复的预约，要通过系列中所有待审批的预约吗？',
+      wholeSeries: '整个系列',
+      onlyThis: '只通过这一次',
       bookFor: '替他人预约',
       all: '全部',
       allUsers: '所有用户',
@@ -435,6 +450,13 @@ const zh: typeof en = {
       empty: '没有有效的 API 密钥。',
     },
     settings: {
+      approval_mode: '审批',
+      approval_mode_desc: '预约是否需要管理员审批。管理员自己的预约不需要。',
+      approval_hours: '超过多久需审批',
+      approval_hours_desc: '选择「长预约」时，超过这个时长的预约需要审批。',
+      choice: {
+        approval_mode: { off: '关闭', long: '长预约', all: '全部预约' },
+      },
       units: { s: '秒', min: '分钟', h: '小时', d: '天' },
       slot_minutes: '日历时段粒度',
       slot_minutes_desc: '预约时间按这个步长对齐。',
@@ -519,6 +541,8 @@ const zh: typeof en = {
       empty: '暂无记录。',
       system: '系统',
       actions: {
+        reservation_approve: '通过预约',
+        reservation_reject: '拒绝预约',
         backup_create: '创建备份',
         reservation_create_for: '替他人预约',
         reservation_update: '修改预约',
@@ -551,6 +575,7 @@ const zh: typeof en = {
     cancelled: '已取消',
   },
   errors: {
+    not_pending: '这个预约已不在待审批状态。',
     too_many_attempts: '失败次数过多，请 {minutes} 分钟后再试。',
     preset_without_model: '请先为这个预设选择模型。',
     reservation_active_locked: '进行中的预约只能延长或缩短。',

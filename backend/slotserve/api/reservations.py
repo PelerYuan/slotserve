@@ -9,7 +9,7 @@ from ..config import get_settings
 from ..db import get_db, utcnow
 from ..deps import current_user
 from ..errors import ApiError
-from ..orm import Reservation, User
+from ..orm import HOLDING_STATUSES, Reservation, User
 from ..schemas import ExtendIn, ReservationCreateIn, ReservationOut, ReservationUpdateIn
 from ..services import booking, queries
 from ..services.audit import record
@@ -21,6 +21,10 @@ def after_change(request: Request) -> None:
     """Re-plan the GPU and give waitlisted people a chance at freed time."""
     request.app.state.scheduler.poke()
     request.app.state.housekeeper.poke()
+
+
+def request_review(request: Request, r: Reservation, count: int = 1) -> None:
+    request.app.state.notifier.emit("approval_requested", reservation_id=r.id, owner_id=r.user_id, count=count)
 
 
 def notify_owner(request: Request, actor: User, r: Reservation, event: str) -> None:
@@ -42,7 +46,7 @@ async def list_reservations(
     end = booking.aware(end) if end else now + timedelta(days=30)
     stmt = select(Reservation).where(Reservation.end_at > start, Reservation.start_at < end)
     if not include_cancelled:
-        stmt = stmt.where(Reservation.status == "booked")
+        stmt = stmt.where(Reservation.status.in_(HOLDING_STATUSES))
     if mine:
         stmt = stmt.where(Reservation.user_id == user.id)
     rows = (await db.execute(stmt.order_by(Reservation.start_at))).scalars().all()
@@ -73,6 +77,7 @@ async def create_reservation(
         raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_too_far", days=settings.max_advance_days)
     model, preset = await booking.resolve_model(db, body.model_id, body.preset_id)
 
+    pending = booking.needs_approval(settings, user, windows)
     async with booking.booking_lock:
         await booking.raise_if_conflicts(db, windows)
         if owner.id == user.id:
@@ -87,6 +92,7 @@ async def create_reservation(
                 start_at=s,
                 end_at=e,
                 note=body.note.strip(),
+                status="pending" if pending else "booked",
             )
             for s, e in windows
         ]
@@ -98,6 +104,8 @@ async def create_reservation(
 
     for r in created:
         notify_owner(request, user, r, "booking_created")
+    if pending:
+        request_review(request, created[0], len(created))
     request.app.state.scheduler.poke()
     return await queries.reservation_out(db, created, utcnow())
 
@@ -114,19 +122,19 @@ async def _editable(db: AsyncSession, reservation_id: int, user: User) -> Reserv
 async def update_reservation_core(
     db: AsyncSession, user: User, r: Reservation, body: ReservationUpdateIn
 ) -> tuple[Reservation, bool]:
-    """Applies an edit with the same rules as booking. Returns (reservation, shortened)."""
+    """Applies an edit with the same rules as booking. Returns (reservation, needs_review)."""
     settings = get_settings()
     now = utcnow()
     phase = queries.reservation_phase(r, now)
     fields = body.model_fields_set
-    if phase in ("finished", "cancelled"):
+    if phase not in ("upcoming", "active", "pending"):
         raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_finished")
     if phase == "active" and (fields & {"start_at", "model_id", "preset_id"}):
         raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_active_locked")
 
     start = booking.aware(body.start_at) if body.start_at else r.start_at
     end = booking.aware(body.end_at) if body.end_at else r.end_at
-    if phase == "upcoming" and ("start_at" in fields or "end_at" in fields):
+    if phase in ("upcoming", "pending") and ("start_at" in fields or "end_at" in fields):
         start, end = booking.check_window(settings, start, end, now)
     elif phase == "active" and "end_at" in fields:
         if end <= now + timedelta(minutes=1):
@@ -139,7 +147,9 @@ async def update_reservation_core(
         model, preset = await booking.resolve_model(db, model_id, preset_id)
         model_id, preset_id = (model.id if model else None), (preset.id if preset else None)
 
-    shortened = start > r.start_at or end < r.end_at
+    # Changing a not-yet-started booking is judged like a new one in approval mode.
+    review = phase != "active" and r.user_id == user.id and booking.needs_approval(settings, user, [(start, end)])
+    newly_pending = review and r.status != "pending"
     async with booking.booking_lock:
         await booking.raise_if_conflicts(db, [(start, end)], exclude={r.id})
         owner = await db.get(User, r.user_id)
@@ -148,6 +158,8 @@ async def update_reservation_core(
         r.start_at, r.end_at, r.model_id, r.preset_id = start, end, model_id, preset_id
         if body.note is not None:
             r.note = body.note.strip()
+        if review:
+            r.status = "pending"
         if r.user_id != user.id:
             record(
                 db,
@@ -158,7 +170,7 @@ async def update_reservation_core(
                 end_at=end,
             )
         await db.commit()
-    return r, shortened
+    return r, newly_pending
 
 
 @router.patch("/{reservation_id}", response_model=ReservationOut)
@@ -170,14 +182,16 @@ async def update_reservation(
     db: AsyncSession = Depends(get_db),
 ):
     r = await _editable(db, reservation_id, user)
-    r, _ = await update_reservation_core(db, user, r, body)
+    r, newly_pending = await update_reservation_core(db, user, r, body)
     notify_owner(request, user, r, "booking_changed")
+    if newly_pending:
+        request_review(request, r)
     after_change(request)
     return (await queries.reservation_out(db, [r], utcnow()))[0]
 
 
 async def extend_core(db: AsyncSession, user: User, r: Reservation, minutes: int) -> Reservation:
-    if queries.reservation_phase(r, utcnow()) not in ("active", "upcoming"):
+    if queries.reservation_phase(r, utcnow()) not in ("active", "upcoming", "pending"):
         raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_finished")
     body = ReservationUpdateIn(end_at=r.end_at + timedelta(minutes=minutes))
     r, _ = await update_reservation_core(db, user, r, body)
@@ -203,14 +217,14 @@ async def end_core(db: AsyncSession, user: User, r: Reservation) -> str:
     """Cancels an upcoming reservation or releases (ends early) an active one; returns the action."""
     now = utcnow()
     phase = queries.reservation_phase(r, now)
-    if phase == "upcoming":
+    if phase in ("upcoming", "pending"):
         r.status = "cancelled"
     elif phase == "active":
         r.end_at = now
         r.released_at = now
     else:
         raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_finished")
-    action = "cancel" if phase == "upcoming" else "release"
+    action = "release" if phase == "active" else "cancel"
     if r.user_id != user.id:
         owner = await db.get(User, r.user_id)
         record(db, user, f"reservation.{action}", f"#{r.id} {owner.username if owner else '?'}", start_at=r.start_at)
@@ -234,7 +248,7 @@ async def cancel_or_release(
             select(Reservation).where(
                 Reservation.series_id == r.series_id,
                 Reservation.id != r.id,
-                Reservation.status == "booked",
+                Reservation.status.in_(HOLDING_STATUSES),
                 Reservation.start_at > utcnow(),
             )
         )

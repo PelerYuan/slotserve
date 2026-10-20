@@ -200,6 +200,11 @@ class ReservationUpdateIn(BaseModel):
     note: str | None = Field(default=None, max_length=500)
 
 
+class ReviewIn(BaseModel):
+    note: str = Field(default="", max_length=500)
+    series: bool = False
+
+
 class ExtendIn(BaseModel):
     minutes: int = Field(ge=5, le=24 * 60)
 
@@ -217,8 +222,10 @@ class ReservationOut(BaseModel):
     start_at: datetime
     end_at: datetime
     status: str
-    phase: str  # upcoming | active | finished | cancelled
+    phase: str  # upcoming | active | finished | cancelled | pending | rejected | expired
     note: str
+    review_note: str | None = None
+    reviewed_by: str | None = None
     released_at: datetime | None
     created_at: datetime
 
@@ -276,6 +283,8 @@ class ConfigOut(BaseModel):
     registration_open: bool
     quota_weekly_hours: int = 0
     quota_upcoming: int = 0
+    approval_mode: str = "off"
+    approval_hours: int = 4
     telegram_enabled: bool = False
     version: str
 
@@ -370,6 +379,7 @@ class AdminStatsOut(BaseModel):
     admins: int
     active_keys: int
     upcoming_reservations: int
+    pending_reservations: int = 0
     requests_24h: int
     tokens_24h: int
     failed_requests_24h: int
@@ -387,7 +397,7 @@ class SettingOut(BaseModel):
     unit: str | None = None
     min: float | None = None
     max: float | None = None
-    choices: list[int | float] | None = None
+    choices: list[int | float | str] | None = None
 
 
 class AuditOut(BaseModel):

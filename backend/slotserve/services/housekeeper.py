@@ -62,6 +62,7 @@ class Housekeeper:
     async def tick(self, now: datetime | None = None) -> None:
         now = now or utcnow()
         async with SessionLocal() as db:
+            await self._expire_pending(db, now)
             booked = await process_waitlist(db, self.settings, self.notifier, now)
             await self._reminders(db, now)
             await self._ready(db)
@@ -89,6 +90,17 @@ class Housekeeper:
         except Exception:
             self._backup_failed_at = now
             log.exception("database backup failed")
+
+    async def _expire_pending(self, db: AsyncSession, now: datetime) -> None:
+        """Requests still unreviewed when they would start lapse and free their time."""
+        rows = await db.execute(select(Reservation).where(Reservation.status == "pending", Reservation.start_at <= now))
+        expired = list(rows.scalars())
+        for r in expired:
+            r.status = "expired"
+        if expired:
+            await db.commit()
+        for r in expired:
+            self.notifier.emit("booking_expired", user_id=r.user_id, reservation_id=r.id)
 
     async def _reminders(self, db: AsyncSession, now: datetime) -> None:
         lead = timedelta(minutes=self.settings.reminder_minutes)

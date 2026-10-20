@@ -97,8 +97,11 @@ class Reservation(Base):
     series_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     start_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
     end_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
-    # booked | cancelled  (upcoming / active / finished is derived from time)
+    # booked | pending (awaiting approval) | cancelled | rejected | expired
+    # (upcoming / active / finished is derived from time for booked rows)
     status: Mapped[str] = mapped_column(String(16), default="booked", index=True)
+    reviewed_by: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     note: Mapped[str] = mapped_column(Text, default="")
     released_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
@@ -223,3 +226,7 @@ class OutboxItem(Base):
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     next_attempt_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+# Statuses that occupy calendar time (and count towards quotas).
+HOLDING_STATUSES = ("booked", "pending")

@@ -62,7 +62,7 @@ async function load() {
     ])
     reservations.value = all
     waiting.value = wl
-    mine.value = my.filter((r) => r.phase === 'upcoming' || r.phase === 'active')
+    mine.value = my.filter((r) => r.phase === 'upcoming' || r.phase === 'active' || r.phase === 'pending')
   } catch (e) {
     showError(e)
   }
@@ -297,6 +297,10 @@ const what = (r: Reservation) =>
           <dd class="num">{{ formatRange(detail.start_at, detail.end_at) }}</dd>
           <dt>{{ t('models.status') }}</dt>
           <dd>{{ t(`phase.${detail.phase}`) }}</dd>
+          <template v-if="detail.review_note">
+            <dt>{{ t('schedule.reviewNote') }}</dt>
+            <dd>{{ detail.review_note }}</dd>
+          </template>
           <template v-if="detail.note">
             <dt>{{ t('schedule.note') }}</dt>
             <dd>{{ detail.note }}</dd>
@@ -385,6 +389,10 @@ const what = (r: Reservation) =>
   border-radius: 5px;
   background: var(--neutral-soft);
   color: var(--text-2);
+}
+.phase.pending {
+  background: var(--warn-soft);
+  color: var(--warn-text);
 }
 .phase.active {
   background: var(--brand-soft);

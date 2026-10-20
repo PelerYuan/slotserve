@@ -12,7 +12,7 @@ from ..config import get_settings
 from ..db import get_db, utcnow
 from ..deps import admin_user, get_scheduler
 from ..errors import ApiError
-from ..orm import ApiKey, AuditLog, LlmModel, ModelLoadEvent, Reservation, UsageLog, User
+from ..orm import HOLDING_STATUSES, ApiKey, AuditLog, LlmModel, ModelLoadEvent, Reservation, UsageLog, User
 from ..runtime.scheduler import MANUAL_KEY, ManualOverride, Scheduler
 from ..schemas import (
     AdminApiKeyOut,
@@ -29,11 +29,13 @@ from ..schemas import (
     RequestLogOut,
     RequestPageOut,
     ReservationOut,
+    ReviewIn,
     SettingOut,
 )
 from ..security import hash_password
 from ..services import app_settings, booking, kv, maintenance, queries
 from ..services.audit import record
+from ..services.review import review
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -64,6 +66,9 @@ async def stats(_: User = Depends(admin_user), db: AsyncSession = Depends(get_db
         active_keys=await scalar(select(func.count(ApiKey.id)).where(ApiKey.revoked_at.is_(None))),
         upcoming_reservations=await scalar(
             select(func.count(Reservation.id)).where(Reservation.status == "booked", Reservation.end_at > now)
+        ),
+        pending_reservations=await scalar(
+            select(func.count(Reservation.id)).where(Reservation.status == "pending", Reservation.end_at > now)
         ),
         requests_24h=await scalar(select(func.count(UsageLog.id)).where(UsageLog.created_at >= since)),
         tokens_24h=await scalar(
@@ -129,7 +134,7 @@ async def _user_rows(db: AsyncSession, users: list[User]) -> list[AdminUserOut]:
         (
             await db.execute(
                 select(Reservation.user_id, func.count(Reservation.id))
-                .where(Reservation.user_id.in_(ids), Reservation.status == "booked", Reservation.end_at > now)
+                .where(Reservation.user_id.in_(ids), Reservation.status.in_(HOLDING_STATUSES), Reservation.end_at > now)
                 .group_by(Reservation.user_id)
             )
         ).all()
@@ -180,7 +185,9 @@ async def _end_reservations(db: AsyncSession, user: User) -> int:
         (
             await db.execute(
                 select(Reservation).where(
-                    Reservation.user_id == user.id, Reservation.status == "booked", Reservation.end_at > now
+                    Reservation.user_id == user.id,
+                    Reservation.status.in_(HOLDING_STATUSES),
+                    Reservation.end_at > now,
                 )
             )
         )
@@ -188,7 +195,7 @@ async def _end_reservations(db: AsyncSession, user: User) -> int:
         .all()
     )
     for r in rows:
-        if r.start_at > now:
+        if r.start_at > now or r.status == "pending":
             r.status = "cancelled"
         else:
             r.end_at = now
@@ -318,7 +325,7 @@ async def revoke_key(key_id: int, admin: User = Depends(admin_user), db: AsyncSe
 
 @router.get("/reservations", response_model=list[ReservationOut])
 async def list_reservations(
-    phase: str | None = Query(default=None, pattern="^(upcoming|active|finished|cancelled)$"),
+    phase: str | None = Query(default=None, pattern="^(upcoming|active|finished|cancelled|pending|rejected|expired)$"),
     user_id: int | None = None,
     limit: int = Query(default=200, ge=1, le=1000),
     _: User = Depends(admin_user),
@@ -326,8 +333,8 @@ async def list_reservations(
 ):
     now = utcnow()
     stmt = select(Reservation)
-    if phase == "cancelled":
-        stmt = stmt.where(Reservation.status == "cancelled")
+    if phase in ("cancelled", "pending", "rejected", "expired"):
+        stmt = stmt.where(Reservation.status == phase)
     elif phase is not None:
         stmt = stmt.where(Reservation.status == "booked")
         if phase == "upcoming":
@@ -534,3 +541,40 @@ async def download_backup(name: str, _: User = Depends(admin_user)):
     if not path.is_file():
         raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
     return FileResponse(path, media_type="application/vnd.sqlite3", filename=name)
+
+
+# ---- approval -------------------------------------------------------------
+
+
+async def _review(request: Request, reservation_id: int, body: ReviewIn, admin: User, db: AsyncSession, approve: bool):
+    r = await db.get(Reservation, reservation_id)
+    if r is None:
+        raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    done = await review(db, admin, r, approve, body.note, body.series)
+    event = "booking_approved" if approve else "booking_rejected"
+    request.app.state.notifier.emit(event, user_id=r.user_id, reservation_id=r.id, count=len(done))
+    request.app.state.scheduler.poke()
+    request.app.state.housekeeper.poke()
+    return await queries.reservation_out(db, done, utcnow())
+
+
+@router.post("/reservations/{reservation_id}/approve", response_model=list[ReservationOut])
+async def approve_reservation(
+    reservation_id: int,
+    body: ReviewIn,
+    request: Request,
+    admin: User = Depends(admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await _review(request, reservation_id, body, admin, db, approve=True)
+
+
+@router.post("/reservations/{reservation_id}/reject", response_model=list[ReservationOut])
+async def reject_reservation(
+    reservation_id: int,
+    body: ReviewIn,
+    request: Request,
+    admin: User = Depends(admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await _review(request, reservation_id, body, admin, db, approve=False)

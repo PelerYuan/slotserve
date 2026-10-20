@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     scheduler_interval_seconds: float = 5.0
     # Per-person limits for non-admins; 0 means unlimited.
     quota_weekly_hours: int = 0
+    # off | long (bookings longer than approval_hours) | all; admins never need approval.
+    approval_mode: str = "off"
+    approval_hours: int = 4
     quota_upcoming: int = 0
     reminder_minutes: int = 10
 

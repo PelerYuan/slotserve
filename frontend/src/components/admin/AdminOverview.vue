@@ -64,6 +64,7 @@ const tiles = computed(() => {
       icon: CalendarClock,
       label: t('admin.stats.upcoming'),
       value: formatNumber(s.upcoming_reservations),
+      sub: s.pending_reservations ? t('admin.stats.pendingSub', { n: s.pending_reservations }) : undefined,
       to: 'reservations' as const,
     },
     {

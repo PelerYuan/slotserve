@@ -192,6 +192,10 @@ export const api = {
         offset,
         errors_only: errorsOnly || undefined,
       }),
+    approve: (id: number, series = false) =>
+      request<Reservation[]>('POST', `/api/admin/reservations/${id}/approve`, { series }),
+    reject: (id: number, note: string, series = false) =>
+      request<Reservation[]>('POST', `/api/admin/reservations/${id}/reject`, { note, series }),
     backups: () => request<Backup[]>('GET', '/api/admin/backups'),
     createBackup: () => request<Backup>('POST', '/api/admin/backups'),
     backupUrl: (name: string) => `/api/admin/backups/${encodeURIComponent(name)}`,

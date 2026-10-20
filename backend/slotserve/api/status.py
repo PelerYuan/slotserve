@@ -24,6 +24,8 @@ async def config(request: Request):
     return ConfigOut(
         quota_weekly_hours=s.quota_weekly_hours,
         quota_upcoming=s.quota_upcoming,
+        approval_mode=s.approval_mode,
+        approval_hours=s.approval_hours,
         telegram_enabled=request.app.state.telegram.enabled,
         slot_minutes=s.slot_minutes,
         max_reservation_hours=s.max_reservation_hours,

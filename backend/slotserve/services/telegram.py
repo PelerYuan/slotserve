@@ -12,7 +12,7 @@ from sqlalchemy import select
 
 from ..db import SessionLocal, utcnow
 from ..errors import ApiError
-from ..orm import Reservation, User
+from ..orm import HOLDING_STATUSES, Reservation, User
 from . import queries
 from .notify import lang
 
@@ -56,6 +56,8 @@ REPLIES = {
         "holder_free": "Open to everyone.",
         "holder": "Booked by {user} until {end}.",
         "error": "Could not do that: {code}",
+        "approved": "Approved ({count}).",
+        "rejected": "Rejected ({count}).",
     },
     "zh-CN": {
         "linked": "已绑定 SlotServe 账号 {username}。发送 /help 查看命令。",
@@ -71,6 +73,8 @@ REPLIES = {
         "holder_free": "当前所有人可用。",
         "holder": "{user} 预约中，直到 {end}。",
         "error": "操作失败：{code}",
+        "approved": "已通过（{count} 个）。",
+        "rejected": "已拒绝（{count} 个）。",
     },
 }
 
@@ -257,6 +261,8 @@ class TelegramBot:
                 return await self._extend(db, user, int(parts[1]), int(parts[2]))
             if parts[0] == "rel" and len(parts) == 2 and parts[1].isdigit():
                 return await self._release(db, user, int(parts[1]))
+            if parts[0] in ("apr", "rej") and len(parts) == 2 and parts[1].isdigit():
+                return await self._review(db, user, int(parts[1]), approve=parts[0] == "apr")
             return ""
 
     # ---- commands -----------------------------------------------------------
@@ -306,7 +312,9 @@ class TelegramBot:
                 await db.execute(
                     select(Reservation)
                     .where(
-                        Reservation.user_id == user.id, Reservation.status == "booked", Reservation.end_at > utcnow()
+                        Reservation.user_id == user.id,
+                        Reservation.status.in_(HOLDING_STATUSES),
+                        Reservation.end_at > utcnow(),
                     )
                     .order_by(Reservation.start_at)
                     .limit(10)
@@ -336,6 +344,24 @@ class TelegramBot:
             return reply(user, "error", code=exc.detail.get("code"))
         self.app.state.scheduler.poke()
         return reply(user, "extended", end=self.app.state.notifier.fmt_time(r.end_at))
+
+    async def _review(self, db, user: User, reservation_id: int, approve: bool) -> str:
+        from .review import review
+
+        if not user.is_admin:
+            return reply(user, "error", code="admin_required")
+        r = await db.get(Reservation, reservation_id)
+        if r is None:
+            return reply(user, "error", code="not_found")
+        try:
+            done = await review(db, user, r, approve, series=True)
+        except ApiError as exc:
+            return reply(user, "error", code=exc.detail.get("code"))
+        event = "booking_approved" if approve else "booking_rejected"
+        self.app.state.notifier.emit(event, user_id=r.user_id, reservation_id=r.id, count=len(done))
+        self.app.state.scheduler.poke()
+        self.app.state.housekeeper.poke()
+        return reply(user, "approved" if approve else "rejected", count=len(done))
 
     async def _release(self, db, user: User, reservation_id: int | None) -> str:
         from ..api.reservations import end_core

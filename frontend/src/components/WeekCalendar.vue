@@ -204,7 +204,7 @@ onMounted(async () => {
             v-for="s in segmentsByDay[i]"
             :key="s.r.id"
             class="event"
-            :class="{ mine: s.mine, active: s.active, short: s.height < 40, exclusive: s.r.exclusive }"
+            :class="{ mine: s.mine, active: s.active, short: s.height < 40, exclusive: s.r.exclusive, pending: s.r.status === 'pending' }"
             :style="{ top: `${s.top}px`, height: `${s.height}px` }"
             :title="`${s.r.username} · ${label(s.r)}`"
             @click.stop="emit('open', s.r)"
@@ -344,6 +344,10 @@ onMounted(async () => {
   border-color: var(--event-mine-border);
   border-left-color: var(--brand);
   color: var(--event-mine-text);
+}
+.event.pending {
+  border-style: dashed;
+  opacity: 0.75;
 }
 .event.exclusive {
   background-image: repeating-linear-gradient(-45deg, var(--event-hatch) 0 5px, transparent 5px 10px);

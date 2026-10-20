@@ -49,7 +49,7 @@ async function save(payload: Record<string, SettingValue | null>) {
 }
 
 const GROUPS: { id: string; keys: string[] }[] = [
-  { id: 'access', keys: ['registration_open', 'invite_code'] },
+  { id: 'access', keys: ['registration_open', 'invite_code', 'approval_mode', 'approval_hours'] },
   {
     id: 'booking',
     keys: [
@@ -94,7 +94,10 @@ const desc = (s: AdminSetting) => (te(`admin.settings.${s.key}_desc`) ? t(`admin
 const unit = (s: AdminSetting) =>
   s.unit ? (te(`admin.settings.units.${s.unit}`) ? t(`admin.settings.units.${s.unit}`) : s.unit) : ''
 const choiceOptions = (s: AdminSetting) =>
-  (s.choices ?? []).map((c) => ({ label: `${c} ${unit(s)}`.trim(), value: c }))
+  (s.choices ?? []).map((c) => {
+    const key = `admin.settings.choice.${s.key}.${c}`
+    return { label: te(key) ? t(key) : `${c} ${unit(s)}`.trim(), value: c }
+  })
 
 const display = (s: AdminSetting, v: SettingValue) =>
   typeof v === 'boolean'
@@ -128,7 +131,7 @@ const display = (s: AdminSetting, v: SettingValue) =>
         <NSwitch v-if="s.kind === 'bool'" v-model:value="draft[s.key] as boolean" />
         <NSelect
           v-else-if="s.choices"
-          v-model:value="draft[s.key] as number"
+          v-model:value="draft[s.key] as number | string"
           :options="choiceOptions(s)"
           class="num-input"
         />

@@ -41,6 +41,8 @@ EDITABLE: dict[str, Editable] = {
     "reminder_minutes": Editable(int, min=1, max=120, unit="min"),
     "quota_weekly_hours": Editable(int, min=0, max=24 * 7, unit="h"),
     "quota_upcoming": Editable(int, min=0, max=100),
+    "approval_mode": Editable(str, choices=("off", "long", "all")),
+    "approval_hours": Editable(int, min=1, max=24 * 7, unit="h"),
     "preload_min_minutes": Editable(int, min=0, max=120, unit="min"),
     "preload_buffer_seconds": Editable(int, min=0, max=3600, unit="s"),
     "load_timeout_seconds": Editable(int, min=30, max=7200, unit="s"),
@@ -96,6 +98,8 @@ def validate(key: str, value: Any) -> Any:
     if not isinstance(value, str):
         raise InvalidSetting(key, "expected text")
     value = value.strip()
+    if spec.choices is not None and value not in spec.choices:
+        raise InvalidSetting(key, "must be one of " + ", ".join(spec.choices))
     if (spec.min is not None and len(value) < spec.min) or (spec.max is not None and len(value) > spec.max):
         raise InvalidSetting(key, "invalid length")
     if key == "default_llama_args":

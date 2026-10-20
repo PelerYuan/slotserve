@@ -34,6 +34,10 @@ EVENT_PREF = {
     "booking_changed": "booking_changes",
     "booking_cancelled": "booking_changes",
     "booking_released": "booking_changes",
+    "booking_approved": "booking_changes",
+    "booking_rejected": "booking_changes",
+    "booking_expired": "booking_changes",
+    "approval_requested": "admin_alerts",
     "fallback": "booking_changes",
     "waitlist_free": "waitlist",
     "waitlist_booked": "waitlist",
@@ -72,6 +76,14 @@ MESSAGES: dict[str, dict[str, str]] = {
         "extend30": "+30 min",
         "extend60": "+1 hour",
         "release": "End now",
+        "approval_requested": "📝 {user} asks for {when}: {what}{series}.",
+        "series_suffix": " (weekly, {count} bookings)",
+        "booking_approved": "✅ Your booking {when} was approved.",
+        "booking_rejected": "🚫 Your booking {when} was not approved.{reason}",
+        "booking_expired": "⌛ Your booking request for {when} expired before an admin reviewed it.",
+        "reason": " Reason: {note}",
+        "approve": "Approve",
+        "reject": "Reject",
     },
     "zh-CN": {
         "reminder_start": "⏰ 你的预约将在 {start} 开始：{what}。",
@@ -95,6 +107,14 @@ MESSAGES: dict[str, dict[str, str]] = {
         "extend30": "延长 30 分钟",
         "extend60": "延长 1 小时",
         "release": "立即结束",
+        "approval_requested": "📝 {user} 申请预约 {when}：{what}{series}。",
+        "series_suffix": "（每周重复，共 {count} 次）",
+        "booking_approved": "✅ 你的预约 {when} 已通过审批。",
+        "booking_rejected": "🚫 你的预约 {when} 未通过审批。{reason}",
+        "booking_expired": "⌛ 你申请的预约 {when} 在审批前已到开始时间，已自动失效。",
+        "reason": "理由：{note}",
+        "approve": "通过",
+        "reject": "拒绝",
     },
 }
 
@@ -103,8 +123,8 @@ def lang(user: User | None) -> str:
     return "zh-CN" if user is not None and (user.locale or "").startswith("zh") else "en"
 
 
-def text(user: User | None, key: str, **params: Any) -> str:
-    template = MESSAGES[lang(user)].get(key) or MESSAGES["en"][key]
+def text(recipient: User | None, key: str, /, **params: Any) -> str:
+    template = MESSAGES[lang(recipient)].get(key) or MESSAGES["en"][key]
     return template.format(**params)
 
 
@@ -180,6 +200,9 @@ class Notifier:
             if event == "fallback":
                 await self._fallback(db, data)
                 return
+            if event == "approval_requested":
+                await self._approval_requested(db, data)
+                return
             user = await db.get(User, data["user_id"]) if data.get("user_id") else None
             if user is None:
                 return
@@ -195,6 +218,9 @@ class Notifier:
                     when=self.fmt_window(r),
                     what=await self.describe(db, r, user),
                 )
+                if event == "booking_rejected" and r.review_note:
+                    params["reason"] = text(user, "reason", note=r.review_note)
+                params.setdefault("reason", "")
                 if event == "reminder_end":
                     buttons = [
                         [
@@ -204,6 +230,25 @@ class Notifier:
                         ]
                     ]
             await self._deliver(user, event, text(user, event, **params), buttons)
+
+    async def _approval_requested(self, db, data: dict) -> None:
+        r = await db.get(Reservation, data["reservation_id"])
+        owner = await db.get(User, data["owner_id"])
+        if r is None or r.status != "pending":
+            return
+        admins = (await db.execute(select(User).where(User.is_admin.is_(True), User.disabled_at.is_(None)))).scalars()
+        for admin in admins:
+            count = int(data.get("count") or 1)
+            message = text(
+                admin,
+                "approval_requested",
+                user=owner.username if owner else "?",
+                when=self.fmt_window(r),
+                what=await self.describe(db, r, admin),
+                series=text(admin, "series_suffix", count=count) if count > 1 else "",
+            )
+            buttons = [[(text(admin, "approve"), f"apr:{r.id}"), (text(admin, "reject"), f"rej:{r.id}")]]
+            await self._deliver(admin, "approval_requested", message, buttons)
 
     async def _fallback(self, db, data: dict) -> None:
         owner = await db.get(User, data["user_id"])

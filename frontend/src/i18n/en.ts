@@ -63,6 +63,9 @@ export default {
     failed: 'Failed',
   },
   phase: {
+    pending: 'Awaiting approval',
+    rejected: 'Rejected',
+    expired: 'Expired',
     upcoming: 'Upcoming',
     active: 'In progress',
     finished: 'Finished',
@@ -108,6 +111,9 @@ export default {
     viewLogs: 'Server log',
   },
   schedule: {
+    needsApproval: 'This booking needs an admin\'s approval. The time is held for you meanwhile.',
+    submittedForApproval: 'Submitted. An admin will review it; you will be notified.',
+    reviewNote: 'Review note',
     presetDefault: "Model's own arguments",
     editTitle: 'Edit booking',
     saved: 'Booking updated',
@@ -351,6 +357,7 @@ export default {
       audit: 'Audit log',
     },
     stats: {
+      pendingSub: '{n} awaiting approval',
       users: 'Users',
       usersSub: '{admins} admin · {disabled} disabled',
       keys: 'Active API keys',
@@ -408,6 +415,14 @@ export default {
       deleted: 'User deleted',
     },
     reservations: {
+      approve: 'Approve',
+      reject: 'Reject',
+      rejectTitle: 'Reject the booking of {name}?',
+      rejectNote: 'Reason (optional, sent to the person)',
+      rejectSeries: 'Reject whole series',
+      seriesQuestion: 'This booking repeats weekly. Approve all pending bookings in the series?',
+      wholeSeries: 'Whole series',
+      onlyThis: 'Only this one',
       bookFor: 'Book for someone',
       all: 'All',
       allUsers: 'All users',
@@ -433,6 +448,13 @@ export default {
       empty: 'No active API keys.',
     },
     settings: {
+      approval_mode: 'Approval',
+      approval_mode_desc: 'Whether bookings need an admin\'s approval. Admins\' own bookings never do.',
+      approval_hours: 'Approval needed above',
+      approval_hours_desc: 'With "Long bookings", bookings longer than this need approval.',
+      choice: {
+        approval_mode: { off: 'Off', long: 'Long bookings', all: 'All bookings' },
+      },
       units: { s: 's', min: 'min', h: 'h', d: 'days' },
       slot_minutes: 'Calendar slot',
       slot_minutes_desc: 'Bookings snap to this step.',
@@ -517,6 +539,8 @@ export default {
       empty: 'Nothing logged yet.',
       system: 'system',
       actions: {
+        reservation_approve: 'Approved booking',
+        reservation_reject: 'Rejected booking',
         backup_create: 'Created backup',
         reservation_create_for: 'Booked for someone',
         reservation_update: 'Changed booking',
@@ -549,6 +573,7 @@ export default {
     cancelled: 'Cancelled',
   },
   errors: {
+    not_pending: 'This booking is no longer waiting for approval.',
     too_many_attempts: 'Too many failed attempts. Try again in {minutes} minutes.',
     preset_without_model: 'Choose a model for this preset.',
     reservation_active_locked: 'A running booking can only be extended or shortened.',

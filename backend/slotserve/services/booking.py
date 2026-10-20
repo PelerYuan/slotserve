@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import Settings
 from ..db import utcnow
 from ..errors import ApiError
-from ..orm import LlmModel, ModelPreset, Reservation, User
+from ..orm import HOLDING_STATUSES, LlmModel, ModelPreset, Reservation, User
 
 # Serialises every overlap check + write (single-process deployment).
 booking_lock = asyncio.Lock()
@@ -68,7 +68,7 @@ def check_length(settings: Settings, start: datetime, end: datetime) -> None:
 
 async def find_conflict(db: AsyncSession, start: datetime, end: datetime, exclude: set[int] = frozenset()):
     stmt = select(Reservation).where(
-        Reservation.status == "booked", Reservation.start_at < end, Reservation.end_at > start
+        Reservation.status.in_(HOLDING_STATUSES), Reservation.start_at < end, Reservation.end_at > start
     )
     if exclude:
         stmt = stmt.where(Reservation.id.not_in(exclude))
@@ -105,7 +105,7 @@ async def check_quota(
     now = utcnow()
     if settings.quota_upcoming:
         stmt = select(Reservation.id).where(
-            Reservation.user_id == user.id, Reservation.status == "booked", Reservation.end_at > now
+            Reservation.user_id == user.id, Reservation.status.in_(HOLDING_STATUSES), Reservation.end_at > now
         )
         existing = [rid for rid in (await db.execute(stmt)).scalars() if rid not in exclude]
         if len(existing) + len(windows) > settings.quota_upcoming:
@@ -123,7 +123,7 @@ async def check_quota(
             rows = await db.execute(
                 select(Reservation.id, Reservation.start_at, Reservation.end_at).where(
                     Reservation.user_id == user.id,
-                    Reservation.status == "booked",
+                    Reservation.status.in_(HOLDING_STATUSES),
                     Reservation.start_at < week_end,
                     Reservation.end_at > week,
                 )
@@ -137,3 +137,13 @@ async def check_quota(
 
 def series_windows(start: datetime, end: datetime, repeat_weeks: int) -> list[Window]:
     return [(start + timedelta(weeks=i), end + timedelta(weeks=i)) for i in range(repeat_weeks + 1)]
+
+
+def needs_approval(settings: Settings, actor: User, windows: list[Window]) -> bool:
+    """Whether bookings made by ``actor`` must wait for an admin. Admins (also when booking for others) never do."""
+    if actor.is_admin or settings.approval_mode == "off":
+        return False
+    if settings.approval_mode == "all":
+        return True
+    limit = timedelta(hours=settings.approval_hours)
+    return any(end - start > limit for start, end in windows)
