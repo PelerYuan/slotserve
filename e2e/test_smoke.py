@@ -44,7 +44,7 @@ def test_api_key_and_gateway(page: Page, server: str):
     page.get_by_role("dialog").get_by_role("button", name="Close", exact=True).last.click()
 
     page.get_by_role("link", name="Overview", exact=True).click()
-    expect(page.get_by_text("Ready").first).to_be_visible(timeout=30_000)
+    expect(page.locator(".model-card").get_by_text("Ready", exact=True)).to_be_visible(timeout=30_000)
     req = urllib.request.Request(
         f"{server}/v1/chat/completions",
         data=json.dumps({"messages": [{"role": "user", "content": "hello e2e"}]}).encode(),

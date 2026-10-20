@@ -22,6 +22,27 @@ Rules:
 
 ### Which lane serves an API request
 
+```mermaid
+flowchart TD
+    req(["Request with a valid API key"]) --> named{"Names a model?"}
+    named -- "Yes" --> usable{"Served on a lane you may use?<br/>your booked lane first, then free lanes"}
+    usable -- "Yes" --> that["That lane"]
+    usable -- "No" --> taken{"Served on a lane<br/>someone else booked?"}
+    taken -- "Yes" --> r403["403 gpu_reserved"]
+    taken -- "No" --> known{"A registered model?"}
+    known -- "Yes" --> r409["409 model_not_loaded"]
+    known -- "No, unknown name" --> mine
+    named -- "No" --> mine{"You have a running booking?"}
+    mine -- "Yes" --> own["Your lane"]
+    mine -- "No" --> ready{"A free lane with<br/>a ready model?"}
+    ready -- "Yes" --> first["The first such lane"]
+    ready -- "No" --> anyfree{"Any free lane?"}
+    anyfree -- "Yes" --> wait["The first free lane<br/>503 + Retry-After until ready"]
+    anyfree -- "No" --> r403b["403 gpu_reserved"]
+```
+
+In words:
+
 1. If the request names a model, it goes to a lane the caller may use (free, or booked by the caller) that serves that model - the caller's own lane first. A model served only on a lane someone else has booked returns `403 gpu_reserved`; a registered model that no usable lane serves returns `409 model_not_loaded`.
 2. Without a model name, the caller's own booked lane is used; otherwise the first free lane whose model is ready.
 3. `/v1/models` lists every model the caller can use right now.
@@ -65,3 +86,16 @@ Pin `VLLM_IMAGE` (a build argument) to a vLLM version that supports your GPU and
 | All bookings | every booking |
 
 Admins' own bookings, and bookings an admin makes for someone, never need approval. A pending booking holds its time (nobody else can book it) and counts towards quotas, but no model is loaded for it. Admins approve or reject in **Admin → Bookings → Awaiting approval** or with the buttons in the Telegram message; a weekly series can be handled at once. Requests still pending when they would start expire automatically and free their time for the waitlist.
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> pending: needs approval
+    [*] --> booked: no approval needed
+    pending --> booked: approved
+    pending --> rejected: rejected
+    pending --> expired: start time passed
+    pending --> cancelled: withdrawn
+    booked --> cancelled: cancelled before start
+    booked --> [*]: slot ends or ended early
+```

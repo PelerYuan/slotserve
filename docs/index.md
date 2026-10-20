@@ -1,6 +1,6 @@
 # SlotServe
 
-**SlotServe turns one GPU into a shared, bookable service.** People book time slots in a web calendar, get exclusive use of the GPU during their slot, and call models through an OpenAI-compatible API with their own key. SlotServe runs [llama.cpp](https://github.com/ggml-org/llama.cpp)'s `llama-server` for you and switches models automatically before each booking.
+**SlotServe turns a GPU server into a shared, bookable service.** People book time slots in a web calendar, get exclusive use of the GPU during their slot, and call models through an OpenAI-compatible API with their own key. SlotServe runs the model server for you - [llama.cpp](https://github.com/ggml-org/llama.cpp)'s `llama-server`, vLLM, SGLang or your own - and switches models automatically before each booking.
 
 ![Overview](assets/screenshots/overview.png)
 
@@ -16,10 +16,10 @@ A lab or small team often shares a single big GPU. Without coordination people s
 
 | | |
 | --- | --- |
-| Calendar booking | Drag across a week view to book; first come, first served; no approvals |
-| OpenAI-compatible gateway | `/v1/chat/completions`, `/v1/completions`, `/v1/embeddings` and any other llama-server route, with streaming |
+| Calendar booking | Drag across a week view to book; first come, first served; optional admin approval |
+| OpenAI-compatible gateway | `/v1/chat/completions`, `/v1/completions`, `/v1/embeddings` and any other route of the model server, with streaming |
 | Per-user API keys | Create, name and revoke keys; only a SHA-256 hash is stored |
-| Managed llama-server | Started, health-checked, restarted and switched by SlotServe; per-model launch arguments edited in the browser |
+| Managed model servers | Started, health-checked, restarted and switched by SlotServe; per-model launch arguments edited in the browser |
 | Preloading | Load times are learned per model; the next booking's model is loaded ahead of time |
 | Model downloads | Paste a direct link (e.g. a Hugging Face `resolve` URL); resumable, one at a time |
 | Usage | Requests, prompt/completion tokens and booked hours per person and per model |
@@ -31,8 +31,32 @@ A lab or small team often shares a single big GPU. Without coordination people s
 | Bilingual UI | English and Simplified Chinese |
 | Simple deployment | One container, SQLite, three bind mounts |
 
+## How it works
+
+```mermaid
+flowchart LR
+    browser["Browser"] -- "/api" --> web
+    clients["OpenAI SDKs and tools"] -- "/v1 + API key" --> gw
+    subgraph slotserve["SlotServe · one container · SQLite"]
+        direction TB
+        web["Web API<br/>bookings · models · admin"]
+        gw["Gateway<br/>auth · admission · usage"]
+        sched["Scheduler<br/>one per lane"]
+    end
+    subgraph gpus["GPU lanes"]
+        direction TB
+        l1["Lane 1 · GPU 0<br/>llama-server"]
+        l2["Lane 2 · GPU 1,2<br/>vLLM / SGLang / custom"]
+    end
+    gw -- "forwards requests" --> gpus
+    sched -- "start · switch · stop" --> gpus
+```
+
+A **lane** is a group of GPUs with its own model server, scheduler and calendar. A single-GPU host has exactly one lane and never shows lane controls.
+
 ## Next steps
 
 - [Getting started](getting-started.md) - deploy with Docker Compose in a few minutes.
 - [How scheduling works](scheduling.md) - what happens around a booking.
 - [API](api.md) - point your OpenAI client at SlotServe.
+- [GPUs, lanes & engines](gpus-and-engines.md) - several GPUs, vLLM and SGLang, approval mode.

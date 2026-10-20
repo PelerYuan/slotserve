@@ -22,6 +22,27 @@
 
 ### 接口请求由哪个通道处理
 
+```mermaid
+flowchart TD
+    req(["带有效密钥的请求"]) --> named{"指定了模型名？"}
+    named -- "是" --> usable{"你可用的通道在提供它？<br/>先看自己预约的，再看空闲的"}
+    usable -- "是" --> that["发往该通道"]
+    usable -- "否" --> taken{"别人预约的通道<br/>在提供它？"}
+    taken -- "是" --> r403["403 gpu_reserved"]
+    taken -- "否" --> known{"是已登记的模型？"}
+    known -- "是" --> r409["409 model_not_loaded"]
+    known -- "否，不认识的名字" --> mine
+    named -- "否" --> mine{"你有进行中的预约？"}
+    mine -- "是" --> own["你的通道"]
+    mine -- "否" --> ready{"有模型已就绪的<br/>空闲通道？"}
+    ready -- "是" --> first["第一个这样的通道"]
+    ready -- "否" --> anyfree{"有空闲通道？"}
+    anyfree -- "是" --> wait["第一个空闲通道<br/>就绪前返回 503 + Retry-After"]
+    anyfree -- "否" --> r403b["403 gpu_reserved"]
+```
+
+文字说明：
+
 1. 请求指定了模型名：发往调用者可用（空闲或自己预约）且正在提供该模型的通道，优先自己预约的通道。只有别人预约的通道提供该模型时返回 `403 gpu_reserved`；已登记但所有可用通道都没加载时返回 `409 model_not_loaded`。
 2. 未指定模型名：有自己的预约就用自己的通道，否则用第一个模型已就绪的空闲通道。
 3. `/v1/models` 列出调用者当前能用的所有模型。
@@ -65,3 +86,21 @@ docker compose up -d
 | 全部预约 | 所有预约 |
 
 管理员自己的预约、管理员替他人建的预约都不需要审批。待审批的预约会占住时段（别人不能再约）并计入配额，但不会为它加载模型。管理员在**管理 → 预约 → 待审批**中，或通过 Telegram 消息里的按钮通过或拒绝；每周重复的系列可以一次处理。到开始时间仍未审批的申请会自动失效，时段释放给候补的人。
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    state "待审批" as pending
+    state "已预约" as booked
+    state "已拒绝" as rejected
+    state "已过期" as expired
+    state "已取消" as cancelled
+    [*] --> pending: 需要审批
+    [*] --> booked: 无需审批
+    pending --> booked: 通过
+    pending --> rejected: 拒绝
+    pending --> expired: 到开始时间仍未审批
+    pending --> cancelled: 撤回
+    booked --> cancelled: 开始前取消
+    booked --> [*]: 时段结束或提前结束
+```

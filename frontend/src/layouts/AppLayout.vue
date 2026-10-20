@@ -55,7 +55,6 @@ async function onUserMenu(key: string) {
 }
 
 const runtime = computed(() => status.value?.runtime)
-const holder = computed(() => status.value?.active_reservation)
 </script>
 
 <template>
@@ -79,20 +78,6 @@ const holder = computed(() => status.value?.active_reservation)
 
         <div class="spacer" />
 
-        <RouterLink v-if="runtime" to="/" class="gpu-mini">
-          <div class="row">
-            <span class="label">GPU</span>
-            <span class="spacer" />
-            <StatusDot :state="runtime.state" />
-          </div>
-          <div class="gpu-model" :title="runtime.model_name ?? ''">{{ runtime.model_name ?? t('overview.noModel') }}</div>
-          <div class="gpu-holder faint">
-            <template v-if="holder">{{
-              holder.user_id === session.user?.id ? t('overview.reservedByYou') : t('overview.reservedBy', { user: holder.username })
-            }}</template>
-            <template v-else>{{ t('overview.freeAccess') }}</template>
-          </div>
-        </RouterLink>
 
         <NDropdown trigger="click" :options="userMenu" placement="top-start" @select="onUserMenu">
           <button class="user">
@@ -191,31 +176,6 @@ const holder = computed(() => status.value?.active_reservation)
 .nav-item.active {
   background: var(--brand-soft);
   color: var(--brand);
-}
-.gpu-mini {
-  display: block;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface-muted);
-  color: var(--text);
-  margin-bottom: 10px;
-}
-.gpu-mini:hover {
-  border-color: var(--border-strong);
-  color: var(--text);
-}
-.gpu-model {
-  margin-top: 8px;
-  font-weight: 600;
-  font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.gpu-holder {
-  font-size: 12px;
-  margin-top: 1px;
 }
 .user {
   display: flex;

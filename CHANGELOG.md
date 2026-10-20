@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+
+- Documentation brought up to date for lanes, engines and approval; architecture, scheduling, routing and booking-status diagrams are drawn with Mermaid.
+- The sidebar no longer shows the GPU status card; the overview page has it.
+
 ## [0.7.0] - 2026-10-20
 
 ### Added

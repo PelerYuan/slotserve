@@ -46,20 +46,24 @@ SlotServe 在 `/v1` 提供 **OpenAI 兼容**接口。任何可以设置 base URL
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| `GET` | `/v1/models` | 当前已加载（或加载中）的模型 |
+| `GET` | `/v1/models` | 你此刻能用的模型（在你可用的通道上已加载或正在加载） |
 | `POST` | `/v1/chat/completions` | 支持流式 |
 | `POST` | `/v1/completions` | 支持流式 |
 | `POST` | `/v1/embeddings` | 模型需以 `--embedding` 启动 |
-| `POST` | `/v1/*` | llama-server 的其他接口按同样规则转发 |
+| `POST` | `/v1/*` | 推理服务的其他接口按同样规则转发 |
 
 密钥可以放在 `Authorization: Bearer <key>` 或 `x-api-key: <key>` 请求头中。
 
 ## `model` 字段
 
-同一时间只加载一个模型，因此：
+每个通道同一时间只提供一个模型，这个字段决定请求发往哪个通道：
 
-- 留空、等于当前模型名、或 SlotServe 不认识的名字 → 转发给当前模型；
-- **另一个已登记模型**的名字 → 返回 `409 model_not_loaded`，需要预约才能切换。
+- 你可用的通道正在提供的模型 → 发往该通道（优先你自己预约的通道）；
+- 留空或 SlotServe 不认识的名字 → 你预约的通道，否则是空闲通道；
+- 已登记、但只在别人预约的通道上提供的模型 → `403 gpu_reserved`；
+- 已登记、但没有任何通道在提供的模型 → `409 model_not_loaded`，需要预约才能加载。
+
+请求总是以实际服务的模型名转发给推理进程，所以会校验模型名的后端（vLLM、SGLang）也能正常接收。完整的路由规则见[多 GPU 与推理后端](gpus-and-engines.md#接口请求由哪个通道处理)。
 
 ## 错误
 
@@ -68,12 +72,12 @@ SlotServe 在 `/v1` 提供 **OpenAI 兼容**接口。任何可以设置 base URL
 | 状态码 | `code` | 含义 |
 | --- | --- | --- |
 | 401 | `missing_api_key` / `invalid_api_key` | 未提供密钥、密钥不存在或已吊销 |
-| 403 | `gpu_reserved` | 当前 GPU 被其他人预约，消息中包含结束时间 |
-| 409 | `model_not_loaded` | 请求了一个已登记但未加载的模型 |
+| 403 | `gpu_reserved` | 当前 GPU（或提供该模型的通道）被其他人预约，消息中包含结束时间 |
+| 409 | `model_not_loaded` | 请求的已登记模型不在任何你可用的通道上运行 |
 | 503 | `gpu_exclusive` | 你自己的整卡预约正在进行，不提供模型服务 |
 | 503 | `model_switching` | 即将切换模型，正在等待进行中的请求完成；请按 `Retry-After` 重试 |
 | 503 | `model_unavailable` | 模型加载中或启动失败；请按 `Retry-After` 重试 |
-| 502 | `upstream_error` | llama-server 没有响应 |
+| 502 | `upstream_error` | 推理进程没有响应 |
 
 ## 用量记录
 
@@ -81,4 +85,4 @@ SlotServe 在 `/v1` 提供 **OpenAI 兼容**接口。任何可以设置 base URL
 
 ## Web API
 
-网页使用 `/api` 下独立的 JSON 接口（Cookie 会话），交互式文档位于 `/api/docs`。同一账号 15 分钟内登录失败 10 次（或同一地址 30 次）后，登录接口返回 `429 too_many_attempts`，需等待一段时间。管理接口位于 `/api/admin` 下（`stats`、`users`、`keys`、`reservations`、`settings`、`audit`），需要管理员登录。
+网页使用 `/api` 下独立的 JSON 接口（Cookie 会话），交互式文档位于 `/api/docs`。同一账号 15 分钟内登录失败 10 次（或同一地址 30 次）后，登录接口返回 `429 too_many_attempts`，需等待一段时间。管理接口位于 `/api/admin` 下（`stats`、`users`、`keys`、`reservations` 及其 `approve` 和 `reject`、`lanes`、`requests`、`runtime/manual`、`settings`、`backups`、`audit`），需要管理员登录。

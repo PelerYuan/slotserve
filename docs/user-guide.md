@@ -17,7 +17,7 @@ Open **Schedule** and drag across the calendar, or press **New booking**. Choose
 | Type | What happens during the slot |
 | --- | --- |
 | **Run a model** | Your model (optionally with one of its **presets**) is loaded before the slot starts. Only your API keys are accepted. |
-| **Whole GPU** | llama-server is stopped shortly before the slot, so the GPU is completely free for training or any other program. The API returns `503 gpu_exclusive`. The default model comes back when the slot ends. |
+| **Whole GPU** | The model server is stopped shortly before the slot, so the GPU is completely free for training or any other program. The API returns `503 gpu_exclusive`. The default model comes back when the slot ends. |
 
 ### Changing bookings
 
@@ -40,14 +40,15 @@ Admins can limit how many hours one person may book per calendar week and how ma
 
 ## Models
 
-**Models** lists every registered GGUF file with its size, estimated load time and launch arguments.
+**Models** lists every registered model with its engine, size, estimated load time and launch arguments.
 
 ![Models](assets/screenshots/models.png)
 
-- **Scan folder** registers new `.gguf` files from the models directory.
+- **Scan folder** registers new `.gguf` files from the models directory as llama.cpp models.
+- **Add model** registers a model by hand: pick the engine (llama.cpp, vLLM, SGLang or custom) and give a file, directory or Hugging Face repository.
 - **Edit** changes the name (the `model` id clients see), launch arguments and description. The person who added a model and admins can edit or delete it.
-- **Set as default** (admin) chooses the model used when nobody has booked the GPU.
-- **Server log** shows the tail of llama-server's output - the first place to look when a model fails to start.
+- **Set as default** (admin) chooses the model used when nobody has booked the GPU. With several lanes this sets the first lane's default; other lanes are set in **Admin → GPUs & lanes**.
+- **Server log** shows the tail of the model server's output - the first place to look when a model fails to start.
 - **Presets** (in **Edit**) store alternative argument sets for the same file, for example a long-context variant with a larger `-c`. People pick a preset when booking; the model's own arguments are the default.
 
 ### Downloading models
@@ -87,13 +88,14 @@ The first account is the admin. Admins see an **Admin** entry in the sidebar.
 
 | Tab | What you can do |
 | --- | --- |
-| Overview | Counts of users, keys, open bookings, requests and tokens in the last 24 h; recent model loads with failures; restart llama-server and read its log; **load a model now** or **unload** while nobody has the GPU booked, for a set time or until the next booking |
+| Overview | Counts of users, keys, open and pending bookings, requests and tokens in the last 24 h; recent model loads with failures; restart a lane's model server and read its log; **load a model now** or **unload** while nobody has the GPU booked, for a set time or until the next booking |
+| GPUs & lanes | Detected GPUs; create, edit and delete lanes and choose each lane's default model |
 | Users | Create users (no invite code needed), reset passwords, grant or remove admin, disable, enable or delete accounts |
-| Bookings | Every booking, filtered by status or person; edit, cancel or end any booking; book for someone else |
+| Bookings | Every booking, filtered by status or person; approve or reject requests; edit, cancel or end any booking; book for someone else |
 | Requests | Every API request with person, key, model, status, duration and tokens; filter to errors |
 | Overview → Backups | Daily database copies; back up now and download |
 | API keys | Every active key with its owner and last use; revoke any key |
-| System settings | Open registration, invite code, longest booking, booking horizon, default launch arguments |
+| System settings | Every operational setting: registration, booking limits and quotas, approval, preloading and timeouts, engine commands, downloads, Telegram, retention and backups |
 | Audit log | Who did what and when, for every admin action |
 
 Rules that protect the system:

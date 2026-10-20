@@ -46,20 +46,24 @@ SlotServe exposes an **OpenAI-compatible** API at `/v1`. Any OpenAI SDK or tool 
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| `GET` | `/v1/models` | The model that is loaded (or loading) right now |
+| `GET` | `/v1/models` | Models you can use right now (loaded or loading on a lane you may use) |
 | `POST` | `/v1/chat/completions` | Streaming supported |
 | `POST` | `/v1/completions` | Streaming supported |
 | `POST` | `/v1/embeddings` | The model must be started with `--embedding` |
-| `POST` | `/v1/*` | Any other llama-server route is forwarded under the same rules |
+| `POST` | `/v1/*` | Any other route of the model server is forwarded under the same rules |
 
 The key can be sent as `Authorization: Bearer <key>` or `x-api-key: <key>`.
 
 ## The `model` field
 
-Only one model is loaded at a time, so the field works like this:
+Each lane serves one model at a time. The field picks the lane:
 
-- empty, equal to the loaded model, or a name SlotServe does not know → the request goes to the loaded model;
-- the name of **another registered model** → `409 model_not_loaded`. Book a slot to switch.
+- a model that a lane you may use is serving → that lane (your booked lane first);
+- empty or a name SlotServe does not know → your booked lane, otherwise a free lane;
+- a registered model that is only served on a lane someone else booked → `403 gpu_reserved`;
+- a registered model that no lane is serving → `409 model_not_loaded`. Book a slot to load it.
+
+The request always reaches the model server with the served model's name, so engines that check the name (vLLM, SGLang) accept it. See [GPUs, lanes & engines](gpus-and-engines.md#which-lane-serves-an-api-request) for the full routing.
 
 ## Errors
 
@@ -68,12 +72,12 @@ Errors use the OpenAI shape: `{"error": {"message", "type", "code"}}`.
 | Status | `code` | Meaning |
 | --- | --- | --- |
 | 401 | `missing_api_key` / `invalid_api_key` | No key, unknown key or revoked key |
-| 403 | `gpu_reserved` | Someone else has booked the GPU right now; the message says until when |
-| 409 | `model_not_loaded` | You asked for a registered model that is not loaded |
+| 403 | `gpu_reserved` | Someone else has booked the GPU (or the lane serving that model) right now; the message says until when |
+| 409 | `model_not_loaded` | You asked for a registered model that no lane you may use is serving |
 | 503 | `gpu_exclusive` | Your own whole-GPU booking is running, so no model is served |
 | 503 | `model_switching` | Running requests are finishing before a model switch; honour `Retry-After` |
 | 503 | `model_unavailable` | The model is loading or failed to start; honour `Retry-After` |
-| 502 | `upstream_error` | llama-server did not answer |
+| 502 | `upstream_error` | The model server did not answer |
 
 ## Usage accounting
 
@@ -81,4 +85,4 @@ Every request is logged with its user, key, model, token counts and duration. Fo
 
 ## Web API
 
-The browser UI uses a separate JSON API under `/api` with cookie sessions. After 10 failed sign-ins for one account (or 30 from one address) within 15 minutes, sign-in returns `429 too_many_attempts` until the window passes. Its interactive reference is served at `/api/docs`. Admin endpoints live under `/api/admin` (`stats`, `users`, `keys`, `reservations`, `settings`, `audit`) and require an admin session.
+The browser UI uses a separate JSON API under `/api` with cookie sessions. After 10 failed sign-ins for one account (or 30 from one address) within 15 minutes, sign-in returns `429 too_many_attempts` until the window passes. Its interactive reference is served at `/api/docs`. Admin endpoints live under `/api/admin` (`stats`, `users`, `keys`, `reservations` with `approve` and `reject`, `lanes`, `requests`, `runtime/manual`, `settings`, `backups`, `audit`) and require an admin session.

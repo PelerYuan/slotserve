@@ -28,11 +28,11 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | `SLOTSERVE_MODELS_DIR` | `models` | Model directory (scanned, and target of downloads) |
 | `SLOTSERVE_STATIC_DIR` | *bundled* | Built frontend directory |
 | `SLOTSERVE_LLAMA_SERVER_CMD` | `llama-server` | Command used to start llama-server; may include a prefix such as `taskset -c 0-15 llama-server` |
-| `SLOTSERVE_LLAMA_HOST` | `127.0.0.1` | Address llama-server binds to (keep it local) |
+| `SLOTSERVE_LLAMA_HOST` | `127.0.0.1` | Address the model servers bind to (keep it local) |
 | `SLOTSERVE_LLAMA_PORT` | `8081` | Port of the first lane's model server; lane *N* uses this + *N* - 1 |
 | `SLOTSERVE_DEFAULT_LLAMA_ARGS` | `-ngl 99 -c 8192` | Arguments given to newly registered models |
 | `SLOTSERVE_LOAD_TIMEOUT_SECONDS` | `1800` | Give up if a model is not ready after this long |
-| `SLOTSERVE_STOP_TIMEOUT_SECONDS` | `20` | Grace period before llama-server is killed |
+| `SLOTSERVE_STOP_TIMEOUT_SECONDS` | `20` | Grace period before a model server is killed |
 | `SLOTSERVE_DISK_READ_MBPS` | `150` | Used to estimate load time before a model's first load |
 | `SLOTSERVE_SLOT_MINUTES` | `30` | Calendar granularity |
 | `SLOTSERVE_MAX_RESERVATION_HOURS` | `8` | Longest single booking |
@@ -56,6 +56,7 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | `SLOTSERVE_HF_TOKEN` | *empty* | Token for gated or private repositories |
 | `SLOTSERVE_TELEGRAM_BOT_TOKEN` | *empty* | Telegram bot token; empty disables the bot |
 | `SLOTSERVE_TELEGRAM_PROXY` | *empty* | `http://` or `socks5://` proxy for Telegram |
+| `SLOTSERVE_TELEGRAM_API_BASE` | `https://api.telegram.org` | Telegram Bot API address, for a self-hosted Bot API server |
 | `SLOTSERVE_METRICS_TOKEN` | *empty* | Bearer token for `/metrics`; empty disables it |
 | `SLOTSERVE_DRAIN_SECONDS` | `30` | Before a model switch, wait this long for running requests to finish |
 | `SLOTSERVE_USAGE_RETENTION_DAYS` | `365` | Keep per-request rows this long, then fold them into daily totals (0 = forever; otherwise ≥ 90) |
@@ -66,11 +67,13 @@ Admins can change every setting in **Admin → System settings** without a resta
 
 ## Per-model launch arguments
 
-Each model has a free-form argument string that is appended to the command:
+Each model has a free-form argument string that is appended to the command. For llama.cpp models:
 
 ```text
 <SLOTSERVE_LLAMA_SERVER_CMD> -m <file> --host 127.0.0.1 --port 8081 --alias <name> <your arguments>
 ```
+
+vLLM, SGLang and custom engines build their command the same way; see [GPUs, lanes & engines](gpus-and-engines.md#engines).
 
 `-m`, `--host`, `--port` and `--alias` are always set by SlotServe; copies in your arguments are ignored. Useful arguments:
 

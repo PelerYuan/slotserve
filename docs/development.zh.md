@@ -1,6 +1,6 @@
 # 开发
 
-开发 SlotServe 不需要 GPU。`tools/mock_llama_server.py` 模拟 llama-server：接受相同的核心参数，假装加载几秒，然后提供支持流式和用量统计的 OpenAI 兼容回显模型。
+开发 SlotServe 不需要 GPU。`tools/mock_llama_server.py` 模拟推理服务：接受 llama-server、vLLM 和 SGLang 的核心参数，假装加载几秒，然后提供支持流式和用量统计的 OpenAI 兼容回显模型。
 
 ## 目录结构
 
@@ -8,11 +8,11 @@
 backend/            FastAPI 应用（Python 包 `slotserve`）
   slotserve/api/      Web API 路由（/api）
   slotserve/gateway/  OpenAI 兼容代理（/v1）
-  slotserve/runtime/  llama-server 进程管理、调度器、GPU 状态
+  slotserve/runtime/  推理进程管理、推理后端、通道、调度器、GPU 状态
   slotserve/services/ 公共查询、模型扫描、下载队列
   tests/              pytest 测试（使用 mock 服务）
 frontend/           Vue 3 + TypeScript + Naive UI
-tools/              mock llama-server
+tools/              mock 推理服务
 e2e/                Playwright 端到端测试
 docs/               本文档站（MkDocs Material，中英双语）
 ```
@@ -75,7 +75,7 @@ mkdocs gh-deploy   # 发布到 GitHub Pages
 | Lint | `ruff check` 和 `ruff format --check` |
 | 后端测试 | 在 Python 3.12 和 3.13 上运行 `pytest` |
 | 前端 | `npm run typecheck` 和 `npm run build` |
-| 端到端 | 启动 SlotServe 和模拟 llama-server，用 Playwright 操作界面（`e2e/`） |
+| 端到端 | 启动 SlotServe 和模拟推理服务，用 Playwright 操作界面（`e2e/`） |
 | 文档 | `mkdocs build --strict` |
 | Docker 镜像 | 构建镜像并确认 `/healthz` 可访问 |
 

@@ -7,7 +7,7 @@ SlotServe 以一个 Docker 镜像发布，**不内置** llama.cpp：你把已经
 - 带 NVIDIA GPU 和驱动的 Linux 主机
 - [Docker](https://docs.docker.com/engine/install/) 及 Compose v2
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
-- 启用 CUDA 编译的 llama.cpp（`llama-server`）
+- 启用 CUDA 编译的 llama.cpp（`llama-server`），或 vLLM / SGLang，见[多 GPU 与推理后端](gpus-and-engines.md)
 
 !!! tip "CUDA 版本保持一致"
     SlotServe 的 `CUDA_IMAGE` 的 CUDA 主版本必须与编译 `llama-server` 时使用的一致，并且该 CUDA 版本要支持你的 GPU。见[配置参考](configuration.md)。
@@ -61,7 +61,7 @@ docker compose logs -f
 ```
 
 !!! tip "预构建镜像"
-    也可以不自己构建，直接使用发布的镜像：`docker compose pull && docker compose up -d`。镜像自带 CUDA 12.8 运行库，兼容用任意 CUDA 12.x 编译的 llama.cpp。如需固定版本，在 `.env` 中设置 `SLOTSERVE_IMAGE=ghcr.io/peleryuan/slotserve:0.5.0`。
+    也可以不自己构建，直接使用发布的镜像：`docker compose pull && docker compose up -d`。镜像自带 CUDA 12.8 运行库，兼容用任意 CUDA 12.x 编译的 llama.cpp。如需固定版本，在 `.env` 中设置 `SLOTSERVE_IMAGE=ghcr.io/peleryuan/slotserve:<版本号>`（版本见 [Releases 页面](https://github.com/PelerYuan/slotserve/releases)）。
 
 
 浏览器打开 `http://<服务器>:8000`。
@@ -71,7 +71,7 @@ docker compose logs -f
 1. **注册。** 第一个注册的账号自动成为管理员。
 2. **模型 → 扫描目录。** `MODELS_DIR` 中的 `.gguf` 文件会被登记（多模态投影文件和分片模型的非首片会被跳过）。
 3. 按需**编辑启动参数**，例如 `-ngl 99 -c 16384 --flash-attn on`。
-4. **设为默认模型**（管理员）。GPU 没有预约时会加载它。
+4. **设为默认模型**（管理员）。GPU 没有预约时会加载它。有多张 GPU 时，先在**管理 → GPU 与通道**中划分通道，每个通道各有默认模型。
 5. **API 密钥 → 新建密钥**，然后调用接口：
 
 ```bash

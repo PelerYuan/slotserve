@@ -5,7 +5,7 @@
 <h1 align="center">SlotServe</h1>
 
 <p align="center">
-  <b>Book GPU time slots. Serve llama.cpp models behind an OpenAI-compatible API.</b>
+  <b>Book GPU time slots. Serve models behind an OpenAI-compatible API.</b>
 </p>
 
 <p align="center">
@@ -23,14 +23,14 @@
 
 ![SlotServe overview](docs/assets/screenshots/overview.png)
 
-SlotServe turns one GPU into a shared, bookable service for a lab or small team. People book time in a web calendar and get the GPU exclusively during their slot. They call models through an OpenAI-compatible endpoint with their own API key. SlotServe runs `llama-server` for you, learns how long each model takes to load, and switches models *before* each booking starts.
+SlotServe turns a GPU server into a shared, bookable service for a lab or small team. People book time in a web calendar and get the GPU exclusively during their slot. They call models through an OpenAI-compatible endpoint with their own API key. SlotServe runs the model server (llama.cpp, vLLM, SGLang or your own) for you, learns how long each model takes to load, and switches models *before* each booking starts.
 
 ## Features
 
 - **Calendar booking**: drag across a week view to book exclusive GPU time. First come, first served.
-- **OpenAI-compatible gateway**: `/v1/chat/completions`, `/v1/completions`, `/v1/embeddings` and every other llama-server route, with streaming.
+- **OpenAI-compatible gateway**: `/v1/chat/completions`, `/v1/completions`, `/v1/embeddings` and every other route of the model server, with streaming.
 - **Per-user API keys**: an idle GPU stays open to every key on the default model; a booking locks it to the booker's keys.
-- **Managed llama-server**: started, health-checked, restarted and switched automatically. Each model's launch arguments are edited in the browser.
+- **Managed model servers**: started, health-checked, restarted and switched automatically. Each model's launch arguments are edited in the browser.
 - **Preloading**: load times are learned per model, so the next booking's model is ready when the slot begins.
 - **Model downloads**: paste a direct `.gguf` link (Hugging Face `resolve` URLs work). Downloads are resumable and run one at a time.
 - **Usage dashboard**: requests, prompt/completion tokens and booked hours per person and per model.
@@ -86,18 +86,33 @@ print(reply.choices[0].message.content)
 
 ## How it works
 
+```mermaid
+flowchart LR
+    browser["Browser"] -- "/api" --> web
+    clients["OpenAI SDKs and tools"] -- "/v1 + API key" --> gw
+    subgraph slotserve["SlotServe · one container · SQLite"]
+        direction TB
+        web["Web API<br/>bookings · models · admin"]
+        gw["Gateway<br/>auth · admission · usage"]
+        sched["Scheduler<br/>one per lane"]
+    end
+    subgraph gpus["GPU lanes"]
+        direction TB
+        l1["Lane 1 · GPU 0<br/>llama-server"]
+        l2["Lane 2 · GPU 1,2<br/>vLLM / SGLang / custom"]
+    end
+    gw -- "forwards requests" --> gpus
+    sched -- "start · switch · stop" --> gpus
 ```
-Browser ──/api──┐                      ┌──────────────────────────┐
-                ├──► FastAPI ──────────►  llama-server (child)    │──► GPU
-SDK/clients ─/v1┘    auth · admission  │  127.0.0.1 only          │
-                     scheduler · usage └──────────────────────────┘
-```
+
+Each lane (a group of GPUs) has its own model server and booking calendar. A single-GPU host has one lane.
 
 | Situation | Booking owner | Everyone else |
 | --- | --- | --- |
-| No booking active | ✅ current model | ✅ current model |
-| Booking active, model ready | ✅ | ❌ `403 gpu_reserved` |
-| Booking active, model loading | ⏳ `503` + `Retry-After` | ❌ `403 gpu_reserved` |
+| Lane not booked | allowed, on the lane's model | allowed, on the lane's model |
+| Booked, model ready | allowed | `403 gpu_reserved` |
+| Booked, model loading | `503` + `Retry-After` | `403 gpu_reserved` |
+| Whole-GPU booking | `503 gpu_exclusive` | `403 gpu_reserved` |
 
 See [How scheduling works](https://peleryuan.github.io/slotserve/scheduling/) for the preloading rules.
 
@@ -109,15 +124,16 @@ See [How scheduling works](https://peleryuan.github.io/slotserve/scheduling/) fo
 | [Configuration](https://peleryuan.github.io/slotserve/configuration/) | Every environment variable, per-model launch arguments, admin CLI |
 | [User guide](https://peleryuan.github.io/slotserve/user-guide/) | Booking, models, downloads, keys, usage, administration |
 | [Notifications & integrations](https://peleryuan.github.io/slotserve/integrations/) | Telegram, calendar feeds, CSV export, Prometheus |
+| [GPUs, lanes & engines](https://peleryuan.github.io/slotserve/gpus-and-engines/) | Multiple GPUs, vLLM / SGLang / custom servers, approval mode |
 | [API](https://peleryuan.github.io/slotserve/api/) | Endpoints, the `model` field, error codes |
-| [Development](https://peleryuan.github.io/slotserve/development/) | Mock llama-server, tests, frontend dev server |
+| [Development](https://peleryuan.github.io/slotserve/development/) | Mock model server, tests, frontend dev server |
 | [FAQ](https://peleryuan.github.io/slotserve/faq/) | Slow loads, reverse proxy, backups |
 
 The docs source lives in [`docs/`](docs/).
 
 ## Development
 
-No GPU needed: a mock llama-server is included.
+No GPU needed: a mock model server is included.
 
 ```bash
 cd backend && python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]" && pytest

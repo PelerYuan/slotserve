@@ -5,7 +5,7 @@
 <h1 align="center">SlotServe</h1>
 
 <p align="center">
-  <b>预约 GPU 时段，通过 OpenAI 兼容接口使用 llama.cpp 模型。</b>
+  <b>预约 GPU 时段，通过 OpenAI 兼容接口使用模型。</b>
 </p>
 
 <p align="center">
@@ -23,14 +23,14 @@
 
 ![SlotServe 总览](docs/assets/screenshots/overview-zh.png)
 
-SlotServe 把一张 GPU 变成实验室或小团队可预约的共享服务：大家在网页日历上预约时段，预约期间独占 GPU，并用自己的 API 密钥通过 OpenAI 兼容接口调用模型。SlotServe 负责托管 `llama-server`，学习每个模型的加载耗时，并在每个预约开始*之前*完成模型切换。
+SlotServe 把 GPU 服务器变成实验室或小团队可预约的共享服务：大家在网页日历上预约时段，预约期间独占 GPU，并用自己的 API 密钥通过 OpenAI 兼容接口调用模型。SlotServe 负责托管推理进程（llama.cpp、vLLM、SGLang 或你自己的服务），学习每个模型的加载耗时，并在每个预约开始*之前*完成模型切换。
 
 ## 功能
 
 - **日历预约**：在周视图上拖选即可预约独占时段，先到先得。
-- **OpenAI 兼容网关**：`/v1/chat/completions`、`/v1/completions`、`/v1/embeddings` 及 llama-server 的其他接口，支持流式。
+- **OpenAI 兼容网关**：`/v1/chat/completions`、`/v1/completions`、`/v1/embeddings` 及推理服务的其他接口，支持流式。
 - **个人 API 密钥**：GPU 空闲时所有密钥都能使用默认模型；有预约时只接受预约者的密钥。
-- **托管 llama-server**：自动启动、健康检查、重启和切换；每个模型的启动参数都可在网页上编辑。
+- **托管推理进程**：自动启动、健康检查、重启和切换；每个模型的启动参数都可在网页上编辑。
 - **预加载**：自动学习每个模型的加载耗时，让下一个预约的模型在时段开始时就已就绪。
 - **模型下载**：粘贴 `.gguf` 直链（支持 Hugging Face 的 `resolve` 链接），断点续传，逐个下载。
 - **用量看板**：按用户、按模型统计请求数、输入/输出 token 和预约时长。
@@ -86,18 +86,33 @@ print(reply.choices[0].message.content)
 
 ## 工作原理
 
+```mermaid
+flowchart LR
+    browser["浏览器"] -- "/api" --> web
+    clients["OpenAI SDK 与工具"] -- "/v1 + API 密钥" --> gw
+    subgraph slotserve["SlotServe · 单个容器 · SQLite"]
+        direction TB
+        web["Web API<br/>预约 · 模型 · 管理"]
+        gw["网关<br/>鉴权 · 准入 · 用量"]
+        sched["调度器<br/>每个通道一个"]
+    end
+    subgraph gpus["GPU 通道"]
+        direction TB
+        l1["通道 1 · GPU 0<br/>llama-server"]
+        l2["通道 2 · GPU 1,2<br/>vLLM / SGLang / 自定义"]
+    end
+    gw -- "转发请求" --> gpus
+    sched -- "启动 · 切换 · 停止" --> gpus
 ```
-浏览器 ──/api──┐                      ┌──────────────────────────┐
-               ├──► FastAPI ──────────►  llama-server（子进程）  │──► GPU
-SDK/客户端 ─/v1┘    鉴权 · 准入        │  仅监听 127.0.0.1        │
-                    调度 · 用量        └──────────────────────────┘
-```
+
+每个通道（一组 GPU）有自己的推理进程和预约日历，单卡机器只有一个通道。
 
 | 情况 | 预约者 | 其他人 |
 | --- | --- | --- |
-| 没有进行中的预约 | ✅ 当前模型 | ✅ 当前模型 |
-| 预约进行中，模型已就绪 | ✅ | ❌ `403 gpu_reserved` |
-| 预约进行中，模型加载中 | ⏳ `503` + `Retry-After` | ❌ `403 gpu_reserved` |
+| 通道未被预约 | 可用，使用通道当前模型 | 可用，使用通道当前模型 |
+| 预约中，模型已就绪 | 可用 | `403 gpu_reserved` |
+| 预约中，模型加载中 | `503` + `Retry-After` | `403 gpu_reserved` |
+| 整卡预约 | `503 gpu_exclusive` | `403 gpu_reserved` |
 
 预加载规则见[调度原理](https://peleryuan.github.io/slotserve/zh/scheduling/)。
 
@@ -109,15 +124,16 @@ SDK/客户端 ─/v1┘    鉴权 · 准入        │  仅监听 127.0.0.1     
 | [配置参考](https://peleryuan.github.io/slotserve/zh/configuration/) | 全部环境变量、每个模型的启动参数、管理员命令行 |
 | [使用指南](https://peleryuan.github.io/slotserve/zh/user-guide/) | 预约、模型、下载、密钥、用量、管理 |
 | [通知与集成](https://peleryuan.github.io/slotserve/zh/integrations/) | Telegram、日历订阅、CSV 导出、Prometheus |
+| [多 GPU 与推理后端](https://peleryuan.github.io/slotserve/zh/gpus-and-engines/) | 多 GPU、vLLM / SGLang / 自定义服务、审批模式 |
 | [接口](https://peleryuan.github.io/slotserve/zh/api/) | 接口列表、`model` 字段、错误码 |
-| [开发](https://peleryuan.github.io/slotserve/zh/development/) | mock llama-server、测试、前端开发服务器 |
+| [开发](https://peleryuan.github.io/slotserve/zh/development/) | mock 推理服务、测试、前端开发服务器 |
 | [常见问题](https://peleryuan.github.io/slotserve/zh/faq/) | 加载慢、反向代理、备份 |
 
 文档源文件在 [`docs/`](docs/) 目录。
 
 ## 开发
 
-不需要 GPU，仓库自带 mock llama-server。
+不需要 GPU，仓库自带 mock 推理服务。
 
 ```bash
 cd backend && python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]" && pytest

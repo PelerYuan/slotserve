@@ -20,8 +20,10 @@ Messages are sent in each person's interface language. Times use the **Time zone
 | Booking ends in 10 minutes, with **+30 min**, **+1 hour** and **End now** buttons | Booker |
 | An admin booked, changed, cancelled or ended your booking | Booker |
 | The booked model failed to load and the default model is serving instead | Booker and admins |
+| Your booking request was approved, rejected (with the reason) or expired | Booker |
 | Time you waited for is free, or was booked for you | Waitlisted person |
 | Your download finished or failed | Person who started it |
+| A booking needs approval, with **Approve** and **Reject** buttons | Admins |
 | A model failed to load, a new account was created, the models disk is low | Admins |
 
 Commands (private chat with the bot):

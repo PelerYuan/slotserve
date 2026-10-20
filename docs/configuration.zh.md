@@ -28,11 +28,11 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_MODELS_DIR` | `models` | 模型目录（扫描及下载目标） |
 | `SLOTSERVE_STATIC_DIR` | *内置* | 前端构建产物目录 |
 | `SLOTSERVE_LLAMA_SERVER_CMD` | `llama-server` | 启动 llama-server 的命令，可带前缀，如 `taskset -c 0-15 llama-server` |
-| `SLOTSERVE_LLAMA_HOST` | `127.0.0.1` | llama-server 监听地址（请保持本地） |
+| `SLOTSERVE_LLAMA_HOST` | `127.0.0.1` | 推理进程监听地址（请保持本地） |
 | `SLOTSERVE_LLAMA_PORT` | `8081` | 第一个通道推理进程的端口；第 *N* 个通道为此值 + *N* - 1 |
 | `SLOTSERVE_DEFAULT_LLAMA_ARGS` | `-ngl 99 -c 8192` | 新登记模型的默认启动参数 |
 | `SLOTSERVE_LOAD_TIMEOUT_SECONDS` | `1800` | 超过此时间仍未就绪则判定加载失败 |
-| `SLOTSERVE_STOP_TIMEOUT_SECONDS` | `20` | 强制结束 llama-server 前的等待时间 |
+| `SLOTSERVE_STOP_TIMEOUT_SECONDS` | `20` | 强制结束推理进程前的等待时间 |
 | `SLOTSERVE_DISK_READ_MBPS` | `150` | 模型首次加载前用于估算加载时间 |
 | `SLOTSERVE_SLOT_MINUTES` | `30` | 日历时间粒度 |
 | `SLOTSERVE_MAX_RESERVATION_HOURS` | `8` | 单次预约最长时长 |
@@ -56,6 +56,7 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_HF_TOKEN` | *空* | 受限或私有仓库所需的 Token |
 | `SLOTSERVE_TELEGRAM_BOT_TOKEN` | *空* | Telegram 机器人 Token，留空则不启用 |
 | `SLOTSERVE_TELEGRAM_PROXY` | *空* | 连接 Telegram 的 `http://` 或 `socks5://` 代理 |
+| `SLOTSERVE_TELEGRAM_API_BASE` | `https://api.telegram.org` | Telegram Bot API 地址，用于自建的 Bot API 服务 |
 | `SLOTSERVE_METRICS_TOKEN` | *空* | `/metrics` 的 Bearer Token，留空则关闭 |
 | `SLOTSERVE_DRAIN_SECONDS` | `30` | 切换模型前等待进行中请求完成的最长时间 |
 | `SLOTSERVE_USAGE_RETENTION_DAYS` | `365` | 逐条请求记录保留天数，之后合并为按天汇总（0 表示永久；否则至少 90） |
@@ -66,11 +67,13 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 
 ## 每个模型的启动参数
 
-每个模型有一行自由填写的参数，会追加到命令末尾：
+每个模型有一行自由填写的参数，会追加到命令末尾。llama.cpp 模型的命令为：
 
 ```text
 <SLOTSERVE_LLAMA_SERVER_CMD> -m <文件> --host 127.0.0.1 --port 8081 --alias <名称> <你的参数>
 ```
+
+vLLM、SGLang 和自定义后端以同样方式拼接命令，见[多 GPU 与推理后端](gpus-and-engines.md#推理后端)。
 
 `-m`、`--host`、`--port`、`--alias` 始终由 SlotServe 设置，你参数里的同名项会被忽略。常用参数：
 

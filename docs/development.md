@@ -1,6 +1,6 @@
 # Development
 
-You do not need a GPU to work on SlotServe. `tools/mock_llama_server.py` imitates llama-server: it accepts the same core flags, pretends to load for a few seconds and serves an OpenAI-compatible echo model with streaming and usage.
+You do not need a GPU to work on SlotServe. `tools/mock_llama_server.py` imitates a model server: it accepts the core flags of llama-server, vLLM and SGLang, pretends to load for a few seconds and serves an OpenAI-compatible echo model with streaming and usage.
 
 ## Layout
 
@@ -8,11 +8,11 @@ You do not need a GPU to work on SlotServe. `tools/mock_llama_server.py` imitate
 backend/            FastAPI application (Python package `slotserve`)
   slotserve/api/      Web API routes (/api)
   slotserve/gateway/  OpenAI-compatible proxy (/v1)
-  slotserve/runtime/  llama-server process manager, scheduler, GPU stats
+  slotserve/runtime/  model server processes, engines, lanes, scheduler, GPU stats
   slotserve/services/ shared queries, model scanner, download queue
   tests/              pytest suite (uses the mock server)
 frontend/           Vue 3 + TypeScript + Naive UI
-tools/              mock llama-server
+tools/              mock model server
 e2e/                Playwright end-to-end tests
 docs/               this site (MkDocs Material, en + zh)
 ```
@@ -75,7 +75,7 @@ Every push to `main` and every pull request runs `.github/workflows/ci.yml`:
 | Lint | `ruff check` and `ruff format --check` |
 | Backend tests | `pytest` on Python 3.12 and 3.13 |
 | Frontend | `npm run typecheck` and `npm run build` |
-| End-to-end | starts SlotServe with the mock llama-server and drives the UI with Playwright (`e2e/`) |
+| End-to-end | starts SlotServe with the mock model server and drives the UI with Playwright (`e2e/`) |
 | Docs | `mkdocs build --strict` |
 | Docker image | builds the image and checks that `/healthz` answers |
 

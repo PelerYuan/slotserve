@@ -7,7 +7,7 @@ SlotServe ships as one Docker image. It does **not** bundle llama.cpp: you mount
 - Linux host with an NVIDIA GPU and driver
 - [Docker](https://docs.docker.com/engine/install/) with Compose v2
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
-- A CUDA build of llama.cpp (`llama-server`)
+- A CUDA build of llama.cpp (`llama-server`), or vLLM / SGLang - see [GPUs, lanes & engines](gpus-and-engines.md)
 
 !!! tip "Match the CUDA version"
     The CUDA major version of SlotServe's `CUDA_IMAGE` must match the one your `llama-server` was built with, and that CUDA version must support your GPU. See [Configuration](configuration.md).
@@ -61,7 +61,7 @@ docker compose logs -f
 ```
 
 !!! tip "Prebuilt image"
-    Instead of building, you can run the published image: `docker compose pull && docker compose up -d`. It uses CUDA 12.8 runtime libraries, which work with llama.cpp builds for any CUDA 12.x. Pin a version with `SLOTSERVE_IMAGE=ghcr.io/peleryuan/slotserve:0.5.0` in `.env`.
+    Instead of building, you can run the published image: `docker compose pull && docker compose up -d`. It uses CUDA 12.8 runtime libraries, which work with llama.cpp builds for any CUDA 12.x. Pin a release with `SLOTSERVE_IMAGE=ghcr.io/peleryuan/slotserve:<version>` in `.env` (versions are listed on the [releases page](https://github.com/PelerYuan/slotserve/releases)).
 
 
 Open `http://<server>:8000`.
@@ -71,7 +71,7 @@ Open `http://<server>:8000`.
 1. **Sign up.** The first account becomes the administrator.
 2. **Models → Scan folder.** Every `.gguf` in `MODELS_DIR` is registered (multimodal projector files and the non-first parts of split models are skipped).
 3. **Edit launch arguments** for each model if needed, e.g. `-ngl 99 -c 16384 --flash-attn on`.
-4. **Set a default model** (admin). It is loaded whenever the GPU is not booked.
+4. **Set a default model** (admin). It is loaded whenever the GPU is not booked. With several GPUs, first decide how to split them in **Admin → GPUs & lanes**; each lane has its own default model.
 5. **API keys → New key**, then call the API:
 
 ```bash
