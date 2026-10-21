@@ -18,6 +18,8 @@ dependencies = [
   "itsdangerous>=2.2",
   "tzdata>=2024.1",
   "cryptography>=42",
+  # Feishu long connection, DingTalk Stream and the QQ gateway (also installed by uvicorn[standard])
+  "websockets>=13",
 ]
 
 [project.optional-dependencies]

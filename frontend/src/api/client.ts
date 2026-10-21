@@ -1,5 +1,6 @@
 import type {
   AdminApiKey,
+  AdminChannels,
   AdminSetting,
   AdminStats,
   AdminUser,
@@ -10,6 +11,9 @@ import type {
   Backup,
   BookingInput,
   CalendarLinks,
+  ChannelLink,
+  ChatChannel,
+  ChatChannels,
   DevInfo,
   DevSession,
   DevTemplate,
@@ -103,6 +107,11 @@ export const api = {
   telegramLink: () => request<TelegramInfo>('POST', '/api/telegram/link'),
   telegramUnlink: () => request<TelegramInfo>('DELETE', '/api/telegram/link'),
   telegramTest: () => request<void>('POST', '/api/telegram/test'),
+  channels: () => request<ChatChannels>('GET', '/api/channels'),
+  channelLink: (id: string) => request<ChannelLink>('POST', `/api/channels/${id}/link`),
+  channelUnlink: (id: string) => request<ChatChannel>('DELETE', `/api/channels/${id}/link`),
+  channelNotify: (id: string, notify: boolean) => request<ChatChannel>('PUT', `/api/channels/${id}`, { notify }),
+  channelTest: (id: string) => request<void>('POST', `/api/channels/${id}/test`),
   calendar: () => request<CalendarLinks>('GET', '/api/calendar'),
   calendarReset: () => request<CalendarLinks>('POST', '/api/calendar/reset'),
 
@@ -226,6 +235,10 @@ export const api = {
     revokeKey: (id: number) => request<void>('DELETE', `/api/admin/keys/${id}`),
     reservations: (phase?: string, user_id?: number) =>
       request<Reservation[]>('GET', '/api/admin/reservations', undefined, { phase, user_id }),
+    channels: () => request<AdminChannels>('GET', '/api/admin/channels'),
+    webhookTest: (id: string) =>
+      request<{ error: string | null }>('POST', `/api/admin/channels/webhooks/${id}/test`),
+    announce: (text: string) => request<{ targets: string[] }>('POST', '/api/admin/channels/announce', { text }),
     settings: () => request<AdminSetting[]>('GET', '/api/admin/settings'),
     saveSettings: (changes: Record<string, SettingValue | null>) =>
       request<AdminSetting[]>('PUT', '/api/admin/settings', changes),

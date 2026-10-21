@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NForm, NFormItem, NInput, NRadioButton, NRadioGroup, NSwitch, useDialog } from 'naive-ui'
-import { Monitor, Moon, Send, Sun } from 'lucide-vue-next'
+import { MessageCircle, Monitor, Moon, Send, Sun } from 'lucide-vue-next'
 import CodeBlock from '@/components/CodeBlock.vue'
 import { api } from '@/api/client'
-import type { CalendarLinks, TelegramInfo } from '@/api/types'
+import type { CalendarLinks, ChannelLink, ChatChannel, ChatChannels } from '@/api/types'
 import { session } from '@/composables/session'
 import { setThemeMode, themeMode, type ThemeMode } from '@/composables/theme'
 import { useErrorMessage } from '@/composables/useErrorMessage'
@@ -32,66 +32,99 @@ async function changePassword() {
   }
 }
 
-// ---- telegram ----------------------------------------------------------------
-const tg = ref<TelegramInfo | null>(null)
-const linking = ref(false)
+// ---- chat channels (Telegram, Feishu, DingTalk, WeCom, QQ) ------------------------
+const chat = ref<ChatChannels | null>(null)
+const codes = ref<Record<string, ChannelLink>>({})
+const linking = ref<string | null>(null)
 let poll: number | undefined
 
 const PREF_KEYS = computed(() => {
   const keys = ['reminders', 'model_ready', 'booking_changes', 'waitlist', 'downloads']
   return session.user?.is_admin ? [...keys, 'admin_alerts'] : keys
 })
+const anyLinked = computed(() => !!chat.value?.channels.some((c) => c.linked))
 
-async function loadTelegram() {
-  tg.value = await api.telegram().catch(() => tg.value)
+async function loadChannels() {
+  chat.value = await api.channels().catch(() => chat.value)
 }
 
-async function link() {
-  linking.value = true
+function replace(updated: ChatChannel) {
+  if (!chat.value) return
+  chat.value.channels = chat.value.channels.map((c) => (c.id === updated.id ? updated : c))
+}
+
+async function link(c: ChatChannel) {
+  linking.value = c.id
   try {
-    const res = await api.telegramLink()
-    if (res.link_url) window.open(res.link_url, '_blank', 'noopener')
-    // Wait for the user to press Start in Telegram.
-    window.clearInterval(poll)
-    let tries = 0
-    poll = window.setInterval(async () => {
-      await loadTelegram()
-      if (tg.value?.linked || ++tries > 60) {
-        window.clearInterval(poll)
-        linking.value = false
-        if (tg.value?.linked) message.success(t('settings.tg.linkedOk'))
-      }
-    }, 2000)
+    const res = await api.channelLink(c.id)
+    if (c.link_kind === 'url') {
+      if (res.link_url) window.open(res.link_url, '_blank', 'noopener')
+    } else {
+      codes.value = { ...codes.value, [c.id]: res }
+    }
+    waitForLink(c.id, c.link_kind === 'url' ? 60 : 450)
   } catch (e) {
-    linking.value = false
+    linking.value = null
     showError(e)
   }
 }
 
-function unlink() {
+// Wait until the person presses Start (Telegram) or sends the code to the bot.
+function waitForLink(id: string, maxTries: number) {
+  window.clearInterval(poll)
+  let tries = 0
+  poll = window.setInterval(async () => {
+    await loadChannels()
+    const now = chat.value?.channels.find((c) => c.id === id)
+    if (now?.linked || ++tries > maxTries) {
+      window.clearInterval(poll)
+      linking.value = null
+      const rest = { ...codes.value }
+      delete rest[id]
+      codes.value = rest
+      if (now?.linked) message.success(t('settings.chat.linkedOk', { channel: now.label }))
+    }
+  }, 2000)
+}
+
+onBeforeUnmount(() => window.clearInterval(poll))
+
+function unlink(c: ChatChannel) {
   dialog.warning({
-    title: t('settings.tg.unlink'),
-    content: t('settings.tg.unlinkConfirm'),
-    positiveText: t('settings.tg.unlink'),
+    title: t('settings.chat.unlink'),
+    content: t('settings.chat.unlinkConfirm', { channel: c.label }),
+    positiveText: t('settings.chat.unlink'),
     negativeText: t('common.cancel'),
     onPositiveClick: async () => {
-      tg.value = await api.telegramUnlink().catch((e) => (showError(e), tg.value))
+      try {
+        replace(await api.channelUnlink(c.id))
+      } catch (e) {
+        showError(e)
+      }
     },
   })
 }
 
-async function testMessage() {
+async function testMessage(c: ChatChannel) {
   try {
-    await api.telegramTest()
-    message.success(t('settings.tg.testSent'))
+    await api.channelTest(c.id)
+    message.success(t('settings.chat.testSent'))
+  } catch (e) {
+    showError(e)
+  }
+}
+
+async function setNotify(c: ChatChannel, value: boolean) {
+  try {
+    replace(await api.channelNotify(c.id, value))
   } catch (e) {
     showError(e)
   }
 }
 
 async function setPref(key: string, value: boolean) {
-  if (!tg.value) return
-  tg.value.notify_prefs = { ...tg.value.notify_prefs, [key]: value }
+  if (!chat.value) return
+  chat.value.notify_prefs = { ...chat.value.notify_prefs, [key]: value }
   try {
     await api.preferences({ notify_prefs: { [key]: value } })
   } catch (e) {
@@ -115,7 +148,7 @@ function resetCalendar() {
 }
 
 onMounted(async () => {
-  await loadTelegram()
+  await loadChannels()
   cal.value = await api.calendar().catch(() => null)
 })
 
@@ -170,37 +203,68 @@ const themes: { value: ThemeMode; icon: typeof Sun }[] = [
     <section class="card">
       <div class="card-header">
         <div>
-          <h3 class="card-title tg-title"><Send :size="15" /> Telegram</h3>
-          <div class="card-sub">{{ t('settings.tg.subtitle') }}</div>
+          <h3 class="card-title tg-title"><MessageCircle :size="15" /> {{ t('settings.chat.title') }}</h3>
+          <div class="card-sub">{{ t('settings.chat.subtitle') }}</div>
         </div>
-        <span v-if="tg?.linked" class="badge ok">{{ t('settings.tg.linked') }}</span>
       </div>
       <div class="card-pad">
-        <p v-if="!tg?.enabled" class="muted no-margin">{{ t('settings.tg.disabled') }}</p>
-        <template v-else>
+        <p v-if="chat && !chat.channels.length" class="muted no-margin">{{ t('settings.chat.none') }}</p>
+        <div v-for="c in chat?.channels ?? []" :key="c.id" class="ch-row" :data-channel="c.id">
           <div class="tg-row">
-            <span v-if="tg.linked" class="muted">
-              {{ t('settings.tg.linkedAs', { name: tg.telegram_username ? '@' + tg.telegram_username : '—' }) }}
-              <span v-if="tg.bot_username" class="faint"> · @{{ tg.bot_username }}</span>
-            </span>
-            <span v-else class="muted">{{ t('settings.tg.notLinked', { bot: tg.bot_username ? '@' + tg.bot_username : '' }) }}</span>
-            <span class="spacer" />
-            <template v-if="tg.linked">
-              <NButton size="small" secondary @click="testMessage">{{ t('settings.tg.test') }}</NButton>
-              <NButton size="small" quaternary type="error" @click="unlink">{{ t('settings.tg.unlink') }}</NButton>
-            </template>
-            <NButton v-else size="small" type="primary" :loading="linking" @click="link">{{ t('settings.tg.link') }}</NButton>
-          </div>
-          <div v-if="tg.linked" class="pref-grid">
-            <label v-for="k in PREF_KEYS" :key="k" class="pref-item">
-              <div>
-                <div>{{ t(`settings.tg.prefs.${k}`) }}</div>
-                <div class="faint small">{{ t(`settings.tg.prefs.${k}_desc`) }}</div>
+            <div class="ch-main">
+              <div class="ch-name">
+                <Send v-if="c.id === 'telegram'" :size="13" />
+                {{ c.label }}
+                <span v-if="c.linked" class="badge ok">{{ t('settings.chat.linked') }}</span>
               </div>
-              <NSwitch :value="tg.notify_prefs[k] ?? true" size="small" @update:value="(v: boolean) => setPref(k, v)" />
-            </label>
+              <div class="muted small">
+                <template v-if="c.linked">{{ t('settings.chat.linkedAs', { name: c.account || '—' }) }}</template>
+                <template v-else-if="!c.receives">{{ t('settings.chat.noReceive') }}</template>
+                <template v-else>{{ t('settings.chat.notLinked') }}</template>
+                <span v-if="c.bot_name" class="faint"> · {{ c.id === 'telegram' ? '@' + c.bot_name : c.bot_name }}</span>
+              </div>
+            </div>
+            <span class="spacer" />
+            <template v-if="c.linked">
+              <label class="notify-switch">
+                <span class="faint small">{{ t('settings.chat.notify') }}</span>
+                <NSwitch :value="c.notify" size="small" @update:value="(v: boolean) => setNotify(c, v)" />
+              </label>
+              <NButton size="small" secondary @click="testMessage(c)">{{ t('settings.chat.test') }}</NButton>
+              <NButton size="small" quaternary type="error" @click="unlink(c)">{{ t('settings.chat.unlink') }}</NButton>
+            </template>
+            <NButton
+              v-else
+              size="small"
+              type="primary"
+              :disabled="!c.receives"
+              :loading="linking === c.id && c.link_kind === 'url'"
+              @click="link(c)"
+            >
+              {{ t('settings.chat.link') }}
+            </NButton>
           </div>
-        </template>
+          <div v-if="codes[c.id] && !c.linked" class="code-box">
+            <div>{{ t('settings.chat.codeHint', { channel: c.label, bot: c.bot_name || c.label }) }}</div>
+            <CodeBlock :code="`bind ${codes[c.id].code}`" inline />
+            <div class="faint small">
+              {{ t('settings.chat.codeExpires', { time: formatDateTime(codes[c.id].expires_at) }) }}
+              <a v-if="codes[c.id].link_url" :href="codes[c.id].link_url ?? undefined" target="_blank" rel="noopener">
+                · {{ t('settings.chat.openApp', { channel: c.label }) }}
+              </a>
+            </div>
+          </div>
+        </div>
+        <div v-if="chat && anyLinked" class="pref-grid">
+          <div class="pref-title faint small">{{ t('settings.chat.prefsTitle') }}</div>
+          <label v-for="k in PREF_KEYS" :key="k" class="pref-item">
+            <div>
+              <div>{{ t(`settings.tg.prefs.${k}`) }}</div>
+              <div class="faint small">{{ t(`settings.tg.prefs.${k}_desc`) }}</div>
+            </div>
+            <NSwitch :value="chat.notify_prefs[k] ?? true" size="small" @update:value="(v: boolean) => setPref(k, v)" />
+          </label>
+        </div>
       </div>
     </section>
 
@@ -309,6 +373,38 @@ const themes: { value: ThemeMode; icon: typeof Sun }[] = [
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
+}
+.pref-title {
+  grid-column: 1 / -1;
+}
+.ch-row + .ch-row {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.ch-main {
+  min-width: 0;
+}
+.ch-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.notify-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 4px;
+  cursor: pointer;
+}
+.code-box {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-muted);
 }
 .pref-item {
   display: flex;

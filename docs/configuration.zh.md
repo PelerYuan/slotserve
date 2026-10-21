@@ -58,6 +58,16 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_TELEGRAM_BOT_TOKEN` | *空* | Telegram 机器人 Token，留空则不启用 |
 | `SLOTSERVE_TELEGRAM_PROXY` | *空* | 连接 Telegram 的 `http://` 或 `socks5://` 代理 |
 | `SLOTSERVE_TELEGRAM_API_BASE` | `https://api.telegram.org` | Telegram Bot API 地址，用于自建的 Bot API 服务 |
+| `SLOTSERVE_CHAT_DEFAULT_LOCALE` | `en` | `en` 或 `zh-CN`：群机器人 Webhook、群聊和尚未绑定的聊天使用的语言 |
+| `SLOTSERVE_FEISHU_ENABLED`、`_APP_ID`、`_APP_SECRET`、`_DOMAIN` | `false`、*空*、*空*、`https://open.feishu.cn` | 飞书 / Lark 机器人（[配置方法](integrations.zh.md#feishu-lark)）；Lark 使用 `https://open.larksuite.com` |
+| `SLOTSERVE_DINGTALK_ENABLED`、`_CLIENT_ID`、`_CLIENT_SECRET`、`_ROBOT_CODE` | `false`、*空* … | 钉钉 Stream 模式机器人；RobotCode 留空即 Client ID |
+| `SLOTSERVE_WECOM_ENABLED`、`_CORP_ID`、`_AGENT_ID`、`_SECRET`、`_TOKEN`、`_AES_KEY` | `false`、*空* … | 企业微信应用；Token 和 AES Key 只在接收命令时需要 |
+| `SLOTSERVE_QQ_ENABLED`、`_APP_ID`、`_APP_SECRET`、`_SANDBOX` | `false`、*空*、*空*、`false` | QQ 官方机器人 |
+| `SLOTSERVE_FEISHU_WEBHOOK_URL`、`_SECRET` | *空* | 飞书 / Lark 群机器人 Webhook 与签名密钥 |
+| `SLOTSERVE_DINGTALK_WEBHOOK_URL`、`_SECRET` | *空* | 钉钉群机器人 Webhook 与加签密钥 |
+| `SLOTSERVE_WECOM_WEBHOOK_URL` | *空* | 企业微信群机器人 Webhook |
+| `SLOTSERVE_GROUP_EVENTS` | `admin_alerts,announcements` | 发到群里的内容：`admin_alerts`、`approvals`、`announcements` |
+| `SLOTSERVE_DINGTALK_API_BASE`、`SLOTSERVE_WECOM_API_BASE`、`SLOTSERVE_QQ_API_BASE`、`SLOTSERVE_QQ_TOKEN_URL` | 官方地址 | API 地址（仅用于代理或测试） |
 | `SLOTSERVE_METRICS_TOKEN` | *空* | `/metrics` 的 Bearer Token，留空则关闭 |
 | `SLOTSERVE_DRAIN_SECONDS` | `30` | 切换模型前等待进行中请求完成的最长时间 |
 | `SLOTSERVE_USAGE_RETENTION_DAYS` | `365` | 逐条请求记录保留天数，之后合并为按天汇总（0 表示永久；否则至少 90） |
@@ -73,7 +83,7 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_DEVENV_SAVED_IMAGES` | `3` | 每人可保存的环境镜像数 |
 | `SLOTSERVE_DEVENV_PULL_MINUTES` | `60` | 预约开始前多久下载镜像 |
 
-除部署相关的几项（`HOST`、`PORT`、`SECRET_KEY`、`COOKIE_SECURE`、`STATIC_DIR`、`DATA_DIR`、`MODELS_DIR`、`LLAMA_SERVER_CMD`、`LLAMA_HOST`、`LLAMA_PORT`、`TELEGRAM_API_BASE`、`DOCKER_HOST`、`DROPBEAR_PATH`，修改需要重启，因此只在 `.env` 中设置）外，其余所有设置都可由管理员在**管理 → 系统设置**中直接修改，无需重启。修改保存在数据库中，优先于 `.env`；点**恢复默认**即可取消覆盖。
+除部署相关的几项（`HOST`、`PORT`、`SECRET_KEY`、`COOKIE_SECURE`、`STATIC_DIR`、`DATA_DIR`、`MODELS_DIR`、`LLAMA_SERVER_CMD`、`LLAMA_HOST`、`LLAMA_PORT`、`TELEGRAM_API_BASE`、各 `…_API_BASE` 与 `QQ_TOKEN_URL` 地址、`DOCKER_HOST`、`DROPBEAR_PATH`，修改需要重启，因此只在 `.env` 中设置）外，其余所有设置都可由管理员在**管理 → 系统设置**中直接修改，无需重启。修改保存在数据库中，优先于 `.env`；点**恢复默认**即可取消覆盖。
 
 ## 每个模型的启动参数
 

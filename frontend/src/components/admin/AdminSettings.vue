@@ -90,7 +90,25 @@ const GROUPS: { id: string; keys: string[] }[] = [
   },
   { id: 'models', keys: ['default_llama_args', 'download_min_free_gb', 'hf_endpoint', 'hf_token'] },
   { id: 'engines', keys: ['vllm_cmd', 'sglang_cmd', 'custom_engine_cmd', 'custom_engine_health'] },
-  { id: 'notify', keys: ['telegram_bot_token', 'telegram_proxy', 'public_url', 'timezone'] },
+  { id: 'notify', keys: ['telegram_bot_token', 'telegram_proxy', 'public_url', 'timezone', 'chat_default_locale'] },
+  { id: 'feishu', keys: ['feishu_enabled', 'feishu_app_id', 'feishu_app_secret', 'feishu_domain'] },
+  { id: 'dingtalk', keys: ['dingtalk_enabled', 'dingtalk_client_id', 'dingtalk_client_secret', 'dingtalk_robot_code'] },
+  {
+    id: 'wecom',
+    keys: ['wecom_enabled', 'wecom_corp_id', 'wecom_agent_id', 'wecom_secret', 'wecom_token', 'wecom_aes_key'],
+  },
+  { id: 'qq', keys: ['qq_enabled', 'qq_app_id', 'qq_app_secret', 'qq_sandbox'] },
+  {
+    id: 'webhooks',
+    keys: [
+      'group_events',
+      'feishu_webhook_url',
+      'feishu_webhook_secret',
+      'dingtalk_webhook_url',
+      'dingtalk_webhook_secret',
+      'wecom_webhook_url',
+    ],
+  },
   { id: 'monitor', keys: ['metrics_token'] },
   { id: 'maintenance', keys: ['usage_retention_days', 'audit_retention_days', 'backup_keep'] },
 ]
@@ -104,6 +122,11 @@ const groups = computed(() => {
   list.push({ id: 'other', items: settings.value.filter((s) => !known.has(s.key)) })
   return list.filter((g) => g.items.length)
 })
+
+// Comma-separated settings edited as a multiple choice.
+const MULTI: Record<string, string[]> = { group_events: ['admin_alerts', 'approvals', 'announcements'] }
+const multiOptions = (key: string) => MULTI[key].map((v) => ({ label: t(`admin.channels.kinds.${v}`), value: v }))
+const splitList = (v: SettingValue) => (typeof v === 'string' && v ? v.split(',').map((x) => x.trim()) : [])
 
 const label = (s: AdminSetting) => (te(`admin.settings.${s.key}`) ? t(`admin.settings.${s.key}`) : s.key)
 const desc = (s: AdminSetting) => (te(`admin.settings.${s.key}_desc`) ? t(`admin.settings.${s.key}_desc`) : '')
@@ -144,7 +167,14 @@ const display = (s: AdminSetting, v: SettingValue) =>
         </div>
       </div>
       <div class="control">
-        <NSwitch v-if="s.kind === 'bool'" v-model:value="draft[s.key] as boolean" />
+        <NSelect
+          v-if="MULTI[s.key]"
+          multiple
+          :value="splitList(draft[s.key])"
+          :options="multiOptions(s.key)"
+          @update:value="(v: string[]) => (draft[s.key] = v.join(','))"
+        />
+        <NSwitch v-else-if="s.kind === 'bool'" v-model:value="draft[s.key] as boolean" />
         <NSelect
           v-else-if="s.choices"
           v-model:value="draft[s.key] as number | string"

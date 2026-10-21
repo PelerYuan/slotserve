@@ -20,6 +20,8 @@ class User(Base):
     telegram_username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     telegram_link_token: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     notify_prefs: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON {kind: bool}
+    # JSON list of chat channels (telegram, feishu, ...) the person switched notifications off for.
+    channels_off: Mapped[str | None] = mapped_column(Text, nullable=True)
     ical_token: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
 
@@ -241,6 +243,26 @@ class OutboxItem(Base):
     payload: Mapped[str] = mapped_column(Text)  # JSON
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     next_attempt_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class ChatLink(Base):
+    """A person's account on a chat platform other than Telegram (Telegram uses the columns on ``users``).
+
+    While ``address`` is empty the row only carries a pending bind ``code``.
+    """
+
+    __tablename__ = "chat_links"
+    __table_args__ = (UniqueConstraint("user_id", "channel"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    channel: Mapped[str] = mapped_column(String(16), index=True)  # feishu | dingtalk | wecom | qq
+    address: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)  # platform user id
+    display_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    code: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
+    code_expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    linked_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 

@@ -27,7 +27,7 @@ A lab or small team often shares a single big GPU. Without coordination people s
 | Flexible bookings | Whole-GPU slots, argument presets, weekly repeats, extensions, waitlist, quotas |
 | Dev environments | Book GPU time as a Docker container you SSH into: PyTorch, TensorFlow, CUDA or your own image; save it as an image for next time |
 | Multiple GPUs & engines | Lanes of GPUs booked independently; llama.cpp, vLLM, SGLang or custom servers; optional approval mode |
-| Integrations | Telegram notifications and bot, calendar feeds, CSV export, Prometheus metrics |
+| Integrations | Notifications and a booking bot on Telegram, Feishu / Lark, DingTalk, WeCom and QQ, group webhooks, calendar feeds, CSV export, Prometheus metrics |
 | GPU status | Memory, utilization, temperature and power from `nvidia-smi` |
 | Bilingual UI | English and Simplified Chinese |
 | Simple deployment | One container, SQLite, three bind mounts |

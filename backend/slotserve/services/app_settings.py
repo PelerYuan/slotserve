@@ -70,6 +70,31 @@ EDITABLE: dict[str, Editable] = {
     "public_url": Editable(str, max=300),
     "telegram_bot_token": Editable(str, max=200, secret=True),
     "telegram_proxy": Editable(str, max=300),
+    "chat_default_locale": Editable(str, choices=("en", "zh-CN")),
+    "feishu_enabled": Editable(bool),
+    "feishu_app_id": Editable(str, max=100),
+    "feishu_app_secret": Editable(str, max=200, secret=True),
+    "feishu_domain": Editable(str, min=1, max=200),
+    "dingtalk_enabled": Editable(bool),
+    "dingtalk_client_id": Editable(str, max=100),
+    "dingtalk_client_secret": Editable(str, max=200, secret=True),
+    "dingtalk_robot_code": Editable(str, max=100),
+    "wecom_enabled": Editable(bool),
+    "wecom_corp_id": Editable(str, max=100),
+    "wecom_agent_id": Editable(str, max=32),
+    "wecom_secret": Editable(str, max=200, secret=True),
+    "wecom_token": Editable(str, max=100, secret=True),
+    "wecom_aes_key": Editable(str, max=64, secret=True),
+    "qq_enabled": Editable(bool),
+    "qq_app_id": Editable(str, max=100),
+    "qq_app_secret": Editable(str, max=200, secret=True),
+    "qq_sandbox": Editable(bool),
+    "feishu_webhook_url": Editable(str, max=500, secret=True),
+    "feishu_webhook_secret": Editable(str, max=200, secret=True),
+    "dingtalk_webhook_url": Editable(str, max=500, secret=True),
+    "dingtalk_webhook_secret": Editable(str, max=200, secret=True),
+    "wecom_webhook_url": Editable(str, max=500, secret=True),
+    "group_events": Editable(str, max=200),
     "hf_endpoint": Editable(str, min=1, max=300),
     "hf_token": Editable(str, max=200, secret=True),
     "metrics_token": Editable(str, max=200, secret=True),
@@ -81,6 +106,9 @@ EDITABLE: dict[str, Editable] = {
 
 # Changing one of these restarts the Telegram bot.
 TELEGRAM_KEYS = {"telegram_bot_token", "telegram_proxy"}
+# Changing a key that starts with "<channel>_" restarts that chat channel.
+CHAT_CHANNELS = ("feishu", "dingtalk", "wecom", "qq")
+GROUP_EVENT_KINDS = ("admin_alerts", "approvals", "announcements")
 
 
 class InvalidSetting(ValueError):
@@ -136,6 +164,20 @@ def validate(key: str, value: Any) -> Any:
             ZoneInfo(value)
         except (ZoneInfoNotFoundError, ValueError) as exc:
             raise InvalidSetting(key, "unknown time zone") from exc
+    elif key == "group_events":
+        kinds = [k.strip() for k in value.split(",") if k.strip()]
+        if unknown := [k for k in kinds if k not in GROUP_EVENT_KINDS]:
+            raise InvalidSetting(key, "unknown kind " + ", ".join(unknown))
+        value = ",".join(dict.fromkeys(kinds))
+    elif key.endswith("_webhook_url") and value:
+        if not value.lower().startswith("https://"):
+            raise InvalidSetting(key, "expected an https:// URL")
+    elif key == "feishu_domain":
+        if not value.lower().startswith(("http://", "https://")):
+            raise InvalidSetting(key, "expected a URL")
+        value = value.rstrip("/")
+    elif key == "wecom_aes_key" and value and len(value) != 43:
+        raise InvalidSetting(key, "must be 43 characters")
     elif key in ("public_url", "hf_endpoint", "telegram_proxy") and value:
         if not value.lower().startswith(("http://", "https://", "socks5://", "socks5h://")):
             raise InvalidSetting(key, "expected a URL")

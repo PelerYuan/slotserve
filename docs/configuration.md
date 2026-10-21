@@ -58,6 +58,16 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | `SLOTSERVE_TELEGRAM_BOT_TOKEN` | *empty* | Telegram bot token; empty disables the bot |
 | `SLOTSERVE_TELEGRAM_PROXY` | *empty* | `http://` or `socks5://` proxy for Telegram |
 | `SLOTSERVE_TELEGRAM_API_BASE` | `https://api.telegram.org` | Telegram Bot API address, for a self-hosted Bot API server |
+| `SLOTSERVE_CHAT_DEFAULT_LOCALE` | `en` | `en` or `zh-CN`: language of group webhooks, group chats and chats not linked yet |
+| `SLOTSERVE_FEISHU_ENABLED`, `_APP_ID`, `_APP_SECRET`, `_DOMAIN` | `false`, *empty*, *empty*, `https://open.feishu.cn` | Feishu / Lark bot ([setup](integrations.md#feishu-lark)); Lark uses `https://open.larksuite.com` |
+| `SLOTSERVE_DINGTALK_ENABLED`, `_CLIENT_ID`, `_CLIENT_SECRET`, `_ROBOT_CODE` | `false`, *empty* … | DingTalk bot in Stream mode; robot code empty = client id |
+| `SLOTSERVE_WECOM_ENABLED`, `_CORP_ID`, `_AGENT_ID`, `_SECRET`, `_TOKEN`, `_AES_KEY` | `false`, *empty* … | WeCom app; token and AES key only for receiving commands |
+| `SLOTSERVE_QQ_ENABLED`, `_APP_ID`, `_APP_SECRET`, `_SANDBOX` | `false`, *empty*, *empty*, `false` | QQ official bot |
+| `SLOTSERVE_FEISHU_WEBHOOK_URL`, `_SECRET` | *empty* | Feishu / Lark group robot webhook and signing secret |
+| `SLOTSERVE_DINGTALK_WEBHOOK_URL`, `_SECRET` | *empty* | DingTalk group robot webhook and signing secret |
+| `SLOTSERVE_WECOM_WEBHOOK_URL` | *empty* | WeCom group robot webhook |
+| `SLOTSERVE_GROUP_EVENTS` | `admin_alerts,announcements` | What group webhooks receive: `admin_alerts`, `approvals`, `announcements` |
+| `SLOTSERVE_DINGTALK_API_BASE`, `SLOTSERVE_WECOM_API_BASE`, `SLOTSERVE_QQ_API_BASE`, `SLOTSERVE_QQ_TOKEN_URL` | official addresses | API addresses (only for proxies or testing) |
 | `SLOTSERVE_METRICS_TOKEN` | *empty* | Bearer token for `/metrics`; empty disables it |
 | `SLOTSERVE_DRAIN_SECONDS` | `30` | Before a model switch, wait this long for running requests to finish |
 | `SLOTSERVE_USAGE_RETENTION_DAYS` | `365` | Keep per-request rows this long, then fold them into daily totals (0 = forever; otherwise ≥ 90) |
@@ -73,7 +83,7 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | `SLOTSERVE_DEVENV_SAVED_IMAGES` | `3` | Saved environment images per person |
 | `SLOTSERVE_DEVENV_PULL_MINUTES` | `60` | Download the image this long before a booking |
 
-Admins can change every setting in **Admin → System settings** without a restart, except the deployment ones (`HOST`, `PORT`, `SECRET_KEY`, `COOKIE_SECURE`, `STATIC_DIR`, `DATA_DIR`, `MODELS_DIR`, `LLAMA_SERVER_CMD`, `LLAMA_HOST`, `LLAMA_PORT`, `TELEGRAM_API_BASE`, `DOCKER_HOST`, `DROPBEAR_PATH`), which need a restart and therefore stay in `.env`. Overrides live in the database and win over `.env`; **Use default** removes an override.
+Admins can change every setting in **Admin → System settings** without a restart, except the deployment ones (`HOST`, `PORT`, `SECRET_KEY`, `COOKIE_SECURE`, `STATIC_DIR`, `DATA_DIR`, `MODELS_DIR`, `LLAMA_SERVER_CMD`, `LLAMA_HOST`, `LLAMA_PORT`, `TELEGRAM_API_BASE`, the `…_API_BASE` and `QQ_TOKEN_URL` addresses, `DOCKER_HOST`, `DROPBEAR_PATH`), which need a restart and therefore stay in `.env`. Overrides live in the database and win over `.env`; **Use default** removes an override.
 
 ## Per-model launch arguments
 

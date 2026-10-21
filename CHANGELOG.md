@@ -7,6 +7,13 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 
 - **Dev environments**: a booking can be a Docker container with the lane's GPUs and SSH (a bundled static Dropbear, public-key login only, a port from a configurable range), a persistent `/workspace` volume and the models read-only. Built-in PyTorch, Jupyter + PyTorch, TensorFlow and CUDA templates, custom templates from any image, and saving a running environment as an image. Images are pulled ahead of time; failures, logs and every environment are visible on the page. Off by default; needs the Docker socket (or Podman's Docker-compatible API).
+- **More chat platforms**: besides Telegram, the bot runs on Feishu / Lark (self-built app, long connection, interactive cards), DingTalk (internal app robot, Stream mode), WeCom (self-built app; sending via the API, commands through a signed and encrypted callback URL) and QQ (official bot, WebSocket gateway, private chats and @mentions in groups). Every platform has the same commands and booking flow; platforms without buttons get numbered choices (on DingTalk, links that send the number). Commands also work without the `/` and in Chinese.
+- People link each platform in **Settings → Chat notifications** with a one-time bind code (Telegram keeps its deep link), can pause each platform, and get every notification on every platform they linked; which notifications they get is still chosen once.
+- **Group webhooks** for Feishu / Lark (optional signature), DingTalk (signed) and WeCom: admins choose whether groups get admin alerts, approval requests and announcements, and can post announcements and send tests from **Admin → Chat channels**, which also shows whether each bot is connected, its errors, how many people linked it and the WeCom callback URL.
+
+### Changed
+
+- Notifications and the booking bot no longer depend on Telegram: commands and buttons are handled once for all platforms. Undelivered messages are retried per platform.
 
 ## [0.8.0] - 2026-10-21
 

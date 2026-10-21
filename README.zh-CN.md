@@ -39,7 +39,7 @@ SlotServe 把 GPU 服务器变成实验室或小团队可预约的共享服务�
 - **多 GPU 与多后端**：把 GPU 划分成可独立预约的通道；用 llama.cpp、vLLM、SGLang 或任意 OpenAI 兼容服务提供模型。
 - **审批模式**：需要时由管理员审批长预约。
 - **灵活预约**：可整卡预约用于训练，支持参数预设、每周重复、延长、候补和每人配额。
-- **Telegram 通知**：预约提醒、一键延长；另有**日历订阅**、**CSV 导出**和 **Prometheus 指标**。
+- **聊天通知与预约机器人**：支持 Telegram、飞书 / Lark、钉钉、企业微信和 QQ，预约提醒、一键延长；另有群机器人、**日历订阅**、**CSV 导出**和 **Prometheus 指标**。
 - **GPU 状态**：实时显存、利用率、温度和功耗。
 - **中英双语界面**，浅色简洁风格，手机也能用。
 - **单容器部署**：SQLite、三个目录挂载，无需其他服务。
@@ -124,7 +124,7 @@ flowchart LR
 | [快速开始](https://peleryuan.github.io/slotserve/zh/getting-started/) | 编译 llama.cpp、配置、部署、不用 Docker 运行 |
 | [配置参考](https://peleryuan.github.io/slotserve/zh/configuration/) | 全部环境变量、每个模型的启动参数、管理员命令行 |
 | [使用指南](https://peleryuan.github.io/slotserve/zh/user-guide/) | 预约、模型、下载、密钥、用量、管理 |
-| [通知与集成](https://peleryuan.github.io/slotserve/zh/integrations/) | Telegram、日历订阅、CSV 导出、Prometheus |
+| [通知与集成](https://peleryuan.github.io/slotserve/zh/integrations/) | Telegram、飞书 / Lark、钉钉、企业微信、QQ、群机器人、日历订阅、CSV 导出、Prometheus |
 | [多 GPU 与推理后端](https://peleryuan.github.io/slotserve/zh/gpus-and-engines/) | 多 GPU、vLLM / SGLang / 自定义服务、审批模式 |
 | [开发环境](https://peleryuan.github.io/slotserve/zh/dev-environments/) | 带 SSH 的 Docker 容器、模板、保存镜像 |
 | [接口](https://peleryuan.github.io/slotserve/zh/api/) | 接口列表、`model` 字段、错误码 |

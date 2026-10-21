@@ -400,6 +400,61 @@ export interface TelegramInfo {
   notify_prefs: NotifyPrefs
 }
 
+export interface ChatChannel {
+  id: string
+  label: string
+  linked: boolean
+  account: string | null
+  bot_name: string | null
+  notify: boolean
+  link_kind: 'url' | 'code'
+  receives: boolean
+}
+
+export interface ChatChannels {
+  channels: ChatChannel[]
+  notify_prefs: NotifyPrefs
+}
+
+export interface ChannelLink {
+  channel: ChatChannel
+  code: string | null
+  expires_at: string | null
+  link_url: string | null
+}
+
+export interface AdminChannelStatus {
+  id: string
+  label: string
+  switched_on: boolean
+  configured: boolean
+  enabled: boolean
+  connected: boolean
+  error: string | null
+  bot_name: string | null
+  receive_mode: string
+  last_event_at: string | null
+  linked_count: number
+  callback_url?: string
+  receives?: boolean
+}
+
+export interface AdminWebhookStatus {
+  id: string
+  label: string
+  configured: boolean
+  signed: boolean
+  last_ok_at: string | null
+  error: string | null
+}
+
+export interface AdminChannels {
+  channels: AdminChannelStatus[]
+  webhooks: AdminWebhookStatus[]
+  group_events: string[]
+  group_event_kinds: string[]
+}
+
 export interface CalendarLinks {
   mine_url: string
   all_url: string

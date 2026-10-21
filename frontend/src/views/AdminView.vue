@@ -12,12 +12,13 @@ import AdminAudit from '@/components/admin/AdminAudit.vue'
 import AdminRequests from '@/components/admin/AdminRequests.vue'
 import AdminLanes from '@/components/admin/AdminLanes.vue'
 import AdminRuntime from '@/components/admin/AdminRuntime.vue'
+import AdminChannels from '@/components/admin/AdminChannels.vue'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
-const TABS = ['overview', 'runtime', 'lanes', 'users', 'reservations', 'requests', 'keys', 'settings', 'audit'] as const
+const TABS = ['overview', 'runtime', 'lanes', 'users', 'reservations', 'requests', 'keys', 'channels', 'settings', 'audit'] as const
 type Tab = (typeof TABS)[number]
 
 const tab = computed<Tab>({
@@ -44,6 +45,7 @@ const tab = computed<Tab>({
         <AdminReservations v-else-if="name === 'reservations'" />
         <AdminRequests v-else-if="name === 'requests'" />
         <AdminKeys v-else-if="name === 'keys'" />
+        <AdminChannels v-else-if="name === 'channels'" @navigate="(v: Tab) => (tab = v)" />
         <AdminSettings v-else-if="name === 'settings'" />
         <AdminAudit v-else />
       </NTabPane>

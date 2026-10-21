@@ -14,6 +14,7 @@ from .api import (
     admin,
     auth,
     calendar,
+    channels,
     devenv,
     downloads,
     keys,
@@ -31,12 +32,12 @@ from .config import Settings, get_settings
 from .gateway import proxy
 from .runtime.lanes import LaneManager, ensure_default_lane
 from .services import app_settings
+from .services.chat.hub import ChannelHub
 from .services.devenv import DevEnvManager, seed_templates
 from .services.downloader import Downloader
 from .services.housekeeper import Housekeeper
 from .services.notify import Notifier
 from .services.ratelimit import AttemptLimiter
-from .services.telegram import TelegramBot
 
 log = logging.getLogger("slotserve")
 PACKAGE_STATIC = Path(__file__).parent / "static"
@@ -78,8 +79,11 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         async with db.SessionLocal() as session:
             await seed_templates(session)
         app.state.devenv = DevEnvManager(app.state, docker=getattr(app.state, "docker_client", None))
-        app.state.telegram = TelegramBot(app, transport=getattr(app.state, "telegram_transport", None))
-        app.state.notifier.bot = app.state.telegram
+        transports = dict(getattr(app.state, "chat_transports", None) or {})
+        transports.setdefault("telegram", getattr(app.state, "telegram_transport", None))
+        app.state.channels = ChannelHub(app, transports)
+        app.state.telegram = app.state.channels.telegram
+        app.state.notifier.hub = app.state.channels
         if restored := await app.state.notifier.restore_pending():
             log.info("re-queued %s notification(s) saved at the last shutdown", restored)
         tasks = []
@@ -88,7 +92,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
                 asyncio.create_task(app.state.downloader.run(), name="downloader"),
                 asyncio.create_task(app.state.notifier.run(), name="notifier"),
                 asyncio.create_task(app.state.housekeeper.run(), name="housekeeper"),
-                asyncio.create_task(app.state.telegram.run(), name="telegram"),
+                *(asyncio.create_task(c.run(), name=f"chat-{c.id}") for c in app.state.channels),
                 asyncio.create_task(app.state.devenv.run(), name="devenv"),
             ]
         try:
@@ -101,7 +105,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
                     await t
             await app.state.notifier.save_pending()
             await app.state.lanes.shutdown()
-            await app.state.telegram.close()
+            await app.state.channels.close()
             await app.state.devenv.close()
             await app.state.http.aclose()
             await db.dispose()
@@ -134,6 +138,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         usage,
         admin,
         calendar,
+        channels,
         metrics,
         lanes,
         runtime_admin,
