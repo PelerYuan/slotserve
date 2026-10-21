@@ -559,6 +559,39 @@ class Node(Base):
     # JSON: hostname, os, gpus, cpu_cores, memory_total_mb, models_dir, engines ...
     inventory: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)  # e.g. a protocol version mismatch
+    # Personal computers (services/sharing.py): the person whose machine this is, and when they share it.
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    # JSON list of weekly windows [{"days": [0..6] (Monday = 0), "start": "23:00", "end": "09:00"}] in the
+    # server's time zone; an end before the start runs into the next day. NULL = always shared.
+    sharing_schedule: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # "I'm using my PC": sharing is paused from this moment (running work is stopped after the grace period)
+    # until ``sharing_paused_until`` (NULL = until resumed).
+    sharing_paused_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    sharing_paused_until: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    sharing_paused_by: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Wake-on-LAN: MAC addresses entered by hand (comma separated), besides those the agent reports.
+    mac_addresses: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Label of the local network the machine is in; machines with the same label (or subnet) wake each other.
+    network: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    woken_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)  # last magic packet sent
+
+
+class NodeShareDaily(Base):
+    """How long an owned machine was online and shared, per UTC day (contribution statistics).
+
+    ``gpu_shared_seconds`` counts the GPUs of the machine's lanes; use by others comes from ``usage_samples``.
+    """
+
+    __tablename__ = "node_share_daily"
+    __table_args__ = (UniqueConstraint("node_id", "day", "owner_id", name="uq_node_share_daily"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    node_id: Mapped[int] = mapped_column(ForeignKey("nodes.id", ondelete="CASCADE"), index=True)
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    day: Mapped[str] = mapped_column(String(10))  # YYYY-MM-DD (UTC)
+    online_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    shared_seconds: Mapped[int] = mapped_column(Integer, default=0)  # online and shared
+    gpu_shared_seconds: Mapped[int] = mapped_column(Integer, default=0)  # shared seconds x GPUs of its lanes
 
 
 class NodeModel(Base):

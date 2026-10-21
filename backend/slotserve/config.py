@@ -177,6 +177,20 @@ class Settings(BaseSettings):
     agent_address: str = ""
     # Interface the node's model servers listen on (the control plane forwards requests to them).
     agent_model_host: str = "0.0.0.0"
+    # Wake-on-LAN: the MAC address(es) of this machine's network card (comma separated). Inside a container the
+    # agent only sees virtual cards, so the install scripts pass the host's MAC here.
+    agent_wol_mac: str = ""
+    # A label for the local network this machine is in (machines with the same label wake each other).
+    agent_network: str = ""
+    # The host's operating system when the agent cannot see it (the install scripts set "windows" / "macos").
+    agent_host_os: str = ""
+
+    # Personal computers (see docs "Add a personal computer"): owners share their machine on a schedule.
+    # Running work on a machine whose owner pauses sharing is warned, then stopped after this many minutes.
+    sharing_grace_minutes: int = 10
+    # Wake a sleeping machine this many minutes before a booking on it starts (0 = never wake automatically).
+    wol_lead_minutes: int = 5
+    wol_port: int = 9  # UDP port of the magic packet (7 or 9)
 
     @property
     def database_url(self) -> str:

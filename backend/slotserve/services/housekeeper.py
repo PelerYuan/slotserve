@@ -194,6 +194,13 @@ async def _process_waitlist(db: AsyncSession, settings: Settings, notifier, now:
             try:
                 await booking.resolve_model(db, e.model_id, e.preset_id)
                 await booking.check_quota(db, settings, user, [(start, e.end_at)])
+                if e.lane_id is not None:
+                    from ..orm import Lane
+                    from . import sharing
+
+                    lane = await db.get(Lane, e.lane_id)
+                    if lane is not None:
+                        await sharing.check_booking(db, settings, lane, [(start, e.end_at)], user.id)
             except ApiError:
                 e.status, e.resolved_at = "notified", now
                 notifier.emit("waitlist_free", user_id=e.user_id, when=_window(notifier, start, e.end_at))
