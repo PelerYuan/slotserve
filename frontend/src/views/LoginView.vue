@@ -62,7 +62,7 @@ function setMode(m: 'login' | 'register') {
         <span class="blob b3" />
       </div>
       <div class="dots" aria-hidden="true" />
-      <BrandMark class="rise" />
+      <div class="hero-brand"><BrandMark class="rise" /></div>
       <div class="hero-body">
         <h2 class="rise" style="--d: 0.05s">{{ t('app.tagline') }}</h2>
         <p class="rise" style="--d: 0.1s">{{ t('auth.subtitle') }}</p>
@@ -169,7 +169,7 @@ function setMode(m: 'login' | 'register') {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 40px 56px;
+  padding: 40px clamp(56px, 6vw, 128px) 40px 56px;
   background: var(--hero-bg);
   border-right: 1px solid var(--border);
   isolation: isolate;
@@ -220,8 +220,16 @@ function setMode(m: 'login' | 'register') {
   mask-image: radial-gradient(ellipse 70% 60% at 40% 40%, #000 20%, transparent 75%);
   -webkit-mask-image: radial-gradient(ellipse 70% 60% at 40% 40%, #000 20%, transparent 75%);
 }
+/* The logo lines up with the hero text instead of sitting in the far corner. */
+.hero-brand {
+  width: 100%;
+  max-width: 480px;
+  margin-left: auto;
+}
+/* On wide screens both columns keep their content next to the divider, so the page reads as one block. */
 .hero-body {
-  margin: auto 0;
+  margin: auto 0 auto auto;
+  width: 100%;
   max-width: 480px;
   padding: 32px 0 8px;
 }
@@ -272,8 +280,8 @@ function setMode(m: 'login' | 'register') {
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 48px 24px;
+  justify-content: flex-start;
+  padding: 48px 24px 48px clamp(48px, 6vw, 128px);
 }
 .lang {
   position: absolute;
@@ -481,7 +489,20 @@ h1 {
   }
 }
 
+@media (min-width: 1700px) {
+  .hero-body,
+  .hero-brand {
+    max-width: 540px;
+  }
+  .hero h2 {
+    font-size: 42px;
+  }
+}
 @media (max-width: 900px) {
+  .panel {
+    justify-content: center;
+    padding: 48px 24px;
+  }
   .auth {
     grid-template-columns: 1fr;
   }
