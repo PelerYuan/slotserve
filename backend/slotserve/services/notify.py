@@ -50,14 +50,20 @@ EVENT_PREF = {
     "fallback_admin": "admin_alerts",
     "user_registered": "admin_alerts",
     "disk_low": "admin_alerts",
+    # storage hook (services/storage.py)
+    "storage_quota": "downloads",
+    "storage_quota_admin": "admin_alerts",
+    "storage_down": "admin_alerts",
 }
 
-ADMIN_EVENTS = {"load_failed", "user_registered", "disk_low"}
+ADMIN_EVENTS = {"load_failed", "user_registered", "disk_low", "storage_quota_admin", "storage_down"}
 # Events that can also go to group webhooks, by the kind admins switch on (setting group_events).
 GROUP_KIND = {
     "load_failed": "admin_alerts",
     "user_registered": "admin_alerts",
     "disk_low": "admin_alerts",
+    "storage_quota_admin": "admin_alerts",
+    "storage_down": "admin_alerts",
     "fallback_admin": "admin_alerts",
     "approval_requested": "approvals",
     "announcement": "announcements",
@@ -87,6 +93,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "load_failed": "🔥 {model} failed to load: {error}",
         "user_registered": "👤 New account: {username}.",
         "disk_low": "💾 Low disk space in the models folder: {free} GB free.",
+        "storage_quota": "💾 Your folder on {storage} uses {used}, more than the {quota} it should. Please tidy up.",
+        "storage_quota_admin": "💾 {user} uses {used} on {storage} (soft limit {quota}).",
+        "storage_down": "🔌 Storage {storage} cannot be used: {error}",
         "exclusive": "whole GPU (no model)",
         "extend30": "+30 min",
         "extend60": "+1 hour",
@@ -123,6 +132,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "load_failed": "🔥 {model} 加载失败：{error}",
         "user_registered": "👤 新用户注册：{username}。",
         "disk_low": "💾 模型目录磁盘空间不足：剩余 {free} GB。",
+        "storage_quota": "💾 你在 {storage} 上的个人空间已用 {used}，超过了建议上限 {quota}，请清理。",
+        "storage_quota_admin": "💾 {user} 在 {storage} 上已用 {used}（软上限 {quota}）。",
+        "storage_down": "🔌 存储 {storage} 无法使用：{error}",
         "exclusive": "整卡（不加载模型）",
         "extend30": "延长 30 分钟",
         "extend60": "延长 1 小时",

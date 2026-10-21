@@ -1,4 +1,5 @@
 import type en from './en'
+import { storageZh } from './storage' // storage hook
 
 const zh: typeof en = {
   app: {
@@ -648,6 +649,7 @@ const zh: typeof en = {
     tabs: {
       runtime: '运行监控',
       lanes: 'GPU 与通道',
+      storage: '存储',
       requests: '请求',
       overview: '概览',
       users: '用户',
@@ -867,7 +869,7 @@ const zh: typeof en = {
       devenv_password_login: '密码登录',
       devenv_password_login_desc: '除 SSH 公钥外，也允许用环境密码登录开发环境。',
       devenv_storage_dir: '存储目录',
-      devenv_storage_dir_desc: 'Docker 主机上存放持久数据的目录（绑定挂载）。留空则使用 Docker 命名卷。',
+      devenv_storage_dir_desc: 'Docker 主机上存放持久数据的目录（绑定挂载）。留空则使用 Docker 命名卷。管理 → 存储中的个人空间和项目数据存储优先。',
       devenv_projects: '每人可保留的环境数',
       devenv_projects_desc: '每人最多可保留多少个环境（在预约之间暂停）。0 表示不允许保留。',
       devenv_project_days: '自动删除闲置的保留环境',
@@ -1024,7 +1026,9 @@ const zh: typeof en = {
     expired: '已过期',
     cancelled: '已取消',
   },
+  storage: storageZh.storage, // storage hook
   errors: {
+    ...storageZh.errors, // storage hook
     devenv_disabled: '开发环境功能已关闭。',
     ssh_key_required: '请先在「访问凭据」页面添加 SSH 公钥。',
     ssh_login_required: '请先在「访问凭据」页面添加 SSH 公钥或设置环境密码。',

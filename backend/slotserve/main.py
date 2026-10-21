@@ -26,6 +26,7 @@ from .api import (
     reservations,
     runtime_admin,
     status,
+    storage,
     usage,
     waitlist,
 )
@@ -39,6 +40,7 @@ from .services.downloader import Downloader
 from .services.housekeeper import Housekeeper
 from .services.notify import Notifier
 from .services.ratelimit import AttemptLimiter
+from .services.storage import StorageService
 from .services.usage_sampler import UsageSampler
 
 log = logging.getLogger("slotserve")
@@ -85,6 +87,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
             await seed_templates(session)
         app.state.devenv = DevEnvManager(app.state, docker=getattr(app.state, "docker_client", None))
         app.state.lanes.gpu_holder = app.state.devenv.holds_gpu
+        app.state.storage = StorageService(app.state)  # storage hook: Admin -> Storage checks
         transports = dict(getattr(app.state, "chat_transports", None) or {})
         transports.setdefault("telegram", getattr(app.state, "telegram_transport", None))
         app.state.channels = ChannelHub(app, transports)
@@ -101,6 +104,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
                 *(asyncio.create_task(c.run(), name=f"chat-{c.id}") for c in app.state.channels),
                 asyncio.create_task(app.state.devenv.run(), name="devenv"),
                 asyncio.create_task(app.state.usage_sampler.run(), name="usage-sampler"),
+                asyncio.create_task(app.state.storage.run(), name="storage"),  # storage hook
             ]
         try:
             yield
@@ -153,6 +157,8 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
     ):
         app.include_router(module.router)
     app.include_router(devenv.keys_router)
+    app.include_router(storage.router)  # storage hook
+    app.include_router(storage.user_router)
     app.include_router(proxy.router)
     app.include_router(devenv_web.router)
 

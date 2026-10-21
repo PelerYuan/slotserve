@@ -86,6 +86,8 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | `SLOTSERVE_DEVENV_PULL_MINUTES` | `60` | Download the image this long before a booking |
 | `SLOTSERVE_DEVENV_PASSWORD_LOGIN` | `true` | Allow SSH logins with the environment password as well as keys |
 | `SLOTSERVE_DEVENV_STORAGE_DIR` | *empty* | Directory on the Docker host for persistent data (bind mounts); empty = Docker named volumes |
+| `SLOTSERVE_STORAGE_HELPER_IMAGE` | `busybox:1.37` | Image of the short-lived containers that check storages from **Admin → Storage** (pulled when missing) |
+| `SLOTSERVE_STORAGE_CHECK_MINUTES` | `30` | How often storages are checked (free space, per-person usage); 0 = only on demand |
 | `SLOTSERVE_DEVENV_PROJECTS` | `3` | Kept (paused) environments per person; 0 = none |
 | `SLOTSERVE_DEVENV_PROJECT_DAYS` | `0` | Remove kept environments unused this many days (0 = never) |
 

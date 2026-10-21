@@ -55,7 +55,7 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn
 }
 
-async function request<T>(method: string, path: string, body?: unknown, query?: Record<string, unknown>): Promise<T> {
+export async function request<T>(method: string, path: string, body?: unknown, query?: Record<string, unknown>): Promise<T> {
   let url = path
   if (query) {
     const qs = new URLSearchParams()

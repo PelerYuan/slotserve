@@ -86,6 +86,8 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_DEVENV_PULL_MINUTES` | `60` | 预约开始前多久下载镜像 |
 | `SLOTSERVE_DEVENV_PASSWORD_LOGIN` | `true` | 除公钥外也允许用环境密码 SSH 登录 |
 | `SLOTSERVE_DEVENV_STORAGE_DIR` | *空* | Docker 主机上存放持久数据的目录（绑定挂载）；留空则使用 Docker 命名卷 |
+| `SLOTSERVE_STORAGE_HELPER_IMAGE` | `busybox:1.37` | 检查**管理 → 存储**中各存储的临时容器所用的镜像（缺少时自动拉取） |
+| `SLOTSERVE_STORAGE_CHECK_MINUTES` | `30` | 多久检查一次存储（可用空间、每人用量）；0 表示只在手动检查时 |
 | `SLOTSERVE_DEVENV_PROJECTS` | `3` | 每人可保留（暂停）的环境数；0 表示不允许 |
 | `SLOTSERVE_DEVENV_PROJECT_DAYS` | `0` | 自动删除闲置这么多天的保留环境（0 表示从不） |
 

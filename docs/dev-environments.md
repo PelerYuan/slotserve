@@ -145,6 +145,8 @@ Accounts are created when the container starts and refreshed when someone change
 
 ## Storage
 
+Admins can add host directories, NFS exports and SMB shares in **Admin → Storage** for shared data, personal spaces (`/workspace`), project data and model libraries; see [Storage](storage.md). What follows is what happens without them.
+
 By default persistent data lives in Docker named volumes: `slotserve-workspace-u<user id>` for `/workspace`, `slotserve-project<id>-<path>` for a kept environment's directories, `slotserve-u<user>-t<template>-<path>` for a template's kept directories and `slotserve-idle-home-l<lane>` for the homes of a lane's shared environment.
 
 With **Storage directory** set to a directory on the Docker host (for example `/srv/slotserve`), bind mounts are used instead:
