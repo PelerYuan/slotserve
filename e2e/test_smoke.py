@@ -257,6 +257,41 @@ def test_nodes_page_and_agent(page: Page, server: str, tmp_path):
     assert not page.errors  # type: ignore[attr-defined]
 
 
+def test_personal_computer_owner_controls(page: Page, server: str):
+    """A personal computer: one-line installers with the token, then its owner sets sharing hours and pauses."""
+    sign_in(page, server, "admin")
+    page.goto(f"{server}/admin?tab=nodes")
+    page.locator("[data-action=add-node]").click()
+    dialog = page.get_by_role("dialog")
+    dialog.locator("[data-field=node-name] input").fill("e2e-pc")
+    dialog.get_by_role("button", name="Create and show token").click()
+    dialog = page.get_by_role("dialog")
+    expect(dialog.get_by_text("/install/node.sh?token=ssn-").first).to_be_visible()
+    expect(dialog.get_by_text("/install/node.ps1?token=ssn-").first).to_be_visible()
+    dialog.get_by_role("button", name="Done").click()
+
+    me = _api(page, server, "GET", "/api/auth/me")
+    node_id = next(n["id"] for n in _api(page, server, "GET", "/api/admin/nodes") if n["name"] == "e2e-pc")
+    _api(page, server, "PATCH", f"/api/admin/nodes/{node_id}", {"owner_id": me["id"]})
+    page.goto(f"{server}/my-machines")
+    panel = page.locator("[data-sharing-node=e2e-pc]")
+    expect(panel).to_be_visible()
+    panel.locator("[data-action=schedule-mode]").click()
+    panel.locator("[data-action=preset-nights]").click()
+    panel.locator("[data-action=save-sharing]").click()
+    expect(page.get_by_text("Sharing hours saved.")).to_be_visible()
+    panel.locator("[data-action=pause-sharing]").click()
+    page.get_by_text("Until I resume").click()
+    expect(panel.locator("[data-field=sharing-status]")).to_have_text("Paused until you resume")
+    panel.locator("[data-action=resume-sharing]").click()
+    expect(page.get_by_text("Sharing resumed.")).to_be_visible()
+    node = next(n for n in _api(page, server, "GET", "/api/admin/nodes") if n["name"] == "e2e-pc")
+    assert node["owner_id"] == me["id"] and len(node["sharing_schedule"]) == 2 and not node["sharing_paused"]
+    _api(page, server, "POST", f"/api/admin/nodes/{node_id}/revoke")
+    _api(page, server, "DELETE", f"/api/admin/nodes/{node_id}")
+    assert not page.errors  # type: ignore[attr-defined]
+
+
 def test_storage_tab(page: Page, server: str):
     """Admin -> Storage: add a host directory, see its check result, remove it."""
     sign_in(page, server, "admin")
