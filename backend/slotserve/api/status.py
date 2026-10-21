@@ -10,9 +10,10 @@ from ..errors import ApiError
 from ..orm import DevSession, DevTemplate, Lane, LlmModel, ModelPreset, Reservation, User
 from ..runtime.gpu import gpu_stats
 from ..runtime.lanes import LaneManager
-from ..schemas import ConfigOut, LaneStatusOut, ManualOut, RuntimeOut, StatusOut
+from ..schemas import ConfigOut, GpuOut, LaneStatusOut, ManualOut, RuntimeOut, StatusOut
 from ..services import queries
 from ..services.audit import record
+from .lanes import node_view
 
 router = APIRouter(prefix="/api", tags=["status"])
 
@@ -107,6 +108,7 @@ async def get_status(
                 shared_state=shared_state,
             )
         )
+        lane_out[-1].node_id, lane_out[-1].node_name, lane_out[-1].node_online = node_view(lanes, ctx.node_id)
     first = lane_out[0]
     upcoming = (
         (
@@ -131,8 +133,18 @@ async def get_status(
         upcoming=await queries.reservation_out(db, list(upcoming), now),
         free_access=first.active_reservation is None,
         default_model=first.default_model,
-        gpus=await gpu_stats(),
+        gpus=await all_gpus(lanes),
     )
+
+
+async def all_gpus(lanes: LaneManager) -> list[GpuOut]:
+    """This machine's GPUs, then those of connected nodes (tagged with their node id)."""
+    local = lanes.nodes.local.node_id
+    gpus = [g.model_copy(update={"node_id": local}) for g in await gpu_stats()]
+    for executor in lanes.nodes.all():
+        if not executor.is_local and executor.online:
+            gpus += [g.model_copy(update={"node_id": executor.node_id}) for g in await executor.gpu_stats()]
+    return gpus
 
 
 @router.get("/runtime/logs")

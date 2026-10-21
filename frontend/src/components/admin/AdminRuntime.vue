@@ -19,6 +19,7 @@ const now = useNow(500)
 const lanes = ref<LaneRuntime[]>([])
 const laneId = ref<number | null>(null)
 const lane = computed(() => lanes.value.find((l) => l.lane_id === laneId.value) ?? lanes.value[0] ?? null)
+const multiNode = computed(() => new Set(lanes.value.map((l) => l.node_id ?? null)).size > 1)
 const progress = computed(() => (lane.value ? loadProgress(lane.value.runtime, now.value) : null))
 const retryIn = computed(() =>
   lane.value?.next_retry_at ? Math.max(0, (Date.parse(lane.value.next_retry_at) - now.value) / 1000) : null,
@@ -195,9 +196,13 @@ watch(
         <dt>GPU</dt>
         <dd class="num">{{ lane.devices?.length ? lane.devices.join(', ') : t('admin.lanes.allGpus') }}</dd>
       </div>
+      <div v-if="lane.node_name && multiNode">
+        <dt>{{ t('admin.lanes.node') }}</dt>
+        <dd>{{ lane.node_name }}</dd>
+      </div>
       <div>
         <dt>{{ t('admin.runtimeView.port') }}</dt>
-        <dd class="num">{{ lane.port }}</dd>
+        <dd class="num" :title="lane.base_url ?? undefined">{{ lane.port }}</dd>
       </div>
       <div>
         <dt>PID</dt>

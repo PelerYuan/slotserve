@@ -29,6 +29,11 @@ const mine = computed(() => holder.value?.user_id === session.user?.id)
 const canRestart = computed(() => !holder.value || mine.value || session.user?.is_admin)
 const manual = computed(() => status.value?.manual ?? null)
 const multiLane = computed(() => (status.value?.lanes.length ?? 0) > 1)
+// Lanes on several machines (nodes): show which machine each lane and GPU is on.
+const nodeNames = computed(
+  () => new Map((status.value?.lanes ?? []).map((l) => [l.node_id ?? null, l.node_name ?? ''] as const)),
+)
+const multiNode = computed(() => nodeNames.value.size > 1)
 const fallbackFrom = computed(() => (status.value?.reason === 'fallback' ? status.value.fallback_from : null))
 const exclusive = computed(() => !!holder.value?.exclusive)
 const modelLabel = computed(() => {
@@ -140,6 +145,7 @@ async function restart() {
       <section v-for="l in status!.lanes" :key="l.id" class="card card-pad lane">
         <div class="row">
           <span class="lane-name">{{ l.name }}</span>
+          <span v-if="multiNode && l.node_name" class="faint small">{{ l.node_name }}</span>
           <span v-if="l.gpus?.length" class="faint small">GPU {{ l.gpus.join(',') }}</span>
           <span class="spacer" />
           <StatusDot :state="l.runtime.state" />
@@ -247,8 +253,10 @@ async function restart() {
           <Cpu :size="16" class="faint" />
         </div>
         <template v-if="status?.gpus.length">
-          <div v-for="g in status.gpus" :key="g.index" class="gpu-item">
-            <div class="gpu-name">{{ g.name }}</div>
+          <div v-for="g in status.gpus" :key="`${g.node_id ?? ''}-${g.index}`" class="gpu-item">
+            <div class="gpu-name">
+              <span v-if="multiNode" class="faint">{{ nodeNames.get(g.node_id ?? null) }} · </span>{{ g.name }}
+            </div>
             <div class="mem-row">
               <span class="muted small">{{ t('overview.memory') }}</span>
               <span class="num small">

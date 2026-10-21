@@ -142,6 +142,19 @@ class Settings(BaseSettings):
     devenv_projects: int = 3  # kept (paused) environments per person; 0 = none
     devenv_project_days: int = 0  # remove kept environments unused for this many days; 0 = never
 
+    # Multiple machines (see docs "Multiple machines"): node agents connect to the control plane.
+    local_node_name: str = "local"  # name of the built-in node (this machine)
+    node_heartbeat_seconds: float = 5.0  # how often agents report metrics
+    node_offline_seconds: float = 30.0  # a node that sent nothing for this long is offline
+    node_rpc_timeout_seconds: float = 30.0
+    # Node agent (``slotserve agent``): the control plane URL and this node's token.
+    agent_server: str = ""
+    agent_token: str = ""
+    # Address the control plane should use to reach this node; empty = the address it connects from.
+    agent_address: str = ""
+    # Interface the node's model servers listen on (the control plane forwards requests to them).
+    agent_model_host: str = "0.0.0.0"
+
     @property
     def database_url(self) -> str:
         return f"sqlite+aiosqlite:///{(self.data_dir / 'slotserve.db').as_posix()}"

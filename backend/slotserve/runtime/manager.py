@@ -8,6 +8,7 @@ import re
 import shlex
 import subprocess
 from collections import deque
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
@@ -37,6 +38,7 @@ class RuntimeState(StrEnum):
     READY = "ready"
     STOPPING = "stopping"
     FAILED = "failed"
+    OFFLINE = "offline"  # the lane's node (machine) is not connected
 
 
 @dataclass(frozen=True)
@@ -59,12 +61,62 @@ def strip_managed_flags(args: list[str]) -> list[str]:
     return strip_flags(args, MANAGED_FLAGS)
 
 
-__all__ = ["LlamaRuntime", "RuntimeState", "split_args", "strip_managed_flags"]
+__all__ = ["LlamaRuntime", "RequestTracker", "RuntimeState", "split_args", "strip_managed_flags"]
+
+# Receives a finished load attempt (the ModelLoadEvent fields) instead of the database, e.g. on a node agent.
+LoadRecorder = Callable[[dict], Awaitable[None]]
 
 
-class LlamaRuntime:
-    def __init__(self, settings: Settings, lane_id: int = 1, devices: list[int] | None = None):
+def probe_host(host: str) -> str:
+    """Where to reach a server listening on ``host`` from the same machine (wildcards are not connectable)."""
+    return "127.0.0.1" if host in ("", "0.0.0.0", "::", "[::]") else host
+
+
+class RequestTracker:
+    """Gateway requests in flight on a lane; a model switch waits for them ("draining")."""
+
+    settings: Settings
+    state: "RuntimeState"
+
+    def _init_requests(self) -> None:
+        self.inflight = 0
+        self.draining = False
+        self._idle = asyncio.Event()
+        self._idle.set()
+
+    def begin_request(self) -> None:
+        self.inflight += 1
+        self._idle.clear()
+
+    def end_request(self) -> None:
+        self.inflight = max(0, self.inflight - 1)
+        if self.inflight == 0:
+            self._idle.set()
+
+    async def _drain(self) -> None:
+        """Lets requests in flight finish before the process is stopped (new ones are refused meanwhile)."""
+        if self.state != RuntimeState.READY or self.inflight == 0 or self.settings.drain_seconds <= 0:
+            return
+        self.draining = True
+        log.info("waiting up to %ss for %s request(s) to finish", self.settings.drain_seconds, self.inflight)
+        try:
+            await asyncio.wait_for(self._idle.wait(), self.settings.drain_seconds)
+        except TimeoutError:
+            log.info("drain timed out with %s request(s) still running", self.inflight)
+        finally:
+            self.draining = False
+
+
+class LlamaRuntime(RequestTracker):
+    def __init__(
+        self,
+        settings: Settings,
+        lane_id: int = 1,
+        devices: list[int] | None = None,
+        recorder: LoadRecorder | None = None,
+    ):
         self.settings = settings
+        self.recorder = recorder
         self.lane_id = lane_id
         # GPUs this process may see (CUDA_VISIBLE_DEVICES); None leaves the environment untouched.
         self.devices = devices
@@ -96,10 +148,7 @@ class LlamaRuntime:
         self._failed_at: datetime | None = None
         self._fail_count = 0
         # Gateway requests currently being served; a switch waits for them ("draining").
-        self.inflight = 0
-        self.draining = False
-        self._idle = asyncio.Event()
-        self._idle.set()
+        self._init_requests()
 
     # ---- public -----------------------------------------------------------
 
@@ -119,35 +168,13 @@ class LlamaRuntime:
             inflight=self.inflight,
         )
 
-    def begin_request(self) -> None:
-        self.inflight += 1
-        self._idle.clear()
-
-    def end_request(self) -> None:
-        self.inflight = max(0, self.inflight - 1)
-        if self.inflight == 0:
-            self._idle.set()
-
-    async def _drain(self) -> None:
-        """Lets requests in flight finish before the process is stopped (new ones are refused meanwhile)."""
-        if self.state != RuntimeState.READY or self.inflight == 0 or self.settings.drain_seconds <= 0:
-            return
-        self.draining = True
-        log.info("waiting up to %ss for %s request(s) to finish", self.settings.drain_seconds, self.inflight)
-        try:
-            await asyncio.wait_for(self._idle.wait(), self.settings.drain_seconds)
-        except TimeoutError:
-            log.info("drain timed out with %s request(s) still running", self.inflight)
-        finally:
-            self.draining = False
-
     @property
     def port(self) -> int:
         return self.settings.llama_port + self.lane_id - 1
 
     @property
     def base_url(self) -> str:
-        return f"http://{self.settings.llama_host}:{self.port}"
+        return f"http://{probe_host(self.settings.llama_host)}:{self.port}"
 
     @property
     def spec(self) -> tuple[int, int | None] | None:
@@ -395,21 +422,23 @@ class LlamaRuntime:
         asyncio.get_running_loop().create_task(self._record_event(model_id, started, success, error))
 
     async def _record_event(self, model_id: int, started: datetime, success: bool, error: str | None) -> None:
+        fields = dict(
+            model_id=model_id,
+            started_at=started,
+            finished_at=utcnow(),
+            success=success,
+            error=error,
+            lane_id=self.lane_id,
+            command=self.command,
+            exit_code=None if success else self.exit_code,
+            log_excerpt=None if success else "\n".join(self.failure_log)[-20000:],
+        )
         try:
+            if self.recorder is not None:  # e.g. a node agent, which reports it to the control plane
+                await self.recorder(fields)
+                return
             async with SessionLocal() as db:
-                db.add(
-                    ModelLoadEvent(
-                        model_id=model_id,
-                        started_at=started,
-                        finished_at=utcnow(),
-                        success=success,
-                        error=error,
-                        lane_id=self.lane_id,
-                        command=self.command,
-                        exit_code=None if success else self.exit_code,
-                        log_excerpt=None if success else "\n".join(self.failure_log)[-20000:],
-                    )
-                )
+                db.add(ModelLoadEvent(**fields))
                 await db.commit()
         except Exception:
             log.exception("failed to record load event")

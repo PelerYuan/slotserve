@@ -8,7 +8,7 @@ const { t } = useI18n()
 
 const tone = computed(
   () =>
-    ({ ready: 'ok', loading: 'warn', stopping: 'warn', failed: 'danger', stopped: 'idle' })[props.state] ?? 'idle',
+    ({ ready: 'ok', loading: 'warn', stopping: 'warn', failed: 'danger', stopped: 'idle', offline: 'danger' })[props.state] ?? 'idle',
 )
 </script>
 

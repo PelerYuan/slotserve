@@ -39,6 +39,8 @@ export interface Model {
   exceeds_vram: boolean
   engine: Engine
   default_lane_ids: number[]
+  /** Machines (nodes) that have the model's files; a lane serves only models of its node. */
+  node_ids?: number[]
 }
 
 export type Engine = 'llama.cpp' | 'vllm' | 'sglang' | 'custom'
@@ -94,7 +96,7 @@ export interface Reservation {
   created_at: string
 }
 
-export type RuntimeState = 'stopped' | 'loading' | 'ready' | 'stopping' | 'failed'
+export type RuntimeState = 'stopped' | 'loading' | 'ready' | 'stopping' | 'failed' | 'offline'
 
 export interface Runtime {
   state: RuntimeState
@@ -119,6 +121,7 @@ export interface Gpu {
   utilization_pct: number
   temperature_c: number
   power_w: number | null
+  node_id?: number | null
 }
 
 export interface ManualOverride {
@@ -142,6 +145,9 @@ export interface LaneStatus {
   idle_mode?: IdleMode
   idle_template_name?: string | null
   shared_state?: DevState | null
+  node_id?: number | null
+  node_name?: string | null
+  node_online?: boolean
 }
 
 export interface Lane {
@@ -154,6 +160,9 @@ export interface Lane {
   idle_mode: IdleMode
   idle_template_id: number | null
   idle_template_name: string | null
+  node_id?: number | null
+  node_name?: string | null
+  node_online?: boolean
 }
 
 /** What a lane runs while nobody has it booked. */
@@ -165,6 +174,7 @@ export interface LaneInput {
   default_model_id: number | null
   idle_mode?: IdleMode
   idle_template_id?: number | null
+  node_id?: number | null
 }
 
 export interface Status {
@@ -304,6 +314,9 @@ export interface LaneRuntime {
   lane_name: string
   devices: number[] | null
   port: number
+  node_id?: number | null
+  node_name?: string | null
+  base_url?: string | null
   log_file: string
   runtime: Runtime
   engine: string | null
@@ -597,4 +610,49 @@ export interface Backup {
   kind: 'daily' | 'manual' | 'upgrade'
   size_bytes: number
   created_at: string
+}
+
+// ---- multiple machines (nodes) ------------------------------------------------
+
+export type NodeStatus = 'online' | 'offline' | 'never' | 'revoked' | 'mismatch'
+
+export interface NodeLane {
+  id: number
+  name: string
+  gpus: number[]
+}
+
+export interface ClusterNode {
+  id: number
+  name: string
+  is_local: boolean
+  status: NodeStatus
+  address: string
+  effective_address: string
+  token_prefix: string | null
+  created_at: string
+  connected_at: string | null
+  last_seen_at: string | null
+  revoked_at: string | null
+  agent_version: string | null
+  protocol_version: number | null
+  last_error: string | null
+  hostname: string | null
+  os: string | null
+  cpu_cores: number | null
+  memory_total_mb: number | null
+  memory_used_mb: number | null
+  cpu_percent: number | null
+  models_dir: string | null
+  model_count: number
+  gpus: Gpu[]
+  lanes: NodeLane[]
+}
+
+export interface ClusterNodeToken {
+  node: ClusterNode
+  token: string
+  server_url: string
+  docker_command: string
+  agent_command: string
 }

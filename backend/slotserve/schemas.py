@@ -127,6 +127,8 @@ class ModelOut(BaseModel):
     default_lane_ids: list[int] = []
     # The weights alone are larger than the GPU memory: full offload (-ngl 99) will not fit.
     exceeds_vram: bool = False
+    # Machines (nodes) that have the model's files; a lane can only serve models of its own node.
+    node_ids: list[int] = []
 
 
 class ModelUpdateIn(BaseModel):
@@ -143,6 +145,7 @@ class ModelCreateIn(BaseModel):
     path: str = Field(min_length=1, max_length=1000)
     args: str = Field(default="", max_length=4000)
     description: str = Field(default="", max_length=2000)
+    node_id: int | None = None  # the machine the path is on (None: this machine)
 
 
 class ScanResultOut(BaseModel):
@@ -156,6 +159,7 @@ class ScanResultOut(BaseModel):
 class DownloadCreateIn(BaseModel):
     url: str = Field(min_length=8, max_length=4000)
     filename: str | None = Field(default=None, max_length=255)
+    node_id: int | None = None  # the machine that downloads into its models directory (None: this machine)
 
 
 class HfFileOut(BaseModel):
@@ -176,6 +180,7 @@ class HfDownloadIn(BaseModel):
     repo: str = Field(min_length=3, max_length=200, pattern=r"^[\w.\-]+/[\w.\-]+$")
     revision: str = Field(default="main", min_length=1, max_length=100)
     files: list[str] = Field(min_length=1, max_length=50)
+    node_id: int | None = None
 
 
 class DownloadOut(ORMModel):
@@ -192,6 +197,7 @@ class DownloadOut(ORMModel):
     model_id: int | None
     created_at: datetime
     finished_at: datetime | None
+    node_id: int | None = None
 
 
 # ---- reservations ---------------------------------------------------------
@@ -271,6 +277,7 @@ class GpuOut(BaseModel):
     utilization_pct: int
     temperature_c: int
     power_w: float | None = None
+    node_id: int | None = None  # set in lists that span machines
 
 
 class RuntimeOut(BaseModel):
@@ -310,6 +317,9 @@ class LaneStatusOut(BaseModel):
     idle_mode: str = "model"  # model | devenv | none: what runs while nobody has the lane booked
     idle_template_name: str | None = None
     shared_state: str | None = None  # state of the lane's shared dev environment, when there is one
+    node_id: int | None = None  # the machine the lane's GPUs are in
+    node_name: str | None = None
+    node_online: bool = True
 
 
 class LaneOut(BaseModel):
@@ -322,6 +332,9 @@ class LaneOut(BaseModel):
     idle_mode: str = "model"
     idle_template_id: int | None = None
     idle_template_name: str | None = None
+    node_id: int | None = None
+    node_name: str | None = None
+    node_online: bool = True
 
 
 class LaneIn(BaseModel):
@@ -333,6 +346,8 @@ class LaneIn(BaseModel):
     # Left out on an update: unchanged.
     idle_mode: str | None = Field(default=None, pattern=r"^(model|devenv|none)$")
     idle_template_id: int | None = None
+    # The machine whose GPUs these are (None: this machine). Left out on an update: unchanged.
+    node_id: int | None = None
 
 
 class StatusOut(BaseModel):
@@ -463,6 +478,9 @@ class LaneRuntimeOut(BaseModel):
     lane_name: str
     devices: list[int] | None
     port: int
+    node_id: int | None = None
+    node_name: str | None = None
+    base_url: str | None = None
     log_file: str
     runtime: RuntimeOut
     engine: str | None

@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { NButton, NCheckbox, NInput, NModal, NSelect, useDialog, useMessage } from 'naive-ui'
 import { Cpu, Plus } from 'lucide-vue-next'
 import { api } from '@/api/client'
-import type { DevTemplate, IdleMode, Lane, Model } from '@/api/types'
+import type { ClusterNode, DevTemplate, Gpu, IdleMode, Lane, Model } from '@/api/types'
 import { loadLanes, useLanes } from '@/composables/lanes'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { useStatus } from '@/composables/useStatus'
@@ -19,12 +19,34 @@ const { lanes } = useLanes()
 
 const models = ref<Model[]>([])
 const templates = ref<DevTemplate[]>([])
+// Machines (Admin > Nodes); with only the built-in one, everything looks as on a single machine.
+const nodes = ref<ClusterNode[]>([])
 const devenvEnabled = computed(() => !!session.config?.devenv_enabled)
 onMounted(async () => {
   await loadLanes(true)
   models.value = await api.models().catch(() => [])
   templates.value = await api.devenv.templates().catch(() => [])
+  nodes.value = await api.admin.nodes().catch(() => [])
 })
+const multi = computed(() => nodes.value.length > 1)
+const localNode = computed(() => nodes.value.find((n) => n.is_local)?.id ?? null)
+const nodeOf = (id: number | null | undefined) => id ?? localNode.value
+const nodeName = (id: number | null | undefined) => nodes.value.find((n) => n.id === nodeOf(id))?.name ?? ''
+const nodeOptions = computed(() =>
+  nodes.value
+    .filter((n) => n.status !== 'revoked')
+    .map((n) => ({ label: `${n.name}${n.is_local ? ` · ${t('cluster.builtIn')}` : ''}`, value: n.id })),
+)
+/** GPUs of a machine: the live list on a single machine, else what each node reported. */
+function gpusOf(nodeId: number | null): Gpu[] {
+  if (!multi.value) return status.value?.gpus ?? []
+  return nodes.value.find((n) => n.id === nodeOf(nodeId))?.gpus ?? []
+}
+const allGpus = computed(() =>
+  multi.value
+    ? nodes.value.flatMap((n) => n.gpus.map((g) => ({ ...g, node_id: n.id })))
+    : (status.value?.gpus ?? []).map((g) => ({ ...g, node_id: localNode.value })),
+)
 // The shared environment of an idle lane comes from a template offered to everyone.
 const templateOptions = computed(() =>
   templates.value.filter((x) => x.kind === 'builtin').map((x) => ({ label: `${x.name}  ·  ${x.image}`, value: x.id })),
@@ -33,11 +55,15 @@ const idleOptions = computed(() =>
   (['model', 'devenv', 'none'] as IdleMode[]).map((m) => ({ label: t(`admin.lanes.idle.${m}`), value: m })),
 )
 
-const gpus = computed(() => status.value?.gpus ?? [])
-const owner = (index: number) => lanes.value.find((l) => l.gpus.includes(index))
+const gpus = computed(() => gpusOf(form.node))
+const sameNode = (a: number | null | undefined, b: number | null | undefined) => !multi.value || nodeOf(a) === nodeOf(b)
+const owner = (index: number, nodeId: number | null = form.node) =>
+  lanes.value.find((l) => l.gpus.includes(index) && sameNode(l.node_id, nodeId))
+// A lane can only serve models whose files its machine has.
+const onNode = (m: Model) => !multi.value || !m.node_ids || m.node_ids.includes(nodeOf(form.node) ?? -1)
 const modelOptions = computed(() => [
   { label: t('admin.lanes.noDefault'), value: null as unknown as number },
-  ...models.value.filter((m) => m.status === 'ready').map((m) => ({ label: m.name, value: m.id })),
+  ...models.value.filter((m) => m.status === 'ready' && onNode(m)).map((m) => ({ label: m.name, value: m.id })),
 ])
 
 const form = reactive({
@@ -48,10 +74,12 @@ const form = reactive({
   model: null as number | null,
   idle: 'model' as IdleMode,
   template: null as number | null,
+  node: null as number | null,
 })
 const busy = ref(false)
 
 function openNew() {
+  form.node = localNode.value
   const free = gpus.value.map((g) => g.index).filter((i) => !owner(i))
   Object.assign(form, {
     open: true,
@@ -61,7 +89,14 @@ function openNew() {
     model: null,
     idle: 'model',
     template: null,
+    node: localNode.value,
   })
+}
+
+function pickNode(id: number) {
+  form.node = id
+  form.gpus = []
+  if (form.model !== null && !models.value.some((m) => m.id === form.model && onNode(m))) form.model = null
 }
 
 function openEdit(l: Lane) {
@@ -73,6 +108,7 @@ function openEdit(l: Lane) {
     model: l.default_model_id,
     idle: l.idle_mode ?? 'model',
     template: l.idle_template_id,
+    node: nodeOf(l.node_id),
   })
 }
 
@@ -94,6 +130,7 @@ async function save() {
       default_model_id: form.model,
       idle_mode: form.idle,
       idle_template_id: form.idle === 'devenv' ? form.template : null,
+      ...(multi.value ? { node_id: form.node } : {}),
     }
     if (form.id === null) await api.admin.createLane(body)
     else await api.admin.updateLane(form.id, body)
@@ -180,16 +217,17 @@ async function saveArgs() {
     <div class="card-header">
       <h3 class="card-title">{{ t('admin.lanes.gpus') }}</h3>
     </div>
-    <div v-if="!gpus.length" class="empty">{{ t('admin.lanes.noGpus') }}</div>
+    <div v-if="!allGpus.length" class="empty">{{ t('admin.lanes.noGpus') }}</div>
     <div v-else class="table-wrap">
       <table class="table">
         <tbody>
-          <tr v-for="g in gpus" :key="g.index">
+          <tr v-for="g in allGpus" :key="`${g.node_id}-${g.index}`">
+            <td v-if="multi" class="strong nowrap">{{ nodeName(g.node_id) }}</td>
             <td class="num nowrap"><Cpu :size="14" class="faint" /> GPU {{ g.index }}</td>
             <td>{{ g.name }}</td>
             <td class="muted num nowrap">{{ (g.memory_total_mb / 1024).toFixed(0) }} GB</td>
             <td class="right">
-              <span v-if="owner(g.index)" class="badge brand">{{ owner(g.index)!.name }}</span>
+              <span v-if="owner(g.index, g.node_id ?? null)" class="badge brand">{{ owner(g.index, g.node_id ?? null)!.name }}</span>
               <span v-else class="badge">{{ t('admin.lanes.unassigned') }}</span>
             </td>
           </tr>
@@ -211,6 +249,7 @@ async function saveArgs() {
         <thead>
           <tr>
             <th>{{ t('admin.lanes.name') }}</th>
+            <th v-if="multi">{{ t('admin.lanes.node') }}</th>
             <th>GPU</th>
             <th>{{ t('admin.lanes.idleMode') }}</th>
             <th>{{ t('admin.lanes.now') }}</th>
@@ -220,6 +259,10 @@ async function saveArgs() {
         <tbody>
           <tr v-for="l in lanes" :key="l.id">
             <td class="strong">{{ l.name }}</td>
+            <td v-if="multi" class="small">
+              {{ l.node_name ?? nodeName(l.node_id) }}
+              <span v-if="l.node_online === false" class="badge danger">{{ t('state.offline') }}</span>
+            </td>
             <td class="num">{{ l.gpus.length ? l.gpus.join(', ') : t('admin.lanes.allGpus') }}</td>
             <td class="small">
               <span v-if="l.idle_mode === 'devenv'">{{ t('admin.lanes.idle.devenv') }} · {{ l.idle_template_name ?? '—' }}</span>
@@ -262,6 +305,11 @@ async function saveArgs() {
       <label>
         <span class="field-label">{{ t('admin.lanes.name') }}</span>
         <NInput v-model:value="form.name" maxlength="64" />
+      </label>
+      <label v-if="multi">
+        <span class="field-label">{{ t('admin.lanes.node') }}</span>
+        <NSelect :value="form.node" :options="nodeOptions" data-field="lane-node" @update:value="pickNode" />
+        <p class="faint small hint">{{ t('admin.lanes.nodeHint') }}</p>
       </label>
       <div>
         <span class="field-label">GPU</span>

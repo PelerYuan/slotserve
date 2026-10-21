@@ -14,6 +14,8 @@ import type {
   ChannelLink,
   ChatChannel,
   ChatChannels,
+  ClusterNode,
+  ClusterNodeToken,
   DevInfo,
   DevProject,
   DevSession,
@@ -274,6 +276,16 @@ export const api = {
     createLane: (body: LaneInput) => request<Lane>('POST', '/api/admin/lanes', body),
     updateLane: (id: number, body: LaneInput) => request<Lane>('PATCH', `/api/admin/lanes/${id}`, body),
     deleteLane: (id: number) => request<void>('DELETE', `/api/admin/lanes/${id}`),
+    nodes: () => request<ClusterNode[]>('GET', '/api/admin/nodes'),
+    createNode: (body: { name: string; address?: string }) =>
+      request<ClusterNodeToken>('POST', '/api/admin/nodes', body),
+    updateNode: (id: number, body: { name?: string; address?: string }) =>
+      request<ClusterNode>('PATCH', `/api/admin/nodes/${id}`, body),
+    rotateNodeToken: (id: number) => request<ClusterNodeToken>('POST', `/api/admin/nodes/${id}/token`),
+    revokeNode: (id: number) => request<ClusterNode>('POST', `/api/admin/nodes/${id}/revoke`),
+    deleteNode: (id: number) => request<void>('DELETE', `/api/admin/nodes/${id}`),
+    scanNode: (id: number) =>
+      request<{ added: string[]; skipped: number }>('POST', '/api/models/scan', undefined, { node_id: id }),
     manual: (body: {
       action: 'load' | 'unload' | 'auto'
       lane_id?: number | null

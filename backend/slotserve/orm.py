@@ -101,6 +101,8 @@ class DownloadTask(Base):
     model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    # The node that downloads into its models directory; NULL = the local node.
+    node_id: Mapped[int | None] = mapped_column(ForeignKey("nodes.id", ondelete="CASCADE"), nullable=True)
 
 
 class Reservation(Base):
@@ -305,6 +307,8 @@ class Lane(Base):
         ForeignKey("devenv_templates.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    # The machine whose GPUs these are (a lane never spans machines); NULL = the built-in local node.
+    node_id: Mapped[int | None] = mapped_column(ForeignKey("nodes.id", ondelete="SET NULL"), nullable=True)
 
     @property
     def mode(self) -> str:
@@ -455,3 +459,47 @@ class UsageSample(Base):
     mem_peak_mb: Mapped[int | None] = mapped_column(Integer, nullable=True)
     mem_total_mb: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cpu_core_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)  # resource "cpu" only
+
+
+class Node(Base):
+    """A machine that runs lanes: the built-in local node, or a ``slotserve agent`` connecting with a token."""
+
+    __tablename__ = "nodes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True)
+    is_local: Mapped[bool] = mapped_column(Boolean, default=False)
+    # SHA-256 of the agent token (shown once when the node is added); NULL for the local node.
+    token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
+    token_prefix: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # Host name or IP the control plane uses to reach the node's model servers and containers;
+    # empty = the address the agent connects from.
+    address: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    connected_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    seen_address: Mapped[str | None] = mapped_column(String(255), nullable=True)  # where the agent connected from
+    agent_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    protocol_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # JSON: hostname, os, gpus, cpu_cores, memory_total_mb, models_dir, engines ...
+    inventory: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)  # e.g. a protocol version mismatch
+
+
+class NodeModel(Base):
+    """Which node has a model's files, and where (paths differ between machines unless storage is shared).
+
+    A model without any row is a model of the local node (registered before clustering, or by hand).
+    """
+
+    __tablename__ = "node_models"
+    __table_args__ = (UniqueConstraint("node_id", "model_id", name="uq_node_models"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    node_id: Mapped[int] = mapped_column(ForeignKey("nodes.id", ondelete="CASCADE"), index=True)
+    model_id: Mapped[int] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), index=True)
+    path: Mapped[str] = mapped_column(Text)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    source: Mapped[str] = mapped_column(String(16), default="scan")  # scan | download | manual
+    seen_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

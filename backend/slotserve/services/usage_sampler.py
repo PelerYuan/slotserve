@@ -4,7 +4,8 @@ Each sample stores utilization, memory and power next to the lane's occupant at 
 (a booking and its kind, shared use while nobody books, or nothing). Old minute rows are
 folded into hourly rows by ``roll_up`` (called from the retention job).
 
-The GPU reader is injectable (``stats``) so this works without GPUs or nvidia-smi.
+The GPU reader is injectable (``stats``) so this works without GPUs or nvidia-smi. Lanes on other machines
+(node agents) are measured with the metrics their agents report.
 """
 
 import asyncio
@@ -100,9 +101,18 @@ class UsageSampler:
         self.current: dict[int, Occupant] = {}  # lane id -> occupant at the last sample
 
     async def stats(self) -> list[GpuOut]:
+        """This machine's GPUs."""
         if self._stats is not None:
             return await self._stats()
         return await gpu_module.gpu_stats()  # looked up at call time so tests can replace it
+
+    async def node_stats(self, ctx, local: list[GpuOut]) -> list[GpuOut]:
+        """GPU metrics of the machine a lane runs on (empty while a node is offline: occupancy only)."""
+        if getattr(ctx, "node_id", None) is None:
+            return local
+        nodes = getattr(self.state, "nodes", None)
+        executor = nodes.find(ctx.node_id) if nodes is not None else None
+        return await executor.gpu_stats() if executor is not None else []
 
     async def run(self) -> None:
         while True:
@@ -139,7 +149,7 @@ class UsageSampler:
             for ctx in lanes:
                 occ = await attribute(db, ctx, now, self.probes)
                 self.current[ctx.id] = occ
-                own = lane_gpus(ctx.devices, gpus)
+                own = lane_gpus(ctx.devices, await self.node_stats(ctx, gpus))
                 for g in own or [None]:
                     db.add(_row(minute, seconds, ctx.id, occ, g, busy_pct))
                     written += 1

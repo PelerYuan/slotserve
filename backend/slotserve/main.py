@@ -29,6 +29,8 @@ from .api import (
     usage,
     waitlist,
 )
+from .cluster import api as cluster_api
+from .cluster.hub import ClusterHub
 from .config import Settings, get_settings
 from .gateway import devenv_web, proxy
 from .runtime.executor import LocalExecutor, NodeRegistry
@@ -74,6 +76,8 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         await ensure_default_lane()
         # Where lanes run: the built-in local node (this machine) and, with clustering, node agents.
         app.state.nodes = NodeRegistry(LocalExecutor(settings))
+        app.state.cluster = ClusterHub(app.state, app.state.nodes)
+        await app.state.cluster.start()
         app.state.lanes = LaneManager(settings, app.state.notifier, app.state.nodes)
         await app.state.lanes.start(run=start_background)
         # The first lane, for code paths that only ever deal with one GPU group.
@@ -81,6 +85,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         app.state.scheduler = app.state.lanes.primary.scheduler
         app.state.downloader = Downloader(settings)
         app.state.downloader.events = app.state.notifier
+        app.state.downloader.cluster = app.state.cluster
         app.state.housekeeper = Housekeeper(app.state)
         # GPU metrics come from nvidia-smi unless a reader was injected (tests, other hardware).
         app.state.usage_sampler = UsageSampler(app.state, stats=getattr(app.state, "gpu_stats_fn", None))
@@ -105,6 +110,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
                 *(asyncio.create_task(c.run(), name=f"chat-{c.id}") for c in app.state.channels),
                 asyncio.create_task(app.state.devenv.run(), name="devenv"),
                 asyncio.create_task(app.state.usage_sampler.run(), name="usage-sampler"),
+                asyncio.create_task(app.state.cluster.run(), name="node-watchdog"),
             ]
         try:
             yield
@@ -115,6 +121,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
                 with contextlib.suppress(asyncio.CancelledError):
                     await t
             await app.state.notifier.save_pending()
+            await app.state.cluster.close()  # before the lanes: model servers on nodes keep running
             await app.state.lanes.shutdown()
             await app.state.channels.close()
             await app.state.devenv.close()
@@ -157,6 +164,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
     ):
         app.include_router(module.router)
     app.include_router(devenv.keys_router)
+    app.include_router(cluster_api.router)
     app.include_router(proxy.router)
     app.include_router(devenv_web.router)
 

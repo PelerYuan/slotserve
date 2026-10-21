@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings
-from ..orm import DevProject, DevTemplate, Lane, LlmModel, ModelLoadEvent, ModelPreset, Reservation, User
+from ..orm import DevProject, DevTemplate, Lane, LlmModel, ModelLoadEvent, ModelPreset, Node, Reservation, User
 from ..schemas import ModelOut, PresetOut, ReservationOut
 
 LOAD_HISTORY = 5
@@ -157,9 +157,12 @@ async def model_out(
     creators: dict[int, str] = {}
     if creator_ids:
         creators = dict((await db.execute(select(User.id, User.username).where(User.id.in_(creator_ids)))).all())
+    from ..cluster import inventory
     from ..runtime.gpu import gpu_stats  # local import: runtime imports this module
 
     vram_bytes = sum(g.memory_total_mb for g in await gpu_stats()) * 1024 * 1024
+    local_id = (await db.execute(select(Node.id).where(Node.is_local.is_(True)).limit(1))).scalar_one_or_none()
+    on_nodes = await inventory.nodes_by_model(db, local_id)
     presets: dict[int, list[PresetOut]] = {}
     if models:
         rows = await db.execute(
@@ -170,13 +173,15 @@ async def model_out(
     out = []
     for m in models:
         path = Path(m.file_path)
+        nodes = inventory.nodes_of(m.id, on_nodes, local_id)
         out.append(
             ModelOut(
                 id=m.id,
                 name=m.name,
                 file_path=m.file_path,
                 file_name=path.name,
-                file_exists=_model_source_exists(m),
+                # Files on other machines are known from what their agents report.
+                file_exists=_model_source_exists(m) if local_id in nodes or not nodes else True,
                 size_bytes=m.size_bytes,
                 status=m.status,
                 is_default=m.id in lane_defaults,
@@ -191,6 +196,7 @@ async def model_out(
                 engine=m.engine or "llama.cpp",
                 default_lane_ids=sorted(lane_defaults.get(m.id, [])),
                 exceeds_vram=bool(vram_bytes) and m.size_bytes > vram_bytes * 0.95,
+                node_ids=sorted(nodes),
             )
         )
     return out
