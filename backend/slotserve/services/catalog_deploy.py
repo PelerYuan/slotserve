@@ -5,7 +5,7 @@ import json
 import logging
 import shutil
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from urllib.parse import quote
 
 import httpx
@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import Settings
 from ..db import SessionLocal, utcnow
 from ..errors import ApiError
-from ..orm import CatalogDeploy, CatalogEntryRow, DownloadTask, Lane, LlmModel
+from ..orm import CatalogDeploy, CatalogEntryRow, DownloadTask, Lane, LlmModel, NodeModel
 from . import catalog, kv, scanner
 from .catalog import Entry, Variant
 
@@ -180,6 +180,78 @@ def downloaded(settings: Settings, variant: Variant) -> bool:
     return (folder / "config.json").is_file() and not any(folder.glob("*.part"))
 
 
+# ---- other nodes ---------------------------------------------------------------------
+#
+# A catalog deployment for a lane of another machine downloads into that node's models directory (as the node's
+# agent reported it) and registers the model on that node only. Paths are the node's own (it may run another OS).
+
+
+def node_join(base: str, rel: str) -> str:
+    """``base`` (a directory on a node) joined with a ``/``-separated relative path, in that node's style."""
+    windows = "\\" in base or (len(base) >= 2 and base[1] == ":")
+    cls = PureWindowsPath if windows else PurePosixPath
+    return str(cls(base, *rel.split("/")))
+
+
+def node_target(models_dir: str, variant: Variant) -> str:
+    if variant.format == "gguf":
+        return node_join(models_dir, variant.files[0].rsplit("/", 1)[-1])
+    return node_join(models_dir, catalog.local_dir_name(variant.repo))
+
+
+def node_mmproj(models_dir: str, variant: Variant) -> str | None:
+    return node_join(models_dir, variant.mmproj.rsplit("/", 1)[-1]) if variant.mmproj else None
+
+
+def check_node_space(free: int | None, variant: Variant, min_free_gb: float) -> None:
+    """Free space the node reported for its models directory (skipped when unknown)."""
+    if free is None:
+        return
+    reserve = int(min_free_gb * 1e9)
+    if free < variant.download_bytes + reserve:
+        raise ApiError(
+            status.HTTP_507_INSUFFICIENT_STORAGE,
+            "insufficient_disk",
+            free_gb=round(free / 1e9, 1),
+            need_gb=round((variant.download_bytes + reserve) / 1e9, 1),
+        )
+
+
+async def queue_node_files(db: AsyncSession, node_id: int, user_id: int, plans: "list[FilePlan]") -> list[int]:
+    """Download tasks on a node (files already there are recognised by the agent and finish at once)."""
+    ids: list[int] = []
+    for plan in plans:
+        active = await db.execute(
+            select(DownloadTask.id).where(
+                DownloadTask.filename == plan.filename,
+                DownloadTask.status.in_(ACTIVE),
+                DownloadTask.node_id == node_id,
+                DownloadTask.storage_id.is_(None),
+            )
+        )
+        task_id = active.scalar_one_or_none()
+        if task_id is None:
+            task = DownloadTask(user_id=user_id, url=plan.url, filename=plan.filename, node_id=node_id)
+            db.add(task)
+            await db.flush()
+            task_id = task.id
+        ids.append(task_id)
+    return ids
+
+
+async def node_paths(db: AsyncSession) -> dict[int, dict[str, list[int]]]:
+    """node id -> path -> model ids registered there (from ``node_models``)."""
+    out: dict[int, dict[str, list[int]]] = {}
+    rows = await db.execute(
+        select(NodeModel.node_id, NodeModel.path, NodeModel.model_id)
+        .join(LlmModel, LlmModel.id == NodeModel.model_id)
+        .where(LlmModel.deleted_at.is_(None))
+    )
+    for node_id, path, model_id in rows.all():
+        out.setdefault(node_id, {}).setdefault(path, []).append(model_id)
+    return out
+
+
 def engine_column(engine: str) -> str | None:
     return None if engine == "llama.cpp" else engine
 
@@ -278,9 +350,10 @@ async def sync_default_flags(db: AsyncSession) -> None:
 class Deployer:
     """Registers catalog models once their downloads are complete (hooked into the Downloader)."""
 
-    def __init__(self, settings: Settings, lanes=None):
+    def __init__(self, settings: Settings, lanes=None, cluster=None):
         self.settings = settings
         self.lanes = lanes
+        self.cluster = cluster  # ClusterHub: deployments onto other nodes
         self._lock = asyncio.Lock()
 
     async def _pending(self, db: AsyncSession) -> list[CatalogDeploy]:
@@ -326,7 +399,54 @@ class Deployer:
                     self.lanes.poke(lane.id)
         return model
 
+    def _remote(self, deploy: CatalogDeploy) -> bool:
+        return (
+            deploy.node_id is not None
+            and self.cluster is not None
+            and not self.cluster.registry.is_local(deploy.node_id)
+        )
+
+    async def _register_on_node(self, db: AsyncSession, deploy: CatalogDeploy) -> LlmModel:
+        """Registers a model whose files are on another node (checked there by its agent)."""
+        from ..cluster import inventory
+        from ..cluster import protocol as cluster_protocol
+
+        node_id = deploy.node_id
+        path = deploy.target_path
+        engine = engine_column(deploy.engine)
+        executor = self.cluster.executor(node_id)
+        if executor is None:
+            raise RuntimeError("the node no longer exists")
+        stat = await executor.request(cluster_protocol.M_MODELS_STAT, {"path": path, "engine": deploy.engine})
+        if not stat.get("exists"):
+            raise RuntimeError(f"file not found on node {executor.name!r}: {path}")
+        if engine is not None and stat.get("complete") is False:
+            raise RuntimeError(f"incomplete model folder on node {executor.name!r}: {path}")
+        size = int(stat.get("size_bytes") or 0)
+        local_id = await inventory.local_node_id(db)
+        existing = await inventory._match(db, node_id, path)
+        if existing is not None and existing.engine == engine:
+            await inventory.add_row(db, existing, node_id, path, size, "download", local_id)
+            return existing
+        model = LlmModel(
+            name=await scanner.unique_name(db, deploy.model_name),
+            file_path=path,
+            size_bytes=size,
+            status="ready",
+            args=deploy.args,
+            description=deploy.description,
+            engine=engine,
+            created_by=deploy.user_id,
+        )
+        db.add(model)
+        await db.flush()
+        db.add(NodeModel(node_id=node_id, model_id=model.id, path=path, size_bytes=size, source="download"))
+        await db.flush()
+        return model
+
     async def _register(self, db: AsyncSession, deploy: CatalogDeploy) -> LlmModel:
+        if self._remote(deploy):
+            return await self._register_on_node(db, deploy)
         path = Path(deploy.target_path)
         engine = engine_column(deploy.engine)
         found = await db.execute(

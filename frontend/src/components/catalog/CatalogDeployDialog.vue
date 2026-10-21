@@ -8,6 +8,9 @@ import { session } from '@/composables/session'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { formatBytes } from '@/utils/format'
 import { CONTEXT_OPTIONS, bestFor, contextLabel, engineLabel, fitClass, fitOn } from '@/utils/catalog'
+import MachinePicker from '@/components/machines/MachinePicker.vue'
+import type { Candidate, Machine } from '@/api/machines'
+import { loadMachines } from '@/composables/machines'
 
 const props = defineProps<{ entry: CatalogEntry; variant: string | null; lanes: CatalogLane[] }>()
 const emit = defineEmits<{ close: []; deployed: [deploy: CatalogDeploy] }>()
@@ -51,9 +54,32 @@ const variantOptions = computed(() =>
     label: `${v.quant} · ${v.engines.map(engineLabel).join('/')} · ${formatBytes(v.download_bytes)}`,
   })),
 )
-const laneOptions = computed(() => props.lanes.map((l) => ({ value: l.id, label: l.name })))
+// Lanes on several machines: pick the machine (seeing which of its lanes fit), then the lane.
+const machineIds = computed(() => new Set(props.lanes.map((l) => l.node_id ?? null)))
+const multiMachine = computed(() => machineIds.value.size > 1)
+const machineId = ref<number | null>(props.lanes[0]?.node_id ?? null)
+const machineLanes = computed(() =>
+  multiMachine.value ? props.lanes.filter((l) => (l.node_id ?? null) === machineId.value) : props.lanes,
+)
+watch(machineId, () => {
+  if (!machineLanes.value.some((l) => l.id === laneId.value)) laneId.value = machineLanes.value[0]?.id ?? null
+})
+if (multiMachine.value) void loadMachines(true)
+const laneOptions = computed(() =>
+  machineLanes.value.map((l) => ({
+    value: l.id,
+    label:
+      `${l.name}  ·  ${t(`catalog.fit.${fitOn(variant.value, l.id)}`)}` +
+      (l.node_online === false ? ` (${t('cluster.statuses.offline')})` : ''),
+  })),
+)
 const lane = computed(() => props.lanes.find((l) => l.id === laneId.value) ?? null)
 const fit = computed(() => (laneId.value != null ? fitOn(variant.value, laneId.value) : 'unknown'))
+const noLanes = (m: Machine) => (props.lanes.some((l) => l.node_id === m.id) ? null : t('machines.reasons.no_gpu'))
+const pickNeed = () => ({ gpu: true, purpose: 'deploy' as const, min_gpu_memory_mb: Math.ceil(est.value.total / 2 ** 20) })
+function onPicked(c: Candidate) {
+  if (c.lane_id != null) laneId.value = c.lane_id
+}
 
 const est = computed(() => variant.value.estimate)
 const scale = computed(() => Math.max(est.value.total, lane.value?.memory_bytes ?? 0) || 1)
@@ -88,7 +114,7 @@ async function submit() {
     :show="true"
     preset="card"
     :title="t('catalog.deploy.title', { name: entry.name })"
-    style="width: 620px; max-width: calc(100vw - 32px)"
+    :style="{ width: multiMachine ? '700px' : '620px', maxWidth: 'calc(100vw - 32px)' }"
     :bordered="false"
     @update:show="(v: boolean) => !v && emit('close')"
   >
@@ -101,12 +127,22 @@ async function submit() {
           <NRadioButton v-for="e in variant.engines" :key="e" :value="e">{{ engineLabel(e) }}</NRadioButton>
         </NRadioGroup>
       </NFormItem>
+      <NFormItem v-if="multiMachine" :label="t('machines.machine')">
+        <MachinePicker
+          v-model="machineId"
+          mode="gpu"
+          :need="pickNeed"
+          :disabled-reason="noLanes"
+          data-test="deploy-machine"
+          @picked="onPicked"
+        />
+      </NFormItem>
       <div class="two">
         <NFormItem :label="t('catalog.deploy.context')">
           <NSelect v-model:value="ctx" :options="ctxOptions" />
         </NFormItem>
         <NFormItem v-if="lanes.length" :label="t('catalog.deploy.lane')">
-          <NSelect v-model:value="laneId" :options="laneOptions" />
+          <NSelect v-model:value="laneId" :options="laneOptions" data-field="deploy-lane" />
         </NFormItem>
       </div>
 

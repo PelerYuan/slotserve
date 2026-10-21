@@ -121,6 +121,9 @@ EDITABLE: dict[str, Editable] = {
     "usage_busy_percent": Editable(int, min=1, max=100, unit="%"),
     "audit_retention_days": Editable(int, min=0, max=3650, unit="d"),
     "backup_keep": Editable(int, min=0, max=100),
+    # personal computers (services/sharing.py)
+    "sharing_grace_minutes": Editable(int, min=0, max=240, unit="min"),
+    "wol_lead_minutes": Editable(int, min=0, max=120, unit="min"),
 }
 
 # Changing one of these restarts the Telegram bot.

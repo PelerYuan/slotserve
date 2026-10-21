@@ -470,6 +470,26 @@ def library_path(st: Storage) -> Path | None:
     return Path(local) if local else None
 
 
+def library_nodes(st: Storage) -> list[int]:
+    """Other nodes a model library is available on (Admin -> Storage)."""
+    return [int(i) for i in load_json(st.node_ids, []) if isinstance(i, int)]
+
+
+def node_library_spec(st: Storage, secret_key: str) -> dict:
+    """What a node agent needs to use a model library: its path (host directory) or how to mount it (NFS / SMB)."""
+    spec: dict = {"storage_id": st.id, "name": st.name}
+    opts = driver_opts(st, secret_key)
+    if opts is None:
+        spec["path"] = st.host_path
+    else:
+        spec["volume"] = {
+            "name": volume_name(st, secret_key),
+            "driver_opts": opts,
+            "labels": {LABEL: str(st.id), f"{LABEL}.sub": ""},
+        }
+    return spec
+
+
 async def model_library_dirs(db) -> list[Path]:
     rows = await enabled_storages(db)
     return [p for st in rows if st.purpose == "models" and (p := library_path(st)) is not None]

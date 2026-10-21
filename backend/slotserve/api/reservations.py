@@ -11,7 +11,7 @@ from ..deps import current_user
 from ..errors import ApiError
 from ..orm import HOLDING_STATUSES, DevProject, DevTemplate, Lane, LlmModel, Reservation, User
 from ..schemas import ExtendIn, ReservationCreateIn, ReservationOut, ReservationUpdateIn
-from ..services import booking, queries
+from ..services import booking, queries, sharing
 from ..services.audit import record
 
 router = APIRouter(prefix="/api/reservations", tags=["reservations"])
@@ -87,6 +87,7 @@ async def create_core(app, db: AsyncSession, user: User, body: ReservationCreate
     model, preset = await booking.resolve_model(db, body.model_id, body.preset_id)
     lane = await booking.resolve_lane(db, body.lane_id)
     await booking.check_model_on_lane(db, model, lane)
+    await sharing.check_booking(db, settings, lane, windows, owner.id)
     if (body.devenv_template_id is not None or body.devenv_project_id is not None) and model is not None:
         raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_with_model")
     if body.devenv_project_id is not None:
@@ -195,6 +196,11 @@ async def update_reservation_core(
         project = await db.get(DevProject, project_id)
         if project is not None:
             await booking.check_project_machine(db, settings, project, await db.get(Lane, lane_id))
+    if fields & {"start_at", "end_at", "lane_id"} and lane_id is not None:
+        # The machine's sharing hours; of a running booking only the extension is checked.
+        check_from = max(start, r.end_at) if phase == "active" else start
+        if end > check_from:
+            await sharing.check_booking(db, settings, await db.get(Lane, lane_id), [(check_from, end)], r.user_id)
     # Changing a not-yet-started booking is judged like a new one in approval mode.
     review = phase != "active" and r.user_id == user.id and booking.needs_approval(settings, user, [(start, end)])
     newly_pending = review and r.status != "pending"

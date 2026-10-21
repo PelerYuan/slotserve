@@ -292,10 +292,11 @@ async def test_remote_cpu_environment_and_usage(app, make_client, start_agent, n
     try:
         _admin, bob, _agent, node_id, _lane = await _remote(app, make_client, start_agent, node_docker, {22: ssh_port})
         torch = next(t for t in (await bob.get("/api/devenv/templates")).json() if t["builtin_key"] == "pytorch")
-        info = (await bob.get("/api/devenv/cpu")).json()
-        assert [n["name"] for n in info["nodes"]] == [app.state.nodes.local.name, "gpu-b"]
+        # the machine picker offers the node for environments without a GPU (CpuEnvs.runs_on)
+        machines = (await bob.get("/api/machines")).json()
+        assert next(m for m in machines if m["name"] == "gpu-b")["capacity"]["cpu_envs"] is True
         r = await bob.post("/api/devenv/cpu/start", json={"template_id": torch["id"], "node_id": 999})
-        assert r.status_code == 400 and r.json()["detail"]["code"] == "devenv_node_missing"
+        assert r.status_code == 400 and r.json()["detail"]["code"] == "node_invalid"
         r = await bob.post("/api/devenv/cpu/start", json={"template_id": torch["id"], "node_id": node_id})
         assert r.status_code == 201, r.text
         started = r.json()

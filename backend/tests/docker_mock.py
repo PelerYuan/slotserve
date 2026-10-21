@@ -29,6 +29,7 @@ class FakeDocker:
         self.created: list[tuple[str, dict]] = []  # (name, config) of every container ever created
         # Storage (services/storage.py): named volumes, what helper containers print, mounts that fail
         self.volumes: dict[str, dict] = {}  # name -> {Name, Driver, Options, Labels}
+        self.volume_root = None  # a Path: volumes get a Mountpoint (directory) below it, like /var/lib/docker/volumes
         self.helper_output: dict[str, str] = {}  # text in a helper's script -> its output (logs)
         self.mount_errors: dict[str, str] = {}  # mount source (prefix) -> error when a container starts
         self._exec_ids: dict[str, int] = {}
@@ -340,6 +341,10 @@ class FakeDocker:
                     "Options": body.get("DriverOpts") or {},
                     "Labels": body.get("Labels") or {},
                 }
+                if self.volume_root is not None:
+                    mountpoint = self.volume_root / name / "_data"
+                    mountpoint.mkdir(parents=True, exist_ok=True)
+                    self.volumes[name]["Mountpoint"] = str(mountpoint)
             return JSONResponse(self.volumes[name], status_code=201)
 
         @self.app.get("/v1.41/volumes/{name}")

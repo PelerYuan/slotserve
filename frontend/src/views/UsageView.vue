@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NDropdown, NRadioButton, NRadioGroup } from 'naive-ui'
+import { NButton, NDropdown, NRadioButton, NRadioGroup, NSelect } from 'naive-ui'
 import { FileDown } from 'lucide-vue-next'
 import UsageChart from '@/components/UsageChart.vue'
 import LineChart from '@/components/LineChart.vue'
 import { api } from '@/api/client'
 import type { Usage, UsageExport, UsageKind } from '@/api/types'
 import { useErrorMessage } from '@/composables/useErrorMessage'
+import { useMachines } from '@/composables/machines'
 import { isDark } from '@/composables/theme'
 import { formatCompact, formatNumber } from '@/utils/format'
+import { sharingApi, type ContributionRow } from '@/api/sharing'
 
 // Categorical slots in fixed order (validated reference palette, stepped per theme); color follows the entity.
 const SERIES_LIGHT = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6']
@@ -39,15 +41,30 @@ function exportCsv(kind: UsageExport) {
   a.click()
 }
 
+// Narrow everything to one machine's lanes (with several machines).
+const { machines, multi: multiMachine } = useMachines()
+const machineId = ref<number | null>(null)
+const machineOptions = computed(() => machines.value.map((m) => ({ label: m.name, value: m.id })))
+// Personal computers: what the machines people own offered, and what everyone used.
+const contribution = ref<ContributionRow[]>([])
+
 async function load() {
   try {
-    data.value = await api.usage(days.value, scope.value)
+    data.value = await api.usage(days.value, scope.value, machineId.value)
+    contribution.value = (await sharingApi.usage(days.value).catch(() => ({ rows: [] }))).rows
   } catch (e) {
     showError(e)
   }
 }
+
+function exportContribution() {
+  const a = document.createElement('a')
+  a.href = sharingApi.usageExportUrl(days.value)
+  a.download = ''
+  a.click()
+}
 onMounted(load)
-watch([days, scope], load)
+watch([days, scope, machineId], load)
 
 // ---- formatting --------------------------------------------------------------
 
@@ -118,6 +135,8 @@ const occupancyOf = (occ: Partial<Record<UsageKind, number>>) => {
     : []
 }
 const multiLane = computed(() => (data.value?.lanes.length ?? 0) > 1)
+// Several machines (nodes): GPU time and occupancy per machine.
+const multiNode = computed(() => (data.value?.nodes?.length ?? 0) > 1)
 const kindsPresent = computed(() =>
   KINDS.filter((k) => (data.value?.lanes ?? []).some((l) => (l.occupancy[k] ?? 0) > 0)),
 )
@@ -138,6 +157,16 @@ const hasData = computed(() => {
         <p>{{ t('usage.subtitle') }}</p>
       </div>
       <div class="head-actions">
+        <NSelect
+          v-if="multiMachine"
+          v-model:value="machineId"
+          :options="machineOptions"
+          :placeholder="t('machines.allMachines')"
+          clearable
+          size="small"
+          class="machine-filter"
+          data-filter="usage-machine"
+        />
         <NRadioGroup v-model:value="scope" size="small" class="scope">
           <NRadioButton value="all">{{ t('usage.everyone') }}</NRadioButton>
           <NRadioButton value="mine">{{ t('usage.mine') }}</NRadioButton>
@@ -150,6 +179,7 @@ const hasData = computed(() => {
           :options="[
             { key: 'people', label: t('usage.exportPeople') },
             { key: 'compute', label: t('usage.exportCompute') },
+            ...(multiNode ? [{ key: 'nodes', label: t('usage.exportNodes') }] : []),
             { key: 'summary', label: t('usage.exportSummary') },
             { key: 'requests', label: t('usage.exportRequests') },
           ]"
@@ -275,6 +305,83 @@ const hasData = computed(() => {
       </div>
     </section>
 
+    <section v-if="hasData && multiNode" class="card" data-section="usage-nodes">
+      <div class="card-header"><h3 class="card-title">{{ t('usage.byNode') }}</h3></div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>{{ t('usage.node') }}</th>
+              <th class="right">{{ t('usage.bookedGpuHoursShort') }}</th>
+              <th class="right">{{ t('usage.usedGpuHoursShort') }}</th>
+              <th class="right">{{ t('usage.avgUtilizationShort') }}</th>
+              <th class="right">{{ t('usage.occupied') }}</th>
+              <th class="occ-col">{{ t('usage.occupancy') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="n in data!.nodes" :key="String(n.node_id)" :data-node="n.node_name">
+              <td class="strong">
+                {{ n.node_name }}
+                <span class="faint">· {{ t('usage.gpuCount', { n: n.gpus }) }}</span>
+              </td>
+              <td class="right num">{{ hours(n.booked_gpu_hours) }}</td>
+              <td class="right num">{{ hours(n.used_gpu_hours) }}</td>
+              <td class="right num">{{ pct(n.avg_utilization) }}</td>
+              <td class="right num">{{ pct(n.occupied_pct) }}</td>
+              <td class="occ-col">
+                <div class="occ" role="img" :aria-label="occupancyOf(n.occupancy).map((o) => `${kindName(o.kind)} ${Math.round(o.share)}%`).join(', ')">
+                  <span
+                    v-for="o in occupancyOf(n.occupancy)"
+                    :key="o.kind"
+                    :style="{ width: `${o.share}%`, background: kindColor(o.kind) }"
+                    :title="`${kindName(o.kind)}: ${hours(o.hours)} h (${Math.round(o.share)}%)`"
+                  />
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section v-if="contribution.some((r) => r.nodes.length)" class="card contribution" data-section="contribution">
+      <div class="card-header">
+        <h3 class="card-title">{{ t('sharing.usageTitle') }}</h3>
+        <NButton size="tiny" quaternary @click="exportContribution">
+          <template #icon><FileDown :size="13" /></template>
+          {{ t('sharing.exportCsv') }}
+        </NButton>
+      </div>
+      <p class="faint small contribution-hint">{{ t('sharing.usageHint') }}</p>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>{{ t('sharing.person') }}</th>
+              <th>{{ t('sharing.machines') }}</th>
+              <th class="right">{{ t('sharing.onlineHours') }}</th>
+              <th class="right">{{ t('sharing.sharedHours') }}</th>
+              <th class="right">{{ t('sharing.gpuOffered') }}</th>
+              <th class="right">{{ t('sharing.usedByOthers') }}</th>
+              <th class="right">{{ t('sharing.consumed') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in contribution" :key="r.user_id">
+              <td>{{ r.username }}</td>
+              <td class="faint">{{ r.nodes.join(', ') || '—' }}</td>
+              <td class="right num">{{ hours(r.online_hours) }}</td>
+              <td class="right num">{{ hours(r.shared_hours) }}</td>
+              <td class="right num">{{ hours(r.gpu_hours_shared) }}</td>
+              <td class="right num">{{ hours(r.gpu_hours_used_by_others) }}</td>
+              <td class="right num">{{ hours(r.gpu_hours_consumed) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <div v-if="hasData" class="two">
       <section class="card">
         <div class="card-header"><h3 class="card-title">{{ multiLane ? t('usage.byLane') : t('usage.occupancy') }}</h3></div>
@@ -290,7 +397,10 @@ const hasData = computed(() => {
             </thead>
             <tbody>
               <tr v-for="l in data!.lanes" :key="String(l.lane_id)">
-                <td class="strong">{{ l.lane_name }} <span class="faint">· {{ t('usage.gpuCount', { n: l.gpus }) }}</span></td>
+                <td class="strong">
+                  {{ l.lane_name }}
+                  <span class="faint">· <template v-if="multiNode && l.node_name">{{ l.node_name }} · </template>{{ t('usage.gpuCount', { n: l.gpus }) }}</span>
+                </td>
                 <td class="right num">{{ hours(l.booked_gpu_hours) }}</td>
                 <td class="right num">{{ pct(l.avg_utilization) }}</td>
                 <td class="occ-col">
@@ -401,6 +511,12 @@ const hasData = computed(() => {
 </template>
 
 <style scoped>
+.contribution {
+  margin-bottom: 16px;
+}
+.contribution-hint {
+  margin: 0 16px 8px;
+}
 .head-actions {
   display: flex;
   align-items: center;
@@ -536,5 +652,8 @@ const hasData = computed(() => {
   .tile-value {
     font-size: 22px;
   }
+}
+.machine-filter {
+  width: 160px;
 }
 </style>

@@ -11,7 +11,7 @@ from ..config import get_settings
 from ..db import get_db
 from ..deps import current_user
 from ..errors import ApiError
-from ..orm import DevProject, DevSession, DevTemplate, Lane, User
+from ..orm import DevProject, DevSession, DevTemplate, Lane, Node, User
 from ..services.audit import record
 from ..services.devenv import DevEnvError, project_move_problem, visible
 from ..services.devenv_cpu import ACTIVE_STATES, KIND, cpu_ranges
@@ -23,7 +23,8 @@ router = APIRouter(prefix="/api/devenv/cpu", tags=["devenv"])
 class StartIn(BaseModel):
     template_id: int | None = None
     project_id: int | None = None
-    node_id: int | None = None  # the machine to run on; None: a kept environment's own machine, else the server's
+    # the machine to run on (see /api/machines); None: a kept environment's own machine, else the local node
+    node_id: int | None = None
 
 
 class AfterBookingIn(BaseModel):
@@ -46,18 +47,8 @@ class CpuSessionOut(BaseModel):
     state: str
     started_at: datetime | None
     live: LiveOut | None
-    node_id: int | None = None  # None: the server's own machine
+    node_id: int | None = None  # None: the built-in local node
     node_name: str | None = None
-
-
-class NodeChoice(BaseModel):
-    """A machine CPU-only environments can run on."""
-
-    id: int | None  # None: the server's own machine
-    name: str
-    online: bool
-    cpus: int | None
-    memory: int | None  # bytes
 
 
 class LaneCores(BaseModel):
@@ -83,7 +74,6 @@ class CpuInfo(BaseModel):
     lanes: list[LaneCores]
     after_booking: list[int]  # my projects that continue without a GPU when a booking ends
     sessions: list[CpuSessionOut]  # mine; every one for admins
-    nodes: list[NodeChoice] = []  # machines to choose from (more than one only with other machines connected)
 
 
 async def _start_target(db: AsyncSession, body: StartIn, user: User) -> tuple[DevTemplate | None, DevProject | None]:
@@ -159,38 +149,7 @@ async def cpu_info(request: Request, user: User = Depends(current_user), db: Asy
         ],
         after_booking=list(after),
         sessions=sessions,
-        nodes=_node_choices(request, cpu) if s.devenv_enabled else [],
     )
-
-
-def _node_choices(request: Request, cpu) -> list[NodeChoice]:
-    """The server's own machine, and every other machine (its cores and memory as last known)."""
-    nodes = request.app.state.nodes
-    local = nodes.local
-    out = [
-        NodeChoice(
-            id=None,
-            name=local.name,
-            online=True,
-            cpus=cpu.host["cpus"] if cpu.host else None,
-            memory=cpu.host["memory"] if cpu.host else None,
-        )
-    ]
-    for executor in nodes.all():
-        if executor.is_local:
-            continue
-        host = cpu.host_of(executor.node_id) or {}
-        out.append(
-            NodeChoice(
-                id=executor.node_id,
-                name=executor.name,
-                online=executor.online,
-                cpus=host.get("cpus") or executor.info.get("cpu_cores"),
-                memory=host.get("memory")
-                or (executor.info["memory_total_mb"] * 2**20 if executor.info.get("memory_total_mb") else None),
-            )
-        )
-    return out
 
 
 @router.post("/start", response_model=SessionOut, status_code=201)
@@ -199,8 +158,10 @@ async def start_cpu(
 ):
     """Starts a dev environment without a GPU (no booking): from a template, or one of my kept environments."""
     template, project = await _start_target(db, body, user)
-    if body.node_id is not None and request.app.state.nodes.find(body.node_id) is None:
-        raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_node_missing")
+    if body.node_id is not None:
+        node = await db.get(Node, body.node_id)
+        if node is None or node.revoked_at is not None:
+            raise ApiError(status.HTTP_400_BAD_REQUEST, "node_invalid")
     if project is not None and body.node_id is not None:
         problem = await project_move_problem(db, get_settings().secret_key, project, body.node_id)
         if problem is not None:

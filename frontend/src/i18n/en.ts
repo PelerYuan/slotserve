@@ -1,4 +1,6 @@
 import { storageEn } from './storage' // storage hook
+import { machinesEn } from './machines' // machines
+import { sharingEn } from './sharing' // personal computers
 
 export default {
   app: {
@@ -13,6 +15,7 @@ export default {
     usage: 'Usage',
     settings: 'Settings',
     admin: 'Admin',
+    machines: machinesEn.nav, // machines
   },
   common: {
     save: 'Save',
@@ -380,7 +383,8 @@ export default {
     exportSummary: 'Daily summary',
     exportRequests: 'Every request',
     exportPeople: 'Per person (GPU-hours, utilization, energy)',
-    exportCompute: 'GPU time per day, lane, GPU and kind',
+    exportCompute: 'GPU time per day, machine, lane, GPU and kind',
+    exportNodes: 'One row per machine',
     title: 'Usage',
     subtitle: 'GPU time booked and actually used, utilization, energy and tokens.',
     everyone: 'Everyone',
@@ -407,6 +411,9 @@ export default {
     other: 'Other',
     utilOverTime: 'Utilization by lane',
     byLane: 'By lane',
+    byNode: 'By machine',
+    node: 'Machine',
+    occupied: 'Occupied',
     occupancy: 'Occupancy',
     lane: 'Lane',
     gpuCount: '{n} GPU | {n} GPUs',
@@ -709,10 +716,6 @@ export default {
     pickHint: 'A kept environment keeps what you install; a template starts fresh (your /workspace is always there).',
     keptGroup: 'Kept environments',
     templateGroup: 'Templates',
-    nodeHint: 'Machine to run it on',
-    nodeDefault: 'The server’s own machine (or where the kept environment is)',
-    nodeOption: '{name} · {n} cores',
-    nodeOffline: 'offline',
   },
   admin: {
     runtimeView: {
@@ -736,6 +739,7 @@ export default {
         idle: 'idle',
         'idle-devenv': 'shared dev environment',
         'idle-none': 'idle (set to run nothing)',
+        unshared: 'not shared by its owner now',
       },
       stage: {
         weights: 'Loading weights',
@@ -1037,6 +1041,10 @@ export default {
       audit_retention_days_desc: '0 = keep forever.',
       backup_keep: 'Daily backups to keep',
       backup_keep_desc: 'A database copy is made every 24 hours. 0 turns automatic backups off.',
+      sharing_grace_minutes: 'Grace period when an owner pauses (minutes)',
+      sharing_grace_minutes_desc: 'When the owner of a personal computer pauses sharing, running work of others gets this long (with a warning) before it is stopped.',
+      wol_lead_minutes: 'Wake machines before bookings (minutes)',
+      wol_lead_minutes_desc: 'An offline machine with Wake-on-LAN is woken this long before a booking on it starts. 0 = never automatically.',
 
       devenv_enabled: 'Dev environments',
       devenv_enabled_desc: 'Let people book GPU time as a Docker container with SSH. Needs the Docker socket mounted into SlotServe, which gives it root access to the host.',
@@ -1105,6 +1113,7 @@ export default {
         qq: 'QQ bot',
         webhooks: 'Group webhooks',
         monitor: 'Monitoring',
+        machines: 'Personal computers',
       },
       unsaved: 'Unsaved changes',
       notSet: 'not set',
@@ -1273,7 +1282,7 @@ export default {
     scan: 'Scan models',
     scanned: '{added} new model(s), {known} already known.',
     newToken: 'New token',
-    newTokenConfirm: 'Issue a new token for {name}? The current token stops working at once (a revoked node is admitted again).',
+    newTokenConfirm: 'Issue a new token for {name}? The current token stops working at once. A connected agent receives the new token and keeps running; otherwise put it into the agent’s configuration (a revoked node is admitted again).',
     revoke: 'Revoke',
     revokeConfirm: 'Revoke {name}? Its agent is disconnected and its token refused; its lanes become unavailable and its model servers stop.',
     delete: 'Delete node',
@@ -1285,10 +1294,33 @@ export default {
     dockerHint: 'Adjust the llama.cpp and models paths. --network host lets the server reach the model servers on this machine.',
     direct: 'Without Docker',
     done: 'Done',
+    tokenDelivered: 'The connected agent received the new token over its connection, stored it and keeps running: nothing to change on the machine. Keep the token in case you reinstall the agent.',
+    clock: 'clock {skew}',
+    clockOff: 'clock off by {skew}',
+    clockHint: 'Difference between the node’s clock and the server’s. Usage and events are recorded with the server’s clock; keep the node’s time synchronised (NTP) all the same.',
+    downloads: '{running} downloading · {queued} queued',
+    libraryMissing: 'model library not mounted',
+    updateAgent: 'Update the agent',
+    updateTitle: 'Update the agent on {name}',
+    updateText: 'This node runs agent {agent}; the server runs {server}. Run the same version on the node. Model servers keep running only if the agent was started with --on-exit keep outside Docker.',
+    updateHow: {
+      compose: 'With Docker Compose (docker-compose.node.yml)',
+      docker: 'With docker run',
+      pip: 'Without Docker',
+    },
+    linkTls: 'Agents connect over TLS (wss)',
+    linkPlain: 'Agents connect without encryption (ws)',
+    linkPlainHint: 'Tokens and commands travel in clear text. Outside a trusted network, serve SlotServe over https (or behind a TLS reverse proxy) and use an https:// server URL on the nodes.',
+    fingerprintHint: 'SHA-256 fingerprint of the server certificate. With a self-signed certificate, pin it on the nodes with --fingerprint (or SLOTSERVE_AGENT_SERVER_FINGERPRINT); a certificate from a private CA can be trusted with --ca-bundle instead.',
+    fingerprintError: 'The certificate could not be read: {error}',
   },
   storage: storageEn.storage, // storage hook
+  machines: machinesEn.machines, // machines
+  sharing: sharingEn.sharing, // personal computers
   errors: {
+    ...machinesEn.errors, // machines
     ...storageEn.errors, // storage hook
+    ...sharingEn.errors, // personal computers
     hf_token_required: '{repo} is gated: add a Hugging Face token in Admin → System settings first.',
     insufficient_disk: 'Not enough disk space: {free_gb} GB free, {need_gb} GB needed.',
     catalog_engine_mismatch: 'This variant cannot run on {engine}.',
@@ -1304,8 +1336,8 @@ export default {
     node_offline: 'Node {node} is offline.',
     devenv_node_missing: 'That machine is not connected to this server.',
     devenv_project_data_elsewhere: 'This kept environment’s /workspace and kept folders are on {node}; it can only continue there. Book a lane on that machine, or ask an admin for storage every machine uses (Admin → Storage).',
-    catalog_remote_lane: 'Catalog models download to this server only; choose a lane on the server’s own machine (not yet on other nodes).',
-    storage_remote_node: 'Model libraries from Admin → Storage are on this server; other nodes download into their own models directory.',
+    catalog_remote_lane: 'This lane’s machine has not reported its models directory yet; wait until its node agent has connected once.',
+    storage_remote_node: 'This model library is not available on that node. Add the node to the library in Admin → Storage, or download into the node’s own models directory.',
     devenv_disabled: 'Dev environments are switched off.',
     ssh_key_required: 'Add an SSH public key under Access credentials first.',
     ssh_login_required: 'Add an SSH public key or set an environment password under Access credentials first.',

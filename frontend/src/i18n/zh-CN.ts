@@ -1,5 +1,7 @@
 import type en from './en'
 import { storageZh } from './storage' // storage hook
+import { machinesZh } from './machines' // machines
+import { sharingZh } from './sharing' // personal computers
 
 const zh: typeof en = {
   app: {
@@ -14,6 +16,7 @@ const zh: typeof en = {
     usage: '用量',
     settings: '设置',
     admin: '管理',
+    machines: machinesZh.nav, // machines
   },
   common: {
     save: '保存',
@@ -381,7 +384,8 @@ const zh: typeof en = {
     exportSummary: '按天汇总',
     exportRequests: '逐条请求',
     exportPeople: '按人汇总（GPU 时、利用率、能耗）',
-    exportCompute: '按天、通道、GPU 和类型的 GPU 时间',
+    exportCompute: '按天、机器、通道、GPU 和类型的 GPU 时间',
+    exportNodes: '每台机器一行',
     title: '用量',
     subtitle: '预约与实际使用的 GPU 时间、利用率、能耗和 token。',
     everyone: '所有人',
@@ -408,6 +412,9 @@ const zh: typeof en = {
     other: '其他',
     utilOverTime: '各通道利用率',
     byLane: '按通道',
+    byNode: '按机器',
+    node: '机器',
+    occupied: '占用率',
     occupancy: '占用情况',
     lane: '通道',
     gpuCount: '{n} 块 GPU',
@@ -708,10 +715,6 @@ const zh: typeof en = {
     pickHint: '保留的环境会保留你安装的东西；模板每次都是全新的（/workspace 始终都在）。',
     keptGroup: '保留的环境',
     templateGroup: '模板',
-    nodeHint: '运行在哪台机器上',
-    nodeDefault: '服务器本机（或保留环境所在的机器）',
-    nodeOption: '{name} · {n} 核',
-    nodeOffline: '离线',
   },
   admin: {
     runtimeView: {
@@ -735,6 +738,7 @@ const zh: typeof en = {
         idle: '空闲',
         'idle-devenv': '共享开发环境',
         'idle-none': '空闲（设为不运行）',
+        unshared: '主人当前未共享',
       },
       stage: {
         weights: '加载权重',
@@ -1036,6 +1040,10 @@ const zh: typeof en = {
       audit_retention_days_desc: '0 表示永久保留。',
       backup_keep: '保留的每日备份数',
       backup_keep_desc: '每 24 小时自动备份一次数据库。0 表示关闭自动备份。',
+      sharing_grace_minutes: '主人暂停共享时的宽限期（分钟）',
+      sharing_grace_minutes_desc: '个人电脑的主人暂停共享后，他人正在运行的任务会先收到提醒，经过这段时间后再被停止。',
+      wol_lead_minutes: '预约前唤醒机器（分钟）',
+      wol_lead_minutes_desc: '支持网络唤醒的离线机器会在上面的预约开始前这么久被唤醒。0 表示从不自动唤醒。',
 
       devenv_enabled: '开发环境',
       devenv_enabled_desc: '允许把 GPU 时段预约成带 SSH 的 Docker 容器。需要把 Docker 套接字挂载进 SlotServe，这相当于给它宿主机的 root 权限。',
@@ -1104,6 +1112,7 @@ const zh: typeof en = {
         qq: 'QQ 机器人',
         webhooks: '群机器人 Webhook',
         monitor: '监控',
+        machines: '个人电脑',
       },
       unsaved: '有未保存的修改',
       notSet: '未设置',
@@ -1272,7 +1281,7 @@ const zh: typeof en = {
     scan: '扫描模型',
     scanned: '新增 {added} 个模型，{known} 个已存在。',
     newToken: '新令牌',
-    newTokenConfirm: '为 {name} 生成新令牌？当前令牌立即失效（已吊销的节点会重新获准接入）。',
+    newTokenConfirm: '为 {name} 生成新令牌？当前令牌立即失效。在线的节点代理会通过连接收到新令牌并继续运行；否则请把新令牌填入节点代理的配置（已吊销的节点会重新获准接入）。',
     revoke: '吊销',
     revokeConfirm: '吊销 {name}？其代理会被断开、令牌被拒绝；它的通道将不可用，模型服务会停止。',
     delete: '删除节点',
@@ -1284,9 +1293,32 @@ const zh: typeof en = {
     dockerHint: '请修改 llama.cpp 和模型目录的路径。--network host 让服务器能够访问这台机器上的模型服务。',
     direct: '不使用 Docker',
     done: '完成',
+    tokenDelivered: '在线的节点代理已通过连接收到并保存新令牌，继续运行，无需在该机器上做任何修改。请保留此令牌，以便日后重新安装节点代理。',
+    clock: '时钟 {skew}',
+    clockOff: '时钟偏差 {skew}',
+    clockHint: '节点时钟与服务器时钟之差。用量和事件均按服务器时间记录；但仍应保持节点时间同步（NTP）。',
+    downloads: '下载中 {running} · 排队 {queued}',
+    libraryMissing: '模型库未挂载',
+    updateAgent: '更新节点代理',
+    updateTitle: '更新 {name} 上的节点代理',
+    updateText: '该节点运行的节点代理版本为 {agent}，服务器为 {server}。请在节点上运行相同版本。只有在 Docker 之外以 --on-exit keep 启动的节点代理，更新时模型服务才会继续运行。',
+    updateHow: {
+      compose: '使用 Docker Compose（docker-compose.node.yml）',
+      docker: '使用 docker run',
+      pip: '不使用 Docker',
+    },
+    linkTls: '节点代理通过 TLS（wss）连接',
+    linkPlain: '节点代理以未加密方式（ws）连接',
+    linkPlainHint: '令牌和命令以明文传输。在可信网络之外，请通过 https 提供 SlotServe（或置于 TLS 反向代理之后），并在节点上使用 https:// 服务器地址。',
+    fingerprintHint: '服务器证书的 SHA-256 指纹。使用自签名证书时，请在节点上用 --fingerprint（或 SLOTSERVE_AGENT_SERVER_FINGERPRINT）固定它；私有 CA 签发的证书也可以改用 --ca-bundle 信任。',
+    fingerprintError: '无法读取证书：{error}',
   },
   storage: storageZh.storage, // storage hook
+  machines: machinesZh.machines, // machines
+  sharing: sharingZh.sharing, // personal computers
   errors: {
+    ...machinesZh.errors, // machines
+    ...sharingZh.errors, // personal computers
     ...storageZh.errors, // storage hook
     hf_token_required: '{repo} 是受限仓库：请先在「管理 → 系统设置」中填写 Hugging Face Token。',
     insufficient_disk: '磁盘空间不足：剩余 {free_gb} GB，需要 {need_gb} GB。',
@@ -1303,8 +1335,8 @@ const zh: typeof en = {
     node_offline: '节点 {node} 已离线。',
     devenv_node_missing: '这台机器没有连接到本服务器。',
     devenv_project_data_elsewhere: '这个保留环境的 /workspace 和保留目录在 {node} 上，只能在那里继续。请预约那台机器上的通道，或请管理员配置所有机器都能使用的存储（管理 → 存储）。',
-    catalog_remote_lane: '模型目录中的模型目前只能下载到服务器本机；请选择服务器本机上的通道（暂不支持其他节点）。',
-    storage_remote_node: '「管理 → 存储」中的模型库位于服务器本机；其他节点会下载到各自的模型目录。',
+    catalog_remote_lane: '该通道所在的机器尚未上报其模型目录；请等待其节点代理至少连接一次。',
+    storage_remote_node: '该节点无法使用这个模型库。请在「管理 → 存储」中把该节点加入模型库，或下载到该节点自己的模型目录。',
     devenv_disabled: '开发环境功能已关闭。',
     ssh_key_required: '请先在「访问凭据」页面添加 SSH 公钥。',
     ssh_login_required: '请先在「访问凭据」页面添加 SSH 公钥或设置环境密码。',

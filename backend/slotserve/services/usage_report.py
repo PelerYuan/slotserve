@@ -13,8 +13,8 @@ from datetime import UTC, datetime
 from sqlalchemy import Integer, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..orm import USAGE_KINDS, Lane, Reservation, UsageSample
-from ..schemas import UsageGpuRow, UsageKindRow, UsageLaneRow, UsageSeries
+from ..orm import USAGE_KINDS, Lane, Node, Reservation, UsageSample
+from ..schemas import UsageGpuRow, UsageKindRow, UsageLaneRow, UsageNodeRow, UsageSeries
 from .usage_sampler import gpu_count
 
 
@@ -117,6 +117,11 @@ class Report:
     people: dict[int, Acc] = field(default_factory=lambda: defaultdict(Acc))
     lanes: dict[int | None, Acc] = field(default_factory=lambda: defaultdict(Acc))
     gpus: dict[tuple[int | None, int], Acc] = field(default_factory=lambda: defaultdict(Acc))
+    nodes: dict[int | None, Acc] = field(default_factory=lambda: defaultdict(Acc))
+    node_booked: dict[int | None, float] = field(default_factory=lambda: defaultdict(float))
+    node_names: dict[int, str] = field(default_factory=dict)
+    lane_node: dict[int, int | None] = field(default_factory=dict)  # lane -> its machine now
+    gpu_node: dict[tuple[int | None, int], int | None] = field(default_factory=dict)  # where a GPU row ran
     kinds: dict[str, Acc] = field(default_factory=lambda: defaultdict(Acc))
     all: Acc = field(default_factory=Acc)
     booking_acc: Acc = field(default_factory=Acc)  # samples taken during bookings
@@ -129,6 +134,9 @@ class Report:
     def lane_name(self, lane_id: int | None) -> str:
         return self.lane_names.get(lane_id, "?") if lane_id is not None else "?"
 
+    def node_name(self, node_id: int | None) -> str | None:
+        return self.node_names.get(node_id) if node_id is not None else None
+
     # ---- outputs ---------------------------------------------------------------
 
     def lane_rows(self) -> list[UsageLaneRow]:
@@ -138,6 +146,8 @@ class Report:
             UsageLaneRow(
                 lane_id=i,
                 lane_name=self.lane_name(i),
+                node_id=self.lane_node.get(i),
+                node_name=self.node_name(self.lane_node.get(i)),
                 gpus=self.lane_gpus.get(i, 1),
                 booked_gpu_hours=_h(self.lane_booked.get(i, 0.0)),
                 used_gpu_hours=self.lanes[i].used_hours,
@@ -156,6 +166,8 @@ class Report:
             UsageGpuRow(
                 lane_id=lane_id,
                 lane_name=self.lane_name(lane_id),
+                node_id=self.gpu_node.get((lane_id, idx)),
+                node_name=self.node_name(self.gpu_node.get((lane_id, idx))),
                 gpu_index=idx,
                 gpu_hours=_h(a.seconds),
                 used_gpu_hours=a.used_hours,
@@ -166,6 +178,32 @@ class Report:
             )
             for (lane_id, idx), a in ((k, self.gpus[k]) for k in keys)
         ]
+
+    def node_rows(self) -> list[UsageNodeRow]:
+        ids = [i for i in self.node_names if i in self.nodes or i in self.node_booked or i in self.lane_node.values()]
+        ids += [i for i in self.nodes if i not in ids]
+        rows = []
+        for i in ids:
+            acc = self.nodes[i]
+            lanes = [lane for lane, node in self.lane_node.items() if node == i]
+            busy = sum(v for k, v in acc.by_kind.items() if k != "free")
+            rows.append(
+                UsageNodeRow(
+                    node_id=i,
+                    node_name=self.node_name(i) or "?",
+                    lanes=len(lanes),
+                    gpus=sum(self.lane_gpus.get(lane, 1) for lane in lanes),
+                    booked_gpu_hours=_h(self.node_booked.get(i, 0.0)),
+                    used_gpu_hours=acc.used_hours,
+                    sampled_gpu_hours=_h(acc.seconds),
+                    avg_utilization=acc.avg_util,
+                    energy_wh=round(acc.wh, 1),
+                    peak_memory_mb=acc.peak,
+                    occupancy={k: _h(v) for k, v in acc.by_kind.items()},
+                    occupied_pct=round(busy / acc.seconds * 100, 1) if acc.seconds else None,
+                )
+            )
+        return rows
 
     def kind_rows(self) -> list[UsageKindRow]:
         return [
@@ -210,13 +248,26 @@ class Report:
 
 
 async def build(
-    db: AsyncSession, window: Window, names: dict[int, str], detected_gpus: int, user_id: int | None = None
+    db: AsyncSession,
+    window: Window,
+    names: dict[int, str],
+    detected_gpus: int,
+    user_id: int | None = None,
+    lane_ids: set[int] | None = None,
+    include_cpu: bool = True,
 ) -> Report:
+    """``lane_ids``: only these lanes (one machine's); ``include_cpu``: count CPU-only environments."""
     rep = Report(window, names)
     lanes = list((await db.execute(select(Lane).order_by(Lane.position, Lane.id))).scalars())
+    nodes = list((await db.execute(select(Node).order_by(Node.is_local.desc(), Node.name))).scalars())
+    rep.node_names = {n.id: n.name for n in nodes}
+    local_id = next((n.id for n in nodes if n.is_local), None)
+    if lane_ids is not None:
+        lanes = [lane for lane in lanes if lane.id in lane_ids]
     for lane in lanes:
         rep.lane_names[lane.id] = lane.name
         rep.lane_gpus[lane.id] = gpu_count(lane.devices, detected_gpus)
+        rep.lane_node[lane.id] = lane.node_id or local_id
     since, now = window.since, window.now
 
     stmt = select(Reservation).where(
@@ -224,6 +275,8 @@ async def build(
     )
     if user_id is not None:
         stmt = stmt.where(Reservation.user_id == user_id)
+    if lane_ids is not None:
+        stmt = stmt.where(Reservation.lane_id.in_(lane_ids))
     for r in (await db.execute(stmt)).scalars():
         n = rep.lane_gpus.get(r.lane_id, 1)
         series = rep.person_series.setdefault(r.user_id, [0.0] * window.count)
@@ -234,12 +287,14 @@ async def build(
             rep.calendar[r.user_id] += sec
         rep.booked[r.user_id] += total
         rep.lane_booked[r.lane_id] += total
+        rep.node_booked[rep.lane_node.get(r.lane_id, local_id)] += total
         rep.bookings[r.user_id] += 1
 
     bucket = window.sql_bucket(UsageSample.start)
     stmt = (
         select(
             bucket,
+            UsageSample.node_id,
             UsageSample.lane_id,
             UsageSample.gpu_index,
             UsageSample.kind,
@@ -253,15 +308,29 @@ async def build(
             func.max(UsageSample.mem_total_mb),
         )
         .where(UsageSample.start >= since, UsageSample.start < now, UsageSample.resource == "gpu")
-        .group_by(bucket, UsageSample.lane_id, UsageSample.gpu_index, UsageSample.kind, UsageSample.user_id)
+        .group_by(
+            bucket,
+            UsageSample.node_id,
+            UsageSample.lane_id,
+            UsageSample.gpu_index,
+            UsageSample.kind,
+            UsageSample.user_id,
+        )
     )
     if user_id is not None:
         stmt = stmt.where(UsageSample.user_id == user_id)
-    for pos, lane_id, gpu, kind, uid, sec, metered, util, busy, wh, peak, total in (await db.execute(stmt)).all():
+    if lane_ids is not None:
+        stmt = stmt.where(UsageSample.lane_id.in_(lane_ids))
+    rows = (await db.execute(stmt)).all()
+    for pos, node_id, lane_id, gpu, kind, uid, sec, metered, util, busy, wh, peak, total in rows:
         vals = (kind, sec or 0, metered or 0, util or 0.0, busy or 0, wh or 0.0, peak, total)
+        # Rows from before multiple machines carry no node: the lane's machine.
+        node_id = node_id or rep.lane_node.get(lane_id, local_id)
         rep.all.add(*vals)
         rep.lanes[lane_id].add(*vals)
         rep.gpus[(lane_id, gpu)].add(*vals)
+        rep.gpu_node.setdefault((lane_id, gpu), node_id)
+        rep.nodes[node_id].add(*vals)
         rep.kinds[kind].add(*vals)
         if uid is not None:
             rep.people[uid].add(*vals)
@@ -281,6 +350,8 @@ async def build(
     )
     if user_id is not None:
         stmt = stmt.where(UsageSample.user_id == user_id)
+    if not include_cpu:
+        return rep
     for uid, cores in (await db.execute(stmt)).all():
         rep.cpu_core_seconds[uid] += float(cores or 0)
     return rep

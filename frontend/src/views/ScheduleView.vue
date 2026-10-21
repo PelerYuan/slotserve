@@ -3,7 +3,7 @@ import { reservationWhat } from '@/utils/reservation'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { NButton, NButtonGroup, NDropdown, NModal, useDialog, useMessage } from 'naive-ui'
+import { NButton, NButtonGroup, NDropdown, NModal, NSelect, useDialog, useMessage } from 'naive-ui'
 import { CalendarPlus, ChevronLeft, ChevronRight, Hourglass, Repeat } from 'lucide-vue-next'
 import WeekCalendar from '@/components/WeekCalendar.vue'
 import BookingModal from '@/components/BookingModal.vue'
@@ -15,6 +15,7 @@ import { useStatus } from '@/composables/useStatus'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { loadLanes, useLanes } from '@/composables/lanes'
 import { formatDate, formatRange, relativeFromNow } from '@/utils/format'
+import { sharingApi, type LaneAvailability } from '@/api/sharing'
 
 const { t } = useI18n()
 const dialog = useDialog()
@@ -56,7 +57,36 @@ const models = ref<Model[]>([])
 const slotMinutes = computed(() => session.config?.slot_minutes ?? 30)
 const { lanes, multi } = useLanes()
 const laneId = ref<number | null>(null)
+// Lanes on several machines: tabs are grouped by machine, and the calendar can be narrowed to one machine.
+const machineFilter = ref<number | null>(null)
+const laneGroups = computed(() => {
+  const groups = new Map<number | null, { id: number | null; name: string; online: boolean; lanes: typeof lanes.value }>()
+  for (const l of lanes.value) {
+    const key = l.node_id ?? null
+    const g = groups.get(key) ?? { id: key, name: l.node_name ?? '', online: l.node_online ?? true, lanes: [] }
+    g.lanes.push(l)
+    groups.set(key, g)
+  }
+  return [...groups.values()]
+})
+const multiMachine = computed(() => laneGroups.value.length > 1)
+const laneNode = (id: number | null | undefined) => lanes.value.find((l) => l.id === id)?.node_name ?? ''
+const shownGroups = computed(() =>
+  machineFilter.value == null ? laneGroups.value : laneGroups.value.filter((g) => g.id === machineFilter.value),
+)
+const machineOptions = computed(() => laneGroups.value.map((g) => ({ label: g.name, value: g.id as number })))
+watch(machineFilter, (id) => {
+  if (id != null && !lanes.value.some((l) => l.id === currentLane.value && l.node_id === id)) {
+    laneId.value = lanes.value.find((l) => l.node_id === id)?.id ?? laneId.value
+  }
+})
 const currentLane = computed(() => laneId.value ?? lanes.value[0]?.id ?? null)
+// Hours the machines of personal computers are not shared (hatched in the calendar; the owner may book them).
+const availability = ref<LaneAvailability[]>([])
+const blocks = computed(() => {
+  const info = availability.value.find((a) => a.lane_id === currentLane.value)
+  return info && info.owner_id !== session.user?.id ? info.blocks : []
+})
 
 async function load() {
   try {
@@ -67,6 +97,7 @@ async function load() {
       api.waitlist(),
     ])
     reservations.value = all
+    availability.value = await sharingApi.unavailable(rangeStart.value, rangeEnd.value).catch(() => [])
     waiting.value = wl
     mine.value = my.filter((r) => r.phase === 'upcoming' || r.phase === 'active' || r.phase === 'pending')
   } catch (e) {
@@ -218,16 +249,29 @@ const what = (r: Reservation) =>
 
     <div class="layout">
       <section class="card cal-card">
-        <div v-if="multi" class="lane-tabs">
-          <button
-            v-for="l in lanes"
-            :key="l.id"
-            class="lane-tab"
-            :class="{ on: l.id === currentLane }"
-            @click="laneId = l.id"
-          >
-            {{ l.name }}<span v-if="l.gpus.length" class="faint"> · GPU {{ l.gpus.join(',') }}</span>
-          </button>
+        <div v-if="multi" class="lane-tabs" data-test="lane-tabs">
+          <NSelect
+            v-if="multiMachine"
+            v-model:value="machineFilter"
+            :options="machineOptions"
+            :placeholder="t('machines.allMachines')"
+            clearable
+            size="small"
+            class="machine-filter"
+            data-filter="schedule-machine"
+          />
+          <template v-for="g in shownGroups" :key="String(g.id)">
+            <span v-if="multiMachine" class="lane-group" :class="{ offline: !g.online }">{{ g.name }}</span>
+            <button
+              v-for="l in g.lanes"
+              :key="l.id"
+              class="lane-tab"
+              :class="{ on: l.id === currentLane }"
+              @click="laneId = l.id"
+            >
+              {{ l.name }}<span v-if="l.gpus.length" class="faint"> · GPU {{ l.gpus.join(',') }}</span>
+            </button>
+          </template>
         </div>
         <div class="toolbar">
           <NButtonGroup size="small">
@@ -240,6 +284,7 @@ const what = (r: Reservation) =>
           <div class="legend">
             <span class="sw mine" />{{ t('common.you') }}
             <span class="sw other" />{{ t('schedule.booked') }}
+            <template v-if="blocks.length"><span class="sw unshared" />{{ t('sharing.unavailable') }}</template>
           </div>
         </div>
         <WeekCalendar
@@ -249,6 +294,8 @@ const what = (r: Reservation) =>
           :reservations="reservations"
           :current-user-id="session.user?.id ?? null"
           :now="now"
+          :blocks="blocks"
+          :block-label="t('sharing.unavailable')"
           @select="openBooking"
           @open="detail = $event"
         />
@@ -263,7 +310,7 @@ const what = (r: Reservation) =>
           <li v-for="r in mine" :key="r.id" :class="{ active: r.phase === 'active' }">
             <div class="row">
               <span class="phase" :class="r.phase">{{ t(`phase.${r.phase}`) }}</span>
-              <span v-if="multi && r.lane_name" class="badge lane-badge">{{ r.lane_name }}</span>
+              <span v-if="multi && r.lane_name" class="badge lane-badge">{{ multiMachine && laneNode(r.lane_id) ? `${laneNode(r.lane_id)} · ` : '' }}{{ r.lane_name }}</span>
               <span class="spacer" />
               <span class="faint small">{{ relativeFromNow(r.phase === 'active' ? r.end_at : r.start_at) }}</span>
             </div>
@@ -315,6 +362,7 @@ const what = (r: Reservation) =>
       :editing="editing"
       :lane-id="currentLane"
       :initial-kind="initialKind"
+      :unavailable="availability"
       @done="onBooked"
     />
 
@@ -378,6 +426,31 @@ const what = (r: Reservation) =>
   padding: 10px 12px 0;
   overflow-x: auto;
 }
+.lane-tabs {
+  align-items: center;
+}
+.machine-filter {
+  width: 150px;
+  flex: none;
+  margin-right: 6px;
+}
+.lane-group {
+  font-size: 11.5px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+  padding: 0 4px 0 10px;
+  white-space: nowrap;
+}
+.lane-group:not(:nth-child(2)) {
+  border-left: 1px solid var(--border);
+  margin-left: 6px;
+}
+.lane-group.offline::after {
+  content: ' ●';
+  color: var(--danger);
+}
 .lane-tab {
   border: 1px solid transparent;
   background: none;
@@ -429,6 +502,10 @@ const what = (r: Reservation) =>
 }
 .sw.other {
   background: var(--event-accent);
+  margin-left: 10px;
+}
+.sw.unshared {
+  background: repeating-linear-gradient(45deg, var(--text-3, #9b9bab) 0 2px, transparent 2px 4px);
   margin-left: 10px;
 }
 .mine {

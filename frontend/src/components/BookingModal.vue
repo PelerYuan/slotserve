@@ -22,8 +22,13 @@ import { ApiError, api } from '@/api/client'
 import type { AdminUser, BookingInput, DevProject, DevTemplate, Model, Reservation } from '@/api/types'
 import { session } from '@/composables/session'
 import { useLanes } from '@/composables/lanes'
+import { loadMachines, useMachines } from '@/composables/machines'
+import MachinePicker from '@/components/machines/MachinePicker.vue'
+import type { Candidate, Machine } from '@/api/machines'
+import { gb } from '@/utils/machines'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { formatBytes, formatDuration } from '@/utils/format'
+import type { LaneAvailability } from '@/api/sharing'
 
 const show = defineModel<boolean>('show', { default: false })
 const props = defineProps<{
@@ -34,6 +39,8 @@ const props = defineProps<{
   editing?: Reservation | null
   laneId?: number | null
   initialKind?: 'model' | 'exclusive' | 'devenv' | null
+  // Per lane, when its machine is not shared by its owner (personal computers).
+  unavailable?: LaneAvailability[]
 }>()
 const emit = defineEmits<{ done: [] }>()
 
@@ -43,9 +50,42 @@ const { describe } = useErrorMessage()
 
 const { lanes, multi } = useLanes()
 const lane = ref<number | null>(null)
-const laneOptions = computed(() =>
-  lanes.value.map((l) => ({ label: l.gpus.length ? `${l.name}  ·  GPU ${l.gpus.join(',')}` : l.name, value: l.id })),
+// Machine -> lane -> time: with lanes on several machines, the machine is chosen first (seeing its load).
+const { ofLane } = useMachines()
+const machineId = ref<number | null>(null)
+const laneMachine = (laneId: number | null) => lanes.value.find((l) => l.id === laneId)?.node_id ?? ofLane(laneId)?.id ?? null
+const gpuMachines = computed(() => new Set(lanes.value.map((l) => l.node_id ?? null)))
+const multiMachine = computed(() => gpuMachines.value.size > 1)
+const machineLanes = computed(() =>
+  multiMachine.value && machineId.value != null ? lanes.value.filter((l) => l.node_id === machineId.value) : lanes.value,
 )
+const laneOptions = computed(() =>
+  machineLanes.value.map((l) => {
+    const info = ofLane(l.id)?.lanes.find((x) => x.id === l.id)
+    const parts = [l.name, l.gpus.length ? `GPU ${l.gpus.join(',')}` : '', info?.gpu_memory_mb ? gb(info.gpu_memory_mb) : '']
+    const state = info ? (info.free_now ? t('machines.freeNow') : info.holder ? t('machines.heldBy', { name: info.holder }) : '') : ''
+    return { label: [...parts, state].filter(Boolean).join('  ·  '), value: l.id }
+  }),
+)
+const noLanes = (m: Machine) => (m.lanes.length ? null : t('machines.reasons.no_gpu'))
+watch(machineId, (id) => {
+  if (id != null && laneMachine(lane.value) !== id) lane.value = machineLanes.value[0]?.id ?? lane.value
+})
+watch(lane, (id) => {
+  const owner = laneMachine(id)
+  if (owner != null && owner !== machineId.value) machineId.value = owner
+})
+function onPicked(c: Candidate) {
+  if (c.lane_id != null) lane.value = c.lane_id
+}
+const pickNeed = () => ({
+  gpu: true,
+  purpose: 'booking' as const,
+  model_id: kind.value === 'model' ? modelId.value : null,
+  start_at: startTs.value ? new Date(startTs.value).toISOString() : null,
+  end_at: endTs.value ? new Date(endTs.value).toISOString() : null,
+  exclude_reservation_id: editing.value?.id ?? null,
+})
 const kind = ref<'model' | 'exclusive' | 'devenv'>('model')
 const devenvEnabled = computed(() => !!session.config?.devenv_enabled)
 const templates = ref<DevTemplate[]>([])
@@ -78,6 +118,18 @@ const error = ref('')
 const conflict = ref(false)
 const autoBook = ref(true)
 
+// The chosen machine's owner does not share it for part of the chosen time (the server refuses such bookings).
+const sharingNote = computed<'blocked' | 'own' | null>(() => {
+  const info = props.unavailable?.find((a) => a.lane_id === lane.value)
+  if (!info || startTs.value == null || endTs.value == null) return null
+  const bookingFor = forUser.value ?? session.user?.id
+  const overlaps = info.blocks.some(
+    (b) => new Date(b.start).getTime() < endTs.value! && new Date(b.end).getTime() > startTs.value!,
+  )
+  if (!overlaps) return null
+  return info.owner_id != null && info.owner_id === bookingFor ? 'own' : 'blocked'
+})
+
 const editing = computed(() => props.editing ?? null)
 const isActive = computed(() => editing.value?.phase === 'active')
 const isAdmin = computed(() => !!session.user?.is_admin)
@@ -106,6 +158,8 @@ watch(show, async (open) => {
   forUser.value = null
   const r = editing.value
   lane.value = r?.lane_id ?? props.laneId ?? lanes.value[0]?.id ?? null
+  machineId.value = laneMachine(lane.value)
+  void loadMachines(true)
   if (devenvEnabled.value) {
     templates.value = await api.devenv.templates().catch(() => templates.value)
     projects.value = await api.devenv.projects().catch(() => projects.value)
@@ -285,12 +339,23 @@ async function joinWaitlist() {
     preset="card"
     :title="editing ? t('schedule.editTitle') : t('schedule.bookingTitle')"
     :auto-focus="false"
-    style="width: 540px; max-width: calc(100vw - 32px)"
+    :style="{ width: multiMachine ? '680px' : '540px', maxWidth: 'calc(100vw - 32px)' }"
     :bordered="false"
   >
     <NForm :show-require-mark="false" @submit.prevent="submit">
-      <NFormItem v-if="multi" :label="t('schedule.lane')">
-        <NSelect v-model:value="lane" :options="laneOptions" :disabled="isActive" />
+      <NFormItem v-if="multiMachine" :label="t('machines.machine')">
+        <MachinePicker
+          v-model="machineId"
+          mode="gpu"
+          :need="pickNeed"
+          :disabled-reason="noLanes"
+          :disabled="isActive"
+          data-test="booking-machine"
+          @picked="onPicked"
+        />
+      </NFormItem>
+      <NFormItem v-if="multi && (!multiMachine || machineLanes.length > 1)" :label="t('schedule.lane')">
+        <NSelect v-model:value="lane" :options="laneOptions" :disabled="isActive" data-field="booking-lane" />
       </NFormItem>
       <NFormItem :label="t('schedule.kind')">
         <NRadioGroup v-model:value="kind" :disabled="isActive" class="kind">
@@ -430,6 +495,9 @@ async function joinWaitlist() {
         <span v-else>{{ t('schedule.preloadInfo') }}</span>
       </div>
 
+      <NAlert v-if="sharingNote" :type="sharingNote === 'own' ? 'info' : 'warning'" :show-icon="false" class="err" data-field="sharing-note">
+        {{ sharingNote === 'own' ? t('sharing.bookingOwnMachine') : t('sharing.bookingBlocked') }}
+      </NAlert>
       <NAlert v-if="error" type="error" :show-icon="false" class="err">
         {{ error }}
         <div v-if="conflict" class="waitlist">

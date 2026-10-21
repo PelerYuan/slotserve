@@ -37,18 +37,7 @@ const info = computed(() => cpuInfo.value)
 const others = computed(() => (info.value?.sessions ?? []).filter((s) => !s.mine))
 
 // ---- starting ----------------------------------------------------------------
-const picker = ref({ open: false, value: null as string | null, node: null as number | null })
-// with other machines connected, people pick where it runs (the server's own machine by default)
-const nodeOptions = computed(() =>
-  (info.value?.nodes ?? []).map((n) => ({
-    label:
-      n.cpus !== null
-        ? t('devenvCpu.nodeOption', { name: n.name, n: n.cpus }) + (n.online ? '' : ` (${t('devenvCpu.nodeOffline')})`)
-        : n.name,
-    value: n.id ?? 0,
-    disabled: !n.online,
-  })),
-)
+const picker = ref({ open: false, value: null as string | null })
 const busy = ref(false)
 const options = computed(() => {
   const kept = props.projects
@@ -63,15 +52,14 @@ const options = computed(() => {
   return out
 })
 function openPicker() {
-  picker.value = { open: true, value: null, node: null }
+  picker.value = { open: true, value: null }
 }
 async function start() {
   const [kind, id] = (picker.value.value ?? '').split(':')
   if (!id) return
   busy.value = true
   try {
-    const where = picker.value.node ? { node_id: picker.value.node } : {}
-    await cpuApi.start(kind === 'p' ? { project_id: Number(id), ...where } : { template_id: Number(id), ...where })
+    await cpuApi.start(kind === 'p' ? { project_id: Number(id) } : { template_id: Number(id) })
     picker.value.open = false
     message.success(t('devenvCpu.starting'))
     await refresh()
@@ -176,10 +164,6 @@ async function stop(id: number) {
         filterable
         data-test="cpu-pick"
       />
-      <template v-if="nodeOptions.length > 1">
-        <p class="muted small node-hint">{{ t('devenvCpu.nodeHint') }}</p>
-        <NSelect v-model:value="picker.node" :options="nodeOptions" :placeholder="t('devenvCpu.nodeDefault')" clearable data-test="cpu-node" />
-      </template>
       <template #footer>
         <div class="footer">
           <NButton @click="picker.open = false">{{ t('common.cancel') }}</NButton>
@@ -231,10 +215,6 @@ async function stop(id: number) {
 }
 .table .right {
   text-align: right;
-}
-.node-hint {
-  margin-top: 12px;
-  margin-bottom: 6px;
 }
 .footer {
   display: flex;

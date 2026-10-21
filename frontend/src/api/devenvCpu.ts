@@ -20,17 +20,9 @@ export interface CpuSession {
   state: string
   started_at: string | null
   live: CpuLive | null
+  /** the machine it runs on; null = the built-in local node */
   node_id?: number | null
   node_name?: string | null
-}
-
-/** a machine CPU-only environments can run on (id null: the server's own) */
-export interface CpuNode {
-  id: number | null
-  name: string
-  online: boolean
-  cpus: number | null
-  memory: number | null
 }
 
 export interface CpuInfo {
@@ -55,11 +47,11 @@ export interface CpuInfo {
   after_booking: number[]
   /** mine; everyone's for admins */
   sessions: CpuSession[]
-  nodes?: CpuNode[]
 }
 
 export const cpuApi = {
   info: () => request<CpuInfo>('GET', '/api/devenv/cpu'),
+  /** node_id: the machine to run on (see /api/machines); omitted = the built-in local node */
   start: (body: { template_id?: number; project_id?: number; node_id?: number | null }) =>
     request<DevSession>('POST', '/api/devenv/cpu/start', body),
   stop: (id: number) => request<{ ok: boolean }>('POST', `/api/devenv/cpu/sessions/${id}/stop`),

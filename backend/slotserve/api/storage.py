@@ -42,7 +42,8 @@ class StorageIn(BaseModel):
     local_path: str | None = Field(default=None, max_length=500)
     quota_gb: float | None = Field(default=None, gt=0, le=1_000_000)
     enabled: bool = True
-    node_ids: list[int] = Field(default_factory=list, max_length=200)  # host: other machines that have it too
+    # other machines where it is available too: a host directory (environments there), a model library (its nodes)
+    node_ids: list[int] = Field(default_factory=list, max_length=500)
 
 
 class CheckOut(BaseModel):
@@ -75,7 +76,7 @@ class StorageOut(BaseModel):
     local_path: str | None
     quota_gb: float | None
     enabled: bool
-    node_ids: list[int]  # host: other machines where the same directory exists (their environments can use it)
+    node_ids: list[int] = []  # other machines where it is available (host directories, model libraries)
     status: CheckOut | None
     checked_at: datetime | None
     usage_total: int | None  # personal: sum of everyone's folders
@@ -196,7 +197,7 @@ async def _apply(db: AsyncSession, st: Storage, body: StorageIn) -> None:
                 raise svc.StorageError("storage_users_invalid")
         st.user_ids = json.dumps(ids) if ids else None
         st.enabled = body.enabled
-        nodes = sorted(set(body.node_ids)) if body.kind == "host" else []
+        nodes = sorted(set(body.node_ids)) if body.kind == "host" or body.purpose == "models" else []
         if nodes:
             found = set(
                 (await db.execute(select(Node.id).where(Node.id.in_(nodes), Node.is_local.is_(False)))).scalars()

@@ -21,6 +21,7 @@ import type {
   CatalogEntryInput,
   ClusterNode,
   ClusterNodeToken,
+  ServerLink,
   DevInfo,
   DevProject,
   DevSession,
@@ -215,8 +216,13 @@ export const api = {
   leaveWaitlist: (id: number) => request<void>('DELETE', `/api/waitlist/${id}`),
 
   // usage
-  usage: (days: number, scope: 'all' | 'mine' = 'all') =>
-    request<Usage>('GET', '/api/usage', undefined, { days, scope, tz_offset: -new Date().getTimezoneOffset() }),
+  usage: (days: number, scope: 'all' | 'mine' = 'all', nodeId: number | null = null) =>
+    request<Usage>('GET', '/api/usage', undefined, {
+      days,
+      scope,
+      node_id: nodeId ?? undefined,
+      tz_offset: -new Date().getTimezoneOffset(),
+    }),
   usageExportUrl: (days: number, kind: UsageExport, scope: 'all' | 'mine' = 'all') =>
     `/api/usage/export?days=${days}&kind=${kind}&scope=${scope}&tz_offset=${-new Date().getTimezoneOffset()}`,
 
@@ -301,11 +307,12 @@ export const api = {
     nodes: () => request<ClusterNode[]>('GET', '/api/admin/nodes'),
     createNode: (body: { name: string; address?: string }) =>
       request<ClusterNodeToken>('POST', '/api/admin/nodes', body),
-    updateNode: (id: number, body: { name?: string; address?: string }) =>
+    updateNode: (id: number, body: { name?: string; address?: string; owner_id?: number | null }) =>
       request<ClusterNode>('PATCH', `/api/admin/nodes/${id}`, body),
     rotateNodeToken: (id: number) => request<ClusterNodeToken>('POST', `/api/admin/nodes/${id}/token`),
     revokeNode: (id: number) => request<ClusterNode>('POST', `/api/admin/nodes/${id}/revoke`),
     deleteNode: (id: number) => request<void>('DELETE', `/api/admin/nodes/${id}`),
+    serverLink: () => request<ServerLink>('GET', '/api/admin/nodes/server'),
     scanNode: (id: number) =>
       request<{ added: string[]; skipped: number }>('POST', '/api/models/scan', undefined, { node_id: id }),
     manual: (body: {

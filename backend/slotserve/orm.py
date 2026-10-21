@@ -138,6 +138,8 @@ class CatalogDeploy(Base):
     lane_id: Mapped[int | None] = mapped_column(ForeignKey("lanes.id", ondelete="SET NULL"), nullable=True)
     set_default: Mapped[bool] = mapped_column(Boolean, default=False)
     task_ids: Mapped[str] = mapped_column(Text, default="[]")  # JSON list of download_tasks ids
+    # The node (agent) the files are downloaded to and the model is registered on; NULL = this machine.
+    node_id: Mapped[int | None] = mapped_column(ForeignKey("nodes.id", ondelete="CASCADE"), nullable=True)
     # downloading | done | failed | cancelled
     status: Mapped[str] = mapped_column(String(16), default="downloading", index=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -451,9 +453,6 @@ class DevSession(Base):
         ForeignKey("devenv_templates.id", ondelete="SET NULL"), nullable=True
     )
     lane_id: Mapped[int | None] = mapped_column(ForeignKey("lanes.id", ondelete="SET NULL"), nullable=True)
-    # The machine (node) the container runs on: the lane's, or the one chosen for a CPU-only environment.
-    # NULL = the control plane's own machine. Other machines are driven through the relay (cluster/relay.py).
-    node_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     image: Mapped[str] = mapped_column(String(255))
     # waiting | pulling | ready | starting | running | stopping | stopped | failed
     state: Mapped[str] = mapped_column(String(16), default="waiting")
@@ -468,6 +467,9 @@ class DevSession(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     started_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     stopped_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    # The machine (node) the container runs on: the lane's, or the one its owner chose for a CPU-only environment
+    # (see CpuEnvs.runs_on). NULL = the built-in local node. Other machines are driven through the relay.
+    node_id: Mapped[int | None] = mapped_column(ForeignKey("nodes.id", ondelete="SET NULL"), nullable=True)
 
 
 class DevPort(Base):
@@ -538,6 +540,8 @@ class UsageSample(Base):
     mem_peak_mb: Mapped[int | None] = mapped_column(Integer, nullable=True)
     mem_total_mb: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cpu_core_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)  # resource "cpu" only
+    # The machine the lane ran on at that time (NULL in rows from before multiple machines: the lane's node).
+    node_id: Mapped[int | None] = mapped_column(ForeignKey("nodes.id", ondelete="SET NULL"), nullable=True)
 
 
 class Node(Base):
@@ -564,6 +568,39 @@ class Node(Base):
     # JSON: hostname, os, gpus, cpu_cores, memory_total_mb, models_dir, engines ...
     inventory: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)  # e.g. a protocol version mismatch
+    # Personal computers (services/sharing.py): the person whose machine this is, and when they share it.
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    # JSON list of weekly windows [{"days": [0..6] (Monday = 0), "start": "23:00", "end": "09:00"}] in the
+    # server's time zone; an end before the start runs into the next day. NULL = always shared.
+    sharing_schedule: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # "I'm using my PC": sharing is paused from this moment (running work is stopped after the grace period)
+    # until ``sharing_paused_until`` (NULL = until resumed).
+    sharing_paused_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    sharing_paused_until: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    sharing_paused_by: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Wake-on-LAN: MAC addresses entered by hand (comma separated), besides those the agent reports.
+    mac_addresses: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Label of the local network the machine is in; machines with the same label (or subnet) wake each other.
+    network: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    woken_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)  # last magic packet sent
+
+
+class NodeShareDaily(Base):
+    """How long an owned machine was online and shared, per UTC day (contribution statistics).
+
+    ``gpu_shared_seconds`` counts the GPUs of the machine's lanes; use by others comes from ``usage_samples``.
+    """
+
+    __tablename__ = "node_share_daily"
+    __table_args__ = (UniqueConstraint("node_id", "day", "owner_id", name="uq_node_share_daily"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    node_id: Mapped[int] = mapped_column(ForeignKey("nodes.id", ondelete="CASCADE"), index=True)
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    day: Mapped[str] = mapped_column(String(10))  # YYYY-MM-DD (UTC)
+    online_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    shared_seconds: Mapped[int] = mapped_column(Integer, default=0)  # online and shared
+    gpu_shared_seconds: Mapped[int] = mapped_column(Integer, default=0)  # shared seconds x GPUs of its lanes
 
 
 class NodeModel(Base):
@@ -606,8 +643,9 @@ class Storage(Base):
     user_ids: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list (access "users")
     local_path: Mapped[str | None] = mapped_column(Text, nullable=True)  # models: where SlotServe sees it
     quota_gb: Mapped[float | None] = mapped_column(Float, nullable=True)  # personal: soft limit per person
-    # host: other machines (node ids, JSON list) where the same directory exists (e.g. the same NFS mount), so their
-    # dev environments can use it too; a host directory is otherwise the control plane's machine only.
+    # Other machines (node ids, JSON list) where the storage is available too. A host directory exists there at the
+    # same path (e.g. the same NFS mount), so their dev environments can use it (otherwise it is the control plane's
+    # machine only); a model library (host or NFS / SMB, mounted by that node's agent) is used by those nodes.
     node_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     status: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON: the last check

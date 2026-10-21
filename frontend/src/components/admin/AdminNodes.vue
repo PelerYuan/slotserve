@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NInput, NModal, useDialog, useMessage } from 'naive-ui'
-import { Cpu, Plus, Server } from 'lucide-vue-next'
+import { NButton, NInput, NModal, NSelect, useDialog, useMessage } from 'naive-ui'
+import { Cpu, Lock, Plus, Server, Unlock } from 'lucide-vue-next'
 import { api } from '@/api/client'
-import type { ClusterNode, ClusterNodeToken, NodeStatus } from '@/api/types'
+import type { AdminUser, ClusterNode, ClusterNodeToken, NodeStatus, ServerLink } from '@/api/types'
 import CodeBlock from '@/components/CodeBlock.vue'
+import MachineDrawer from '@/components/machines/MachineDrawer.vue'
+import SharingPanel from '@/components/sharing/SharingPanel.vue'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { formatDateTime, relativeFromNow } from '@/utils/format'
 
@@ -16,6 +18,7 @@ const { showError } = useErrorMessage()
 
 const nodes = ref<ClusterNode[]>([])
 const loaded = ref(false)
+const link = ref<ServerLink | null>(null)
 let timer: number | undefined
 
 async function load() {
@@ -30,7 +33,16 @@ async function load() {
 onMounted(() => {
   load()
   timer = window.setInterval(load, 5000)
+  api.admin
+    .serverLink()
+    .then((v) => (link.value = v))
+    .catch(() => undefined)
 })
+
+// ---- versions, clocks ------------------------------------------------------------
+
+const updating = ref<ClusterNode | null>(null)
+const skew = (s: number) => `${s > 0 ? '+' : ''}${s.toFixed(Math.abs(s) < 10 ? 1 : 0)} s`
 onBeforeUnmount(() => window.clearInterval(timer))
 
 const STATUS_CLASS: Record<NodeStatus, string> = {
@@ -41,19 +53,33 @@ const STATUS_CLASS: Record<NodeStatus, string> = {
   mismatch: 'warn',
 }
 
+// the same machine card everyone sees on the Machines page
+const openId = ref<number | null>(null)
+
 const gb = (mb: number | null) => (mb == null ? '—' : `${(mb / 1024).toFixed(mb >= 10240 ? 0 : 1)} GB`)
 
 // ---- add / edit -----------------------------------------------------------------
 
-const form = reactive({ open: false, id: null as number | null, name: '', address: '' })
+const form = reactive({ open: false, id: null as number | null, name: '', address: '', owner: null as number | null })
+const users = ref<AdminUser[]>([])
+const ownerOptions = computed(() => [
+  { label: t('sharing.noOwner'), value: -1 },
+  ...users.value.map((u) => ({ label: u.username, value: u.id })),
+])
+async function loadUsers() {
+  if (!users.value.length) users.value = await api.admin.users().catch(() => [])
+}
+// Owner controls of one machine (sharing hours, pause, what runs, Wake-on-LAN).
+const sharingNode = ref<ClusterNode | null>(null)
 const busy = ref(false)
 const issued = ref<ClusterNodeToken | null>(null)
 
 function openNew() {
-  Object.assign(form, { open: true, id: null, name: '', address: '' })
+  Object.assign(form, { open: true, id: null, name: '', address: '', owner: null })
 }
 function openEdit(n: ClusterNode) {
-  Object.assign(form, { open: true, id: n.id, name: n.name, address: n.address })
+  Object.assign(form, { open: true, id: n.id, name: n.name, address: n.address, owner: n.owner_id ?? -1 })
+  loadUsers()
 }
 
 async function save() {
@@ -62,7 +88,11 @@ async function save() {
     if (form.id === null) {
       issued.value = await api.admin.createNode({ name: form.name.trim(), address: form.address.trim() })
     } else {
-      await api.admin.updateNode(form.id, { name: form.name.trim(), address: form.address.trim() })
+      await api.admin.updateNode(form.id, {
+        name: form.name.trim(),
+        address: form.address.trim(),
+        owner_id: form.owner === -1 ? null : form.owner,
+      })
       message.success(t('cluster.saved'))
     }
     form.open = false
@@ -118,6 +148,22 @@ async function scan(n: ClusterNode) {
 <template>
   <p class="muted intro">{{ t('cluster.intro') }}</p>
 
+  <section v-if="link" class="card link" data-section="server-link">
+    <div class="link-row">
+      <component :is="link.tls ? Lock : Unlock" :size="16" :class="link.tls ? 'ok-text' : 'warn-text'" />
+      <div>
+        <div class="strong">{{ link.tls ? t('cluster.linkTls') : t('cluster.linkPlain') }}</div>
+        <div class="faint small mono">{{ link.server_url }}</div>
+      </div>
+    </div>
+    <template v-if="link.fingerprint">
+      <p class="small hint">{{ t('cluster.fingerprintHint') }}</p>
+      <CodeBlock :code="link.fingerprint" inline />
+    </template>
+    <p v-else-if="link.fingerprint_error" class="small warn-text">{{ t('cluster.fingerprintError', { error: link.fingerprint_error }) }}</p>
+    <p v-else-if="!link.tls" class="small faint">{{ t('cluster.linkPlainHint') }}</p>
+  </section>
+
   <section class="card">
     <div class="card-header">
       <h3 class="card-title">{{ t('cluster.title') }}</h3>
@@ -153,9 +199,26 @@ async function scan(n: ClusterNode) {
                 <div v-if="!n.is_local && n.last_seen_at" class="faint small" :title="formatDateTime(n.last_seen_at)">
                   {{ t('cluster.lastSeen', { when: relativeFromNow(n.last_seen_at) }) }}
                 </div>
+                <div
+                  v-if="!n.is_local && n.clock_skew_seconds != null"
+                  class="small"
+                  :class="n.clock_skew_warning ? 'warn-text' : 'faint'"
+                  :title="t('cluster.clockHint')"
+                  data-field="clock-skew"
+                >
+                  {{ t(n.clock_skew_warning ? 'cluster.clockOff' : 'cluster.clock', { skew: skew(n.clock_skew_seconds) }) }}
+                </div>
+                <div v-if="n.download_running || n.downloads_queued" class="faint small">
+                  {{ t('cluster.downloads', { running: n.download_running ? 1 : 0, queued: n.downloads_queued ?? 0 }) }}
+                </div>
               </td>
               <td class="small">
-                <div>{{ n.hostname ?? '—' }}</div>
+                <div>{{ n.hostname ?? '—' }}<span v-if="n.platform" class="faint"> · {{ n.platform }}</span></div>
+                <div v-if="n.owner_name" class="owner">
+                  <span class="badge brand">{{ t('sharing.owner') }}: {{ n.owner_name }}</span>
+                  <span v-if="n.sharing_paused" class="badge warn">{{ t('sharing.paused') }}</span>
+                  <span v-else-if="n.shared_now === false" class="badge">{{ t('sharing.notShared') }}</span>
+                </div>
                 <div class="faint">
                   <span v-if="n.cpu_cores">{{ t('cluster.cores', { n: n.cpu_cores }) }}</span>
                   <span v-if="n.cpu_percent != null"> · {{ n.cpu_percent.toFixed(0) }}%</span>
@@ -164,6 +227,9 @@ async function scan(n: ClusterNode) {
                   </span>
                 </div>
                 <div v-if="n.models_dir" class="faint mono">{{ n.models_dir }} · {{ t('cluster.models', { n: n.model_count }) }}</div>
+                <div v-for="lib in n.libraries ?? []" :key="lib.storage_id" class="mono" :class="lib.error ? 'warn-text' : 'faint'">
+                  {{ lib.path ?? t('cluster.libraryMissing') }}<template v-if="lib.error"> · {{ lib.error }}</template>
+                </div>
               </td>
               <td class="small">
                 <div v-if="!n.gpus.length" class="faint">{{ t('cluster.noGpus') }}</div>
@@ -179,11 +245,25 @@ async function scan(n: ClusterNode) {
               <td class="small mono">
                 <div>{{ n.agent_version ?? '—' }}</div>
                 <div v-if="n.protocol_version != null" class="faint">{{ t('cluster.protocol', { n: n.protocol_version }) }}</div>
+                <NButton
+                  v-if="n.update_commands && Object.keys(n.update_commands).length"
+                  size="tiny"
+                  type="warning"
+                  secondary
+                  data-action="update-agent"
+                  @click="updating = n"
+                >
+                  {{ t('cluster.updateAgent') }}
+                </NButton>
               </td>
               <td class="right nowrap">
+                <NButton size="small" quaternary :disabled="n.status === 'revoked'" data-action="node-details" @click="openId = n.id">
+                  {{ t('machines.details') }}
+                </NButton>
                 <NButton size="small" quaternary :disabled="n.status !== 'online'" @click="scan(n)">
                   {{ t('cluster.scan') }}
                 </NButton>
+                <NButton size="small" quaternary :data-sharing="n.name" @click="sharingNode = n">{{ t('sharing.manage') }}</NButton>
                 <NButton size="small" quaternary @click="openEdit(n)">{{ t('common.edit') }}</NButton>
                 <template v-if="!n.is_local">
                   <NButton size="small" quaternary @click="rotate(n)">{{ t('cluster.newToken') }}</NButton>
@@ -205,6 +285,8 @@ async function scan(n: ClusterNode) {
     </div>
   </section>
 
+  <MachineDrawer :machine-id="openId" @close="openId = null" />
+
   <NModal
     v-model:show="form.open"
     preset="card"
@@ -222,6 +304,11 @@ async function scan(n: ClusterNode) {
         <NInput v-model:value="form.address" maxlength="255" :placeholder="t('cluster.addressAuto')" />
         <p class="faint small hint">{{ t('cluster.addressHint') }}</p>
       </label>
+      <label v-if="form.id !== null">
+        <span class="field-label">{{ t('sharing.owner') }}</span>
+        <NSelect v-model:value="form.owner" :options="ownerOptions" filterable data-field="node-owner" />
+        <p class="faint small hint">{{ t('sharing.ownerHint') }}</p>
+      </label>
     </div>
     <template #footer>
       <div class="footer">
@@ -234,6 +321,36 @@ async function scan(n: ClusterNode) {
   </NModal>
 
   <NModal
+    :show="sharingNode !== null"
+    preset="card"
+    :title="t('sharing.manageTitle', { name: sharingNode?.name ?? '' })"
+    :bordered="false"
+    style="width: 760px; max-width: calc(100vw - 32px)"
+    @update:show="(v: boolean) => !v && ((sharingNode = null), load())"
+  >
+    <SharingPanel v-if="sharingNode" :node-id="sharingNode.id" />
+  </NModal>
+
+  <NModal
+    :show="updating !== null"
+    preset="card"
+    :title="t('cluster.updateTitle', { name: updating?.name ?? '' })"
+    :bordered="false"
+    style="width: 720px; max-width: calc(100vw - 32px)"
+    @update:show="(v: boolean) => !v && (updating = null)"
+  >
+    <template v-if="updating">
+      <p class="small">
+        {{ t('cluster.updateText', { agent: updating.agent_version ?? '?', server: link?.version ?? '' }) }}
+      </p>
+      <template v-for="(cmd, how) in updating.update_commands" :key="how">
+        <h4 class="sub">{{ t(`cluster.updateHow.${how}`) }}</h4>
+        <CodeBlock :code="cmd" />
+      </template>
+    </template>
+  </NModal>
+
+  <NModal
     :show="issued !== null"
     preset="card"
     :title="t('cluster.tokenTitle', { name: issued?.node.name ?? '' })"
@@ -242,8 +359,17 @@ async function scan(n: ClusterNode) {
     @update:show="(v: boolean) => !v && (issued = null)"
   >
     <template v-if="issued">
+      <p v-if="issued.delivered" class="small ok-text" data-field="token-delivered">{{ t('cluster.tokenDelivered') }}</p>
       <p class="small">{{ t('cluster.tokenOnce') }}</p>
       <CodeBlock :code="issued.token" inline />
+      <template v-if="issued.install_linux">
+        <h4 class="sub">{{ t('sharing.install') }}</h4>
+        <p class="faint small">{{ t('sharing.installHint') }}</p>
+        <p class="small label">{{ t('sharing.installLinux') }}</p>
+        <CodeBlock :code="issued.install_linux" />
+        <p class="small label">{{ t('sharing.installWindows') }}</p>
+        <CodeBlock :code="issued.install_windows ?? ''" />
+      </template>
       <h4 class="sub">{{ t('cluster.docker') }}</h4>
       <p class="faint small">{{ t('cluster.dockerHint') }}</p>
       <CodeBlock :code="issued.docker_command" />
@@ -273,6 +399,29 @@ async function scan(n: ClusterNode) {
 }
 .lane {
   margin: 0 4px 4px 0;
+}
+.owner {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin: 2px 0;
+}
+.label {
+  margin: 10px 0 4px;
+}
+.warn-text {
+  color: var(--warning, #b45309);
+}
+.ok-text {
+  color: var(--success, #15803d);
+}
+.link {
+  margin-bottom: 16px;
+}
+.link-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .error-row td {
   color: var(--warning, #b45309);

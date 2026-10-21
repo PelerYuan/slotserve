@@ -92,7 +92,7 @@ async def _is(value: bool) -> bool:
 
 
 async def test_relay_targets_limits_idle_and_auth(app, make_client, start_agent, live):
-    _admin, agent, executor = await _node(app, make_client, start_agent)
+    admin, agent, executor = await _node(app, make_client, start_agent)
     relay = app.state.cluster.relay
     server, port, _seen = await _echo_server()
     try:
@@ -167,6 +167,14 @@ async def test_relay_targets_limits_idle_and_auth(app, make_client, start_agent,
         stream = await stream_task
         await stream.write(b"still fine")
         assert await stream.read() == b"still fine"
+        await stream.close()
+
+        # After an in-band token rotation the agent's relayed connections use (and need) the new token.
+        r = await admin.post(f"/api/admin/nodes/{executor.node_id}/token")
+        assert r.status_code == 200 and r.json()["token"] == agent.token
+        stream = await relay.open(executor, target)
+        await stream.write(b"new token")
+        assert await stream.read() == b"new token"
         await stream.close()
 
         # Revoking a node ends its streams.

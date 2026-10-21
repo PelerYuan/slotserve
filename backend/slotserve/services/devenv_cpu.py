@@ -283,6 +283,17 @@ class CpuEnvs:
     def enabled(self) -> bool:
         return bool(self.settings.devenv_enabled and self.settings.devenv_cpu_enabled)
 
+    def runs_on(self, node_id: int | None) -> bool:
+        """Whether CPU-only environments can start on a machine (``None``: the built-in local node).
+
+        The local node, and every other machine with an agent: its Docker is driven through the relay.
+        """
+        return self._is_local(node_id) or self.m.executor(node_id) is not None
+
+    def _is_local(self, node_id: int | None) -> bool:
+        nodes = getattr(self.m.state, "nodes", None)
+        return node_id is None if nodes is None else nodes.is_local(node_id)
+
     async def active_count(self, db, user_id: int | None = None) -> int:
         stmt = select(func.count(DevSession.id)).where(DevSession.kind == KIND, DevSession.state.in_(ACTIVE_STATES))
         if user_id is not None:
@@ -337,14 +348,15 @@ class CpuEnvs:
         node_id: int | None = None,
     ) -> DevSession:
         """Starts a CPU-only environment from a template, or continues a kept environment without a GPU, on a
-        machine (``node_id``; by default a kept environment's own machine, else the control plane's)."""
+        machine: ``node_id`` (the local node's id or None: the built-in local node), or by default a kept
+        environment's own machine."""
         from .devenv import DevEnvError
 
         if node_id is None and project is not None:
             node_id = project.container_node_id if project.container_id else None
+        if not self.runs_on(node_id):
+            raise DevEnvError("devenv_cpu_node_unsupported")
         node = self.m.node_key(node_id)
-        if node is not None and self.m.executor(node) is None:
-            raise DevEnvError("devenv_node_missing")
         await self.check_room(db, user.id)
         has_key = (await db.execute(select(SshKey.id).where(SshKey.user_id == user.id).limit(1))).first()
         password = self.settings.devenv_password_login and user.devenv_password_hash

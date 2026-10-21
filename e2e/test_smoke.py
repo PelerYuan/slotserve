@@ -257,6 +257,41 @@ def test_nodes_page_and_agent(page: Page, server: str, tmp_path):
     assert not page.errors  # type: ignore[attr-defined]
 
 
+def test_personal_computer_owner_controls(page: Page, server: str):
+    """A personal computer: one-line installers with the token, then its owner sets sharing hours and pauses."""
+    sign_in(page, server, "admin")
+    page.goto(f"{server}/admin?tab=nodes")
+    page.locator("[data-action=add-node]").click()
+    dialog = page.get_by_role("dialog")
+    dialog.locator("[data-field=node-name] input").fill("e2e-pc")
+    dialog.get_by_role("button", name="Create and show token").click()
+    dialog = page.get_by_role("dialog")
+    expect(dialog.get_by_text("/install/node.sh?token=ssn-").first).to_be_visible()
+    expect(dialog.get_by_text("/install/node.ps1?token=ssn-").first).to_be_visible()
+    dialog.get_by_role("button", name="Done").click()
+
+    me = _api(page, server, "GET", "/api/auth/me")
+    node_id = next(n["id"] for n in _api(page, server, "GET", "/api/admin/nodes") if n["name"] == "e2e-pc")
+    _api(page, server, "PATCH", f"/api/admin/nodes/{node_id}", {"owner_id": me["id"]})
+    page.goto(f"{server}/my-machines")
+    panel = page.locator("[data-sharing-node=e2e-pc]")
+    expect(panel).to_be_visible()
+    panel.locator("[data-action=schedule-mode]").click()
+    panel.locator("[data-action=preset-nights]").click()
+    panel.locator("[data-action=save-sharing]").click()
+    expect(page.get_by_text("Sharing hours saved.")).to_be_visible()
+    panel.locator("[data-action=pause-sharing]").click()
+    page.get_by_text("Until I resume").click()
+    expect(panel.locator("[data-field=sharing-status]")).to_have_text("Paused until you resume")
+    panel.locator("[data-action=resume-sharing]").click()
+    expect(page.get_by_text("Sharing resumed.")).to_be_visible()
+    node = next(n for n in _api(page, server, "GET", "/api/admin/nodes") if n["name"] == "e2e-pc")
+    assert node["owner_id"] == me["id"] and len(node["sharing_schedule"]) == 2 and not node["sharing_paused"]
+    _api(page, server, "POST", f"/api/admin/nodes/{node_id}/revoke")
+    _api(page, server, "DELETE", f"/api/admin/nodes/{node_id}")
+    assert not page.errors  # type: ignore[attr-defined]
+
+
 def test_storage_tab(page: Page, server: str):
     """Admin -> Storage: add a host directory, see its check result, remove it."""
     sign_in(page, server, "admin")
@@ -326,4 +361,70 @@ def test_model_catalog_deploy(page: Page, server: str):
     expect(page.get_by_text("nomic-embed-text-v1.5-q8_0 is ready")).to_be_visible()
     model = next(m for m in _api(page, server, "GET", "/api/models") if m["name"] == "nomic-embed-text-v1.5-q8_0")
     assert model["args"] == "-ngl 99 -c 8192 --embedding --pooling mean"
+    assert not page.errors  # type: ignore[attr-defined]
+
+
+def test_machines_page(page: Page, server: str, tmp_path):
+    """Machines: cards for the local node and a node agent, filters, details drawer, Pick for me."""
+    sign_in(page, server, "admin")
+    created = _api(page, server, "POST", "/api/admin/nodes", data={"name": "e2e-box"})
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    env = {
+        **os.environ,
+        "SLOTSERVE_DATA_DIR": str(tmp_path / "data"),
+        "SLOTSERVE_MODELS_DIR": str(tmp_path / "models"),
+        "SLOTSERVE_LLAMA_PORT": str(port),
+        "SLOTSERVE_AGENT_MODEL_HOST": "127.0.0.1",
+    }
+    agent = subprocess.Popen(
+        [sys.executable, "-m", "slotserve", "agent", "--server", server, "--token", created["token"]],
+        cwd=tmp_path,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        page.get_by_role("link", name="Machines", exact=True).click()
+        expect(page.get_by_role("heading", name="Machines")).to_be_visible()
+        local = next(m for m in _api(page, server, "GET", "/api/machines") if m["is_local"])
+        expect(page.locator(f"[data-machine='{local['name']}']")).to_be_visible()
+        remote = page.locator("article[data-machine=e2e-box]")
+        expect(remote.get_by_text("Online")).to_be_visible(timeout=20000)
+        expect(page.locator("[data-test=machine-totals]")).to_contain_text("2 of 2 online")
+
+        # filters: GPU / CPU only narrow the list; free RAM beyond any machine shows the reset hint
+        page.get_by_text("CPU only", exact=True).first.click()
+        page.get_by_text("Has GPU", exact=True).click()
+        page.get_by_text("All", exact=True).first.click()
+        expect(page.locator("article.machine")).to_have_count(2)
+        page.locator("[data-filter=ram]").click()
+        page.get_by_text("≥ 128 GB").click()
+        if not page.locator("article.machine").count():
+            page.get_by_role("button", name="Reset filters").click()
+        expect(page.locator("article.machine").first).to_be_visible()
+
+        # details drawer of the node agent
+        remote.locator("[data-action=machine-details]").click()
+        drawer = page.locator("[data-test=machine-drawer]")
+        expect(drawer.get_by_text("Hardware")).to_be_visible()
+        expect(drawer.get_by_text("CPU compute")).to_be_visible()
+        page.keyboard.press("Escape")
+
+        page.locator("[data-action=machines-pick]").click()
+        expect(page.locator("[data-test=pick-result]")).to_be_visible()
+
+        # the booking dialog lists machines only when lanes are on several of them; Admin > Nodes opens the card
+        page.goto(f"{server}/admin?tab=nodes")
+        page.locator("tr[data-node=e2e-box] [data-action=node-details]").click()
+        expect(page.locator("[data-test=machine-drawer]").get_by_text("Hardware")).to_be_visible()
+        _api(page, server, "POST", f"/api/admin/nodes/{created['node']['id']}/revoke")
+        _api(page, server, "DELETE", f"/api/admin/nodes/{created['node']['id']}")
+    finally:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(agent.pid)], capture_output=True, check=False)
+        else:
+            agent.terminate()
+        agent.wait(timeout=20)
     assert not page.errors  # type: ignore[attr-defined]

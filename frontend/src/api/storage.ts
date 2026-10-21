@@ -33,10 +33,10 @@ export interface Storage {
   user_ids: number[]
   usernames: string[]
   local_path: string | null
+  /** other machines it is available on: a host directory (their dev environments), a model library (their lanes) */
+  node_ids?: number[]
   quota_gb: number | null
   enabled: boolean
-  /** host: other machines where the same directory exists */
-  node_ids: number[]
   status: StorageCheck | null
   checked_at: string | null
   usage_total: number | null
@@ -60,9 +60,9 @@ export interface StorageInput {
   access: StorageAccess
   user_ids: number[]
   local_path?: string | null
+  node_ids?: number[]
   quota_gb?: number | null
   enabled: boolean
-  node_ids?: number[]
 }
 
 export interface StorageUsage {

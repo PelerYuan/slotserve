@@ -465,16 +465,12 @@ async def test_remote_download(app, make_client, start_agent):
 
 
 async def test_server_only_features_on_remote_nodes(app, make_client, start_agent, monkeypatch):
-    """Catalog deploys and model library downloads stay on the server; remote lanes reserve no server cores."""
+    """Model libraries not made available on a node stay on the server; remote lanes reserve no server cores."""
     admin, _agent, node_id, lane, _models = await _remote_setup(app, make_client, start_agent)
     r = await admin.post(
-        "/api/catalog/deploy", json={"entry_id": "qwen3-8b", "variant_id": "q4_k_m", "lane_id": lane["id"]}
+        "/api/downloads", json={"url": "http://127.0.0.1:9/x.gguf", "node_id": node_id, "storage_id": 999}
     )
-    assert r.status_code == 400 and r.json()["detail"]["code"] == "catalog_remote_lane"
-    r = await admin.post(
-        "/api/downloads", json={"url": "http://127.0.0.1:9/x.gguf", "node_id": node_id, "storage_id": 1}
-    )
-    assert r.status_code == 400 and r.json()["detail"]["code"] == "storage_remote_node"
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "storage_library_invalid"
 
     async def host_info(force: bool = False):
         return {"cpus": 32, "memory": 0}

@@ -8,6 +8,7 @@ import contextlib
 import json
 import logging
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ..cluster import protocol as p
@@ -67,12 +68,17 @@ class AgentRelay:
 
     async def connect_data(self, stream_id: str, secret: str):
         """The data connection of one stream: the one place it is set up. It authenticates like the control
-        connection (the agent's current token) and must verify the server the same way (TLS settings)."""
+        connection (the agent's current, possibly rotated, token) and verifies the server the same way."""
         from websockets.asyncio.client import connect
 
         headers = {"Authorization": f"Bearer {self.agent.token}", p.STREAM_SECRET_HEADER: secret}
         return await connect(
-            self.url(stream_id), additional_headers=headers, max_size=None, open_timeout=15, compression=None
+            self.url(stream_id),
+            additional_headers=headers,
+            max_size=None,
+            open_timeout=15,
+            compression=None,
+            **self.agent.link_options(),  # the same TLS verification and pinning as the control connection
         )
 
     # ---- targets ----------------------------------------------------------------------------------
@@ -92,7 +98,13 @@ class AgentRelay:
                 return await open_docker(self.settings.docker_host)
             if kind == "container":
                 host, port = await self.resolve_container(target)
-                return await asyncio.open_connection(host, port)
+                try:
+                    return await asyncio.wait_for(asyncio.open_connection(host, port), 5)
+                except (OSError, TimeoutError):
+                    fallback = await self.join_network(target)
+                    if fallback is None:
+                        raise
+                    return await asyncio.open_connection(*fallback)
         except p.RemoteError:
             raise
         except (OSError, ValueError, KeyError, TypeError) as exc:
@@ -102,7 +114,7 @@ class AgentRelay:
     async def resolve_container(self, target: dict) -> tuple[str, int]:
         """Where this machine reaches a container's port: a port Docker publishes on the host, else the container's
         address in its network (works where container networks are routable, i.e. Linux)."""
-        docker = self.agent.docker()
+        docker = self.agent.docker_api()
         info = await docker.inspect(str(target["container"]))
         if info is None:
             raise p.RemoteError("not_found", f"container {target['container']} does not exist")
@@ -120,6 +132,23 @@ class AgentRelay:
         if not ip:
             raise p.RemoteError("unreachable", f"container {target['container']} has no address")
         return ip, port
+
+    async def join_network(self, target: dict) -> tuple[str, int] | None:
+        """An agent in a container without host networking (e.g. Docker Desktop) cannot reach ports published on
+        the host's loopback: it joins the environment's network and connects to the container there."""
+        import socket
+
+        network = target.get("network")
+        if not network or not Path("/.dockerenv").exists():
+            return None
+        docker = self.agent.docker_api()
+        try:
+            await docker.network_connect(str(network), socket.gethostname())
+            info = await docker.inspect(str(target["container"])) or {}
+        except Exception:  # noqa: BLE001 - no fallback then
+            return None
+        ip = (((info.get("NetworkSettings") or {}).get("Networks") or {}).get(network) or {}).get("IPAddress")
+        return (ip, int(target["port"])) if ip else None
 
     # ---- moving bytes -------------------------------------------------------------------------------
 

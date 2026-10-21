@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db, utcnow
 from ..deps import current_user
-from ..orm import ApiKey, Lane, UsageDaily, UsageLog, UsageSample, User
+from ..orm import USAGE_KINDS, ApiKey, Lane, Node, UsageDaily, UsageLog, UsageSample, User
 from ..schemas import UsageDayRow, UsageModelRow, UsageOut, UsageTotals, UsageUserRow
 from ..services import usage_report
 
@@ -24,10 +24,37 @@ async def _detected_gpus(request: Request) -> int:
     return len(await sampler.stats()) if sampler is not None else 0
 
 
-async def _report(request: Request, db: AsyncSession, days: int, tz_offset: int, user_id: int | None):
+async def node_lanes(request: Request, db: AsyncSession, node_id: int | None) -> set[int] | None:
+    """The lanes of one machine (``None``: every machine)."""
+    if node_id is None:
+        return None
+    nodes = request.app.state.nodes
+    return {
+        lane_id
+        for lane_id, lane_node in (await db.execute(select(Lane.id, Lane.node_id))).all()
+        if (nodes.is_local(node_id) if lane_node is None else lane_node == node_id)
+    }
+
+
+def _cpu_on(request: Request, node_id: int | None) -> bool:
+    """CPU-only environments run on the local node (their usage rows do not name a machine)."""
+    return node_id is None or request.app.state.nodes.is_local(node_id)
+
+
+async def _report(
+    request: Request, db: AsyncSession, days: int, tz_offset: int, user_id: int | None, node_id: int | None = None
+):
     window = usage_report.Window(days, tz_offset, utcnow())
     names = dict((await db.execute(select(User.id, User.username))).all())
-    rep = await usage_report.build(db, window, names, await _detected_gpus(request), user_id)
+    rep = await usage_report.build(
+        db,
+        window,
+        names,
+        await _detected_gpus(request),
+        user_id,
+        lane_ids=await node_lanes(request, db, node_id),
+        include_cpu=_cpu_on(request, node_id),
+    )
     return window, names, rep
 
 
@@ -37,15 +64,19 @@ async def usage(
     days: int = Query(default=30, ge=1, le=365),
     tz_offset: int = TZ,
     scope: str = SCOPE,
+    node_id: int | None = Query(default=None, description="Only this machine's lanes (see /api/machines)"),
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
     only = user.id if scope == "mine" else None
-    window, names, rep = await _report(request, db, days, tz_offset, only)
+    window, names, rep = await _report(request, db, days, tz_offset, only, node_id)
     since = window.since
+    lane_ids = await node_lanes(request, db, node_id)
 
     def logs(stmt):
         stmt = stmt.where(UsageLog.created_at >= since)
+        if lane_ids is not None:
+            stmt = stmt.where(UsageLog.lane_id.in_(lane_ids))
         return stmt.where(UsageLog.user_id == only) if only is not None else stmt
 
     per_user = (
@@ -149,6 +180,7 @@ async def usage(
         ),
         lanes=rep.lane_rows(),
         gpus=rep.gpu_rows(),
+        nodes=rep.node_rows(),
         kinds=rep.kind_rows(),
         bucket_hours=window.bucket_hours,
         buckets=window.labels(),
@@ -178,7 +210,7 @@ def _pct(util: float, metered: float) -> float | str:
 async def export_usage(
     request: Request,
     days: int = Query(default=30, ge=1, le=365),
-    kind: str = Query(default="summary", pattern="^(summary|requests|compute|people)$"),
+    kind: str = Query(default="summary", pattern="^(summary|requests|compute|people|nodes)$"),
     tz_offset: int = TZ,
     scope: str = SCOPE,
     user: User = Depends(current_user),
@@ -187,12 +219,13 @@ async def export_usage(
     """CSV for spreadsheets.
 
     ``summary``: requests and tokens per day, person and model; ``requests``: one row per request;
-    ``compute``: GPU time per day, lane, GPU, kind and person; ``people``: one row per person.
+    ``compute``: GPU time per day, machine (node), lane, GPU, kind and person; ``nodes``: one row per machine;
+    ``people``: one row per person.
     """
     only = user.id if scope == "mine" else None
     names = dict((await db.execute(select(User.id, User.username))).all())
     if kind == "people":
-        data = (await usage(request, days, tz_offset, scope, user, db)).users
+        data = (await usage(request, days, tz_offset, scope, node_id=None, user=user, db=db)).users
         rows: list[list] = [
             [
                 "user",
@@ -225,11 +258,49 @@ async def export_usage(
                 ]
             )
         return _csv(kind, rows)
+    if kind == "nodes":
+        data = (await usage(request, days, tz_offset, scope, node_id=None, user=user, db=db)).nodes
+        kinds = [k for k in USAGE_KINDS if any(k in n.occupancy for n in data)]
+        rows = [
+            [
+                "node",
+                "lanes",
+                "gpus",
+                "booked_gpu_hours",
+                "sampled_gpu_hours",
+                "used_gpu_hours",
+                "avg_utilization_pct",
+                "occupied_pct",
+                "peak_memory_mb",
+                "energy_wh",
+                *[f"{k}_gpu_hours" for k in kinds],
+            ]
+        ]
+        for n in data:
+            rows.append(
+                [
+                    n.node_name,
+                    n.lanes,
+                    n.gpus,
+                    n.booked_gpu_hours,
+                    n.sampled_gpu_hours,
+                    n.used_gpu_hours,
+                    "" if n.avg_utilization is None else n.avg_utilization,
+                    "" if n.occupied_pct is None else n.occupied_pct,
+                    "" if n.peak_memory_mb is None else n.peak_memory_mb,
+                    n.energy_wh,
+                    *[n.occupancy.get(k, 0.0) for k in kinds],
+                ]
+            )
+        return _csv(kind, rows)
     if kind == "compute":
         window = usage_report.Window(days, tz_offset, utcnow())
         lanes = dict((await db.execute(select(Lane.id, Lane.name))).all())
+        lane_nodes = dict((await db.execute(select(Lane.id, Lane.node_id))).all())
+        node_names = dict((await db.execute(select(Node.id, Node.name))).all())
+        local_id = (await db.execute(select(Node.id).where(Node.is_local.is_(True)).limit(1))).scalar_one_or_none()
         day = func.strftime("%Y-%m-%d", UsageSample.start, f"{tz_offset:+d} minutes")
-        keys = (UsageSample.lane_id, UsageSample.gpu_index, UsageSample.kind, UsageSample.user_id)
+        keys = (UsageSample.node_id, UsageSample.lane_id, UsageSample.gpu_index, UsageSample.kind, UsageSample.user_id)
         stmt = (
             select(
                 day,
@@ -250,6 +321,7 @@ async def export_usage(
         rows = [
             [
                 "date",
+                "node",
                 "lane",
                 "gpu",
                 "kind",
@@ -261,10 +333,12 @@ async def export_usage(
                 "energy_wh",
             ]
         ]
-        for d, lane_id, gpu, k, uid, sec, busy, util, metered, peak, wh in (await db.execute(stmt)).all():
+        for d, node_id, lane_id, gpu, k, uid, sec, busy, util, metered, peak, wh in (await db.execute(stmt)).all():
+            node_id = node_id or lane_nodes.get(lane_id) or local_id
             rows.append(
                 [
                     d,
+                    node_names.get(node_id, ""),
                     lanes.get(lane_id, "?"),
                     "" if gpu < 0 else gpu,
                     k,

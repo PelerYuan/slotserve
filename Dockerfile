@@ -56,7 +56,7 @@ ENV SLOTSERVE_HOST=0.0.0.0 \
     SLOTSERVE_MODELS_DIR=/models \
     SLOTSERVE_STATIC_DIR=/app/static \
     SLOTSERVE_LLAMA_SERVER_CMD=/opt/llama.cpp/llama-server \
-    LD_LIBRARY_PATH=/opt/llama.cpp:/usr/local/nvidia/lib:/usr/local/nvidia/lib64
+    LD_LIBRARY_PATH=/opt/llama.cpp:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/lib/wsl/lib
 
 VOLUME ["/data", "/models"]
 EXPOSE 8000 8001
