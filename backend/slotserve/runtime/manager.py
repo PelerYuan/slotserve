@@ -32,6 +32,14 @@ FAIL_BACKOFF_SECONDS = (30, 60, 120, 300, 600)
 OOM_RE = re.compile(r"out of memory|cudaMalloc failed|failed to allocate .*buffer|unable to allocate .*CUDA", re.I)
 
 
+async def _exited(proc) -> None:
+    """Returns once a (Popen-like) process has exited."""
+    while True:
+        if proc.poll() is not None:
+            return
+        await asyncio.sleep(1.0)
+
+
 class RuntimeState(StrEnum):
     STOPPED = "stopped"
     LOADING = "loading"
@@ -396,11 +404,59 @@ class LlamaRuntime(RequestTracker):
         log.info("model %s ready after %.1fs", self.model_name, (self.ready_at - started).total_seconds())
         await self._record_event(model_id, started, True, None)
 
-        await asyncio.to_thread(proc.wait)
+        # Polled rather than waited for in a thread: a node agent may exit and leave the server running.
+        await _exited(proc)
         if self._proc is proc:
             self.exit_code = proc.returncode
             self._mark_failed(f"{engine.label} server exited unexpectedly with code {proc.returncode}")
             await self._record_event(model_id, started, False, self.error)
+
+    def adopt(
+        self,
+        pid: int,
+        model: LlmModel,
+        preset: ModelPreset | None,
+        command: str | None,
+        load_started_at: datetime | None,
+        ready_at: datetime | None,
+    ) -> None:
+        """Takes over a running, healthy model server started by an earlier agent process (``agent_on_exit=keep``)."""
+        from .adopted import AdoptedProcess
+
+        proc = AdoptedProcess(pid)
+        self._proc = proc  # type: ignore[assignment]  # Popen-like: poll / terminate / kill / wait
+        self.settings.log_dir.mkdir(parents=True, exist_ok=True)
+        self._log_file = self.log_path.open("ab")
+        self.model_id = model.id
+        self.model_name = model.name
+        self.preset_id = preset.id if preset else None
+        self.preset_name = preset.name if preset else None
+        self.load_started_at = load_started_at or utcnow()
+        self.ready_at = ready_at or utcnow()
+        self.engine = engine_for(model).id
+        self.command = command
+        self.pid = pid
+        self.exit_code = None
+        self.state = RuntimeState.READY
+        self._watch_task = asyncio.create_task(self._watch_adopted(proc))
+        log.info("took over the model server of lane %s (pid %s, model %s)", self.lane_id, pid, model.name)
+
+    async def _watch_adopted(self, proc) -> None:
+        await _exited(proc)
+        if self._proc is proc:
+            self.exit_code = proc.returncode
+            self._mark_failed("the model server taken over from the previous agent exited")
+
+    def detach(self) -> None:
+        """Forgets the process without stopping it (it keeps serving; a later agent may take it over)."""
+        if self._watch_task is not None:
+            self._watch_task.cancel()
+            self._watch_task = None
+        self._proc = None
+        if self._log_file is not None:
+            with contextlib.suppress(OSError):
+                self._log_file.close()
+            self._log_file = None
 
     def _mark_failed(self, message: str) -> None:
         if self._log_file is not None:

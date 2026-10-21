@@ -12,6 +12,7 @@ import asyncio
 import contextlib
 import getpass
 import logging
+import signal
 import sys
 
 import uvicorn
@@ -32,26 +33,45 @@ def serve() -> None:
         log_level="info",
         # Open streams (live logs, long generations) must not keep a restart waiting.
         timeout_graceful_shutdown=5,
+        ssl_certfile=settings.ssl_certfile or None,
+        ssl_keyfile=settings.ssl_keyfile or None,
     )
 
 
-def agent(server: str | None, token: str | None, address: str | None) -> None:
+def agent(
+    server: str | None,
+    token: str | None,
+    address: str | None,
+    ca_bundle: str | None = None,
+    fingerprint: str | None = None,
+    on_exit: str | None = None,
+) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
     from .agent.node import NodeAgent
 
     settings = get_settings()
-    node = NodeAgent(settings, server=server, token=token, address=address)
+    updates = {"agent_ca_bundle": ca_bundle, "agent_server_fingerprint": fingerprint, "agent_on_exit": on_exit}
+    settings = settings.model_copy(update={k: v for k, v in updates.items() if v is not None})
+    try:
+        node = NodeAgent(settings, server=server, token=token, address=address)
+    except ValueError as exc:
+        sys.exit(f"slotserve agent: {exc}")
     if not node.server or not node.token:
         sys.exit("slotserve agent needs --server and --token (or SLOTSERVE_AGENT_SERVER and SLOTSERVE_AGENT_TOKEN).")
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.models_dir.mkdir(parents=True, exist_ok=True)
 
     async def main() -> None:
+        loop = asyncio.get_running_loop()
+        # docker stop / systemd send SIGTERM: shut down cleanly (stop or keep model servers: SLOTSERVE_AGENT_ON_EXIT)
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            with contextlib.suppress(NotImplementedError, RuntimeError, AttributeError):
+                loop.add_signal_handler(sig, node.request_stop)
         try:
             await node.run()
         finally:
-            await node.close()  # model servers stop with the agent
+            await node.close()
 
     with contextlib.suppress(KeyboardInterrupt):
         asyncio.run(main())
@@ -95,6 +115,16 @@ def main() -> None:
     p_agent.add_argument(
         "--address", help="address the control plane uses to reach this machine (SLOTSERVE_AGENT_ADDRESS)"
     )
+    p_agent.add_argument("--ca-bundle", help="CA certificates to trust for an https server (SLOTSERVE_AGENT_CA_BUNDLE)")
+    p_agent.add_argument(
+        "--fingerprint",
+        help="pin the server certificate's SHA-256 fingerprint from Admin > Nodes (SLOTSERVE_AGENT_SERVER_FINGERPRINT)",
+    )
+    p_agent.add_argument(
+        "--on-exit",
+        choices=("stop", "keep"),
+        help="stop the model servers when the agent stops, or keep them running (SLOTSERVE_AGENT_ON_EXIT)",
+    )
     p_reset = sub.add_parser("reset-password", help="set a new password for a user")
     p_reset.add_argument("username")
     p_admin = sub.add_parser("set-admin", help="grant or revoke admin rights")
@@ -106,7 +136,7 @@ def main() -> None:
         serve()
         return
     if args.command == "agent":
-        agent(args.server, args.token, args.address)
+        agent(args.server, args.token, args.address, args.ca_bundle, args.fingerprint, args.on_exit)
         return
 
     if args.command == "reset-password":
