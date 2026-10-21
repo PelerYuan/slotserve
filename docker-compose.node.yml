@@ -1,0 +1,43 @@
+# A SlotServe node: this machine's GPUs (or CPUs) serve lanes of a SlotServe server elsewhere.
+# See docs/multiple-machines.md. Add the node in Admin > Nodes on the server first, then put its token in .env:
+#
+#   SLOTSERVE_AGENT_SERVER=http://slotserve-server:8000
+#   SLOTSERVE_AGENT_TOKEN=ssn-...
+#   LLAMA_CPP_DIR=/opt/llama.cpp
+#   MODELS_DIR=/srv/models
+#
+#   docker compose -f docker-compose.node.yml up -d
+name: slotserve-node
+
+services:
+  agent:
+    image: ${SLOTSERVE_IMAGE:-ghcr.io/peleryuan/slotserve:latest}
+    container_name: slotserve-agent
+    restart: unless-stopped
+    command: ["slotserve", "agent"]
+    env_file: .env
+    environment:
+      SLOTSERVE_AGENT_SERVER: ${SLOTSERVE_AGENT_SERVER:?Set SLOTSERVE_AGENT_SERVER in .env}
+      SLOTSERVE_AGENT_TOKEN: ${SLOTSERVE_AGENT_TOKEN:?Set SLOTSERVE_AGENT_TOKEN in .env}
+      # Optional: the address the server should use to reach this machine (default: where it connects from).
+      SLOTSERVE_AGENT_ADDRESS: ${SLOTSERVE_AGENT_ADDRESS:-}
+      SLOTSERVE_DATA_DIR: /data
+      SLOTSERVE_MODELS_DIR: /models
+      SLOTSERVE_LLAMA_SERVER_CMD: /opt/llama.cpp/llama-server
+    # The server forwards model requests to this machine's model servers (SLOTSERVE_LLAMA_PORT + lane id - 1),
+    # so they must be reachable on the machine's address. Without host networking, publish those ports instead.
+    network_mode: host
+    volumes:
+      - ${LLAMA_CPP_DIR:?Set LLAMA_CPP_DIR in .env}:/opt/llama.cpp:ro
+      # This machine's models; with shared storage (NFS), mount the same share as on the server.
+      - ${MODELS_DIR:?Set MODELS_DIR in .env}:/models
+      # Model server logs.
+      - ${DATA_DIR:-./data}:/data
+    # Remove this block on machines without NVIDIA GPUs.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

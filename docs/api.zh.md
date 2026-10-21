@@ -85,4 +85,4 @@ SlotServe 在 `/v1` 提供 **OpenAI 兼容**接口。任何可以设置 base URL
 
 ## Web API
 
-网页使用 `/api` 下独立的 JSON 接口（Cookie 会话），交互式文档位于 `/api/docs`。同一账号 15 分钟内登录失败 10 次（或同一地址 30 次）后，登录接口返回 `429 too_many_attempts`，需等待一段时间。管理接口位于 `/api/admin` 下（`stats`、`users`、`keys`、`reservations` 及其 `approve` 和 `reject`、`lanes`、`runtime`（运行详情、加载记录、日志下载和服务器推送的实时日志 `stream`）、`requests`、`runtime/manual`、`settings`、`backups`、`audit`），需要管理员登录。
+网页使用 `/api` 下独立的 JSON 接口（Cookie 会话），交互式文档位于 `/api/docs`。同一账号 15 分钟内登录失败 10 次（或同一地址 30 次）后，登录接口返回 `429 too_many_attempts`，需等待一段时间。管理接口位于 `/api/admin` 下（`stats`、`users`、`keys`、`reservations` 及其 `approve` 和 `reject`、`lanes`、`nodes`（运行节点代理的机器：添加、新令牌、吊销）、`runtime`（运行详情、加载记录、日志下载和服务器推送的实时日志 `stream`）、`requests`、`runtime/manual`、`settings`、`backups`、`audit`），需要管理员登录。

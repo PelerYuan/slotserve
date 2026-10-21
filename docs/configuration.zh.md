@@ -91,6 +91,8 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 
 除部署相关的几项（`HOST`、`PORT`、`SECRET_KEY`、`COOKIE_SECURE`、`STATIC_DIR`、`DATA_DIR`、`MODELS_DIR`、`LLAMA_SERVER_CMD`、`LLAMA_HOST`、`LLAMA_PORT`、`TELEGRAM_API_BASE`、各 `…_API_BASE` 与 `QQ_TOKEN_URL` 地址、`DOCKER_HOST`、`DROPBEAR_PATH`，修改需要重启，因此只在 `.env` 中设置）外，其余所有设置都可由管理员在**管理 → 系统设置**中直接修改，无需重启。修改保存在数据库中，优先于 `.env`；点**恢复默认**即可取消覆盖。
 
+多台机器相关的设置（服务器的节点设置和节点代理的 `SLOTSERVE_AGENT_*`）见[多台机器](multiple-machines.md)；它们在启动时读取。
+
 ## 每个模型的启动参数
 
 每个模型有一行自由填写的参数，会追加到命令末尾。llama.cpp 模型的命令为：

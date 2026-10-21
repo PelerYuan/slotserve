@@ -20,6 +20,7 @@ Rules:
 - Bookings, waitlist entries, manual load/unload and the "fall back to the default model" behaviour are per lane. Quotas count bookings across all lanes.
 - A lane with bookings that have not ended cannot be deleted, and the last lane cannot be deleted.
 - Each lane's process gets `CUDA_VISIBLE_DEVICES` set to its GPUs and listens on `SLOTSERVE_LLAMA_PORT + lane id - 1`. Logs are per lane (`llama-server-lane<N>.log`).
+- Lanes can also use the GPUs of other machines: see [Multiple machines](multiple-machines.md). A lane always belongs to one machine.
 
 ### Which lane serves an API request
 

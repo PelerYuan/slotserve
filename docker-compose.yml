@@ -20,6 +20,7 @@ services:
       SLOTSERVE_MODELS_DIR: /models
       SLOTSERVE_LLAMA_SERVER_CMD: /opt/llama.cpp/llama-server
     ports:
+      # Also the address node agents of other machines connect to (docs: Multiple machines, docker-compose.node.yml).
       - "${PORT:-8000}:8000"
     volumes:
       # Directory that contains your compiled `llama-server` and its .so files.

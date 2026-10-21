@@ -26,6 +26,22 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - Notifications and the booking bot no longer depend on Telegram: commands and buttons are handled once for all platforms. Undelivered messages are retried per platform.
 
+## [Unreleased: multiple machines] (feature branch, not released yet)
+
+### Added
+
+- **Multiple machines**: one SlotServe server can use the GPUs (or CPUs) of several machines. Each extra machine runs a node agent (`slotserve agent --server URL --token TOKEN`, or `SLOTSERVE_AGENT_SERVER` / `SLOTSERVE_AGENT_TOKEN`; same Docker image, see `docker-compose.node.yml`) that connects out to the server over a WebSocket with its own token. The server is the built-in node, so single-machine installations behave exactly as before.
+- **Admin → Nodes**: add a machine (token shown once, with a ready `docker run` command), rename it, set the address the server uses to reach it, issue a new token, revoke and delete; status, last seen, agent and protocol versions, hostname, CPU cores and load, memory, GPUs, models folder and lanes per machine.
+- Lanes belong to a machine (**Admin → GPUs & lanes**); GPUs and overlaps are checked per machine. Model servers on a node are started and stopped by its agent; loading progress, the live log, log download, failure details and load history work in the runtime monitor as for local lanes. The gateway forwards requests directly to the node.
+- Models are per machine: **Scan models** also scans every connected node (or one node from Admin → Nodes); downloads can go straight to a node (**Download to**). A lane only serves, and can only be booked with, models its machine has; shared storage makes a model available on every machine that sees the same file.
+- When a node goes offline its lanes become unavailable (the gateway stops routing to them, "Offline" in the UI); admins and people with bookings on it in the next 24 hours are notified, admins again when it is back. On reconnect the server takes over what the node is running without restarting it and stops servers of lanes that were removed meanwhile. Incompatible agent versions are refused with a clear message.
+- Usage sampling records remote lanes with the GPU metrics their agents report.
+- New settings: `SLOTSERVE_LOCAL_NODE_NAME`, `SLOTSERVE_NODE_HEARTBEAT_SECONDS`, `SLOTSERVE_NODE_OFFLINE_SECONDS`, `SLOTSERVE_NODE_RPC_TIMEOUT_SECONDS`; for agents `SLOTSERVE_AGENT_SERVER`, `SLOTSERVE_AGENT_TOKEN`, `SLOTSERVE_AGENT_ADDRESS`, `SLOTSERVE_AGENT_MODEL_HOST`. Docs: "Multiple machines".
+
+### Not yet
+
+- Dev environments (containers, SSH, web ports) still run on the server's machine only.
+
 ## [0.8.0] - 2026-10-21
 
 ### Added

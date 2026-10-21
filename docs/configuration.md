@@ -91,6 +91,8 @@ These only exist in `docker-compose.yml` and describe the **host**.
 
 Admins can change every setting in **Admin → System settings** without a restart, except the deployment ones (`HOST`, `PORT`, `SECRET_KEY`, `COOKIE_SECURE`, `STATIC_DIR`, `DATA_DIR`, `MODELS_DIR`, `LLAMA_SERVER_CMD`, `LLAMA_HOST`, `LLAMA_PORT`, `TELEGRAM_API_BASE`, the `…_API_BASE` and `QQ_TOKEN_URL` addresses, `DOCKER_HOST`, `DROPBEAR_PATH`), which need a restart and therefore stay in `.env`. Overrides live in the database and win over `.env`; **Use default** removes an override.
 
+Settings for several machines (the server's node settings and the node agent's `SLOTSERVE_AGENT_*`) are listed in [Multiple machines](multiple-machines.md#settings); they are read at startup.
+
 ## Per-model launch arguments
 
 Each model has a free-form argument string that is appended to the command. For llama.cpp models:
