@@ -85,4 +85,4 @@ Every request is logged with its user, key, model, token counts and duration. Fo
 
 ## Web API
 
-The browser UI uses a separate JSON API under `/api` with cookie sessions. After 10 failed sign-ins for one account (or 30 from one address) within 15 minutes, sign-in returns `429 too_many_attempts` until the window passes. Its interactive reference is served at `/api/docs`. Admin endpoints live under `/api/admin` (`stats`, `users`, `keys`, `reservations` with `approve` and `reject`, `lanes`, `requests`, `runtime/manual`, `settings`, `backups`, `audit`) and require an admin session.
+The browser UI uses a separate JSON API under `/api` with cookie sessions. After 10 failed sign-ins for one account (or 30 from one address) within 15 minutes, sign-in returns `429 too_many_attempts` until the window passes. Its interactive reference is served at `/api/docs`. Admin endpoints live under `/api/admin` (`stats`, `users`, `keys`, `reservations` with `approve` and `reject`, `lanes`, `runtime` (details, load history, log download and a live `stream` of server-sent events), `requests`, `runtime/manual`, `settings`, `backups`, `audit`) and require an admin session.

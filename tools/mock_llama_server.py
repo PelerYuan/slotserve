@@ -12,6 +12,7 @@ import asyncio
 import json
 import os
 import sys
+import threading
 import time
 import uuid
 
@@ -51,6 +52,29 @@ STARTED = time.monotonic()
 
 app = FastAPI()
 print(f"mock llama-server: model={args.model} alias={ALIAS} extra={unknown}", flush=True)
+
+
+def _fake_load_output() -> None:
+    """Print loading output shaped like the real servers, so progress parsing can be exercised."""
+    steps = 20
+    if STRICT_MODEL:  # vLLM / SGLang style tqdm bar
+        for i in range(1, steps + 1):
+            time.sleep(LOAD_SECONDS * 0.8 / steps)
+            pct = i * 100 // steps
+            print(f"\rLoading safetensors checkpoint shards: {pct:3d}% Completed | {i}/{steps}", end="", flush=True)
+        print("\nINFO: Memory profiling takes 0.1 seconds", flush=True)
+    else:  # llama.cpp: one dot per percent, no newline until done
+        print("load_tensors: loading model tensors, this can take a while... (mmap = true)", flush=True)
+        for _ in range(steps):
+            time.sleep(LOAD_SECONDS * 0.8 / steps)
+            print("." * (100 // steps), end="", flush=True)
+        print(flush=True)
+        print("llama_context: n_ctx = 8192", flush=True)
+    time.sleep(LOAD_SECONDS * 0.1)
+    print("main: server is listening on http://127.0.0.1", flush=True)
+
+
+threading.Thread(target=_fake_load_output, daemon=True).start()
 
 
 def loaded() -> bool:

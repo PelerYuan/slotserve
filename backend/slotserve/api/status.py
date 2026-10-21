@@ -34,8 +34,10 @@ async def config(request: Request):
     )
 
 
-def _runtime_out(snap) -> RuntimeOut:
+def _runtime_out(snap, progress=None) -> RuntimeOut:
     return RuntimeOut(
+        stage=progress.stage if progress else None,
+        log_percent=progress.percent if progress else None,
         state=snap.state,
         model_id=snap.model_id,
         model_name=snap.model_name,
@@ -82,7 +84,7 @@ async def get_status(
                 id=ctx.id,
                 name=ctx.name,
                 gpus=ctx.devices,
-                runtime=_runtime_out(ctx.runtime.snapshot()),
+                runtime=_runtime_out(ctx.runtime.snapshot(), ctx.runtime.log_progress()),
                 reason=target.reason if target else None,
                 fallback_from=target.fallback_from if target else None,
                 manual=await _manual_out(db, ctx.scheduler),

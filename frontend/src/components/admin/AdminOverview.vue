@@ -12,7 +12,7 @@ import { useErrorMessage } from '@/composables/useErrorMessage'
 import { useStatus } from '@/composables/useStatus'
 import { formatBytes, formatCompact, formatDateTime, formatDuration, formatNumber, formatTime } from '@/utils/format'
 
-const emit = defineEmits<{ navigate: [tab: 'users' | 'reservations' | 'keys'] }>()
+const emit = defineEmits<{ navigate: [tab: 'users' | 'reservations' | 'keys' | 'runtime'] }>()
 const { t } = useI18n()
 const message = useMessage()
 const { showError } = useErrorMessage()
@@ -187,7 +187,7 @@ const seconds = (a: string, b: string) => (new Date(b).getTime() - new Date(a).g
         <NButton v-if="manual" size="small" secondary :loading="busyManual" @click="manualAction('auto')">
           {{ t('admin.manual.auto') }}
         </NButton>
-        <NButton size="small" secondary @click="logs = true">{{ t('admin.viewLogs') }}</NButton>
+        <NButton size="small" secondary @click="emit('navigate', 'runtime')">{{ t('admin.runtimeView.open') }}</NButton>
         <NButton size="small" secondary :loading="restarting" :disabled="!runtime?.model_name" @click="restart">
           {{ t('admin.restart') }}
         </NButton>

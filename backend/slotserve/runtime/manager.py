@@ -9,7 +9,7 @@ import shlex
 import subprocess
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
 from typing import IO
@@ -20,6 +20,7 @@ from ..config import Settings
 from ..db import SessionLocal, utcnow
 from ..orm import LlmModel, ModelLoadEvent, ModelPreset
 from .engines import ENGINES, Engine, engine_for, split_args, strip_flags
+from .progress import LogProgress, parse_progress
 
 log = logging.getLogger(__name__)
 
@@ -85,6 +86,13 @@ class LlamaRuntime:
         self.est_load_seconds: float | None = None
         self.error: str | None = None
         self.error_hint: str | None = None
+        # Details for the admin runtime view.
+        self.engine: str | None = None
+        self.command: str | None = None
+        self.pid: int | None = None
+        self.exit_code: int | None = None
+        self.failure_log: list[str] = []
+        self._progress_cache: tuple[float, LogProgress] | None = None
         self._failed_at: datetime | None = None
         self._fail_count = 0
         # Gateway requests currently being served; a switch waits for them ("draining").
@@ -190,6 +198,34 @@ class LlamaRuntime:
         tail = deque(data.decode("utf-8", errors="replace").splitlines(), maxlen=lines)
         return list(tail)
 
+    def launch_log(self, lines: int = 400) -> list[str]:
+        """Log lines of the current (or last) launch only."""
+        tail = self.tail_log(lines)
+        starts = [i for i, line in enumerate(tail) if line.startswith("===== ") and " start: " in line]
+        return tail[starts[-1] :] if starts else tail
+
+    def log_progress(self) -> LogProgress:
+        """Stage and weight-loading percentage read from the log; cached for a second."""
+        if self.state != RuntimeState.LOADING:
+            return LogProgress(stage=None, percent=None)
+        now = utcnow().timestamp()
+        if self._progress_cache is not None and now - self._progress_cache[0] < 1.0:
+            return self._progress_cache[1]
+        result = parse_progress(self.launch_log(400))
+        self._progress_cache = (now, result)
+        return result
+
+    @property
+    def next_retry_at(self) -> datetime | None:
+        if self.state != RuntimeState.FAILED or self._failed_at is None:
+            return None
+        idx = min(max(self._fail_count - 1, 0), len(FAIL_BACKOFF_SECONDS) - 1)
+        return self._failed_at + timedelta(seconds=FAIL_BACKOFF_SECONDS[idx])
+
+    @property
+    def fail_count(self) -> int:
+        return self._fail_count
+
     def build_command(self, model: LlmModel, preset: ModelPreset | None = None) -> list[str]:
         args = (preset.args if preset else model.args) or ""
         return engine_for(model).command(
@@ -214,6 +250,11 @@ class LlamaRuntime:
         self.est_load_seconds = None
         self.error = None
         self.error_hint = None
+        self.engine = None
+        self.command = None
+        self.pid = None
+        self.exit_code = None
+        self.failure_log = []
         self._fail_count = 0
         self._failed_at = None
 
@@ -235,6 +276,12 @@ class LlamaRuntime:
         self.est_load_seconds = est_load_seconds
         self.error = None
         self.error_hint = None
+        self.engine = engine_for(model).id
+        self.command = shlex.join(cmd)
+        self.pid = None
+        self.exit_code = None
+        self.failure_log = []
+        self._progress_cache = None
 
         kwargs: dict = {}
         if self.devices is not None:
@@ -254,6 +301,7 @@ class LlamaRuntime:
             return
 
         engine = engine_for(model)
+        self.pid = self._proc.pid
         log.info("%s starting (pid %s, lane %s) for model %s", engine.label, self._proc.pid, self.lane_id, model.name)
         self.state = RuntimeState.LOADING
         self._watch_task = asyncio.create_task(self._watch(self._proc, model.id, started, engine))
@@ -271,6 +319,7 @@ class LlamaRuntime:
         while True:
             code = proc.poll()
             if code is not None:
+                self.exit_code = code
                 self._mark_failed(f"{engine.label} server exited with code {code} while loading")
                 await self._record_event(model_id, started, False, self.error)
                 return
@@ -296,15 +345,16 @@ class LlamaRuntime:
 
         await asyncio.to_thread(proc.wait)
         if self._proc is proc:
+            self.exit_code = proc.returncode
             self._mark_failed(f"{engine.label} server exited unexpectedly with code {proc.returncode}")
+            await self._record_event(model_id, started, False, self.error)
 
     def _mark_failed(self, message: str) -> None:
         if self._log_file is not None:
             with contextlib.suppress(OSError):
                 self._log_file.flush()
-        lines = self.tail_log(200)
-        starts = [i for i, line in enumerate(lines) if line.startswith("===== ") and " start: " in line]
-        current = lines[starts[-1] :] if starts else lines  # only this launch's output
+        current = self.launch_log(400)  # only this launch's output
+        self.failure_log = current[-80:]
         if any(OOM_RE.search(line) for line in current):
             self.error_hint = "oom"
             message += " (GPU out of memory: offload fewer layers with -ngl, or lower the context size -c)"
@@ -329,6 +379,9 @@ class LlamaRuntime:
                         success=success,
                         error=error,
                         lane_id=self.lane_id,
+                        command=self.command,
+                        exit_code=None if success else self.exit_code,
+                        log_excerpt=None if success else "\n".join(self.failure_log)[-20000:],
                     )
                 )
                 await db.commit()

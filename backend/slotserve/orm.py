@@ -140,6 +140,10 @@ class ModelLoadEvent(Base):
     success: Mapped[bool] = mapped_column(Boolean)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     lane_id: Mapped[int | None] = mapped_column(ForeignKey("lanes.id", ondelete="SET NULL"), nullable=True)
+    # What was run and how it ended, so a failure can be understood after the log has moved on.
+    command: Mapped[str | None] = mapped_column(Text, nullable=True)
+    exit_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    log_excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class AppSetting(Base):

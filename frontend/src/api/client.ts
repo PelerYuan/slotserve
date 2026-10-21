@@ -7,23 +7,25 @@ import type {
   ApiKeyCreated,
   AppConfig,
   AuditEntry,
-  Lane,
   Backup,
   BookingInput,
   CalendarLinks,
+  DownloadTask,
   HfFile,
+  Lane,
+  LaneRuntime,
+  LoadEvent,
+  Model,
   NotifyPrefs,
   Preset,
   RequestLog,
-  TelegramInfo,
-  WaitlistEntry,
-  DownloadTask,
-  SettingValue,
-  Model,
   Reservation,
+  SettingValue,
   Status,
+  TelegramInfo,
   Usage,
   User,
+  WaitlistEntry,
 } from './types'
 
 export class ApiError extends Error {
@@ -179,6 +181,15 @@ export const api = {
   // admin
   admin: {
     stats: () => request<AdminStats>('GET', '/api/admin/stats'),
+    runtime: () => request<LaneRuntime[]>('GET', '/api/admin/runtime'),
+    loadEvents: (q: { laneId?: number | null; failed?: boolean; limit?: number }) =>
+      request<LoadEvent[]>('GET', '/api/admin/runtime/events', undefined, {
+        lane_id: q.laneId ?? undefined,
+        failed: q.failed || undefined,
+        limit: q.limit,
+      }),
+    runtimeStreamUrl: (laneId: number) => `/api/admin/runtime/${laneId}/stream`,
+    runtimeLogUrl: (laneId: number) => `/api/admin/runtime/${laneId}/log`,
     users: () => request<AdminUser[]>('GET', '/api/admin/users'),
     createUser: (username: string, password: string, is_admin: boolean) =>
       request<AdminUser>('POST', '/api/admin/users', { username, password, is_admin }),

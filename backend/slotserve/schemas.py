@@ -270,6 +270,9 @@ class RuntimeOut(BaseModel):
     error: str | None
     error_hint: str | None = None
     draining: bool = False
+    # While loading: stage and weight progress read from the server's log (None when it says nothing useful).
+    stage: str | None = None
+    log_percent: float | None = None
 
 
 class ManualOut(BaseModel):
@@ -421,6 +424,32 @@ class LoadEventOut(BaseModel):
     finished_at: datetime
     success: bool
     error: str | None
+    lane_id: int | None = None
+    lane_name: str | None = None
+    command: str | None = None
+    exit_code: int | None = None
+    log_excerpt: str | None = None
+
+
+class LaneRuntimeOut(BaseModel):
+    """Everything an admin may want to know about one lane's model server."""
+
+    lane_id: int
+    lane_name: str
+    devices: list[int] | None
+    port: int
+    log_file: str
+    runtime: RuntimeOut
+    engine: str | None
+    command: str | None
+    pid: int | None
+    exit_code: int | None
+    inflight: int
+    fail_count: int
+    next_retry_at: datetime | None
+    failure_log: list[str]
+    target_model: str | None
+    target_reason: str | None
 
 
 class AdminStatsOut(BaseModel):

@@ -21,6 +21,7 @@ from .api import (
     models,
     notifications,
     reservations,
+    runtime_admin,
     status,
     usage,
     waitlist,
@@ -128,6 +129,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         calendar,
         metrics,
         lanes,
+        runtime_admin,
     ):
         app.include_router(module.router)
     app.include_router(proxy.router)

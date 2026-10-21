@@ -102,6 +102,8 @@ export interface Runtime {
   error: string | null
   error_hint: 'oom' | null
   draining: boolean
+  stage?: 'weights' | 'context' | 'warmup' | 'ready' | null
+  log_percent?: number | null
 }
 
 export interface Gpu {
@@ -207,6 +209,30 @@ export interface LoadEvent {
   finished_at: string
   success: boolean
   error: string | null
+  lane_id?: number | null
+  lane_name?: string | null
+  command?: string | null
+  exit_code?: number | null
+  log_excerpt?: string | null
+}
+
+export interface LaneRuntime {
+  lane_id: number
+  lane_name: string
+  devices: number[] | null
+  port: number
+  log_file: string
+  runtime: Runtime
+  engine: string | null
+  command: string | null
+  pid: number | null
+  exit_code: number | null
+  inflight: number
+  fail_count: number
+  next_retry_at: string | null
+  failure_log: string[]
+  target_model: string | null
+  target_reason: string | null
 }
 
 export interface AdminStats {

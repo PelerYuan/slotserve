@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { loadProgress as loadProgressOf } from '@/utils/progress'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NDropdown, NProgress, NTabPane, NTabs } from 'naive-ui'
@@ -50,13 +51,7 @@ async function extend(minutes: number) {
   }
 }
 
-const loadProgress = computed(() => {
-  const rt = runtime.value
-  if (!rt || rt.state !== 'loading' || !rt.load_started_at) return null
-  const elapsed = (now.value - new Date(rt.load_started_at).getTime()) / 1000
-  const est = rt.est_load_seconds || 60
-  return { pct: Math.min(99, (elapsed / est) * 100), remaining: est - elapsed }
-})
+const loadProgress = computed(() => (runtime.value ? loadProgressOf(runtime.value, now.value) : null))
 
 const baseUrl = computed(() => `${window.location.origin}/v1`)
 const modelName = computed(() => runtime.value?.model_name ?? 'default')

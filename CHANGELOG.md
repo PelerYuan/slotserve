@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- **Admin → Runtime monitor**: per-lane live server output (server-sent events), loading stage and progress read from llama.cpp / vLLM / SGLang output, failure details (error, exit code, last output lines, retry countdown), the exact launch command and a load history with command and output excerpt for every load.
+- The overview's loading bar uses the progress the model server reports when available.
+
 ## [0.7.1] - 2026-10-21
 
 ### Added

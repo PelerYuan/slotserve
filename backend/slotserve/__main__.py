@@ -27,6 +27,8 @@ def serve() -> None:
         port=settings.port,
         proxy_headers=True,
         log_level="info",
+        # Open streams (live logs, long generations) must not keep a restart waiting.
+        timeout_graceful_shutdown=5,
     )
 
 
