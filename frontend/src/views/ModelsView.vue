@@ -31,7 +31,20 @@ async function save() {
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NCheckbox, NDropdown, NForm, NFormItem, NInput, NModal, NProgress, NTabPane, NTabs, useDialog } from 'naive-ui'
+import {
+  NButton,
+  NCheckbox,
+  NDropdown,
+  NForm,
+  NFormItem,
+  NInput,
+  NModal,
+  NProgress,
+  NSelect,
+  NTabPane,
+  NTabs,
+  useDialog,
+} from 'naive-ui'
 import { Download, FolderSearch, MoreHorizontal, Plus, RotateCw, ScrollText, Search, Star, Trash2, X } from 'lucide-vue-next'
 import { NRadioButton, NRadioGroup } from 'naive-ui'
 import LogDrawer from '@/components/LogDrawer.vue'
@@ -88,6 +101,16 @@ async function scan() {
 }
 
 const { lanes, multi, nameOf } = useLanes()
+// Machines (nodes) that run lanes; with more than one, downloads pick a machine and models show where they are.
+const machines = computed(() => {
+  const seen = new Map<number, string>()
+  for (const l of lanes.value) if (l.node_id != null) seen.set(l.node_id, l.node_name ?? `#${l.node_id}`)
+  return [...seen].map(([id, name]) => ({ id, name }))
+})
+const multiNode = computed(() => machines.value.length > 1)
+const machineName = (id: number | null | undefined) => machines.value.find((x) => x.id === id)?.name ?? ''
+const machineOptions = computed(() => machines.value.map((x) => ({ label: x.name, value: x.id })))
+const dlNode = ref<number | null>(null)
 const defaultLabel = (m: Model) =>
   multi.value ? `${t('models.default')} · ${m.default_lane_ids.map(nameOf).join(', ')}` : t('models.default')
 
@@ -266,7 +289,7 @@ async function startDownload() {
   if (!dl.url.trim()) return
   submitting.value = true
   try {
-    await api.createDownload(dl.url.trim(), dl.filename.trim() || undefined)
+    await api.createDownload(dl.url.trim(), dl.filename.trim() || undefined, multiNode.value ? dlNode.value : null)
     dl.url = ''
     dl.filename = ''
     await loadDownloads()
@@ -317,7 +340,7 @@ async function hfDownload() {
   if (!files.length) return
   submitting.value = true
   try {
-    await api.hfDownload(hf.repo, files, hf.revision || 'main')
+    await api.hfDownload(hf.repo, files, hf.revision || 'main', multiNode.value ? dlNode.value : null)
     message.success(t('models.hf.queued', { n: files.length }))
     hf.picked = []
     await loadDownloads()
@@ -383,7 +406,9 @@ function eta(d: DownloadTask) {
               <span v-if="!m.file_exists" class="badge danger">{{ t('models.missingFile') }}</span>
               <span v-if="m.exceeds_vram" class="badge warn" :title="t('models.exceedsVramHint')">{{ t('models.exceedsVram') }}</span>
             </div>
-            <div class="m-file mono faint" :title="m.file_path">{{ m.file_name }}</div>
+            <div class="m-file mono faint" :title="m.file_path">
+              {{ m.file_name }}<template v-if="multiNode && m.node_ids?.length"> · {{ m.node_ids.map(machineName).join(', ') }}</template>
+            </div>
             <div v-if="m.description" class="m-desc muted">{{ m.description }}</div>
             <code class="m-args" :title="m.args">{{ m.args || '—' }}</code>
             <div v-if="m.presets.length" class="m-presets">
@@ -418,6 +443,17 @@ function eta(d: DownloadTask) {
           <h3 class="card-title">{{ t('models.downloads') }}</h3>
           <div class="card-sub">{{ t('models.downloadsHint') }}</div>
         </div>
+      </div>
+      <div v-if="multiNode" class="dl-node card-pad">
+        <span class="faint small">{{ t('models.downloadTo') }}</span>
+        <NSelect
+          v-model:value="dlNode"
+          :options="machineOptions"
+          :placeholder="t('models.downloadToServer')"
+          clearable
+          size="small"
+          class="dl-node-pick"
+        />
       </div>
       <NTabs v-model:value="dlTab" type="line" size="small" class="dl-tabs" :tabs-padding="20">
         <NTabPane name="url" :tab="t('models.hf.tabUrl')">
@@ -463,6 +499,7 @@ function eta(d: DownloadTask) {
         <li v-for="d in downloads" :key="d.id">
           <div class="dl-top">
             <span class="mono dl-file">{{ d.filename }}</span>
+            <span v-if="multiNode && d.node_id" class="badge">{{ machineName(d.node_id) }}</span>
             <span class="dl-status" :class="d.status">{{ t(`models.dl.${d.status}`) }}</span>
             <span class="spacer" />
             <span class="faint small num">
@@ -815,5 +852,14 @@ function eta(d: DownloadTask) {
   .dl-form {
     flex-direction: column;
   }
+}
+.dl-node {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 0;
+}
+.dl-node-pick {
+  max-width: 260px;
 }
 </style>

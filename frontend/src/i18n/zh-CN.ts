@@ -178,6 +178,8 @@ const zh: typeof en = {
     noModels: '还没有可用的模型，请先到“模型”页面添加。',
   },
   models: {
+    downloadTo: '下载到',
+    downloadToServer: '本服务器',
     setDefaultLane: '设为 {lane} 的默认模型',
     add: '添加模型',
     addTitle: '添加模型',
@@ -1081,6 +1083,7 @@ const zh: typeof en = {
     node_has_lanes: '该节点仍有通道，请先移走或删除。',
     node_has_downloads: '该节点仍有排队或进行中的下载。',
     node_offline: '节点 {node} 已离线。',
+    devenv_remote_lane: '开发环境目前只能运行在服务器本机上（暂不支持其他节点）。',
     devenv_disabled: '开发环境功能已关闭。',
     ssh_key_required: '请先在「访问凭据」页面添加 SSH 公钥。',
     ssh_login_required: '请先在「访问凭据」页面添加 SSH 公钥或设置环境密码。',

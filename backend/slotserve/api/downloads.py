@@ -10,7 +10,7 @@ from ..config import get_settings
 from ..db import get_db, utcnow
 from ..deps import current_user, get_downloader
 from ..errors import ApiError
-from ..orm import DownloadTask, User
+from ..orm import DownloadTask, Node, User
 from ..schemas import DownloadCreateIn, DownloadOut, HfDownloadIn, HfFileOut, HfFilesOut
 from ..services.downloader import Downloader, filename_from_url, safe_filename
 from ..services.scanner import SPLIT_RE
@@ -32,22 +32,44 @@ async def list_downloads(_: User = Depends(current_user), db: AsyncSession = Dep
     return await _out(db, list(tasks))
 
 
-async def _queue(db: AsyncSession, user: User, downloader: Downloader, url: str, filename: str | None) -> DownloadTask:
+async def _queue(
+    db: AsyncSession,
+    user: User,
+    downloader: Downloader,
+    url: str,
+    filename: str | None,
+    node_id: int | None = None,
+) -> DownloadTask:
     if not url.lower().startswith(("http://", "https://")):
         raise ApiError(status.HTTP_400_BAD_REQUEST, "invalid_url")
     name = safe_filename(filename or filename_from_url(url))
     if name is None:
         raise ApiError(status.HTTP_400_BAD_REQUEST, "invalid_filename")
-    if downloader.dest_path(name).exists():
+    node_id = await _node(db, downloader, node_id)
+    if node_id is None and downloader.dest_path(name).exists():
         raise ApiError(status.HTTP_409_CONFLICT, "file_exists", filename=name)
     busy = await db.execute(
-        select(DownloadTask.id).where(DownloadTask.filename == name, DownloadTask.status.in_(ACTIVE))
+        select(DownloadTask.id).where(
+            DownloadTask.filename == name,
+            DownloadTask.status.in_(ACTIVE),
+            DownloadTask.node_id.is_(None) if node_id is None else DownloadTask.node_id == node_id,
+        )
     )
     if busy.first() is not None:
         raise ApiError(status.HTTP_409_CONFLICT, "download_in_progress", filename=name)
-    task = DownloadTask(user_id=user.id, url=url, filename=name)
+    task = DownloadTask(user_id=user.id, url=url, filename=name, node_id=node_id)
     db.add(task)
     return task
+
+
+async def _node(db: AsyncSession, downloader: Downloader, node_id: int | None) -> int | None:
+    """The machine that downloads, as stored: ``None`` for this one."""
+    if node_id is None or not downloader.is_remote(node_id):
+        return None
+    node = await db.get(Node, node_id)
+    if node is None or node.revoked_at is not None:
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "lane_node_invalid")
+    return node.id
 
 
 @router.post("", response_model=DownloadOut, status_code=201)
@@ -57,7 +79,7 @@ async def create_download(
     db: AsyncSession = Depends(get_db),
     downloader: Downloader = Depends(get_downloader),
 ):
-    task = await _queue(db, user, downloader, body.url.strip(), body.filename)
+    task = await _queue(db, user, downloader, body.url.strip(), body.filename, body.node_id)
     await db.commit()
     downloader.poke()
     return (await _out(db, [task]))[0]
@@ -130,7 +152,7 @@ async def hf_download(
         if ".." in path.split("/") or not re.fullmatch(r"[\w.\-/ ]+\.gguf", path, re.IGNORECASE):
             raise ApiError(status.HTTP_400_BAD_REQUEST, "invalid_filename")
         url = f"{endpoint}/{body.repo}/resolve/{quote(body.revision, safe='')}/{quote(path)}"
-        tasks.append(await _queue(db, user, downloader, url, path.rsplit("/", 1)[-1]))
+        tasks.append(await _queue(db, user, downloader, url, path.rsplit("/", 1)[-1], body.node_id))
     await db.commit()
     downloader.poke()
     return await _out(db, tasks)
@@ -180,7 +202,7 @@ async def cancel_download(
     elif task.status in ("failed", "cancelled", "done"):
         # Remove finished entries from the list (keeps the downloaded file).
         part = downloader.dest_path(task.filename + ".part")
-        if task.status != "done" and part.exists():
+        if task.status != "done" and task.node_id is None and part.exists():
             part.unlink()
         await db.delete(task)
         await db.commit()

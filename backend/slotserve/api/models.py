@@ -1,14 +1,18 @@
+import asyncio
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..cluster import inventory
+from ..cluster import protocol as cluster_protocol
 from ..config import get_settings
 from ..db import get_db, utcnow
 from ..deps import admin_user, current_user, get_lanes
 from ..errors import ApiError
-from ..orm import HOLDING_STATUSES, Lane, LlmModel, ModelPreset, Reservation, User
+from ..orm import HOLDING_STATUSES, Lane, LlmModel, ModelPreset, NodeModel, Reservation, User
 from ..runtime.engines import split_args
 from ..runtime.lanes import LaneManager
 from ..schemas import ModelCreateIn, ModelOut, ModelUpdateIn, PresetIn, PresetOut, ScanResultOut
@@ -16,6 +20,7 @@ from ..services import booking, queries, scanner
 from ..services.audit import record
 
 router = APIRouter(prefix="/api/models", tags=["models"])
+log = logging.getLogger(__name__)
 
 
 async def _get_model(db: AsyncSession, model_id: int) -> LlmModel:
@@ -51,8 +56,35 @@ async def list_models(
 
 
 @router.post("/scan", response_model=ScanResultOut)
-async def scan_models(user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
-    added, skipped = await scanner.scan(db, get_settings(), user.id)
+async def scan_models(
+    node_id: int | None = None,
+    user: User = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+    lanes: LaneManager = Depends(get_lanes),
+):
+    """Registers new model files: on this machine and every connected node (or only on ``node_id``)."""
+    settings = get_settings()
+    nodes = lanes.nodes
+    local_id = nodes.local.node_id
+    added: list[str] = []
+    skipped = 0
+    if node_id is None or nodes.is_local(node_id):
+        added, skipped = await scanner.scan(db, settings, user.id)
+        if len(nodes.all()) > 1:
+            await inventory.claim_local(db, await nodes.local.scan_models(), local_id)
+            await db.commit()
+    for executor in nodes.all():
+        if executor.is_local or not executor.online or (node_id is not None and executor.node_id != node_id):
+            continue
+        try:
+            files = await executor.scan_models()
+        except cluster_protocol.RemoteError as exc:
+            log.warning("scanning node %s failed: %s", executor.name, exc)
+            continue
+        more, known = await inventory.register_node_files(db, executor.node_id, files, settings, user.id, local_id)
+        await db.commit()
+        added += more
+        skipped += known
     return ScanResultOut(added=added, skipped=skipped)
 
 
@@ -85,7 +117,13 @@ async def create_model(
         split_args(body.args)
     except ValueError as exc:
         raise ApiError(status.HTTP_400_BAD_REQUEST, "invalid_args", reason=str(exc)) from exc
-    path, size = _source(body.engine, body.path)
+    remote = None if lanes.nodes.is_local(body.node_id) else lanes.nodes.find(body.node_id)
+    if body.node_id is not None and not lanes.nodes.is_local(body.node_id) and remote is None:
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "lane_node_invalid")
+    if remote is not None:
+        path, size = await _remote_source(remote, body.engine, body.path)
+    else:
+        path, size = _source(body.engine, body.path)
     model = LlmModel(
         name=body.name,
         file_path=path,
@@ -97,8 +135,24 @@ async def create_model(
         created_by=user.id,
     )
     db.add(model)
+    await db.flush()
+    if remote is not None:
+        await inventory.add_row(db, model, remote.node_id, path, size, "manual", lanes.nodes.local.node_id)
     await db.commit()
     return (await queries.model_out(db, [model], get_settings(), lanes.loaded_model_ids()))[0]
+
+
+async def _remote_source(executor, engine: str, path: str) -> tuple[str, int]:
+    """Like ``_source``, checked by the node that has the files."""
+    try:
+        found = await executor.request(cluster_protocol.M_MODELS_STAT, {"path": path.strip(), "engine": engine})
+    except cluster_protocol.RemoteError as exc:
+        raise ApiError(status.HTTP_409_CONFLICT, "node_offline", node=executor.name) from exc
+    if engine == "llama.cpp" and (found.get("kind") != "file" or not path.strip().lower().endswith(".gguf")):
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "model_path_invalid")
+    if found.get("exists"):
+        return str(found["path"]), int(found.get("size_bytes") or 0)
+    return path.strip(), 0  # repository id or a path the engine resolves itself
 
 
 @router.patch("/{model_id}", response_model=ModelOut)
@@ -153,6 +207,7 @@ async def set_default(
     if model.status != "ready":
         raise ApiError(status.HTTP_400_BAD_REQUEST, "model_not_ready")
     lane = await booking.resolve_lane(db, lane_id)
+    await booking.check_model_on_lane(db, model, lane)
     lane.default_model_id = model.id
     await sync_default_flags(db)
     record(db, admin, "model.set_default", model.name, lane=lane.name)
@@ -203,6 +258,7 @@ async def delete_model(
     if future.first() is not None:
         raise ApiError(status.HTTP_409_CONFLICT, "model_has_reservations")
     record(db, user, "model.delete", model.name, delete_file=delete_file)
+    on_nodes = await _node_files(db, lanes, model) if delete_file else []
     past = await db.execute(select(Reservation.id).where(Reservation.model_id == model.id).limit(1))
     if past.first() is not None:
         # Keep usage history intact: soft-delete and free the name.
@@ -218,6 +274,21 @@ async def delete_model(
         if path.is_file() and path.resolve().is_relative_to(root):
             path.unlink()
     await db.commit()
+    calls = [executor.request(cluster_protocol.M_MODELS_DELETE, {"path": path}) for executor, path in on_nodes]
+    for result in await asyncio.gather(*calls, return_exceptions=True):
+        if isinstance(result, Exception):
+            log.warning("deleting a model file on a node failed: %s", result)
+
+
+async def _node_files(db: AsyncSession, lanes: LaneManager, model: LlmModel) -> list:
+    """(executor, path) of every connected node that has the model's files."""
+    rows = (await db.execute(select(NodeModel).where(NodeModel.model_id == model.id))).scalars().all()
+    out = []
+    for row in rows:
+        executor = lanes.nodes.find(row.node_id)
+        if executor is not None and not executor.is_local and executor.online:
+            out.append((executor, row.path))
+    return out
 
 
 # ---- launch-argument presets ------------------------------------------------

@@ -217,6 +217,7 @@ class BookingFlow:
                     .limit(MAX_MODELS)
                 )
             ).scalars()
+            models = await _on_lane_node(db, lane, list(models))
             rows = [[(m.name, f"{prefix}:{m.id}")] for m in models]
             rows.append([(_t(user, "whole_gpu"), f"{prefix}:x")])
             return Reply(_t(user, "pick_model", lane=lane_suffix), [*rows, nav], edit=True)
@@ -295,7 +296,10 @@ class BookingFlow:
         if waitlist:
             try:
                 start, end = booking.check_window(get_settings(), start, end, utcnow())
-                await booking.resolve_model(db, model_id, None)
+                model, _preset = await booking.resolve_model(db, model_id, None)
+                lane = await db.get(Lane, int(lane_id))
+                if lane is not None:
+                    await booking.check_model_on_lane(db, model, lane)
             except ApiError as exc:
                 return Reply(error_text(user, exc), edit=True)
             db.add(
@@ -404,3 +408,13 @@ def _duration(user: User, minutes: int) -> str:
     hours = minutes / 60
     text = f"{hours:g}"
     return f"{text} h" if lang(user) == "en" else f"{text} 小时"
+
+
+async def _on_lane_node(db, lane: Lane, models: list[LlmModel]) -> list[LlmModel]:
+    """Only the models whose files the lane's machine (node) has."""
+    from ...cluster import inventory
+
+    local_id = await inventory.local_node_id(db)
+    mapping = await inventory.nodes_by_model(db, local_id)
+    node = lane.node_id or local_id
+    return [m for m in models if node in inventory.nodes_of(m.id, mapping, local_id)]

@@ -62,6 +62,7 @@ async def join_waitlist(
     start, end = booking.check_window(get_settings(), body.start_at, body.end_at, utcnow())
     model, preset = await booking.resolve_model(db, body.model_id, body.preset_id)
     lane = await booking.resolve_lane(db, body.lane_id)
+    await booking.check_model_on_lane(db, model, lane)
     entry = WaitlistEntry(
         user_id=user.id,
         lane_id=lane.id,

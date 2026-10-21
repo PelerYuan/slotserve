@@ -1,6 +1,10 @@
 """Smoke test of the main user journeys through the real UI."""
 
 import json
+import os
+import socket
+import subprocess
+import sys
 import urllib.request
 
 from playwright.sync_api import Page, expect
@@ -75,6 +79,9 @@ def test_admin_pages_render(page: Page, server: str):
     sign_in(page, server, "admin")
     for tab in (
         "overview",
+        "runtime",
+        "lanes",
+        "nodes",
         "users",
         "reservations",
         "requests",
@@ -195,4 +202,54 @@ def test_access_credentials_and_idle_lane(page: Page, server: str):
     finally:
         _api(page, server, "DELETE", "/api/devenv/password")
         _api(page, server, "PUT", "/api/admin/settings", {"devenv_enabled": None})
+    assert not page.errors  # type: ignore[attr-defined]
+
+
+def test_nodes_page_and_agent(page: Page, server: str, tmp_path):
+    """Admin > Nodes: add a machine, start a real node agent with the token shown, see it come online."""
+    sign_in(page, server, "admin")
+    page.goto(f"{server}/admin?tab=nodes")
+    expect(page.get_by_text("built-in (this server)")).to_be_visible()
+    page.locator("[data-action=add-node]").click()
+    dialog = page.get_by_role("dialog")
+    dialog.locator("[data-field=node-name] input").fill("e2e-node")
+    dialog.get_by_role("button", name="Create and show token").click()
+    dialog = page.get_by_role("dialog")
+    expect(dialog.get_by_text("shown only once")).to_be_visible()
+    token = dialog.locator("pre code").first.inner_text().strip()
+    assert token.startswith("ssn-")
+    expect(dialog.get_by_text("slotserve agent").first).to_be_visible()
+    dialog.get_by_role("button", name="Done").click()
+    row = page.locator("tr[data-node=e2e-node]")
+    expect(row.get_by_text("Not connected yet")).to_be_visible()
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    env = {
+        **os.environ,
+        "SLOTSERVE_DATA_DIR": str(tmp_path / "data"),
+        "SLOTSERVE_MODELS_DIR": str(tmp_path / "models"),
+        "SLOTSERVE_LLAMA_PORT": str(port),
+        "SLOTSERVE_AGENT_MODEL_HOST": "127.0.0.1",
+    }
+    agent = subprocess.Popen(
+        [sys.executable, "-m", "slotserve", "agent", "--server", server, "--token", token],
+        cwd=tmp_path,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        expect(row.get_by_text("Online")).to_be_visible(timeout=20000)
+        node_id = next(n["id"] for n in _api(page, server, "GET", "/api/admin/nodes") if n["name"] == "e2e-node")
+        _api(page, server, "POST", f"/api/admin/nodes/{node_id}/revoke")
+        expect(row.get_by_text("Revoked")).to_be_visible(timeout=10000)
+        _api(page, server, "DELETE", f"/api/admin/nodes/{node_id}")
+    finally:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(agent.pid)], capture_output=True, check=False)
+        else:
+            agent.terminate()
+        agent.wait(timeout=20)
     assert not page.errors  # type: ignore[attr-defined]

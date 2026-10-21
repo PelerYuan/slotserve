@@ -157,8 +157,8 @@ export const api = {
 
   // downloads
   downloads: () => request<DownloadTask[]>('GET', '/api/downloads'),
-  createDownload: (url: string, filename?: string) =>
-    request<DownloadTask>('POST', '/api/downloads', { url, filename: filename || null }),
+  createDownload: (url: string, filename?: string, nodeId?: number | null) =>
+    request<DownloadTask>('POST', '/api/downloads', { url, filename: filename || null, node_id: nodeId ?? null }),
   retryDownload: (id: number) => request<DownloadTask>('POST', `/api/downloads/${id}/retry`),
   removeDownload: (id: number) => request<void>('DELETE', `/api/downloads/${id}`),
   hfFiles: (repo: string, revision = 'main') =>
@@ -166,8 +166,8 @@ export const api = {
       repo,
       revision,
     }),
-  hfDownload: (repo: string, files: string[], revision = 'main') =>
-    request<DownloadTask[]>('POST', '/api/downloads/hf', { repo, revision, files }),
+  hfDownload: (repo: string, files: string[], revision = 'main', nodeId?: number | null) =>
+    request<DownloadTask[]>('POST', '/api/downloads/hf', { repo, revision, files, node_id: nodeId ?? null }),
 
   // reservations
   reservations: (start: Date, end: Date, mine = false, laneId?: number | null) =>

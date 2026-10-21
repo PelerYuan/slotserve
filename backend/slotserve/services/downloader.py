@@ -46,12 +46,28 @@ class Downloader:
         self._cancel: set[int] = set()
         self.current_id: int | None = None
         self.events = None  # Notifier, set by the app
+        self.cluster = None  # ClusterHub, set by the app: downloads that run on other machines
+        self._remote_calls: set[asyncio.Task] = set()
 
     def poke(self) -> None:
         self._wake.set()
 
     def cancel(self, task_id: int) -> None:
         self._cancel.add(task_id)
+        if self.cluster is not None and task_id in self.cluster.downloads:
+            task = asyncio.get_running_loop().create_task(self.cluster.cancel_download(task_id))
+            self._remote_calls.add(task)
+            task.add_done_callback(self._remote_calls.discard)
+
+    def is_remote(self, node_id: int | None) -> bool:
+        """Whether a task downloads on another machine (a node agent)."""
+        return node_id is not None and self.cluster is not None and not self.cluster.registry.is_local(node_id)
+
+    def _available(self, node_id: int | None) -> bool:
+        if not self.is_remote(node_id):
+            return True
+        executor = self.cluster.executor(node_id)
+        return executor is not None and executor.online
 
     def dest_path(self, filename: str) -> Path:
         return self.settings.models_dir / filename
@@ -82,8 +98,11 @@ class Downloader:
 
     async def _next_task(self) -> int | None:
         async with SessionLocal() as db:
-            stmt = select(DownloadTask.id).where(DownloadTask.status == "queued").order_by(DownloadTask.id).limit(1)
-            return (await db.execute(stmt)).scalar_one_or_none()
+            stmt = select(DownloadTask.id, DownloadTask.node_id).where(DownloadTask.status == "queued")
+            for task_id, node_id in (await db.execute(stmt.order_by(DownloadTask.id))).all():
+                if self._available(node_id):  # downloads of an offline node wait for it
+                    return task_id
+            return None
 
     async def _set(self, task_id: int, **values) -> None:
         async with SessionLocal() as db:
@@ -95,16 +114,25 @@ class Downloader:
             task = await db.get(DownloadTask, task_id)
             if task is None or task.status != "queued":
                 return
-            url, filename, user_id = task.url, task.filename, task.user_id
+            url, filename, user_id, node_id = task.url, task.filename, task.user_id, task.node_id
         self._cancel.discard(task_id)
         self.current_id = task_id
         await self._set(task_id, status="running", error=None, speed_bps=0.0)
+        remote = self.is_remote(node_id)
+        remote_path = ""
         try:
-            await self._download(task_id, url, filename)
+            if remote:
+                remote_path = await self.cluster.run_download(node_id, task_id, url, filename, self.auth_headers(url))
+            else:
+                await self._download(task_id, url, filename)
         except DownloadCancelled:
             await self._set(task_id, status="cancelled", speed_bps=0.0, finished_at=utcnow())
             return
         except Exception as exc:  # noqa: BLE001
+            if remote and getattr(exc, "code", None) in ("offline", "disconnected"):
+                # The node went away: try again (resuming) when it is back.
+                await self._set(task_id, status="queued", speed_bps=0.0)
+                return
             log.warning("download %s failed: %s", task_id, exc)
             await self._set(task_id, status="failed", error=str(exc)[:1000], speed_bps=0.0, finished_at=utcnow())
             self._emit("download_failed", user_id=user_id, filename=filename, error=str(exc)[:200])
@@ -112,6 +140,11 @@ class Downloader:
         finally:
             self.current_id = None
 
+        if remote:
+            model_id = await self._register_remote(node_id, remote_path, filename, user_id)
+            await self._set(task_id, status="done", speed_bps=0.0, finished_at=utcnow(), model_id=model_id)
+            self._emit("download_done", user_id=user_id, filename=filename)
+            return
         dest = self.dest_path(filename)
         model_id = None
         if scanner.is_primary_gguf(dest):
@@ -121,6 +154,25 @@ class Downloader:
                 model_id = model.id if model else None
         await self._set(task_id, status="done", speed_bps=0.0, finished_at=utcnow(), model_id=model_id)
         self._emit("download_done", user_id=user_id, filename=filename)
+
+    async def _register_remote(self, node_id: int, path: str, filename: str, user_id: int | None) -> int | None:
+        """A model downloaded by a node is registered as available there."""
+        from ..cluster import inventory
+        from ..cluster import protocol as cluster_protocol
+
+        if not path or not scanner.is_primary_gguf(Path(filename)):
+            return None
+        try:
+            stat = await self.cluster.executor(node_id).request(cluster_protocol.M_MODELS_STAT, {"path": path})
+            size = int(stat.get("size_bytes") or 0)
+        except Exception:  # noqa: BLE001 - the size is only informative
+            size = 0
+        found = scanner.ModelFile(path=path, name=scanner.model_name_for(Path(filename)), size_bytes=size)
+        async with SessionLocal() as db:
+            local_id = await inventory.local_node_id(db)
+            await inventory.register_node_files(db, node_id, [found], self.settings, user_id, local_id, "download")
+            await db.commit()
+            return await inventory.model_at(db, node_id, path)
 
     def _emit(self, event: str, **data) -> None:
         if self.events is not None and data.get("user_id") is not None:

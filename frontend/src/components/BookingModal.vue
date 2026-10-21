@@ -82,7 +82,10 @@ const editing = computed(() => props.editing ?? null)
 const isActive = computed(() => editing.value?.phase === 'active')
 const isAdmin = computed(() => !!session.user?.is_admin)
 
-const ready = computed(() => props.models.filter((m) => m.status === 'ready' && m.file_exists))
+// Only models whose files the chosen lane's machine has (lanes on other nodes, see Admin > Nodes).
+const laneNode = computed(() => lanes.value.find((l) => l.id === lane.value)?.node_id ?? null)
+const onLaneNode = (m: Model) => laneNode.value === null || !m.node_ids || m.node_ids.includes(laneNode.value)
+const ready = computed(() => props.models.filter((m) => m.status === 'ready' && m.file_exists && onLaneNode(m)))
 const options = computed(() =>
   ready.value.map((m) => ({ label: `${m.name}  ·  ${formatBytes(m.size_bytes)}`, value: m.id })),
 )

@@ -65,6 +65,8 @@ export interface DownloadTask {
   model_id: number | null
   created_at: string
   finished_at: string | null
+  /** The machine that downloads into its models directory (null: the server). */
+  node_id?: number | null
 }
 
 export type ReservationPhase = 'upcoming' | 'active' | 'finished' | 'cancelled' | 'pending' | 'rejected' | 'expired'

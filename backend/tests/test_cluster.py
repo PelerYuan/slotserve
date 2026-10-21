@@ -6,18 +6,24 @@ a subprocess, exactly like a single-machine SlotServe does; the gateway reaches 
 
 import asyncio
 import contextlib
+import json
 import socket
 import sys
 from datetime import timedelta
 
 import pytest
 import uvicorn
+from fastapi import FastAPI
+from fastapi.responses import Response
+from sqlalchemy import select
 
-from conftest import MOCK_SERVER
+from conftest import MOCK_SERVER, make_gguf
 from slotserve.agent.node import NodeAgent
+from slotserve.api import runtime_admin
 from slotserve.cluster import protocol
 from slotserve.config import Settings
-from slotserve.db import utcnow
+from slotserve.db import SessionLocal, utcnow
+from slotserve.orm import ModelLoadEvent, UsageSample
 from slotserve.schemas import GpuOut
 
 
@@ -139,6 +145,22 @@ def _events(app) -> list[tuple[str, dict]]:
     return seen
 
 
+async def _remote_setup(app, make_client, start_agent, model_file: str = "remote.gguf"):
+    """A node with one lane on its GPU 0 and a model that only that node has."""
+    admin = await make_client("root")
+    created = await _add_node(admin)
+    node_id = created["node"]["id"]
+    agent = await start_agent(created["token"])
+    make_gguf(agent.settings.models_dir, model_file)
+    r = await admin.post("/api/admin/lanes", json={"name": "B", "gpus": [0], "node_id": node_id})
+    assert r.status_code == 201, r.text
+    lane = r.json()
+    scan = (await admin.post("/api/models/scan")).json()
+    assert model_file[:-5] in scan["added"]
+    models = {m["name"]: m for m in (await admin.get("/api/models")).json()}
+    return admin, agent, node_id, lane, models
+
+
 # ---- registration, heartbeat, revocation --------------------------------------------
 
 
@@ -252,3 +274,243 @@ async def test_heartbeat_offline_detection_and_notifications(app, make_client, s
     await _until(lambda: _is(executor.online), what="reconnect")
     assert ("node_online", {"node": "gpu-b"}) in seen
     assert (await _lane(admin, "B"))["node_online"] is True
+
+
+# ---- remote model servers end to end ----------------------------------------------------
+
+
+async def test_remote_model_server_end_to_end(app, make_client, start_agent, monkeypatch):
+    monkeypatch.setattr(runtime_admin, "STREAM_SECONDS", 1.5)
+    monkeypatch.setattr(runtime_admin, "POLL_SECONDS", 0.1)
+    monkeypatch.setenv("MOCK_LOAD_SECONDS", "2")
+    admin, agent, node_id, lane, models = await _remote_setup(app, make_client, start_agent)
+    remote = models["remote"]
+    assert remote["node_ids"] == [node_id] and remote["file_exists"]
+    assert lane["node_id"] == node_id and lane["node_name"] == "gpu-b"
+
+    r = await admin.post(f"/api/models/{remote['id']}/default", params={"lane_id": lane["id"]})
+    assert r.status_code == 200, r.text
+
+    # Loading progress comes from the node's log.
+    progress = set()
+
+    async def ready():
+        status = await _lane(admin, "B")
+        rt = status["runtime"]
+        if rt["state"] == "loading" and rt["log_percent"] is not None:
+            progress.add(rt["log_percent"])
+        return status if rt["state"] == "ready" else None
+
+    status = await _until(ready, what="remote model ready")
+    assert status["runtime"]["model_name"] == "remote"
+    assert progress, "no loading progress seen"
+
+    runtime = next(x for x in (await admin.get("/api/admin/runtime")).json() if x["lane_id"] == lane["id"])
+    assert runtime["node_name"] == "gpu-b" and runtime["node_id"] == node_id
+    assert runtime["base_url"] == f"http://127.0.0.1:{agent.settings.llama_port + lane['id'] - 1}"
+    assert "remote.gguf" in runtime["command"] and isinstance(runtime["pid"], int)
+    logs = (await admin.get("/api/runtime/logs", params={"lane_id": lane["id"]})).json()["lines"]
+    assert any("--alias remote" in line for line in logs)
+    download = await admin.get(f"/api/admin/runtime/{lane['id']}/log")
+    assert download.status_code == 200 and "server is listening" in download.text
+    stream = await admin.get(f"/api/admin/runtime/{lane['id']}/stream")
+    lines = [
+        line for raw in stream.text.splitlines() if raw.startswith("data: ") for line in json.loads(raw[6:])["lines"]
+    ]
+    assert any("start:" in line for line in lines) and any("server is listening" in line for line in lines)
+    async with SessionLocal() as db:
+        events = (await db.execute(select(ModelLoadEvent).where(ModelLoadEvent.lane_id == lane["id"]))).scalars()
+        assert any(e.success for e in events)
+
+    # The gateway forwards to the node directly.
+    key = {"Authorization": f"Bearer {(await admin.post('/api/keys', json={'name': 'k'})).json()['key']}"}
+    r = await admin.post(
+        "/v1/chat/completions", headers=key, json={"model": "remote", "messages": [{"role": "user", "content": "hi"}]}
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["choices"][0]["message"]["content"].startswith("[remote]")
+    assert [m["id"] for m in (await admin.get("/v1/models", headers=key)).json()["data"]] == ["remote"]
+
+    # Usage samples of the remote lane carry the node's GPU metrics.
+    when = (utcnow() + timedelta(minutes=1)).replace(second=0, microsecond=0)
+    await app.state.usage_sampler.sample(when)
+    async with SessionLocal() as db:
+        rows = (
+            (await db.execute(select(UsageSample).where(UsageSample.lane_id == lane["id"], UsageSample.start == when)))
+            .scalars()
+            .all()
+        )
+    assert [(r.gpu_index, r.kind, r.model_name) for r in rows] == [(0, "idle_model", "remote")]
+    assert rows[0].util_seconds == 70 * 60 and rows[0].mem_peak_mb == 1000
+
+    # Unloading stops the server on the node.
+    await admin.delete(f"/api/models/{remote['id']}/default", params={"lane_id": lane["id"]})
+    await _until(
+        lambda: _is_state(admin, "B", "stopped"),
+        what="remote model stopped",
+    )
+    assert agent.runtimes[lane["id"]].pid is None
+
+
+async def _is_state(admin, lane_name: str, state: str):
+    return (await _lane(admin, lane_name))["runtime"]["state"] == state
+
+
+async def test_failed_remote_load_reports_details(app, make_client, start_agent):
+    admin, _agent, _node_id, lane, models = await _remote_setup(app, make_client, start_agent)
+    remote = models["remote"]
+    await admin.patch(f"/api/models/{remote['id']}", json={"args": "--mock-fail"})
+    await admin.post(f"/api/models/{remote['id']}/default", params={"lane_id": lane["id"]})
+    await _until(lambda: _is_state(admin, "B", "failed"), what="remote load failed")
+    runtime = next(x for x in (await admin.get("/api/admin/runtime")).json() if x["lane_id"] == lane["id"])
+    assert any("simulated load failure" in line for line in runtime["failure_log"])
+    assert runtime["exit_code"] not in (None, 0) and runtime["next_retry_at"] is not None
+    failed = (await admin.get("/api/admin/runtime/events", params={"failed": "true"})).json()
+    assert failed and "simulated load failure" in failed[0]["log_excerpt"] and failed[0]["lane_id"] == lane["id"]
+
+
+# ---- scheduling with per-node models -------------------------------------------------------
+
+
+async def test_models_are_per_node(app, make_client, start_agent, models_dir):
+    admin, agent, node_id, lane, models = await _remote_setup(app, make_client, start_agent)
+    make_gguf(models_dir, "local.gguf")
+    await admin.post("/api/models/scan")
+    models = {m["name"]: m for m in (await admin.get("/api/models")).json()}
+    local_id = app.state.nodes.local.node_id
+    assert models["local"]["node_ids"] == [local_id] and models["remote"]["node_ids"] == [node_id]
+    first = next(x for x in (await admin.get("/api/lanes")).json() if x["name"] != "B")
+    assert first["node_id"] == local_id
+
+    # A lane only serves (and can only be booked with) models its machine has.
+    r = await admin.post(f"/api/models/{models['local']['id']}/default", params={"lane_id": lane["id"]})
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "model_not_on_node"
+    r = await admin.post(f"/api/models/{models['remote']['id']}/default", params={"lane_id": first["id"]})
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "model_not_on_node"
+    now = utcnow()
+    start, end = (now + timedelta(hours=1)).isoformat(), (now + timedelta(hours=2)).isoformat()
+    booking = {"start_at": start, "end_at": end}
+    r = await admin.post(
+        "/api/reservations", json={**booking, "model_id": models["local"]["id"], "lane_id": lane["id"]}
+    )
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "model_not_on_node"
+    r = await admin.post(
+        "/api/reservations", json={**booking, "model_id": models["remote"]["id"], "lane_id": lane["id"]}
+    )
+    assert r.status_code == 201, r.text
+    r = await admin.patch(
+        f"/api/admin/lanes/{lane['id']}", json={"name": "B", "gpus": [1], "default_model_id": models["local"]["id"]}
+    )
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "model_not_on_node"
+    # GPUs are checked against the node's own GPUs, and only lanes of the same node may not overlap.
+    r = await admin.post("/api/admin/lanes", json={"name": "C", "gpus": [5], "node_id": node_id})
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "lane_gpus_invalid"
+    r = await admin.post("/api/admin/lanes", json={"name": "C", "gpus": [0], "node_id": node_id})
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "lane_gpus_overlap"
+    r = await admin.post("/api/admin/lanes", json={"name": "C", "gpus": [1], "node_id": node_id})
+    assert r.status_code == 201
+    # Dev environments do not run on other machines yet.
+    r = await admin.post(
+        "/api/reservations", json={**booking, "devenv_template_id": 1, "lane_id": lane["id"], "model_id": None}
+    )
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "devenv_remote_lane"
+
+    # The same file on shared storage (same path everywhere) is one model, available on both machines.
+    shared = make_gguf(agent.settings.models_dir, "shared.gguf")
+    r = await admin.post("/api/models", json={"name": "shared", "path": str(shared)})
+    assert r.status_code == 201 and r.json()["node_ids"] == [local_id]
+    await admin.post("/api/models/scan", params={"node_id": node_id})
+    shared_model = next(m for m in (await admin.get("/api/models")).json() if m["name"] == "shared")
+    assert shared_model["node_ids"] == sorted([local_id, node_id])
+    r = await admin.post(f"/api/models/{shared_model['id']}/default", params={"lane_id": lane["id"]})
+    assert r.status_code == 200
+    assert (await admin.post("/api/admin/lanes", json={"name": "D", "gpus": [], "node_id": 999})).status_code == 400
+
+
+async def test_remote_download(app, make_client, start_agent):
+    payload = b"GGUF" + b"\0" * 5000
+    files = FastAPI()
+
+    @files.get("/files/{name}")
+    async def serve_file(name: str):
+        return Response(payload, media_type="application/octet-stream")
+
+    port = _free_port()
+    server, task = await _serve(files, port)
+    try:
+        admin = await make_client("root")
+        created = await _add_node(admin)
+        node_id = created["node"]["id"]
+        agent = await start_agent(created["token"])
+        r = await admin.post(
+            "/api/downloads", json={"url": f"http://127.0.0.1:{port}/files/fetched.gguf", "node_id": node_id}
+        )
+        assert r.status_code == 201, r.text
+
+        async def done():
+            tasks = (await admin.get("/api/downloads")).json()
+            return tasks[0] if tasks[0]["status"] in ("done", "failed") else None
+
+        result = await _until(done, what="remote download finished")
+        assert result["status"] == "done", result
+        assert result["node_id"] == node_id and result["downloaded_bytes"] == len(payload)
+        assert (agent.settings.models_dir / "fetched.gguf").read_bytes() == payload
+        assert not (app.state.settings.models_dir / "fetched.gguf").exists()
+        model = next(m for m in (await admin.get("/api/models")).json() if m["id"] == result["model_id"])
+        assert model["name"] == "fetched" and model["node_ids"] == [node_id]
+    finally:
+        await _stop(server, task)
+
+
+# ---- reconciliation ------------------------------------------------------------------------
+
+
+async def test_reconnect_reconciles_running_servers(app, make_client, start_agent):
+    admin, agent, node_id, lane, models = await _remote_setup(app, make_client, start_agent)
+    await admin.post(f"/api/models/{models['remote']['id']}/default", params={"lane_id": lane["id"]})
+    await _until(lambda: _is_state(admin, "B", "ready"), what="remote model ready")
+    pid = agent.runtimes[lane["id"]].pid
+
+    # A second lane on the node, removed while the node is away: its server must not survive the reconnect.
+    r = await admin.post("/api/admin/lanes", json={"name": "C", "gpus": [1], "node_id": node_id})
+    lane_c = r.json()
+    await admin.post(f"/api/models/{models['remote']['id']}/default", params={"lane_id": lane_c["id"]})
+    await _until(lambda: _is_state(admin, "C", "ready"), what="second lane ready")
+    orphan = agent.runtimes[lane_c["id"]]
+
+    executor = app.state.nodes.get(node_id)
+    await app.state.cluster.disconnect(node_id, 1001, "test")
+    await _until(lambda: _is(not executor.online), what="disconnect")
+    assert (await _lane(admin, "B"))["runtime"]["state"] == "offline"
+    assert (await admin.delete(f"/api/admin/lanes/{lane_c['id']}")).status_code == 204
+    assert orphan.state.value == "ready"  # nothing could be sent while the node was away
+
+    await _until(lambda: _is(executor.online), what="reconnect")
+    status = await _until(lambda: _lane_ready(admin, "B"), what="lane ready again")
+    assert status["runtime"]["model_name"] == "remote"
+    assert agent.runtimes[lane["id"]].pid == pid  # the running server was kept, not restarted
+    await _until(lambda: _is(lane_c["id"] not in agent.runtimes), what="orphan stopped")
+    assert orphan.state.value == "stopped"
+
+
+async def _lane_ready(admin, name: str):
+    lane = await _lane(admin, name)
+    return lane if lane["runtime"]["state"] == "ready" else None
+
+
+async def test_control_plane_restart_keeps_remote_servers(app, make_client, start_agent):
+    """The control plane forgets everything (new lane manager); the agent's report restores the state."""
+    admin, agent, node_id, lane, models = await _remote_setup(app, make_client, start_agent)
+    await admin.post(f"/api/models/{models['remote']['id']}/default", params={"lane_id": lane["id"]})
+    await _until(lambda: _is_state(admin, "B", "ready"), what="remote model ready")
+    pid = agent.runtimes[lane["id"]].pid
+
+    executor = app.state.nodes.get(node_id)
+    runtime = executor.runtimes[lane["id"]]
+    runtime.apply({"lane_id": lane["id"], "state": "stopped"})  # as if freshly started
+    await app.state.cluster.disconnect(node_id, 1001, "test")
+    await _until(lambda: _is(not executor.online), what="disconnect")
+    await _until(lambda: _is(executor.online), what="reconnect")
+    assert runtime.state.value == "ready" and runtime.model_name == "remote"
+    await asyncio.sleep(1.0)  # a few scheduler rounds: nothing is restarted
+    assert agent.runtimes[lane["id"]].pid == pid

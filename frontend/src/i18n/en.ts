@@ -176,6 +176,8 @@ export default {
     noModels: 'No ready models yet. Add one on the Models page first.',
   },
   models: {
+    downloadTo: 'Download to',
+    downloadToServer: 'This server',
     setDefaultLane: 'Set as default for {lane}',
     add: 'Add model',
     addTitle: 'Add model',
@@ -1079,6 +1081,7 @@ export default {
     node_has_lanes: 'The node still has lanes. Move or delete them first.',
     node_has_downloads: 'The node still has downloads queued or running.',
     node_offline: 'Node {node} is offline.',
+    devenv_remote_lane: 'Dev environments run on the server’s own machine only (not yet on other nodes).',
     devenv_disabled: 'Dev environments are switched off.',
     ssh_key_required: 'Add an SSH public key under Access credentials first.',
     ssh_login_required: 'Add an SSH public key or set an environment password under Access credentials first.',

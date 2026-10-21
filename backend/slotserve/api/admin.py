@@ -12,7 +12,7 @@ from ..config import get_settings
 from ..db import get_db, utcnow
 from ..deps import admin_user, get_lanes
 from ..errors import ApiError
-from ..orm import HOLDING_STATUSES, ApiKey, AuditLog, LlmModel, ModelLoadEvent, Reservation, UsageLog, User
+from ..orm import HOLDING_STATUSES, ApiKey, AuditLog, Lane, LlmModel, ModelLoadEvent, Reservation, UsageLog, User
 from ..runtime.lanes import LaneManager
 from ..runtime.scheduler import ManualOverride
 from ..schemas import (
@@ -453,6 +453,9 @@ async def manual_runtime(
         if body.model_id is None:
             raise ApiError(status.HTTP_400_BAD_REQUEST, "validation_error", field="model_id")
         model, preset = await booking.resolve_model(db, body.model_id, body.preset_id)
+        lane = await db.get(Lane, ctx.id)
+        if lane is not None:
+            await booking.check_model_on_lane(db, model, lane)
     until = utcnow() + timedelta(hours=body.hours) if body.hours else None
     override = ManualOverride(
         model_id=model.id if model else None,

@@ -197,6 +197,8 @@ def _state_message(snap) -> str:
         return f"Model '{snap.model_name}' is loading."
     if snap.state == RuntimeState.FAILED:
         return f"Model '{snap.model_name}' failed to start: {snap.error}"
+    if snap.state == RuntimeState.OFFLINE:
+        return "The machine that serves this lane is offline; SlotServe reconnects to it automatically."
     return "No model is loaded right now."
 
 
