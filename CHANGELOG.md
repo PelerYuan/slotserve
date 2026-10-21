@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 
 - **Dev environments**: a booking can be a Docker container with the lane's GPUs and SSH (a bundled static Dropbear, public-key login only, a port from a configurable range), a persistent `/workspace` volume and the models read-only. Built-in PyTorch, Jupyter + PyTorch, TensorFlow and CUDA templates, custom templates from any image, and saving a running environment as an image. Images are pulled ahead of time; failures, logs and every environment are visible on the page. Off by default; needs the Docker socket (or Podman's Docker-compatible API).
+- Dev environment **passwords**: everyone can set an environment password (stored only as a SHA-512-crypt hash, written into the container) and log in with it as well as with SSH keys; admins can switch password logins off. Dropbear limits each connection to three tries. A booking needs a key or a password.
+- **Access credentials** page (formerly API keys): API keys, SSH public keys and the environment password in one place.
+- **What an idle lane runs** (Admin → GPUs & lanes): its default model, a **shared dev environment** everyone can log into with their own account (keys, password, kept home directory; stopped ahead of each booking and started again afterwards), or nothing. The overview shows what an idle lane is doing.
+- **Kept dev environments**: a booking can keep its environment; the container is paused when the booking ends and a later booking continues it (recreated from a snapshot when the GPUs change). Rename, delete (optionally with its data) and limit them; unused ones can be removed after a number of days.
+- **Kept directories** besides `/workspace` per template or kept environment (e.g. `/root`, `/opt/conda`), and an optional **storage directory** on the Docker host to keep persistent data in bind mounts instead of Docker volumes.
 
 ## [0.8.0] - 2026-10-21
 

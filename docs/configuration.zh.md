@@ -72,6 +72,10 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_DEVENV_ALLOWED_REGISTRIES` | *空* | 允许的镜像仓库，逗号分隔；留空表示不限 |
 | `SLOTSERVE_DEVENV_SAVED_IMAGES` | `3` | 每人可保存的环境镜像数 |
 | `SLOTSERVE_DEVENV_PULL_MINUTES` | `60` | 预约开始前多久下载镜像 |
+| `SLOTSERVE_DEVENV_PASSWORD_LOGIN` | `true` | 除公钥外也允许用环境密码 SSH 登录 |
+| `SLOTSERVE_DEVENV_STORAGE_DIR` | *空* | Docker 主机上存放持久数据的目录（绑定挂载）；留空则使用 Docker 命名卷 |
+| `SLOTSERVE_DEVENV_PROJECTS` | `3` | 每人可保留（暂停）的环境数；0 表示不允许 |
+| `SLOTSERVE_DEVENV_PROJECT_DAYS` | `0` | 自动删除闲置这么多天的保留环境（0 表示从不） |
 
 除部署相关的几项（`HOST`、`PORT`、`SECRET_KEY`、`COOKIE_SECURE`、`STATIC_DIR`、`DATA_DIR`、`MODELS_DIR`、`LLAMA_SERVER_CMD`、`LLAMA_HOST`、`LLAMA_PORT`、`TELEGRAM_API_BASE`、`DOCKER_HOST`、`DROPBEAR_PATH`，修改需要重启，因此只在 `.env` 中设置）外，其余所有设置都可由管理员在**管理 → 系统设置**中直接修改，无需重启。修改保存在数据库中，优先于 `.env`；点**恢复默认**即可取消覆盖。
 
