@@ -46,6 +46,7 @@ class Downloader:
         self._cancel: set[int] = set()
         self.current_id: int | None = None
         self.events = None  # Notifier, set by the app
+        self.deployer = None  # services.catalog_deploy.Deployer, set by the app
 
     def poke(self) -> None:
         self._wake.set()
@@ -132,6 +133,12 @@ class Downloader:
 
         dest = self.dest_path(filename, base)
         model_id = None
+        if self.deployer is not None and await self.deployer.owns(task_id):
+            # Part of a catalog deployment: it registers the model itself once every file is here.
+            await self._set(task_id, status="done", speed_bps=0.0, finished_at=utcnow())
+            self._emit("download_done", user_id=user_id, filename=filename)
+            await self.deployer.task_done(task_id)
+            return
         if scanner.is_primary_gguf(dest):
             async with SessionLocal() as db:
                 model = await scanner.register_file(db, dest, self.settings, user_id)

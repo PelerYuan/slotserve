@@ -15,6 +15,7 @@ from .api import (
     admin,
     auth,
     calendar,
+    catalog,
     channels,
     devenv,
     devenv_cpu,
@@ -37,6 +38,7 @@ from .gateway import devenv_web, devenv_web_app, proxy
 from .gateway.devenv_web_auth import WebOriginGuard
 from .runtime.lanes import LaneManager, ensure_default_lane
 from .services import app_settings
+from .services.catalog_deploy import Deployer
 from .services.chat.hub import ChannelHub
 from .services.devenv import DevEnvManager, seed_templates
 from .services.downloader import Downloader
@@ -83,6 +85,8 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         app.state.scheduler = app.state.lanes.primary.scheduler
         app.state.downloader = Downloader(settings)
         app.state.downloader.events = app.state.notifier
+        app.state.deployer = Deployer(settings, app.state.lanes)
+        app.state.downloader.deployer = app.state.deployer
         app.state.housekeeper = Housekeeper(app.state)
         # GPU metrics come from nvidia-smi unless a reader was injected (tests, other hardware).
         app.state.usage_sampler = UsageSampler(app.state, stats=getattr(app.state, "gpu_stats_fn", None))
@@ -164,6 +168,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         lanes,
         runtime_admin,
         devenv,
+        catalog,
     ):
         app.include_router(module.router)
     app.include_router(devenv.keys_router)
