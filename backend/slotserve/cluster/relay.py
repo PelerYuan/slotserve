@@ -97,6 +97,7 @@ class RelayStream:
         self.target = target
         self.kind = str(target.get("kind") or "?")
         self.websocket: WebSocket | None = None
+        self.idle: float | None = None  # seconds without traffic before it is closed; None: relay_idle_seconds
         self.attached = asyncio.Event()
         self.closed = asyncio.Event()
         self.last_activity = time.monotonic()
@@ -210,8 +211,11 @@ class Relay:
     def streams(self, node_id: int | None = None) -> list[RelayStream]:
         return [s for s in self._open.values() if node_id is None or s.node_id == node_id]
 
-    async def open(self, executor: RemoteExecutor, target: dict, timeout: float | None = None) -> RelayStream:
-        """A new stream to ``target`` on the executor's node (see ``protocol.M_STREAM_OPEN`` for targets)."""
+    async def open(
+        self, executor: RemoteExecutor, target: dict, timeout: float | None = None, idle: float | None = None
+    ) -> RelayStream:
+        """A new stream to ``target`` on the executor's node (see ``protocol.M_STREAM_OPEN`` for targets).
+        ``idle``: close it after this long without traffic (0: never; None: ``relay_idle_seconds``)."""
         if not executor.online:
             raise RelayError("offline", f"node {executor.name!r} is offline")
         stats = self.stats(executor.node_id)
@@ -220,6 +224,7 @@ class Relay:
             raise RelayError("too_many_streams", f"node {executor.name!r} has {stats.open} relayed connections open")
         timeout = timeout or self.settings.relay_open_seconds
         stream = RelayStream(self, executor.node_id, secrets.token_hex(16), secrets.token_urlsafe(32), target)
+        stream.idle = idle
         self._pending[stream.id] = stream
         stats.open += 1
         stats.by_kind[stream.kind] = stats.by_kind.get(stream.kind, 0) + 1
@@ -293,13 +298,13 @@ class Relay:
             await stream.close()
 
     async def sweep(self) -> None:
-        """Closes streams without traffic for ``relay_idle_seconds``."""
-        limit = self.settings.relay_idle_seconds
-        if limit <= 0:
-            return
+        """Closes streams without traffic for ``relay_idle_seconds`` (or their own limit; 0 = never). Dead peers are
+        noticed by the WebSockets' own keepalive pings, so long-lived quiet connections (SSH) need no idle limit."""
+        default = self.settings.relay_idle_seconds
         now = time.monotonic()
         for stream in list(self._open.values()):
-            if now - stream.last_activity > limit:
+            limit = default if stream.idle is None else stream.idle
+            if limit > 0 and now - stream.last_activity > limit:
                 log.info("closing relayed connection %s to %s (idle)", stream.id[:8], stream.kind)
                 await stream.close()
 
@@ -428,10 +433,20 @@ class RelayListener:
     connection), so a front that picks the target per connection (e.g. by name) needs no change here. ``key``
     identifies what the listener serves, for reconciling (by default: the target of a fixed route)."""
 
-    def __init__(self, relay: Relay, route: Route, host: str, port: int, label: str = "", key: Any = None):
+    def __init__(
+        self,
+        relay: Relay,
+        route: Route,
+        host: str,
+        port: int,
+        label: str = "",
+        key: Any = None,
+        idle: float | None = None,
+    ):
         self.relay = relay
         self.route = route
         self.key = key
+        self.idle = idle  # idle limit of its connections (see Relay.open)
         self.host = host
         self.port = port
         self.label = label or str(key)
@@ -447,9 +462,10 @@ class RelayListener:
         host: str,
         port: int,
         label: str = "",
+        idle: float | None = None,
     ) -> RelayListener:
         """A listener relaying every connection to one target."""
-        return cls(relay, fixed_route(executor, target), host, port, label or str(target), key=target)
+        return cls(relay, fixed_route(executor, target), host, port, label or str(target), key=target, idle=idle)
 
     async def start(self) -> None:
         """Starts listening (raises ``OSError`` when the port is taken); port 0 picks a free one."""
@@ -466,7 +482,7 @@ class RelayListener:
             executor, target = await self.route()
             if executor is None:
                 raise RelayError("offline", "the node is gone")
-            stream = await self.relay.open(executor, target)
+            stream = await self.relay.open(executor, target, idle=self.idle)
         except (RelayError, OSError) as exc:
             log.info("relay %s: %s", self.label, exc)
             writer.close()

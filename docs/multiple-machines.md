@@ -62,7 +62,8 @@ on the node; the agent connects to the target, then opens a WebSocket of its own
 (`/api/cluster/stream/<id>`, authenticated with the node token and a one-time secret for that stream). Bytes flow
 both ways with TCP backpressure; a half-closed connection (one side done sending) stays open for the other side.
 A node may have at most `SLOTSERVE_RELAY_MAX_STREAMS` relayed connections open at once, and connections idle for
-`SLOTSERVE_RELAY_IDLE_SECONDS` are closed.
+`SLOTSERVE_RELAY_IDLE_SECONDS` are closed, except SSH sessions (`SLOTSERVE_RELAY_SSH_IDLE_SECONDS`, default 0 =
+never); connections whose other end is gone are noticed by keepalive pings.
 
 ## Dev environments on nodes
 
@@ -72,9 +73,12 @@ Dev environments work on every machine that runs Docker:
   there (progress is shown as usual), SlotServe's SSH files are uploaded into the container through the relay.
 - **Shared environments of idle lanes** run on the lane's node.
 - **Kept environments** are paused and resumed on the node they live on; when the lane's GPUs change they are
-  recreated from a snapshot as before. Booked on a lane of another machine, a kept environment is snapshotted where
-  it is and its image is copied to the new machine (through the server); it waits while its old machine is offline.
-  Saved images are copied the same way when they are used on another machine.
+  recreated from a snapshot as before. A kept environment can continue on another machine only when its
+  `/workspace` and kept folders are on storage both machines use (a personal storage, plus a project storage if it
+  keeps folders, e.g. NFS); otherwise they are Docker volumes on its machine and booking it elsewhere is refused
+  (`devenv_project_data_elsewhere`) instead of starting it empty. When it moves, it is snapshotted where it is and
+  its image is copied to the new machine (through the server); it waits while its old machine is offline. Saved
+  images are copied the same way when they are used on another machine.
 - **Environments without a GPU** can be started on any machine: the start dialog asks which one when nodes are
   connected. Their cores are that machine's own (its cores minus what its lanes reserve, see
   [dev environments](dev-environments.md)), and their CPU and memory use is recorded in usage like on the server.
@@ -157,6 +161,7 @@ Server:
 | `SLOTSERVE_NODE_RPC_TIMEOUT_SECONDS` | `30` | How long the server waits for an agent to answer a command |
 | `SLOTSERVE_RELAY_MAX_STREAMS` | `256` | Relayed connections one node may have open at once |
 | `SLOTSERVE_RELAY_IDLE_SECONDS` | `3600` | Relayed connections without traffic for this long are closed |
+| `SLOTSERVE_RELAY_SSH_IDLE_SECONDS` | `0` | Quiet SSH sessions into node environments are closed after this long (0: never) |
 | `SLOTSERVE_RELAY_OPEN_SECONDS` | `15` | How long opening a relayed connection may take |
 | `SLOTSERVE_DEVENV_RELAY_HOST` | `0.0.0.0` | Where the server listens for SSH and direct ports of environments on nodes |
 

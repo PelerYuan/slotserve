@@ -1302,6 +1302,7 @@ const zh: typeof en = {
     node_has_downloads: '该节点仍有排队或进行中的下载。',
     node_offline: '节点 {node} 已离线。',
     devenv_node_missing: '这台机器没有连接到本服务器。',
+    devenv_project_data_elsewhere: '这个保留环境的 /workspace 和保留目录在 {node} 上，只能在那里继续。请预约那台机器上的通道，或请管理员配置所有机器都能使用的存储（管理 → 存储）。',
     catalog_remote_lane: '模型目录中的模型目前只能下载到服务器本机；请选择服务器本机上的通道（暂不支持其他节点）。',
     storage_remote_node: '「管理 → 存储」中的模型库位于服务器本机；其他节点会下载到各自的模型目录。',
     devenv_disabled: '开发环境功能已关闭。',

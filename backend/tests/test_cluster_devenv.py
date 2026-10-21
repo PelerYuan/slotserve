@@ -246,8 +246,33 @@ async def test_remote_project_pause_resume_and_move(app, make_client, start_agen
         await bob.delete(f"/api/reservations/{booking['id']}")
         await _until_ticks(app, lambda: _is(not new["Running"]), "paused on the node")
 
-        # Booked on the server's own lane: snapshotted on the node, the image is copied over, created here.
+        # Booked on the server's own lane: its /workspace and kept folders are Docker volumes on the node, so it
+        # cannot move (it would start empty) ...
         local_lane = next(x for x in (await admin.get("/api/lanes")).json() if x["name"] != "B")
+        start = utcnow()
+        window = {"start_at": start.isoformat(), "end_at": (start + timedelta(hours=1)).isoformat()}
+        r = await bob.post(
+            "/api/reservations", json={**window, "lane_id": local_lane["id"], "devenv_project_id": project["id"]}
+        )
+        assert r.status_code == 400 and r.json()["detail"]["code"] == "devenv_project_data_elsewhere"
+        assert r.json()["detail"]["params"]["node"] == "gpu-b"
+        r = await bob.post("/api/devenv/cpu/start", json={"project_id": project["id"], "node_id": None})
+        assert r.status_code == 201  # without a machine named: it stays where it is
+        await _until_ticks(app, lambda: _session(bob, state="running", kind="cpu"), "CPU-only on the node")
+        cpu_session = await _session(bob, state="running", kind="cpu")
+        assert cpu_session["node_id"] == node_id
+        assert (await bob.post(f"/api/devenv/cpu/sessions/{cpu_session['id']}/stop")).status_code == 202
+        local_id = app.state.nodes.local.node_id
+        r = await bob.post("/api/devenv/cpu/start", json={"project_id": project["id"], "node_id": local_id})
+        assert r.status_code == 400 and r.json()["detail"]["code"] == "devenv_project_data_elsewhere"
+
+        # ... until its data is on storage both machines use (here NFS): then it moves, data and all.
+        for name, purpose in (("homes", "personal"), ("kept", "projects")):
+            r = await admin.post(
+                "/api/admin/storage",
+                json={"name": name, "kind": "nfs", "purpose": purpose, "server": "nas.lan", "remote_path": f"/{name}"},
+            )
+            assert r.status_code == 201, r.text
         await _book(bob, local_lane["id"], devenv_project_id=project["id"])
         await _until_ticks(app, lambda: _session(bob, state="running"), "running on the server", n=80)
         [moved] = local.containers.values()

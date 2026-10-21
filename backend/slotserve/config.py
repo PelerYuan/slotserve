@@ -177,6 +177,9 @@ class Settings(BaseSettings):
     # connections the node agent opens to the control plane (cluster/relay.py).
     relay_max_streams: int = 256  # relayed connections one node may have open at the same time
     relay_idle_seconds: float = 3600.0  # a relayed connection without traffic for this long is closed
+    # SSH into dev environments on nodes is never closed for being quiet (0); dead connections are still noticed by
+    # the relay's keepalive pings. Set a number of seconds to close idle SSH sessions after that long.
+    relay_ssh_idle_seconds: float = 0.0
     relay_open_seconds: float = 15.0  # how long opening a relayed connection may take
     # Node agent (``slotserve agent``): the control plane URL and this node's token.
     agent_server: str = ""

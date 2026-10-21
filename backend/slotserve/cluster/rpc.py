@@ -28,6 +28,10 @@ class Peer:
         self.on_event = on_event
         self._pending: dict[str, asyncio.Future] = {}
         self._tasks: set[asyncio.Task] = set()
+        # Events are handled one after another (in order) by a task of their own, so slow handling (database
+        # writes) never holds up the frames behind them - responses, e.g. to stream.open.
+        self._events: asyncio.Queue[tuple[str, dict]] = asyncio.Queue()
+        self._event_task: asyncio.Task | None = None
         self._send_lock = asyncio.Lock()
         self.closed = False
 
@@ -72,11 +76,23 @@ class Peer:
             self._tasks.add(task)
             task.add_done_callback(self._tasks.discard)
         elif kind == "event":
-            if self.on_event is not None:
-                try:
-                    await self.on_event(str(message.get("event")), message.get("data") or {})
-                except Exception:
-                    log.exception("handling event %s failed", message.get("event"))
+            if self.on_event is not None and not self.closed:
+                self._events.put_nowait((str(message.get("event")), message.get("data") or {}))
+                if self._event_task is None or self._event_task.done():
+                    self._event_task = asyncio.create_task(self._handle_events(), name="peer events")
+
+    async def _handle_events(self) -> None:
+        while not self._events.empty():
+            name, data = self._events.get_nowait()
+            try:
+                await self.on_event(name, data)
+            except Exception:
+                log.exception("handling event %s failed", name)
+
+    async def drain_events(self) -> None:
+        """Waits until every event received so far has been handled."""
+        while self._event_task is not None and not self._event_task.done():
+            await asyncio.shield(self._event_task)
 
     async def _answer(self, message: dict) -> None:
         rid = str(message.get("id", ""))
@@ -102,6 +118,10 @@ class Peer:
             if not future.done():
                 future.set_exception(p.RemoteError("disconnected", "connection closed"))
         self._pending.clear()
+        if self._event_task is not None and not self._event_task.done():
+            # what the other side reported before it went away is still recorded
+            with contextlib.suppress(Exception):
+                await asyncio.wait_for(asyncio.shield(self._event_task), 10)
         for task in list(self._tasks):
             task.cancel()
         for task in list(self._tasks):

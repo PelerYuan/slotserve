@@ -309,6 +309,25 @@ class DevEnvError(Exception):
         self.params = params
 
 
+# Failures shown on a session as text (others show their code).
+FAILURE_TEXT = {
+    "devenv_project_data_elsewhere": (
+        "devenv_project_data_elsewhere: this kept environment's /workspace and kept folders are on {node}; it can "
+        "only continue there (or with storage that every machine uses, Admin -> Storage)."
+    ),
+}
+
+
+def failure_text(exc: DevEnvError) -> str:
+    text = FAILURE_TEXT.get(exc.code)
+    if text is None:
+        return exc.code
+    try:
+        return text.format(**exc.params)
+    except (KeyError, IndexError):
+        return exc.code
+
+
 def parse_port_range(value: str) -> tuple[int, int]:
     m = re.fullmatch(r"\s*(\d+)\s*-\s*(\d+)\s*", value)
     if not m:
@@ -401,6 +420,40 @@ def unix_names(users: list[User]) -> dict[int, str]:
 async def unix_name(db, user: User) -> str:
     users = (await db.execute(select(User).where(User.disabled_at.is_(None)))).scalars().all()
     return unix_names([*users, user]).get(user.id, user.username.lower())
+
+
+async def project_move_problem(db, secret_key: str, project: DevProject, node_id: int | None) -> dict | None:
+    """Why a kept environment cannot continue on another machine (``node_id``; None = the server's own), or None.
+
+    Only the container (what was installed) moves between machines. ``/workspace`` and the kept folders move only
+    when they are on storage both machines use (Admin -> Storage: a personal storage, and a project storage when
+    the environment keeps folders); otherwise they are Docker volumes or server directories that would stay behind.
+    Returns ``{"code": ..., "node": <machine of the data>}``."""
+    from ..cluster import inventory
+    from ..orm import Node
+
+    if not project.container_id:
+        return None  # never ran (or nothing is left of it): it can start anywhere
+    local_id = await inventory.local_node_id(db)
+
+    def norm(n: int | None) -> int | None:
+        return None if n is None or n == local_id else n
+
+    src, dst = norm(project.container_node_id), norm(node_id)
+    if src == dst:
+        return None
+    owner = await db.get(User, project.owner_id)
+    here = await storage.plan_for(db, secret_key, owner, node_id=src)
+    there = await storage.plan_for(db, secret_key, owner, node_id=dst)
+
+    def same(a, b) -> bool:
+        return a is not None and b is not None and a.id == b.id
+
+    paths = load_paths(project.persist_paths) or load_paths(project.container_paths)
+    if same(here.personal, there.personal) and (not paths or same(here.projects, there.projects)):
+        return None
+    node = await db.get(Node, src) if src is not None else None
+    return {"code": "devenv_project_data_elsewhere", "node": node.name if node is not None else "server"}
 
 
 def can_access(session: DevSession, user: User | None) -> bool:
@@ -832,7 +885,7 @@ class DevEnvManager:
                     try:
                         await self._advance(db, s)
                     except DevEnvError as exc:
-                        await self._fail(db, s, exc.code, notify=True)
+                        await self._fail(db, s, failure_text(exc), notify=True)
                     except DockerError as exc:
                         await self._fail(db, s, exc.message, notify=True)
                     except (httpx.HTTPError, OSError) as exc:
@@ -1140,6 +1193,10 @@ class DevEnvManager:
         source = self.node_key(project.container_node_id)
         if source == self.node_key(s.node_id):
             return False
+        problem = await project_move_problem(db, self.settings.secret_key, project, self.node_key(s.node_id))
+        if problem is not None:
+            # its /workspace and kept folders would stay on the other machine: refuse rather than start it empty
+            raise DevEnvError(problem["code"], node=problem["node"])
         if not await self.node_ready(source):
             s.detail = "devenv_project_node_offline"
             return True

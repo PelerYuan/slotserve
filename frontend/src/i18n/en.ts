@@ -1303,6 +1303,7 @@ export default {
     node_has_downloads: 'The node still has downloads queued or running.',
     node_offline: 'Node {node} is offline.',
     devenv_node_missing: 'That machine is not connected to this server.',
+    devenv_project_data_elsewhere: 'This kept environment’s /workspace and kept folders are on {node}; it can only continue there. Book a lane on that machine, or ask an admin for storage every machine uses (Admin → Storage).',
     catalog_remote_lane: 'Catalog models download to this server only; choose a lane on the server’s own machine (not yet on other nodes).',
     storage_remote_node: 'Model libraries from Admin → Storage are on this server; other nodes download into their own models directory.',
     devenv_disabled: 'Dev environments are switched off.',

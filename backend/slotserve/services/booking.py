@@ -76,6 +76,15 @@ async def check_model_on_lane(db: AsyncSession, model: LlmModel | None, lane: La
         raise ApiError(status.HTTP_400_BAD_REQUEST, "model_not_on_node")
 
 
+async def check_project_machine(db: AsyncSession, settings: Settings, project, lane: Lane) -> None:
+    """A kept environment continues on another machine only when its data can go with it."""
+    from .devenv import project_move_problem
+
+    problem = await project_move_problem(db, settings.secret_key, project, lane.node_id)
+    if problem is not None:
+        raise ApiError(status.HTTP_400_BAD_REQUEST, problem["code"], node=problem["node"])
+
+
 async def resolve_lane(db: AsyncSession, lane_id: int | None) -> Lane:
     """The lane a booking goes to (``None``: the first lane)."""
     if lane_id is None:

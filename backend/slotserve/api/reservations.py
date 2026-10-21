@@ -9,7 +9,7 @@ from ..config import get_settings
 from ..db import get_db, utcnow
 from ..deps import current_user
 from ..errors import ApiError
-from ..orm import HOLDING_STATUSES, DevTemplate, Lane, LlmModel, Reservation, User
+from ..orm import HOLDING_STATUSES, DevProject, DevTemplate, Lane, LlmModel, Reservation, User
 from ..schemas import ExtendIn, ReservationCreateIn, ReservationOut, ReservationUpdateIn
 from ..services import booking, queries
 from ..services.audit import record
@@ -95,6 +95,8 @@ async def create_core(app, db: AsyncSession, user: User, body: ReservationCreate
     else:
         template = await booking.resolve_devenv(db, settings, body.devenv_template_id, owner)
         project = await booking.resolve_project(db, settings, owner, None, body.devenv_project_name, template)
+    if project is not None and project.id is not None:
+        await booking.check_project_machine(db, settings, project, lane)
 
     pending = booking.needs_approval(settings, user, windows)
     async with booking.booking_lock:
@@ -189,6 +191,10 @@ async def update_reservation_core(
             devenv_id, project_id = (template.id if template else None), None
     if model_id is not None:
         devenv_id = project_id = None  # running a model and a dev environment are different kinds of booking
+    if project_id is not None and lane_id is not None and fields & {"lane_id", "devenv_project_id"}:
+        project = await db.get(DevProject, project_id)
+        if project is not None:
+            await booking.check_project_machine(db, settings, project, await db.get(Lane, lane_id))
     # Changing a not-yet-started booking is judged like a new one in approval mode.
     review = phase != "active" and r.user_id == user.id and booking.needs_approval(settings, user, [(start, end)])
     newly_pending = review and r.status != "pending"

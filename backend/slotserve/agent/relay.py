@@ -48,8 +48,6 @@ class AgentRelay:
 
     async def open(self, params: dict) -> dict:
         """``stream.open``: connect to the target, then open the stream's data connection to the control plane."""
-        from websockets.asyncio.client import connect
-
         if len(self.tasks) >= MAX_STREAMS:
             raise p.RemoteError("too_many_streams", "this node has too many relayed connections open")
         stream_id, secret = str(params.get("id") or ""), str(params.get("secret") or "")
@@ -57,11 +55,8 @@ class AgentRelay:
         if not stream_id or not secret:
             raise p.RemoteError("bad_request", "stream id and secret are required")
         reader, writer = await self.dial(target)
-        headers = {"Authorization": f"Bearer {self.agent.token}", p.STREAM_SECRET_HEADER: secret}
         try:
-            ws = await connect(
-                self.url(stream_id), additional_headers=headers, max_size=None, open_timeout=15, compression=None
-            )
+            ws = await self.connect_data(stream_id, secret)
         except Exception as exc:
             writer.close()
             raise p.RemoteError("relay_failed", f"could not connect back to the control plane: {exc}") from exc
@@ -69,6 +64,16 @@ class AgentRelay:
         self.tasks.add(task)
         task.add_done_callback(self.tasks.discard)
         return {}
+
+    async def connect_data(self, stream_id: str, secret: str):
+        """The data connection of one stream: the one place it is set up. It authenticates like the control
+        connection (the agent's current token) and must verify the server the same way (TLS settings)."""
+        from websockets.asyncio.client import connect
+
+        headers = {"Authorization": f"Bearer {self.agent.token}", p.STREAM_SECRET_HEADER: secret}
+        return await connect(
+            self.url(stream_id), additional_headers=headers, max_size=None, open_timeout=15, compression=None
+        )
 
     # ---- targets ----------------------------------------------------------------------------------
 

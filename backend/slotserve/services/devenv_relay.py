@@ -67,11 +67,13 @@ class RelayPorts:
         channel; the relay and the agent need nothing new."""
         return self.target(s, 22, container, network)
 
-    async def _listen(self, s: DevSession, target: dict, host: str, listen_port: int, label: str) -> RelayListener:
+    async def _listen(
+        self, s: DevSession, target: dict, host: str, listen_port: int, label: str, idle: float | None = None
+    ) -> RelayListener:
         relay = self._relay()
         if relay is None:
             raise OSError("the relay is not available")
-        listener = RelayListener.to(relay, self._executor(s.node_id), target, host, listen_port, label)
+        listener = RelayListener.to(relay, self._executor(s.node_id), target, host, listen_port, label, idle=idle)
         await listener.start()
         return listener
 
@@ -85,7 +87,8 @@ class RelayPorts:
             return
         await self.close_ssh(s.id)
         host = self.settings.devenv_relay_host
-        self.ssh[s.id] = await self._listen(s, target, host, port, f"ssh of environment {s.id}")
+        idle = self.settings.relay_ssh_idle_seconds  # interactive sessions may be quiet for hours
+        self.ssh[s.id] = await self._listen(s, target, host, port, f"ssh of environment {s.id}", idle=idle)
 
     async def close_ssh(self, session_id: int) -> None:
         listener = self.ssh.pop(session_id, None)

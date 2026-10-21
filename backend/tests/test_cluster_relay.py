@@ -119,13 +119,37 @@ async def test_relay_targets_limits_idle_and_auth(app, make_client, start_agent,
         third = await relay.open(executor, target)  # room again
 
         # Streams without traffic are closed after relay_idle_seconds.
+        # ... unless they have no idle limit of their own (SSH): those stay however quiet they are.
+        app.state.settings.relay_max_streams = 10
+        quiet_ssh = await relay.open(executor, target, idle=0)
         app.state.settings.relay_idle_seconds = 0.3
         await asyncio.sleep(0.5)
         await relay.sweep()
-        assert second.closed.is_set() and third.closed.is_set()
+        assert second.closed.is_set() and third.closed.is_set() and not quiet_ssh.closed.is_set()
         assert await second.read() == b""
+        await quiet_ssh.write(b"still here")
+        assert await quiet_ssh.read() == b"still here"
+        await quiet_ssh.close()
         await _until(lambda: _is(agent.relay.open_streams == 0), what="agent closed idle streams", timeout=10)
         app.state.settings.relay_idle_seconds = 3600
+
+        # Slow handling of a node's events (database writes) does not hold up its other frames.
+        hub = app.state.cluster
+        original = hub._on_event
+
+        async def slow(executor_, name, data):
+            if name == protocol.E_INVENTORY:
+                await asyncio.sleep(3)
+            await original(executor_, name, data)
+
+        hub._on_event = slow
+        executor.peer.on_event = lambda name, data: slow(executor, name, data)
+        await agent.peer.emit(protocol.E_INVENTORY, await agent.inventory())
+        started = asyncio.get_running_loop().time()
+        fast = await relay.open(executor, target)
+        assert asyncio.get_running_loop().time() - started < 2
+        await fast.close()
+        hub._on_event = original
 
         # A data connection needs the node's token and the stream's one-time secret.
         url = live.replace("http://", "ws://") + protocol.STREAM_PATH + "/nope"

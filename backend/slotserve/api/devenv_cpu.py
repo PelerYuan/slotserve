@@ -13,7 +13,7 @@ from ..deps import current_user
 from ..errors import ApiError
 from ..orm import DevProject, DevSession, DevTemplate, Lane, User
 from ..services.audit import record
-from ..services.devenv import DevEnvError, visible
+from ..services.devenv import DevEnvError, project_move_problem, visible
 from ..services.devenv_cpu import ACTIVE_STATES, KIND, cpu_ranges
 from .devenv import SessionOut, _devenv_error, _project, _session_out, node_name
 
@@ -201,6 +201,10 @@ async def start_cpu(
     template, project = await _start_target(db, body, user)
     if body.node_id is not None and request.app.state.nodes.find(body.node_id) is None:
         raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_node_missing")
+    if project is not None and body.node_id is not None:
+        problem = await project_move_problem(db, get_settings().secret_key, project, body.node_id)
+        if problem is not None:
+            raise ApiError(status.HTTP_400_BAD_REQUEST, problem["code"], node=problem["node"])
     try:
         s = await request.app.state.devenv.cpu.start(db, user, template=template, project=project, node_id=body.node_id)
     except DevEnvError as exc:
