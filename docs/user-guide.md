@@ -67,9 +67,11 @@ Downloads run one at a time, write to `<file>.part` and resume from where they s
 
 ## API keys
 
-**API keys → New key** creates a key and shows it **once**. Store it in your client or a secret manager. Revoke a key to stop it immediately.
+**Access credentials → New key** creates a key and shows it **once**. Store it in your client or a secret manager. Revoke a key to stop it immediately.
 
 If an admin turns on **Let people view their API keys again** (**Admin → System settings → Accounts**), SlotServe keeps an encrypted copy of each new key and its owner can press **View** to see it later. Keys created while the switch is off cannot be shown, and turning it off deletes every stored copy. The copies are encrypted with `SLOTSERVE_SECRET_KEY`; changing that key makes them unreadable. See [API](api.md) for client setup.
+
+The same page holds your SSH public keys and environment password for [dev environments](dev-environments.md) when they are switched on.
 
 ## Usage
 

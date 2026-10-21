@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings
-from ..orm import DevTemplate, Lane, LlmModel, ModelLoadEvent, ModelPreset, Reservation, User
+from ..orm import DevProject, DevTemplate, Lane, LlmModel, ModelLoadEvent, ModelPreset, Reservation, User
 from ..schemas import ModelOut, PresetOut, ReservationOut
 
 LOAD_HISTORY = 5
@@ -103,6 +103,12 @@ async def reservation_out(db: AsyncSession, rows: list[Reservation], now: dateti
         if template_ids
         else {}
     )
+    project_ids = {r.devenv_project_id for r in rows if r.devenv_project_id is not None}
+    projects = (
+        dict((await db.execute(select(DevProject.id, DevProject.name).where(DevProject.id.in_(project_ids)))).all())
+        if project_ids
+        else {}
+    )
     presets = (
         dict((await db.execute(select(ModelPreset.id, ModelPreset.name).where(ModelPreset.id.in_(preset_ids)))).all())
         if preset_ids
@@ -120,6 +126,8 @@ async def reservation_out(db: AsyncSession, rows: list[Reservation], now: dateti
             exclusive=r.model_id is None,
             devenv_template_id=r.devenv_template_id,
             devenv_template_name=templates.get(r.devenv_template_id) if r.devenv_template_id else None,
+            devenv_project_id=r.devenv_project_id,
+            devenv_project_name=projects.get(r.devenv_project_id) if r.devenv_project_id else None,
             series_id=r.series_id,
             lane_id=r.lane_id,
             lane_name=lane_names.get(r.lane_id),

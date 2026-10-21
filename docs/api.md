@@ -5,7 +5,7 @@ SlotServe exposes an **OpenAI-compatible** API at `/v1`. Any OpenAI SDK or tool 
 | Setting | Value |
 | --- | --- |
 | Base URL | `http://<server>:8000/v1` |
-| API key | a key from the **API keys** page (`sk-ss-...`) |
+| API key | a key from the **Access credentials** page (`sk-ss-...`) |
 | Model | the loaded model's name, or anything else (see below) |
 
 ## Examples

@@ -78,6 +78,8 @@ export interface Reservation {
   exclusive: boolean
   devenv_template_id?: number | null
   devenv_template_name?: string | null
+  devenv_project_id?: number | null
+  devenv_project_name?: string | null
   series_id: string | null
   lane_id: number | null
   lane_name: string | null
@@ -137,6 +139,9 @@ export interface LaneStatus {
   active_reservation: Reservation | null
   next_reservation: Reservation | null
   default_model: string | null
+  idle_mode?: IdleMode
+  idle_template_name?: string | null
+  shared_state?: DevState | null
 }
 
 export interface Lane {
@@ -146,6 +151,20 @@ export interface Lane {
   default_model_id: number | null
   default_model_name: string | null
   position: number
+  idle_mode: IdleMode
+  idle_template_id: number | null
+  idle_template_name: string | null
+}
+
+/** What a lane runs while nobody has it booked. */
+export type IdleMode = 'model' | 'devenv' | 'none'
+
+export interface LaneInput {
+  name: string
+  gpus: number[]
+  default_model_id: number | null
+  idle_mode?: IdleMode
+  idle_template_id?: number | null
 }
 
 export interface Status {
@@ -364,6 +383,8 @@ export interface BookingInput {
   repeat_weeks?: number
   user_id?: number | null
   devenv_template_id?: number | null
+  devenv_project_id?: number | null
+  devenv_project_name?: string | null
 }
 
 export interface DevInfo {
@@ -374,6 +395,10 @@ export interface DevInfo {
   custom_images: boolean
   saved_limit: number
   pull_minutes: number
+  password_login: boolean
+  password_set: boolean
+  projects_limit: number
+  project_days: number
 }
 
 export type DevWebKind = 'desktop' | 'jupyter' | 'vscode' | 'http'
@@ -394,6 +419,7 @@ export interface DevTemplate {
   env: Record<string, string>
   web_ports: DevWebPort[]
   keep_entrypoint: boolean
+  persist_paths: string[]
   kind: 'builtin' | 'custom' | 'saved'
   builtin_key: string | null
   owner: string | null
@@ -410,6 +436,7 @@ export interface DevTemplateInput {
   env?: Record<string, string>
   web_ports?: DevWebPort[]
   keep_entrypoint?: boolean
+  persist_paths?: string[]
   shared?: boolean
   enabled?: boolean
 }
@@ -418,8 +445,14 @@ export type DevState = 'waiting' | 'pulling' | 'ready' | 'starting' | 'running' 
 
 export interface DevSession {
   id: number
-  reservation_id: number
-  username: string
+  /** shared: the environment of an idle lane, which everyone can log into with their own account */
+  kind: 'booking' | 'shared'
+  reservation_id: number | null
+  username: string | null
+  mine: boolean
+  project_id: number | null
+  project_name: string | null
+  lane_id: number | null
   template_name: string | null
   image: string
   lane_name: string | null
@@ -428,12 +461,29 @@ export interface DevSession {
   progress: number | null
   error: string | null
   ssh_port: number | null
+  ssh_user: string | null
   ssh_command: string | null
   web: (DevWebPort & { url: string })[]
   start_at: string | null
   end_at: string | null
   started_at: string | null
   stopped_at: string | null
+}
+
+export interface DevProject {
+  id: number
+  name: string
+  owner: string | null
+  mine: boolean
+  template_id: number | null
+  template_name: string | null
+  image: string
+  persist_paths: string[]
+  state: 'new' | 'running' | 'paused' | 'missing'
+  size_bytes: number | null
+  last_used_at: string | null
+  created_at: string
+  upcoming: number
 }
 
 export interface SshKey {

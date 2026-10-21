@@ -24,6 +24,7 @@ import httpx
 import websockets
 from fastapi import APIRouter, Request, WebSocket
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
+from sqlalchemy import select
 from starlette.background import BackgroundTask
 from starlette.websockets import WebSocketDisconnect
 
@@ -94,6 +95,15 @@ async def _target(app, scope_session: dict, session_id: int, port: int) -> Targe
         if user is None or user.disabled_at is not None:
             raise Denied(401, "not_authenticated")
         s = await db.get(DevSession, session_id)
+        if s is not None and s.state != "running" and s.project_id:
+            # a kept environment's container keeps the paths of the booking that created it
+            current = (
+                await db.execute(
+                    select(DevSession).where(DevSession.project_id == s.project_id, DevSession.state == "running")
+                )
+            ).scalar()
+            if current is not None and (session_web(current) or {}).get("base_session") == s.id:
+                s = current
         if s is None or not can_access(s, user):
             raise Denied(404, "not_found")
     web = session_web(s)

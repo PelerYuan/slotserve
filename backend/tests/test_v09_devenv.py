@@ -107,9 +107,9 @@ async def test_lifecycle(app, make_client):
     templates = {t["builtin_key"]: t for t in (await bob.get("/api/devenv/templates")).json()}
     torch = templates["pytorch"]
 
-    # a key is required, and dev environments must be switched on
+    # a key (or an environment password) is required, and dev environments must be switched on
     r = await _book(bob, torch["id"])
-    assert r.status_code == 400 and r.json()["detail"]["code"] == "ssh_key_required"
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "ssh_login_required"
     key = ed25519_key()
     await bob.post("/api/ssh-keys", json={"public_key": key})
     await admin.put("/api/admin/settings", json={"devenv_enabled": False})

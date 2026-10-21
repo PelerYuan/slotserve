@@ -135,6 +135,12 @@ class Settings(BaseSettings):
     devenv_allowed_registries: str = ""  # comma separated, e.g. docker.io,nvcr.io; empty = any
     devenv_saved_images: int = 3  # saved images per person
     devenv_pull_minutes: int = 60  # start pulling the image this long before the booking
+    # Let people log in with their environment password as well as their SSH keys.
+    devenv_password_login: bool = True
+    # Host directory for persistent data (bind mounts); empty = Docker named volumes.
+    devenv_storage_dir: str = ""
+    devenv_projects: int = 3  # kept (paused) environments per person; 0 = none
+    devenv_project_days: int = 0  # remove kept environments unused for this many days; 0 = never
 
     @property
     def database_url(self) -> str:

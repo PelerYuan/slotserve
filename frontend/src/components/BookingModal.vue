@@ -19,7 +19,7 @@ import {
 } from 'naive-ui'
 import { Cpu, Info, Terminal, TriangleAlert } from 'lucide-vue-next'
 import { ApiError, api } from '@/api/client'
-import type { AdminUser, BookingInput, DevTemplate, Model, Reservation } from '@/api/types'
+import type { AdminUser, BookingInput, DevProject, DevTemplate, Model, Reservation } from '@/api/types'
 import { session } from '@/composables/session'
 import { useLanes } from '@/composables/lanes'
 import { useErrorMessage } from '@/composables/useErrorMessage'
@@ -56,6 +56,14 @@ const templateOptions = computed(() =>
     .map((tpl) => ({ label: `${tpl.name}  ·  ${tpl.image}`, value: tpl.id })),
 )
 const template = computed(() => templates.value.find((tpl) => tpl.id === templateId.value) ?? null)
+// A dev environment starts fresh from a template, is kept as a new project, or continues a kept one.
+const devSource = ref<'fresh' | 'new' | 'project'>('fresh')
+const projects = ref<DevProject[]>([])
+const projectId = ref<number | null>(null)
+const projectName = ref('')
+const projectOptions = computed(() =>
+  projects.value.map((p) => ({ label: `${p.name}  ·  ${p.template_name ?? p.image}`, value: p.id })),
+)
 const modelId = ref<number | null>(null)
 const presetId = ref<number | null>(null)
 const startTs = ref<number | null>(null)
@@ -97,10 +105,14 @@ watch(show, async (open) => {
   lane.value = r?.lane_id ?? props.laneId ?? lanes.value[0]?.id ?? null
   if (devenvEnabled.value) {
     templates.value = await api.devenv.templates().catch(() => templates.value)
+    projects.value = await api.devenv.projects().catch(() => projects.value)
   }
+  projectName.value = ''
   if (r) {
-    kind.value = r.devenv_template_id ? 'devenv' : r.exclusive ? 'exclusive' : 'model'
+    kind.value = r.devenv_template_id || r.devenv_project_id ? 'devenv' : r.exclusive ? 'exclusive' : 'model'
     templateId.value = r.devenv_template_id ?? templateId.value
+    devSource.value = r.devenv_project_id ? 'project' : 'fresh'
+    projectId.value = r.devenv_project_id ?? null
     modelId.value = r.model_id ?? modelId.value
     presetId.value = r.preset_id
     startTs.value = new Date(r.start_at).getTime()
@@ -108,6 +120,8 @@ watch(show, async (open) => {
     note.value = r.note
   } else {
     kind.value = props.initialKind && (props.initialKind !== 'devenv' || devenvEnabled.value) ? props.initialKind : 'model'
+    devSource.value = 'fresh'
+    if (!projects.value.some((p) => p.id === projectId.value)) projectId.value = projects.value[0]?.id ?? null
     if (!templates.value.some((tpl) => tpl.id === templateId.value && tpl.enabled)) {
       templateId.value = templates.value.find((tpl) => tpl.enabled)?.id ?? null
     }
@@ -120,6 +134,13 @@ watch(show, async (open) => {
     }
   }
   if (isAdmin.value && !r && !users.value.length) users.value = await api.admin.users().catch(() => [])
+})
+
+// the models may arrive after the dialog opened
+watch(ready, (list) => {
+  if (show.value && !editing.value && !list.some((m) => m.id === modelId.value)) {
+    modelId.value = (list.find((m) => m.is_default) ?? list[0])?.id ?? null
+  }
 })
 
 watch(modelId, () => {
@@ -160,11 +181,17 @@ const loadHint = computed(() => {
   return { kind: 'preload' as const }
 })
 
+const devenvReady = computed(() => {
+  if (devSource.value === 'project') return !!projectId.value
+  if (devSource.value === 'new') return !!templateId.value && !!projectName.value.trim()
+  return !!templateId.value
+})
+
 const slotMs = computed(() => (session.config?.slot_minutes ?? 30) * 60_000)
 const maxWeeks = computed(() => Math.max(1, Math.floor((session.config?.max_advance_days ?? 30) / 7)))
 const canSubmit = computed(
   () =>
-    (kind.value === 'exclusive' || (kind.value === 'devenv' ? !!templateId.value : !!modelId.value)) &&
+    (kind.value === 'exclusive' || (kind.value === 'devenv' ? devenvReady.value : !!modelId.value)) &&
     !!startTs.value &&
     !!endTs.value &&
     endTs.value > startTs.value,
@@ -189,7 +216,9 @@ function payload(): BookingInput {
     lane_id: lane.value,
     model_id: exclusive ? null : modelId.value,
     preset_id: exclusive ? null : presetId.value,
-    devenv_template_id: kind.value === 'devenv' ? templateId.value : null,
+    devenv_template_id: kind.value === 'devenv' && devSource.value !== 'project' ? templateId.value : null,
+    devenv_project_id: kind.value === 'devenv' && devSource.value === 'project' ? projectId.value : null,
+    devenv_project_name: kind.value === 'devenv' && devSource.value === 'new' ? projectName.value.trim() : null,
     start_at: new Date(startTs.value!).toISOString(),
     end_at: new Date(endTs.value!).toISOString(),
     note: note.value,
@@ -269,12 +298,34 @@ async function joinWaitlist() {
       </NFormItem>
 
       <template v-if="kind === 'devenv'">
-        <NFormItem :label="t('devenv.template')">
-          <NSelect v-model:value="templateId" :options="templateOptions" filterable :disabled="isActive" />
+        <NFormItem :label="t('devenv.source')">
+          <NRadioGroup v-model:value="devSource" :disabled="isActive" class="kind" size="small">
+            <NRadioButton value="fresh">{{ t('devenv.sourceFresh') }}</NRadioButton>
+            <NRadioButton v-if="!editing" value="new">{{ t('devenv.sourceNew') }}</NRadioButton>
+            <NRadioButton value="project">{{ t('devenv.sourceProject') }}</NRadioButton>
+          </NRadioGroup>
         </NFormItem>
-        <p v-if="template?.description" class="faint small tpl-desc">
-          {{ template.builtin_key ? t(`devenv.builtin.${template.builtin_key}`) : template.description }}
-        </p>
+        <template v-if="devSource === 'project'">
+          <NFormItem :label="t('devenv.projectPick')">
+            <NSelect
+              v-model:value="projectId"
+              :options="projectOptions"
+              :placeholder="t('devenv.noProjects')"
+              :disabled="isActive || !projects.length"
+            />
+          </NFormItem>
+        </template>
+        <template v-else>
+          <NFormItem :label="t('devenv.template')">
+            <NSelect v-model:value="templateId" :options="templateOptions" filterable :disabled="isActive" />
+          </NFormItem>
+          <p v-if="template?.description" class="faint small tpl-desc">
+            {{ template.builtin_key ? t(`devenv.builtin.${template.builtin_key}`) : template.description }}
+          </p>
+          <NFormItem v-if="devSource === 'new'" :label="t('devenv.projectName')">
+            <NInput v-model:value="projectName" maxlength="64" :placeholder="template?.name ?? ''" />
+          </NFormItem>
+        </template>
       </template>
 
       <template v-if="kind === 'model'">

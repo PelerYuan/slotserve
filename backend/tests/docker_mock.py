@@ -18,7 +18,14 @@ class FakeDocker:
         self.busy_ports: set[str] = set()
         self.pulls: list[str] = []
         self.networks: dict[str, dict] = {}
-        self.execs: dict[str, dict] = {}
+        self.execs: dict[str, dict] = {}  # exec id -> {Container, Config, Started}
+        self.exec_calls: list[tuple[str, list[str]]] = []  # (container id, command) of every exec
+        self.exec_result: tuple[int, bytes] = (0, b"")
+        self.wait_code: int | None = None  # exit code reported for helper containers (default: their own)
+        self.removed_volumes: list[str] = []
+        self.commits: list[tuple[str, str]] = []
+        self.created: list[tuple[str, dict]] = []  # (name, config) of every container ever created
+        self._exec_ids: dict[str, int] = {}
         self._next = 1
 
         def ref(name: str, tag: str) -> str:
@@ -70,6 +77,7 @@ class FakeDocker:
                 return JSONResponse({"message": f"network {mode} not found"}, status_code=404)
             cid = f"c{self._next:04d}"
             self._next += 1
+            self.created.append((name, config))
             self.containers[cid] = {"Id": cid, "Name": name, "Config": config, "Running": False, "ExitCode": 0}
             if mode and net(mode) is not None:
                 net(mode)["Containers"].add(cid)
@@ -136,17 +144,28 @@ class FakeDocker:
             c = find(cid)
             if c is None or not c["Running"]:
                 return JSONResponse({"message": f"container {cid} is not running"}, status_code=409)
+            body = await request.json()
             eid = f"e{self._next:04d}"
             self._next += 1
-            self.execs[eid] = {"Container": c["Id"], "Config": await request.json(), "Started": False}
+            self.execs[eid] = {"Container": c["Id"], "Config": body, "Started": False}
+            self.exec_calls.append((c["Id"], body["Cmd"]))
             return JSONResponse({"Id": eid}, status_code=201)
 
         @self.app.post("/v1.41/exec/{eid}/start")
         async def exec_start(eid: str, request: Request):
             if eid not in self.execs:
                 return JSONResponse({"message": "no such exec"}, status_code=404)
-            self.execs[eid]["Started"] = (await request.json()).get("Detach")
-            return Response(status_code=200)
+            detach = bool((await request.json()).get("Detach"))
+            self.execs[eid]["Started"] = detach
+            if detach:
+                return Response(status_code=200)
+            code, text = self.exec_result
+            self._exec_ids[eid] = code
+            return Response(content=b"\x01\x00\x00\x00" + len(text).to_bytes(4, "big") + text if text else b"")
+
+        @self.app.get("/v1.41/exec/{eid}/json")
+        async def exec_inspect(eid: str):
+            return {"ExitCode": self._exec_ids.get(eid, 0), "Running": False}
 
         def find(cid: str) -> dict | None:
             return self.containers.get(cid) or next((c for c in self.containers.values() if c["Name"] == cid), None)
@@ -159,8 +178,8 @@ class FakeDocker:
             with tarfile.open(fileobj=io.BytesIO(await request.body())) as tar:
                 files = {m.name: tar.extractfile(m).read() for m in tar.getmembers() if m.isfile()}
                 modes = {m.name: m.mode for m in tar.getmembers()}
-            self.archives[c["Id"]] = files
-            c["Modes"] = modes
+            self.archives.setdefault(c["Id"], {}).update(files)
+            c.setdefault("Modes", {}).update(modes)
             return Response(status_code=200)
 
         @self.app.post("/v1.41/containers/{cid}/start")
@@ -194,7 +213,7 @@ class FakeDocker:
             return Response(status_code=204)
 
         @self.app.get("/v1.41/containers/{cid}/json")
-        async def inspect(cid: str):
+        async def inspect(cid: str, size: str = "false"):
             c = find(cid)
             if c is None:
                 return JSONResponse({"message": "no such container"}, status_code=404)
@@ -205,7 +224,7 @@ class FakeDocker:
                     {"HostIp": b.get("HostIp", ""), "HostPort": b.get("HostPort") or c["Assigned"][spec]}
                     for b in bindings
                 ]
-            return {
+            out = {
                 "Id": c["Id"],
                 "Name": "/" + c["Name"],
                 "State": {"Running": c["Running"], "ExitCode": c["ExitCode"]},
@@ -218,6 +237,22 @@ class FakeDocker:
                     },
                 },
             }
+            if size == "true":
+                out["SizeRw"] = 4096
+            return out
+
+        @self.app.post("/v1.41/containers/{cid}/wait")
+        async def wait(cid: str):
+            c = find(cid)
+            if c is None:
+                return JSONResponse({"message": "no such container"}, status_code=404)
+            c["Running"] = False
+            return {"StatusCode": self.wait_code if self.wait_code is not None else c["ExitCode"]}
+
+        @self.app.delete("/v1.41/volumes/{name}")
+        async def remove_volume(name: str):
+            self.removed_volumes.append(unquote(name))
+            return Response(status_code=204)
 
         @self.app.get("/v1.41/containers/json")
         async def listing(filters: str = "{}"):
@@ -240,6 +275,7 @@ class FakeDocker:
             if find(container) is None:
                 return JSONResponse({"message": "no such container"}, status_code=404)
             self.images.add(f"{repo}:{tag}")
+            self.commits.append((find(container)["Id"], f"{repo}:{tag}"))
             return JSONResponse({"Id": "sha256:saved"}, status_code=201)
 
     def add_container(self, name: str, labels: dict, running: bool = True) -> str:

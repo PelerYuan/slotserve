@@ -4,6 +4,7 @@
 import asyncio
 import json
 import socket
+from datetime import timedelta
 from types import SimpleNamespace
 
 import httpx
@@ -17,9 +18,15 @@ from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket
 from test_v09_devenv import _book, _setup, _ticks, ed25519_key
 
-from slotserve.db import SessionLocal
+from slotserve.db import SessionLocal, utcnow
 from slotserve.orm import DevSession
-from slotserve.services.devenv import can_access, fill_placeholders, network_name, placeholder_values
+from slotserve.services.devenv import (
+    can_access,
+    fill_placeholders,
+    network_name,
+    placeholder_values,
+    project_network_name,
+)
 
 
 def _env(config: dict) -> dict[str, str]:
@@ -434,3 +441,58 @@ async def test_proxy_head_and_other_methods(app, make_client, servers):
         assert r.status_code == 200
         r = await c.delete(url + "x")
         assert r.json()["method"] == "DELETE" and r.json()["path"] == "/x"
+
+
+async def test_kept_environment_keeps_its_network_and_web_paths(app, make_client):
+    """A kept environment's container is created once with a session's base path and token: its network stays while
+    it is paused, and the address it was created with keeps working in later bookings."""
+    docker = app.state.fake_docker
+    _admin, bob = await _setup(app, make_client)
+    await bob.post("/api/ssh-keys", json={"public_key": ed25519_key()})
+    app.state.devenv.in_container = False
+    body = {
+        "name": "Lab",
+        "image": "me/lab:1",
+        "command": "lab --base={base_path}",
+        "web_ports": [{"port": 8888, "kind": "jupyter"}],
+    }
+    t = (await bob.post("/api/devenv/templates", json=body)).json()
+    docker.images.add("me/lab:1")
+
+    async def book(**extra):
+        now = utcnow()
+        times = {"start_at": now.isoformat(), "end_at": (now + timedelta(hours=1)).isoformat()}
+        r = await bob.post("/api/reservations", json={**times, **extra})
+        assert r.status_code == 201, r.text
+        return r.json()[0]
+
+    first = await book(devenv_template_id=t["id"], devenv_project_name="Lab")
+    await _ticks(app)
+    [s1] = (await bob.get("/api/devenv/sessions")).json()
+    url = s1["web"][0]["url"]
+    assert s1["state"] == "running" and url == f"/devenv/{s1['id']}/port/8888/"
+    [project] = (await bob.get("/api/devenv/projects")).json()
+    [container] = docker.containers.values()
+    [net] = docker.networks.values()
+    assert net["Name"] == project_network_name(project["id"]) == container["Config"]["HostConfig"]["NetworkMode"]
+    _row, web1 = await _web(s1["id"])
+
+    await bob.delete(f"/api/reservations/{first['id']}")
+    await _ticks(app, 2)
+    assert container["Id"] in docker.containers and not container["Running"] and net["Id"] in docker.networks
+
+    second = await book(devenv_project_id=project["id"])
+    await _ticks(app)
+    s2 = next(s for s in (await bob.get("/api/devenv/sessions")).json() if s["state"] == "running")
+    assert s2["id"] != s1["id"] and s2["web"][0]["url"] == url and container["Running"]
+    _row, web2 = await _web(s2["id"])
+    assert web2["token"] == web1["token"] and web2["base_session"] == s1["id"] and web2["published"]["8888"]
+    # the address of the booking that created the container reaches the running one, for its owner only
+    asked = _upstream_at(app, 9)
+    assert (await bob.get(url + "api/x")).status_code == 502 and asked == [8888]
+    assert (await (await make_client("eve")).get(url + "api/x")).status_code == 404
+
+    await bob.delete(f"/api/reservations/{second['id']}")
+    await _ticks(app, 2)
+    assert (await bob.delete(f"/api/devenv/projects/{project['id']}")).status_code == 204
+    assert not docker.containers and not docker.networks

@@ -45,6 +45,10 @@ EDITABLE: dict[str, Editable] = {
     "devenv_allowed_registries": Editable(str, max=500),
     "devenv_saved_images": Editable(int, min=0, max=100),
     "devenv_pull_minutes": Editable(int, min=0, max=24 * 60, unit="min"),
+    "devenv_password_login": Editable(bool),
+    "devenv_storage_dir": Editable(str, max=500),
+    "devenv_projects": Editable(int, min=0, max=100),
+    "devenv_project_days": Editable(int, min=0, max=3650, unit="d"),
     "invite_code": Editable(str, min=1, max=128, secret=True),
     "max_reservation_hours": Editable(int, min=1, max=24 * 7, unit="h"),
     "max_advance_days": Editable(int, min=1, max=365, unit="d"),
@@ -159,6 +163,12 @@ def validate(key: str, value: Any) -> Any:
             parse_port_range(value)
         except ValueError as exc:
             raise InvalidSetting(key, str(exc)) from exc
+    if key == "devenv_storage_dir" and value:
+        if not value.startswith("/") or ".." in value.split("/"):
+            raise InvalidSetting(key, "expected an absolute path on the Docker host")
+        value = value.rstrip("/") or "/"
+        if value == "/":
+            raise InvalidSetting(key, "expected an absolute path on the Docker host")
     if key == "custom_engine_health" and not value.startswith("/"):
         raise InvalidSetting(key, "must start with /")
     if key == "timezone":

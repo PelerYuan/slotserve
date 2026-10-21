@@ -84,6 +84,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         async with db.SessionLocal() as session:
             await seed_templates(session)
         app.state.devenv = DevEnvManager(app.state, docker=getattr(app.state, "docker_client", None))
+        app.state.lanes.gpu_holder = app.state.devenv.holds_gpu
         transports = dict(getattr(app.state, "chat_transports", None) or {})
         transports.setdefault("telegram", getattr(app.state, "telegram_transport", None))
         app.state.channels = ChannelHub(app, transports)

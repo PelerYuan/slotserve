@@ -7,7 +7,7 @@ from ..config import get_settings
 from ..db import get_db, utcnow
 from ..deps import current_user, get_lanes
 from ..errors import ApiError
-from ..orm import LlmModel, ModelPreset, Reservation, User
+from ..orm import DevSession, DevTemplate, Lane, LlmModel, ModelPreset, Reservation, User
 from ..runtime.gpu import gpu_stats
 from ..runtime.lanes import LaneManager
 from ..schemas import ConfigOut, LaneStatusOut, ManualOut, RuntimeOut, StatusOut
@@ -80,6 +80,16 @@ async def get_status(
         upcoming = await queries.next_reservation(db, now, ctx.id)
         default = await queries.default_model(db, ctx.id)
         shown = await queries.reservation_out(db, [r for r in (active, upcoming) if r], now)
+        lane = await db.get(Lane, ctx.id)
+        idle_template = await db.get(DevTemplate, lane.idle_template_id) if lane and lane.idle_template_id else None
+        shared_state = (
+            await db.execute(
+                select(DevSession.state)
+                .where(DevSession.kind == "shared", DevSession.lane_id == ctx.id, DevSession.state != "stopped")
+                .order_by(DevSession.id.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
         lane_out.append(
             LaneStatusOut(
                 id=ctx.id,
@@ -92,6 +102,9 @@ async def get_status(
                 active_reservation=shown[0] if active else None,
                 next_reservation=shown[-1] if upcoming else None,
                 default_model=default.name if default else None,
+                idle_mode=lane.mode if lane else "model",
+                idle_template_name=idle_template.name if idle_template else None,
+                shared_state=shared_state,
             )
         )
     first = lane_out[0]

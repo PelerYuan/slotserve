@@ -9,6 +9,7 @@ import StatusDot from '@/components/StatusDot.vue'
 import CodeBlock from '@/components/CodeBlock.vue'
 import LogDrawer from '@/components/LogDrawer.vue'
 import { api } from '@/api/client'
+import type { LaneStatus } from '@/api/types'
 import { session } from '@/composables/session'
 import { useStatus } from '@/composables/useStatus'
 import { useNow } from '@/composables/useNow'
@@ -51,6 +52,17 @@ async function extend(minutes: number) {
     showError(e)
   }
 }
+
+// What a lane does while nobody has it booked, when that is not "run the default model".
+function idleLabel(l: LaneStatus | undefined): string | null {
+  if (!l || l.active_reservation || l.runtime.model_name || !l.idle_mode || l.idle_mode === 'model') return null
+  if (l.idle_mode === 'devenv') {
+    const state = l.shared_state ? ` (${t(`devenv.state.${l.shared_state}`)})` : ''
+    return t('overview.idleDevenv', { name: l.idle_template_name ?? '?' }) + state
+  }
+  return t('overview.idleNone')
+}
+const firstLane = computed(() => status.value?.lanes[0])
 
 const loadProgress = computed(() => (runtime.value ? loadProgressOf(runtime.value, now.value) : null))
 
@@ -133,7 +145,7 @@ async function restart() {
           <StatusDot :state="l.runtime.state" />
         </div>
         <div class="lane-model mono">
-          {{ l.active_reservation?.exclusive ? reservationWhat(l.active_reservation, t) : (l.runtime.model_name ?? t('overview.noModel')) }}
+          {{ l.active_reservation?.exclusive ? reservationWhat(l.active_reservation, t) : (l.runtime.model_name ?? idleLabel(l) ?? t('overview.noModel')) }}
         </div>
         <div class="muted small">
           <template v-if="l.active_reservation">
@@ -155,7 +167,7 @@ async function restart() {
           <span class="spacer" />
           <StatusDot v-if="runtime" :state="runtime.state" />
         </div>
-        <div class="model-name">{{ exclusive && holder ? reservationWhat(holder, t) : (modelLabel ?? t('overview.noModel')) }}</div>
+        <div class="model-name">{{ exclusive && holder ? reservationWhat(holder, t) : (modelLabel ?? idleLabel(firstLane) ?? t('overview.noModel')) }}</div>
         <div class="model-sub muted">
           <template v-if="loadProgress">
             {{
@@ -172,6 +184,9 @@ async function restart() {
           </template>
           <template v-else-if="runtime?.draining">{{ t('overview.draining') }}</template>
           <template v-else-if="exclusive">{{ t('overview.exclusiveHint') }}</template>
+          <template v-else-if="idleLabel(firstLane)">
+            {{ firstLane?.idle_mode === 'devenv' ? t('overview.idleDevenvHint') : t('overview.idleNoneHint') }}
+          </template>
           <template v-else-if="!runtime?.model_name">{{ t('overview.noModelHint') }}</template>
         </div>
         <NProgress

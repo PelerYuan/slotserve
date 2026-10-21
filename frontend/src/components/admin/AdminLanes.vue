@@ -4,10 +4,11 @@ import { useI18n } from 'vue-i18n'
 import { NButton, NCheckbox, NInput, NModal, NSelect, useDialog, useMessage } from 'naive-ui'
 import { Cpu, Plus } from 'lucide-vue-next'
 import { api } from '@/api/client'
-import type { Lane, Model } from '@/api/types'
+import type { DevTemplate, IdleMode, Lane, Model } from '@/api/types'
 import { loadLanes, useLanes } from '@/composables/lanes'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { useStatus } from '@/composables/useStatus'
+import { session } from '@/composables/session'
 
 const { t } = useI18n()
 const dialog = useDialog()
@@ -17,10 +18,20 @@ const { status, refresh } = useStatus()
 const { lanes } = useLanes()
 
 const models = ref<Model[]>([])
+const templates = ref<DevTemplate[]>([])
+const devenvEnabled = computed(() => !!session.config?.devenv_enabled)
 onMounted(async () => {
   await loadLanes(true)
   models.value = await api.models().catch(() => [])
+  templates.value = await api.devenv.templates().catch(() => [])
 })
+// The shared environment of an idle lane comes from a template offered to everyone.
+const templateOptions = computed(() =>
+  templates.value.filter((x) => x.kind === 'builtin').map((x) => ({ label: `${x.name}  ·  ${x.image}`, value: x.id })),
+)
+const idleOptions = computed(() =>
+  (['model', 'devenv', 'none'] as IdleMode[]).map((m) => ({ label: t(`admin.lanes.idle.${m}`), value: m })),
+)
 
 const gpus = computed(() => status.value?.gpus ?? [])
 const owner = (index: number) => lanes.value.find((l) => l.gpus.includes(index))
@@ -29,16 +40,40 @@ const modelOptions = computed(() => [
   ...models.value.filter((m) => m.status === 'ready').map((m) => ({ label: m.name, value: m.id })),
 ])
 
-const form = reactive({ open: false, id: null as number | null, name: '', gpus: [] as number[], model: null as number | null })
+const form = reactive({
+  open: false,
+  id: null as number | null,
+  name: '',
+  gpus: [] as number[],
+  model: null as number | null,
+  idle: 'model' as IdleMode,
+  template: null as number | null,
+})
 const busy = ref(false)
 
 function openNew() {
   const free = gpus.value.map((g) => g.index).filter((i) => !owner(i))
-  Object.assign(form, { open: true, id: null, name: `GPU ${free.join(',') || lanes.value.length + 1}`, gpus: free, model: null })
+  Object.assign(form, {
+    open: true,
+    id: null,
+    name: `GPU ${free.join(',') || lanes.value.length + 1}`,
+    gpus: free,
+    model: null,
+    idle: 'model',
+    template: null,
+  })
 }
 
 function openEdit(l: Lane) {
-  Object.assign(form, { open: true, id: l.id, name: l.name, gpus: [...l.gpus], model: l.default_model_id })
+  Object.assign(form, {
+    open: true,
+    id: l.id,
+    name: l.name,
+    gpus: [...l.gpus],
+    model: l.default_model_id,
+    idle: l.idle_mode ?? 'model',
+    template: l.idle_template_id,
+  })
 }
 
 function toggleGpu(index: number, on: boolean) {
@@ -53,7 +88,13 @@ const takenElsewhere = (index: number) => {
 async function save() {
   busy.value = true
   try {
-    const body = { name: form.name.trim(), gpus: form.gpus, default_model_id: form.model }
+    const body = {
+      name: form.name.trim(),
+      gpus: form.gpus,
+      default_model_id: form.model,
+      idle_mode: form.idle,
+      idle_template_id: form.idle === 'devenv' ? form.template : null,
+    }
     if (form.id === null) await api.admin.createLane(body)
     else await api.admin.updateLane(form.id, body)
     form.open = false
@@ -171,7 +212,7 @@ async function saveArgs() {
           <tr>
             <th>{{ t('admin.lanes.name') }}</th>
             <th>GPU</th>
-            <th>{{ t('admin.lanes.defaultModel') }}</th>
+            <th>{{ t('admin.lanes.idleMode') }}</th>
             <th>{{ t('admin.lanes.now') }}</th>
             <th />
           </tr>
@@ -180,11 +221,18 @@ async function saveArgs() {
           <tr v-for="l in lanes" :key="l.id">
             <td class="strong">{{ l.name }}</td>
             <td class="num">{{ l.gpus.length ? l.gpus.join(', ') : t('admin.lanes.allGpus') }}</td>
-            <td class="mono small">{{ l.default_model_name ?? '—' }}</td>
+            <td class="small">
+              <span v-if="l.idle_mode === 'devenv'">{{ t('admin.lanes.idle.devenv') }} · {{ l.idle_template_name ?? '—' }}</span>
+              <span v-else-if="l.idle_mode === 'none'" class="muted">{{ t('admin.lanes.idle.none') }}</span>
+              <span v-else class="mono">{{ l.default_model_name ?? '—' }}</span>
+            </td>
             <td class="muted small">
               <template v-if="laneState(l.id)">
                 {{ t(`state.${laneState(l.id)!.runtime.state}`) }}
                 <span v-if="laneState(l.id)!.runtime.model_name" class="mono"> · {{ laneState(l.id)!.runtime.model_name }}</span>
+                <span v-else-if="laneState(l.id)!.shared_state">
+                  · {{ t('admin.lanes.idle.devenv') }} ({{ t(`devenv.state.${laneState(l.id)!.shared_state}`) }})
+                </span>
               </template>
             </td>
             <td class="right nowrap">
@@ -236,11 +284,28 @@ async function saveArgs() {
         <span class="field-label">{{ t('admin.lanes.defaultModel') }}</span>
         <NSelect v-model:value="form.model" :options="modelOptions" filterable />
       </label>
+      <label>
+        <span class="field-label">{{ t('admin.lanes.idleMode') }}</span>
+        <NSelect v-model:value="form.idle" :options="idleOptions" data-field="idle-mode" />
+      </label>
+      <label v-if="form.idle === 'devenv'">
+        <span class="field-label">{{ t('admin.lanes.idleTemplate') }}</span>
+        <NSelect v-model:value="form.template" :options="templateOptions" filterable data-field="idle-template" />
+        <p class="faint small hint">{{ t('admin.lanes.idleHint') }}</p>
+        <p v-if="!devenvEnabled" class="small hint warn-text">{{ t('admin.lanes.idleNoDevenv') }}</p>
+      </label>
     </div>
     <template #footer>
       <div class="footer">
         <NButton @click="form.open = false">{{ t('common.cancel') }}</NButton>
-        <NButton type="primary" :loading="busy" :disabled="!form.name.trim()" @click="save">{{ t('common.save') }}</NButton>
+        <NButton
+          type="primary"
+          :loading="busy"
+          :disabled="!form.name.trim() || (form.idle === 'devenv' && !form.template)"
+          @click="save"
+        >
+          {{ t('common.save') }}
+        </NButton>
       </div>
     </template>
   </NModal>
@@ -305,5 +370,8 @@ async function saveArgs() {
 }
 .args-hint {
   margin-top: 8px;
+}
+.warn-text {
+  color: var(--warning, #b45309);
 }
 </style>

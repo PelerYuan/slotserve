@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Protocol
@@ -10,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings
 from ..db import SessionLocal, utcnow
-from ..orm import LlmModel, ModelPreset, Reservation
+from ..orm import Lane, LlmModel, ModelPreset, Reservation
 from ..services import kv, queries
 from .manager import FAIL_BACKOFF_SECONDS, LlamaRuntime, RuntimeState
 
@@ -29,6 +30,7 @@ class Target:
     preset: ModelPreset | None
     est_load_seconds: float
     # reservation | exclusive | preload | preload-early | preload-exclusive | manual | fallback | default | idle
+    # | idle-devenv (the lane's shared dev environment runs) | idle-none (the lane is set to run nothing)
     reason: str
     reservation: Reservation | None = None
     fallback_from: str | None = None
@@ -108,7 +110,9 @@ async def compute_target(
             est = await queries.estimate_load_seconds(db, model, settings)
             return Target(model, preset, est, "reservation", active)
 
-    default = await queries.default_model(db, lane_id)
+    lane = await db.get(Lane, lane_id) if lane_id is not None else await queries.primary_lane(db)
+    mode = lane.mode if lane is not None else "model"
+    default = await queries.default_model(db, lane_id) if mode == "model" else None
     default_spec = (default.id, None) if default else None
     est_default = await queries.estimate_load_seconds(db, default, settings) if default else 0.0
 
@@ -125,6 +129,8 @@ async def compute_target(
                 spec = (model.id, preset.id if preset else None)
                 est_next = await queries.estimate_load_seconds(db, model, settings)
                 lead = max(est_next + buffer, settings.preload_min_minutes * 60)
+                if mode == "devenv":
+                    lead += settings.stop_timeout_seconds  # the shared environment has to stop first
                 if spec != default_spec:
                     if gap <= lead:
                         return Target(model, preset, est_next, "preload", upcoming)
@@ -137,6 +143,8 @@ async def compute_target(
         est = await queries.estimate_load_seconds(db, model, settings) if model else 0.0
         return Target(model, preset, est, "manual")
 
+    if mode != "model":
+        return Target(None, None, 0.0, f"idle-{mode}")
     return Target(default, None, est_default, "default" if default else "idle")
 
 
@@ -156,6 +164,8 @@ class Scheduler:
         self._seen_failure: datetime | None = None
         self._fallback_notified: set[int] = set()
         self.last_reason: str | None = None
+        # Whether something else (a lane's shared dev environment) still holds the GPUs; models wait for it.
+        self.hold: Callable[[int | None], bool] | None = None
 
     def poke(self) -> None:
         """Re-evaluate immediately (after a reservation or model change)."""
@@ -242,6 +252,8 @@ class Scheduler:
             log.info("scheduler target: %s (%s)", target.model.name if target.model else None, target.reason)
             self.last_reason = target.reason
         self.target = target
+        if target.model is not None and self.hold is not None and self.hold(self.lane_id):
+            return  # the shared dev environment is being stopped; load once it has let go of the GPUs
         force, self._force_restart = self._force_restart, False
         await self.runtime.ensure(target.model, target.est_load_seconds, force=force, preset=target.preset)
 

@@ -34,6 +34,8 @@ class User(Base):
     # JSON list of chat channels (telegram, feishu, ...) the person switched notifications off for.
     channels_off: Mapped[str | None] = mapped_column(Text, nullable=True)
     ical_token: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    # SSH password for dev environments (separate from the web login), as a SHA-512-crypt hash only.
+    devenv_password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
 class ApiKey(Base):
@@ -116,6 +118,10 @@ class Reservation(Base):
     # A dev environment booking: the GPU is handed to a container built from this template.
     devenv_template_id: Mapped[int | None] = mapped_column(
         ForeignKey("devenv_templates.id", ondelete="SET NULL"), nullable=True
+    )
+    # ... continuing a kept dev environment (its container is paused between bookings).
+    devenv_project_id: Mapped[int | None] = mapped_column(
+        ForeignKey("devenv_projects.id", ondelete="SET NULL"), nullable=True, index=True
     )
     start_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
     end_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
@@ -292,7 +298,17 @@ class Lane(Base):
     gpu_indices: Mapped[str] = mapped_column(String(64), default="")
     default_model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="SET NULL"), nullable=True)
     position: Mapped[int] = mapped_column(Integer, default=0)
+    # What runs while nobody has the lane booked: model (the default model; also NULL) | devenv | none
+    idle_mode: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # idle_mode devenv: the template of the shared environment everyone can log into.
+    idle_template_id: Mapped[int | None] = mapped_column(
+        ForeignKey("devenv_templates.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+    @property
+    def mode(self) -> str:
+        return self.idle_mode or "model"
 
     @property
     def devices(self) -> list[int] | None:
@@ -332,24 +348,59 @@ class DevTemplate(Base):
     builtin_key: Mapped[str | None] = mapped_column(String(32), nullable=True, unique=True)
     owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # JSON list of extra paths inside the container that are kept between bookings (besides /workspace).
+    persist_paths: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
+class DevProject(Base):
+    """A dev environment someone keeps: its container is stopped ("paused") between bookings, not removed."""
+
+    __tablename__ = "devenv_projects"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(64))
+    template_id: Mapped[int | None] = mapped_column(
+        ForeignKey("devenv_templates.id", ondelete="SET NULL"), nullable=True
+    )
+    # The image the container is (re)created from: the template's, or a snapshot taken when the GPUs changed.
+    image: Mapped[str] = mapped_column(String(255))
+    persist_paths: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list
+    # new (no container yet) | running | paused | missing (the container disappeared)
+    state: Mapped[str] = mapped_column(String(16), default="new")
+    container_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    # What the container was created with; a different lane or paths mean recreating it from a snapshot.
+    container_devices: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    container_paths: Mapped[str | None] = mapped_column(Text, nullable=True)
+    container_port: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # JSON: the web interfaces the container was created with {token, ports, base_session} (kept across bookings)
+    container_web: Mapped[str | None] = mapped_column(Text, nullable=True)
+    size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
 class DevSession(Base):
-    """The container behind one dev environment booking."""
+    """The container behind one dev environment booking, or the shared one of an idle lane."""
 
     __tablename__ = "devenv_sessions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    reservation_id: Mapped[int] = mapped_column(ForeignKey("reservations.id", ondelete="CASCADE"), unique=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # booking | shared (an idle lane's environment: no booking, no owner, everyone has an account)
+    kind: Mapped[str | None] = mapped_column(String(16), default="booking", nullable=True)
+    reservation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("reservations.id", ondelete="CASCADE"), unique=True, nullable=True
+    )
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=True)
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("devenv_projects.id", ondelete="SET NULL"), nullable=True)
     template_id: Mapped[int | None] = mapped_column(
         ForeignKey("devenv_templates.id", ondelete="SET NULL"), nullable=True
     )
     lane_id: Mapped[int | None] = mapped_column(ForeignKey("lanes.id", ondelete="SET NULL"), nullable=True)
     image: Mapped[str] = mapped_column(String(255))
-    # waiting | pulling | starting | running | stopping | stopped | failed
+    # waiting | pulling | ready | starting | running | stopping | stopped | failed
     state: Mapped[str] = mapped_column(String(16), default="waiting")
     detail: Mapped[str | None] = mapped_column(Text, nullable=True)  # pull progress, saving, ...
     progress: Mapped[float | None] = mapped_column(nullable=True)

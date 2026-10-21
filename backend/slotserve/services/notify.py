@@ -12,7 +12,7 @@ from sqlalchemy import select
 
 from ..config import Settings
 from ..db import SessionLocal, utcnow
-from ..orm import DevTemplate, Lane, LlmModel, ModelPreset, OutboxItem, Reservation, User
+from ..orm import DevProject, DevTemplate, Lane, LlmModel, ModelPreset, OutboxItem, Reservation, User
 
 log = logging.getLogger(__name__)
 
@@ -223,7 +223,10 @@ class Notifier:
         return urlsplit(self.settings.public_url).hostname or "<server>" if self.settings.public_url else "<server>"
 
     async def describe(self, db, r: Reservation, user: User | None) -> str:
-        if r.devenv_template_id is not None:
+        if r.devenv_project_id is not None:
+            project = await db.get(DevProject, r.devenv_project_id)
+            name = f"{text(user, 'devenv')} · {project.name if project else '?'}"
+        elif r.devenv_template_id is not None:
             template = await db.get(DevTemplate, r.devenv_template_id)
             name = f"{text(user, 'devenv')} · {template.name if template else '?'}"
         elif r.model_id is None:
