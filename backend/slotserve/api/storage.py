@@ -13,7 +13,7 @@ from ..config import get_settings
 from ..db import get_db
 from ..deps import admin_user, current_user
 from ..errors import ApiError
-from ..orm import Storage, User
+from ..orm import Node, Storage, User
 from ..services import storage as svc
 from ..services.audit import record
 
@@ -42,6 +42,7 @@ class StorageIn(BaseModel):
     local_path: str | None = Field(default=None, max_length=500)
     quota_gb: float | None = Field(default=None, gt=0, le=1_000_000)
     enabled: bool = True
+    node_ids: list[int] = Field(default_factory=list, max_length=500)  # models: other nodes that use it
 
 
 class CheckOut(BaseModel):
@@ -74,6 +75,7 @@ class StorageOut(BaseModel):
     local_path: str | None
     quota_gb: float | None
     enabled: bool
+    node_ids: list[int] = []
     status: CheckOut | None
     checked_at: datetime | None
     usage_total: int | None  # personal: sum of everyone's folders
@@ -135,6 +137,7 @@ async def _out(db: AsyncSession, rows: list[Storage]) -> list[StorageOut]:
                 local_path=st.local_path,
                 quota_gb=st.quota_gb,
                 enabled=st.enabled,
+                node_ids=svc.library_nodes(st),
                 status=CheckOut(**{k: check.get(k) for k in CheckOut.model_fields}) if "ok" in check else None,
                 checked_at=st.checked_at,
                 usage_total=sum(usage.values()) if st.purpose == "personal" and st.usage else None,
@@ -193,6 +196,14 @@ async def _apply(db: AsyncSession, st: Storage, body: StorageIn) -> None:
                 raise svc.StorageError("storage_users_invalid")
         st.user_ids = json.dumps(ids) if ids else None
         st.enabled = body.enabled
+        nodes = sorted(set(body.node_ids)) if body.purpose == "models" else []
+        if nodes:
+            found = set(
+                (await db.execute(select(Node.id).where(Node.id.in_(nodes), Node.is_local.is_(False)))).scalars()
+            )
+            if found != set(nodes):
+                raise svc.StorageError("storage_nodes_invalid")
+        st.node_ids = json.dumps(nodes) if nodes else None
     except svc.StorageError as exc:
         raise _error(exc) from exc
     taken = await db.execute(select(Storage.id).where(Storage.name == st.name, Storage.id != (st.id or 0)))
