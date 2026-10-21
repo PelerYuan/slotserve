@@ -95,8 +95,14 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_DEVENV_CPU_CORES_PER_GPU` | `8` | 每个通道按每块 GPU 为其预约保留的 CPU 核心数（cpuset）；0 表示不保留 |
 | `SLOTSERVE_DEVENV_CPU_CORES` / `_MEMORY_GB` | `4` / `16` | 单个无 GPU 环境的上限（0 表示整个共享池 / 不限） |
 | `SLOTSERVE_DEVENV_CPU_MEMORY_POOL_GB` | `0` | 所有无 GPU 环境合计可占用的内存（0 表示不限） |
+| `SLOTSERVE_DEVENV_PUBLIC_PORTS_ENABLED` | `true` | 允许用户把容器端口直接发布到宿主机端口（无需登录 SlotServe） |
+| `SLOTSERVE_DEVENV_PUBLIC_PORTS` | `2300-2399` | 直连端口使用的宿主机端口（与 SSH 端口分开） |
+| `SLOTSERVE_DEVENV_PUBLIC_PORT_LIMIT` | `5` | 每人直连端口数；管理员不受限制；0 表示只有管理员 |
+| `SLOTSERVE_DEVENV_FORWARDER_IMAGE` | `alpine/socat:1.8.1.1` | 每个端口的转发容器所用镜像（PATH 中需要有 `socat`） |
+| `SLOTSERVE_DEVENV_WEB_PORT` | `8001` | 开发环境网页界面的端口，作为独立的源（0 表示在 `PORT` 上提供，不推荐） |
+| `SLOTSERVE_DEVENV_WEB_URL` | *空* | 浏览器访问该端口的地址，例如经过反向代理时；留空则为同一主机的 `DEVENV_WEB_PORT` |
 
-除部署相关的几项（`HOST`、`PORT`、`SECRET_KEY`、`COOKIE_SECURE`、`STATIC_DIR`、`DATA_DIR`、`MODELS_DIR`、`LLAMA_SERVER_CMD`、`LLAMA_HOST`、`LLAMA_PORT`、`TELEGRAM_API_BASE`、各 `…_API_BASE` 与 `QQ_TOKEN_URL` 地址、`DOCKER_HOST`、`DROPBEAR_PATH`，修改需要重启，因此只在 `.env` 中设置）外，其余所有设置都可由管理员在**管理 → 系统设置**中直接修改，无需重启。修改保存在数据库中，优先于 `.env`；点**恢复默认**即可取消覆盖。
+除部署相关的几项（`HOST`、`PORT`、`SECRET_KEY`、`COOKIE_SECURE`、`STATIC_DIR`、`DATA_DIR`、`MODELS_DIR`、`LLAMA_SERVER_CMD`、`LLAMA_HOST`、`LLAMA_PORT`、`TELEGRAM_API_BASE`、各 `…_API_BASE` 与 `QQ_TOKEN_URL` 地址、`DOCKER_HOST`、`DROPBEAR_PATH`、`DEVENV_WEB_PORT`，修改需要重启，因此只在 `.env` 中设置）外，其余所有设置都可由管理员在**管理 → 系统设置**中直接修改，无需重启。修改保存在数据库中，优先于 `.env`；点**恢复默认**即可取消覆盖。
 
 ## 每个模型的启动参数
 

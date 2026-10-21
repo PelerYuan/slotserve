@@ -21,6 +21,7 @@ class FakeDocker:
         self.execs: dict[str, dict] = {}  # exec id -> {Container, Config, Started}
         self.exec_calls: list[tuple[str, list[str]]] = []  # (container id, command) of every exec
         self.exec_result: tuple[int, bytes] = (0, b"")
+        self.listening: bytes | None = None  # /proc/net/tcp contents the port probe sees (None: exec_result)
         self.wait_code: int | None = None  # exit code reported for helper containers (default: their own)
         self.removed_volumes: list[str] = []
         self.commits: list[tuple[str, str]] = []
@@ -198,6 +199,8 @@ class FakeDocker:
             if detach:
                 return Response(status_code=200)
             code, text = self.exec_result
+            if self.listening is not None and "proc/net/tcp" in " ".join(self.execs[eid]["Config"]["Cmd"]):
+                code, text = 0, self.listening  # what the port probe reads (services/devenv_ports.py)
             self._exec_ids[eid] = code
             return Response(content=b"\x01\x00\x00\x00" + len(text).to_bytes(4, "big") + text if text else b"")
 
@@ -231,10 +234,12 @@ class FakeDocker:
                         return JSONResponse({"message": error}, status_code=500)
                 if m.get("Type") == "volume" and m["Source"] not in self.volumes:
                     self.volumes[m["Source"]] = {"Name": m["Source"], "Driver": "local", "Options": {}, "Labels": {}}
-            port = c["Config"]["HostConfig"].get("PortBindings", {}).get("22/tcp", [{}])[0].get("HostPort")
-            if port in self.busy_ports:
-                message = f"Bind for 0.0.0.0:{port} failed: port is already allocated"
-                return JSONResponse({"message": message}, status_code=500)
+            # any published host port (SSH, forwarders of direct ports) can be taken by something else
+            for bindings in c["Config"]["HostConfig"].get("PortBindings", {}).values():
+                port = (bindings or [{}])[0].get("HostPort")
+                if port and port in self.busy_ports:
+                    message = f"Bind for 0.0.0.0:{port} failed: port is already allocated"
+                    return JSONResponse({"message": message}, status_code=500)
             c["Running"] = True
             return Response(status_code=204)
 
@@ -376,3 +381,11 @@ class FakeDocker:
             "ExitCode": 0,
         }
         return cid
+
+    def forwarders(self) -> dict[str, dict]:
+        """Forwarder containers of direct ports, by name."""
+        return {
+            c["Name"]: c
+            for c in self.containers.values()
+            if c["Config"].get("Labels", {}).get("slotserve.devenv") == "forwarder"
+        }

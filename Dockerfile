@@ -59,7 +59,7 @@ ENV SLOTSERVE_HOST=0.0.0.0 \
     LD_LIBRARY_PATH=/opt/llama.cpp:/usr/local/nvidia/lib:/usr/local/nvidia/lib64
 
 VOLUME ["/data", "/models"]
-EXPOSE 8000
+EXPOSE 8000 8001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD curl -fsS http://127.0.0.1:8000/healthz || exit 1
 
 CMD ["slotserve"]

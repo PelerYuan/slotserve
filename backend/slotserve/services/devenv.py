@@ -435,7 +435,7 @@ def web_base(session_id: int, port: int) -> str:
 
 
 def load_web_ports(raw: str | None) -> list[dict]:
-    """A template's declared web interfaces: [{name, port, kind}] (invalid entries are skipped)."""
+    """A template's declared web interfaces: [{name, port, kind, mode?}] (invalid entries are skipped)."""
     try:
         items = json.loads(raw) if raw else []
     except ValueError:
@@ -450,7 +450,10 @@ def load_web_ports(raw: str | None) -> list[dict]:
             continue
         seen.add(port)
         kind = item.get("kind") if item.get("kind") in WEB_KINDS else "http"
-        out.append({"name": str(item.get("name") or port)[:32], "port": port, "kind": kind})
+        entry = {"name": str(item.get("name") or port)[:32], "port": port, "kind": kind}
+        if item.get("mode") == "direct":  # direct ports: published on the host (services/devenv_ports.py)
+            entry["mode"] = "direct"
+        out.append(entry)
     return out
 
 
@@ -591,6 +594,10 @@ class DevEnvManager:
         self._web_http: httpx.AsyncClient | None = None
         self.self_container = socket.gethostname()
         self.cpu = CpuEnvs(self)  # devenv_cpu: environments without a GPU
+        # [ports hook] direct ports and their forwarder containers (services/devenv_ports.py)
+        from .devenv_ports import PortManager
+
+        self.ports = PortManager(self)
 
     # ---- plumbing ---------------------------------------------------------------
 
@@ -733,6 +740,7 @@ class DevEnvManager:
                         log.warning("dev environment %s: docker unreachable: %s", s.id, exc)
                     await db.commit()
                 self._accounts_dirty = False
+                await self.ports.reconcile(db)  # [ports hook] forwarders of direct ports
                 self._holding = set(
                     (
                         await db.execute(
@@ -1440,6 +1448,7 @@ class DevEnvManager:
     async def _discard(self, db, s: DevSession, stop_first: bool) -> None:
         """Ends a session's container: a kept environment's is paused, any other removed with its network."""
         project = await db.get(DevProject, s.project_id) if s.project_id else None
+        await self.ports.drop_forwarders(s)  # [ports hook] before the network goes or the container pauses
         if s.container_id:
             if project is not None and project.container_id == s.container_id:
                 await self._pause(db, project, s.container_id)  # keep what is installed in it
@@ -1478,6 +1487,7 @@ class DevEnvManager:
     async def _cleanup(self, db) -> None:
         """After a restart: keep containers whose session is still running (and their networks), pause kept ones,
         remove the rest and leftover networks."""
+        await self.ports.remove_all()  # [ports hook] the next tick starts the forwarders that are still wanted
         running = {
             s.container_id: s
             for s in (await db.execute(select(DevSession).where(DevSession.state == "running"))).scalars()
@@ -1590,7 +1600,8 @@ class DevEnvManager:
                         command=source.command if source else None,
                         env=source.env if source else None,
                         persist_paths=source.persist_paths if source else None,
-                        web_ports=source.web_ports if source else None,
+                        # [ports hook] the declared ports plus the ones added at runtime, with their modes
+                        web_ports=await self.ports.saved_web_ports(db, s, source),
                         keep_entrypoint=source.keep_entrypoint if source else False,
                         kind="saved",
                         owner_id=owner_id,
@@ -1658,6 +1669,7 @@ class DevEnvManager:
                 for path in {*load_paths(project.persist_paths), *load_paths(project.container_paths)}:
                     with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
                         await self.docker.remove_volume(f"slotserve-project{project.id}-{_slug(path)}")
+        await self.ports.release_project(db, project)  # [ports hook] its fixed host ports go back to the pool
         await self._drop_network(project_network_name(project.id))
         if project.image.startswith(f"slotserve/project-{project.id}:"):
             with contextlib.suppress(DockerError, httpx.HTTPError, OSError):

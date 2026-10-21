@@ -45,12 +45,19 @@ class WebPort(BaseModel):
     name: str = Field(default="", max_length=32)
     port: int = Field(ge=1, le=65535)
     kind: WebKind = "http"
+    # [ports hook] login: through SlotServe's proxy; direct: published on a host port (services/devenv_ports.py)
+    mode: Literal["login", "direct"] = "login"
 
 
 def _web_ports(ports: list[WebPort]) -> str | None:
     if len({p.port for p in ports}) != len(ports):
         raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_web_port_duplicate")
-    items = [{"name": p.name.strip() or str(p.port), "port": p.port, "kind": p.kind} for p in ports]
+    items = []
+    for p in ports:
+        item = {"name": p.name.strip() or str(p.port), "port": p.port, "kind": p.kind}
+        if p.mode == "direct":
+            item["mode"] = "direct"
+        items.append(item)
     return json.dumps(items) if items else None
 
 

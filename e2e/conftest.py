@@ -49,6 +49,7 @@ def server(tmp_path_factory):
         "SLOTSERVE_SECRET_KEY": "e2e-secret",
         "SLOTSERVE_LLAMA_SERVER_CMD": f'"{sys.executable}" "{ROOT / "tools" / "mock_llama_server.py"}"',
         "SLOTSERVE_LLAMA_PORT": str(_free_port()),
+        "SLOTSERVE_DEVENV_WEB_PORT": str(_free_port()),  # the second listener (dev environment web interfaces)
         "SLOTSERVE_SCHEDULER_INTERVAL_SECONDS": "0.5",
         "MOCK_LOAD_SECONDS": "1",
         "MOCK_TOKEN_DELAY": "0",

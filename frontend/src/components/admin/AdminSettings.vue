@@ -74,6 +74,11 @@ const GROUPS: { id: string; keys: string[] }[] = [
       'devenv_cpu_cores',
       'devenv_cpu_memory_gb',
       'devenv_cpu_memory_pool_gb',
+      'devenv_public_ports_enabled',
+      'devenv_public_ports',
+      'devenv_public_port_limit',
+      'devenv_forwarder_image',
+      'devenv_web_url',
     ],
   },
   {

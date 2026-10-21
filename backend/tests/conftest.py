@@ -38,6 +38,8 @@ async def app(tmp_path, monkeypatch):
         "SLOTSERVE_STOP_TIMEOUT_SECONDS": "5",
         "MOCK_LOAD_SECONDS": "0.5",
         "MOCK_TOKEN_DELAY": "0",
+        # no second listener for dev environment web interfaces (tests serve app.state.web_app themselves)
+        "SLOTSERVE_DEVENV_WEB_PORT": "0",
     }
     for key, value in env.items():
         monkeypatch.setenv(key, value)

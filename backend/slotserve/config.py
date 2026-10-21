@@ -152,6 +152,18 @@ class Settings(BaseSettings):
     devenv_cpu_cores: float = 4.0  # cores one CPU-only environment may use at most; 0 = the whole shared pool
     devenv_cpu_memory_gb: float = 16.0  # RAM one CPU-only environment may use at most; 0 = no limit
     devenv_cpu_memory_pool_gb: float = 0.0  # RAM all CPU-only environments together may claim; 0 = no limit
+    # Direct ports: container ports published on the host as http://server:<port> (no SlotServe login), through a
+    # small forwarder container per port (services/devenv_ports.py).
+    devenv_public_ports_enabled: bool = True
+    devenv_public_ports: str = "2300-2399"  # host ports for them; keep it apart from devenv_ssh_ports
+    devenv_public_port_limit: int = 5  # direct ports per person (admins: no limit); 0 = only admins
+    devenv_forwarder_image: str = "alpine/socat:1.8.1.1"  # any image with socat on its PATH
+    # Web interfaces behind the SlotServe login are served on their own port, so the browser keeps them apart from
+    # SlotServe itself (a separate origin). 0 = serve them on SlotServe's own port (not recommended).
+    devenv_web_port: int = 8001
+    # How browsers reach that port, e.g. https://gpu-box:8443 behind a reverse proxy; empty = the host name the
+    # browser uses for SlotServe with devenv_web_port.
+    devenv_web_url: str = ""
 
     @property
     def database_url(self) -> str:

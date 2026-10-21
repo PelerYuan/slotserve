@@ -33,7 +33,7 @@ sequenceDiagram
 
 2. Turn on **Admin → System settings → Dev environments → Dev environments**.
 
-3. Open the **SSH ports** range (default `2200-2299`) in the host firewall. Each running environment gets one port from it.
+3. Open the **SSH ports** range (default `2200-2299`) in the host firewall. Each running environment gets one port from it. Open the **Direct port range** (default `2300-2399`) as well if people may publish ports directly (see [Ports](#ports)), and the **web interface port** (`SLOTSERVE_DEVENV_WEB_PORT`, default `8001`, published by `docker-compose.yml`).
 
 4. Optionally set **SSH host name** (what people should type after `root@`), CPU, memory and shared-memory limits, which image registries are allowed, whether **Password logins** are allowed, a **Storage directory** for persistent data, and the limits for kept environments.
 
@@ -55,7 +55,7 @@ sequenceDiagram
     You are `root` inside the container. Your files belong in `/workspace`; the shared models are at `/models` (read-only).
 
 4. **VS Code**: add the snippet from the page to `~/.ssh/config` and connect with Remote-SSH. The port can change between bookings.
-5. **Desktop, JupyterLab, VS Code in the browser**: templates with a web interface show an **Open desktop / Open JupyterLab / Open VS Code** button while they run (see [Web interfaces](#web-interfaces)). Other web tools you start yourself can be reached with port forwarding, e.g. `ssh -p 2201 -L 8888:localhost:8888 root@server`.
+5. **Desktop, JupyterLab, VS Code in the browser**: templates with a web interface show an **Open desktop / Open JupyterLab / Open VS Code** button while they run (see [Web interfaces](#web-interfaces)). Anything else you start yourself (TensorBoard, a demo, an API, a database) can be added under **Ports** on the environment's card while it runs (see [Ports](#ports)), or reached with SSH port forwarding, e.g. `ssh -p 2201 -L 8888:localhost:8888 root@server`.
 
 When the booking ends the container is removed, unless it is a kept environment. Extend the booking in time (the reminder 10 minutes before the end has buttons for that) if you need longer.
 
@@ -76,12 +76,12 @@ Anyone can add **their own template** from any image (unless an admin turned cus
 
 ### Web interfaces
 
-SlotServe opens any port of a running environment in the browser at `/devenv/<session>/port/<port>/` on the SlotServe address. A template **declares its web interfaces** as a list of ports, each with a name and a kind (desktop, JupyterLab, VS Code or any other web app); while the environment runs, its card has an **Open …** button for each of them (new tab). Other ports, e.g. a TensorBoard you start yourself on port 6006, can be opened by typing `/devenv/<session>/port/6006/`. Only the person who booked the environment and admins can open its ports (environments that belong to no booking are open to everyone signed in); you need to be signed in to SlotServe.
+SlotServe opens any port of a running environment in the browser at `/devenv/<session>/port/<port>/`, served on the **web interface port** (see [Their own origin](#their-own-origin)). A template **declares its web interfaces** as a list of ports, each with a name and a kind (desktop, JupyterLab, VS Code or any other web app); while the environment runs, its card has an **Open …** button for each of them (new tab). Other ports, e.g. a TensorBoard you start yourself on port 6006, can be added under **Ports** or opened by typing `/devenv/<session>/port/6006/` on the SlotServe address. Only the person who booked the environment and admins can open its ports (environments that belong to no booking are open to everyone signed in); you need to be signed in to SlotServe.
 
 ```mermaid
 flowchart LR
-    B[Browser] -- "/devenv/7/port/8888/ (session cookie)" --> S[SlotServe]
-    S -- "HTTP + WebSocket, token added" --> C["container slotserve-dev-7:8888"]
+    B[Browser] -- "server:8001/devenv/7/port/8888/ (environment cookie)" --> W[SlotServe web port]
+    W -- "HTTP + WebSocket, token added" --> C["container slotserve-dev-7:8888"]
     subgraph N["network slotserve-devenv-7"]
         C
     end
@@ -98,12 +98,55 @@ The built-ins: **JupyterLab + PyTorch** (JupyterLab on port 8888, files in `/wor
 !!! note
     The desktop streams video with modern browser APIs that need a secure context: open SlotServe over HTTPS (or on `localhost`). Hardware-accelerated graphics in the desktop may need `NVIDIA_DRIVER_CAPABILITIES=all` in the template's environment variables, depending on the host's driver setup.
 
-!!! warning "Same origin"
-    Web interfaces are served from the same address as SlotServe. A page in someone's environment runs with the rights of whoever opens it, so admins should only open environments of people they trust. code-server has no token of its own; it relies on the per-environment network (and the port bound to `127.0.0.1` when SlotServe runs on the host).
+#### Their own origin
+
+Apps in environments are written by whoever uses them. If they were served on SlotServe's own address, a page in someone's environment could use SlotServe with the rights of whoever opens it (an admin, for example). So the web interfaces are served on a **port of their own** (`SLOTSERVE_DEVENV_WEB_PORT`, default `8001`): browsers treat it as a different site origin, and it never accepts SlotServe's login cookie.
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant S as SlotServe (:8000)
+    participant W as Web port (:8001)
+    B->>S: /devenv/7/port/8888/ (signed in)
+    S->>S: may this person use environment 7?
+    S-->>B: redirect to :8001 with a one-time token (valid one minute)
+    B->>W: token
+    W-->>B: cookie for /devenv/7/ only, redirect to the app
+    B->>W: /devenv/7/port/8888/ (environment cookie)
+```
+
+- The links on the environment cards (and old bookmarks of `/devenv/…` on SlotServe's address) go through SlotServe, which signs you in and hands you over; there is nothing to set up for users.
+- The cookie on the web port is HttpOnly, belongs to one environment's path, lasts 12 hours and is checked against the database on every request (a disabled account or a lost booking ends access at once).
+- SlotServe refuses changing requests (POST, PUT, PATCH, DELETE) sent by pages on the web port, and the web port refuses requests from a page of one environment to another one's address.
+- **Behind a reverse proxy** or when the port is published on another number, set **Web interface address** (`SLOTSERVE_DEVENV_WEB_URL`, e.g. `https://gpu-box:8443`) and proxy that address to port 8001 with WebSockets enabled. For the way back to the sign-in, `SLOTSERVE_PUBLIC_URL` should be SlotServe's own address.
+- Environments share the web port's origin among themselves. When an app must be fully isolated from other environments' pages, publish it as a [direct port](#ports) (each host port is an origin of its own).
+- `SLOTSERVE_DEVENV_WEB_PORT=0` serves web interfaces on SlotServe's own address again, as in earlier versions. Not recommended.
+
+code-server has no token of its own; it relies on the per-environment network (and the port bound to `127.0.0.1` when SlotServe runs on the host).
+
+### Ports
+
+While an environment runs, its card lists its **ports**: the ones its template declares and any you add. For each port you see its name, the container port, how it is opened, its address with **Open** and **Copy** buttons, and whether something listens on it (SlotServe looks at the container's listening sockets; *Localhost only* means the app listens on `127.0.0.1` and must be told to listen on `0.0.0.0`). Ports that something listens on but that are not listed yet are offered for adding with one click.
+
+Each port is opened one of two ways, which you can switch at any time:
+
+| Mode | Address | Who can use it |
+| --- | --- | --- |
+| **SlotServe login** (default) | `http://server:8001/devenv/<session>/port/<port>/` | You and admins, signed in to SlotServe. For web apps. |
+| **Direct** | `http://server:<host port>` | Anyone on the network, without SlotServe. Any app or protocol (HTTP, WebSocket, gRPC, databases, …). |
+
+**Add port** asks for the container port, a name and the mode. Adding, switching and removing ports never restarts the environment. Ports declared by a template (desktop, JupyterLab, VS Code, …) are behind the login unless the template sets them to direct; for those, removing means going back to the template's setting.
+
+- **Direct ports** come from the **Direct port range** (default `2300-2399`, separate from the SSH ports). SlotServe starts a tiny forwarder container (`socat`, image **Port forwarder image**, default `alpine/socat:1.8.1.1`) on the environment's network that publishes the host port and passes connections to the environment. It runs only while the environment runs: it is removed when the port is removed or switched to the login, and when the environment stops or is paused. Direct ports are open to everyone who can reach the server; protect the app itself (a password, a token) if it matters.
+- **Fixed numbers**: a kept environment's direct port belongs to the kept environment. Its number stays while the environment is paused and is the same when it is continued; it is released when the kept environment is deleted (or removed for being unused). Any other environment's direct port belongs to its booking and is released when the booking ends.
+- **Limits**: admins set **Direct ports per person** (default 5; admins have no limit; `0` lets only admins publish ports) and can switch **Direct ports** off (forwarders stop, the numbers stay assigned).
+- **Shared environments** of idle lanes list only their template's ports; nobody can add ports to them.
+- A port that the host already uses is skipped when it is first published (the next free number is taken). If a fixed port is taken later, the card shows the problem.
+- **Direct ports** on the Dev environments page lists your direct ports, including those of paused kept environments, and lets you release one. Admins see everyone's with **Everyone** and can **reclaim** any: the host port goes back to the pool and the container port stays reachable behind the login.
 
 ### Saving an environment
 
-**Save as image** stores the running container (installed packages, files outside `/workspace`) as a new template of yours, so the next booking starts exactly where you left off. `/workspace` is kept anyway and is not part of the image. The number of saved images per person is limited (default 3); deleting a saved template removes the image from the server.
+**Save as image** stores the running container (installed packages, files outside `/workspace`) as a new template of yours, so the next booking starts exactly where you left off. `/workspace` is kept anyway and is not part of the image. The new template declares the environment's ports, including the ones you added and whether each is direct. The number of saved images per person is limited (default 3); deleting a saved template removes the image from the server.
 
 ## Logging in: SSH keys and the environment password
 
@@ -207,5 +250,6 @@ The path is a path on the Docker host, not inside the SlotServe container. Missi
 
 - **Dev environments** with **Everyone** switched on lists every environment with its state, image, port and errors; **Logs** shows the container output.
 - A failed environment (image not found, container exited, no free port) shows the reason and can be started again with **Try again**. The person is notified.
-- On restart SlotServe keeps environments that are still running, stops kept environments whose booking is over and removes leftover containers and networks.
+- On restart SlotServe keeps environments that are still running, stops kept environments whose booking is over and removes leftover containers and networks. Port forwarders are recreated for the environments that still run.
+- **Direct ports** with **Everyone** lists every published host port with its owner and environment; **Reclaim** frees one.
 - Shared environments: only admins can restart them or read their logs and errors (for example a failed account refresh).

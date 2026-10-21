@@ -422,6 +422,34 @@ class DevSession(Base):
     stopped_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
+class DevPort(Base):
+    """A container port of a dev environment: one someone added, or a declared one whose setting was changed.
+
+    ``mode`` direct: published on ``host_port`` of the host through a forwarder container (no SlotServe login);
+    login: opened through SlotServe's web proxy. A kept environment's ports belong to its project (the host port
+    stays while it is paused); any other environment's to its session, until the booking ends.
+    """
+
+    __tablename__ = "devenv_ports"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    project_id: Mapped[int | None] = mapped_column(
+        ForeignKey("devenv_projects.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    session_id: Mapped[int | None] = mapped_column(
+        ForeignKey("devenv_sessions.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    container_port: Mapped[int] = mapped_column(Integer)
+    name: Mapped[str] = mapped_column(String(32), default="")
+    mode: Mapped[str] = mapped_column(String(8), default="login")  # direct | login
+    declared: Mapped[bool] = mapped_column(Boolean, default=False)  # the template declares this port
+    host_port: Mapped[int | None] = mapped_column(Integer, nullable=True, unique=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    active_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)  # forwarder first ran
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
 # What a resource was doing: bookings, shared use while nobody books, or nothing.
 # ``cpu_devenv`` is reserved for CPU-only dev environments (resource "cpu").
 BOOKING_KINDS = ("model", "gpu", "devenv", "cpu_devenv")
