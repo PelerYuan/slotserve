@@ -118,6 +118,10 @@ class UsageSampler:
         executor = nodes.find(ctx.node_id) if nodes is not None else None
         return await executor.gpu_stats() if executor is not None else []
 
+    def local_node_id(self) -> int | None:
+        nodes = getattr(self.state, "nodes", None)
+        return nodes.local.node_id if nodes is not None else None
+
     async def run(self) -> None:
         while True:
             try:
@@ -150,12 +154,16 @@ class UsageSampler:
             ).scalar_one()
             if done:
                 return 0  # this minute was recorded already (restart, or the clock went back)
+            local_id = self.local_node_id()
             for ctx in lanes:
                 occ = await attribute(db, ctx, now, self.probes)
                 self.current[ctx.id] = occ
                 own = lane_gpus(ctx.devices, await self.node_stats(ctx, gpus))
+                node_id = getattr(ctx, "node_id", None) or local_id
                 for g in own or [None]:
-                    db.add(_row(minute, seconds, ctx.id, occ, g, busy_pct))
+                    row = _row(minute, seconds, ctx.id, occ, g, busy_pct)
+                    row.node_id = node_id
+                    db.add(row)
                     written += 1
             for writer in self.writers:
                 try:
@@ -203,6 +211,7 @@ async def roll_up(db: AsyncSession, keep_days: int, now: datetime) -> int:
     hour = func.strftime("%Y-%m-%d %H:00:00", UsageSample.start)
     keys = (
         UsageSample.resource,
+        UsageSample.node_id,
         UsageSample.lane_id,
         UsageSample.gpu_index,
         UsageSample.kind,
@@ -228,13 +237,32 @@ async def roll_up(db: AsyncSession, keep_days: int, now: datetime) -> int:
             .group_by(hour, *keys)
         )
     ).all()
-    for h, resource, lane_id, gpu, kind, uid, rid, model, sec, metered, util, busy, wh, peak, total, cores in rows:
+    for (
+        h,
+        resource,
+        node_id,
+        lane_id,
+        gpu,
+        kind,
+        uid,
+        rid,
+        model,
+        sec,
+        metered,
+        util,
+        busy,
+        wh,
+        peak,
+        total,
+        cores,
+    ) in rows:
         db.add(
             UsageSample(
                 start=queries.as_utc(h),
                 hourly=True,
                 seconds=int(sec or 0),
                 resource=resource,
+                node_id=node_id,
                 lane_id=lane_id,
                 gpu_index=gpu,
                 kind=kind,

@@ -574,6 +574,8 @@ class UsageTotals(BaseModel):
 class UsageLaneRow(BaseModel):
     lane_id: int | None
     lane_name: str
+    node_id: int | None = None
+    node_name: str | None = None
     gpus: int
     booked_gpu_hours: float
     used_gpu_hours: float
@@ -586,13 +588,32 @@ class UsageLaneRow(BaseModel):
 class UsageGpuRow(BaseModel):
     lane_id: int | None
     lane_name: str
-    gpu_index: int  # -1: the lane has no GPU metrics
+    node_id: int | None = None
+    node_name: str | None = None
+    gpu_index: int  # -1: the lane has no GPU metrics (numbered as the lane's machine sees them)
     gpu_hours: float
     used_gpu_hours: float
     avg_utilization: float | None
     energy_wh: float
     peak_memory_mb: int | None
     memory_total_mb: int | None
+
+
+class UsageNodeRow(BaseModel):
+    """One machine: its lanes' booked and sampled GPU time, and what it was used for (occupancy by kind)."""
+
+    node_id: int | None
+    node_name: str
+    lanes: int
+    gpus: int
+    booked_gpu_hours: float
+    used_gpu_hours: float
+    sampled_gpu_hours: float
+    avg_utilization: float | None
+    energy_wh: float
+    peak_memory_mb: int | None
+    occupancy: dict[str, float]  # kind -> sampled GPU-hours
+    occupied_pct: float | None  # share of sampled GPU time held by bookings or shared use (not free)
 
 
 class UsageKindRow(BaseModel):
@@ -634,6 +655,7 @@ class UsageOut(BaseModel):
     totals: UsageTotals | None = None
     lanes: list[UsageLaneRow] = []
     gpus: list[UsageGpuRow] = []
+    nodes: list[UsageNodeRow] = []  # per machine (one row on a single machine)
     kinds: list[UsageKindRow] = []
     # Time series over ``buckets`` (local start times, YYYY-MM-DDTHH:MM, each ``bucket_hours`` long).
     bucket_hours: int = 24

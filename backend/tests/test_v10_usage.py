@@ -237,10 +237,15 @@ async def test_usage_numbers_csv_and_scope(app, make_client, sampler):
     assert any(line.startswith("bob,1,1.0,2.0,0.07,30.0,9000,") for line in lines)
     csv = (await admin.get("/api/usage/export", params={"days": 7, "kind": "compute"})).text
     header, *lines = csv.lstrip("﻿").strip().splitlines()
-    assert header == ("date,lane,gpu,kind,user,gpu_hours,used_gpu_hours,avg_utilization_pct,peak_memory_mb,energy_wh")
+    assert header == ("date,node,lane,gpu,kind,user,gpu_hours,used_gpu_hours,avg_utilization_pct,peak_memory_mb,energy_wh")
     gpu0 = next(line for line in lines if ",0,gpu,bob," in line)
     assert gpu0.endswith(",0.067,0.067,60.0,9000,6.7")
     assert any(",1,free,," in line for line in lines)
+    assert all(line.split(",")[1] == "local" for line in lines)  # the machine each row ran on
+    csv = (await admin.get("/api/usage/export", params={"days": 7, "kind": "nodes"})).text
+    header, *lines = csv.lstrip("﻿").strip().splitlines()
+    assert header.startswith("node,lanes,gpus,booked_gpu_hours,sampled_gpu_hours,used_gpu_hours")
+    assert len(lines) == 1 and lines[0].startswith("local,1,")
     assert (await admin.get("/api/usage/export", params={"kind": "nope"})).status_code == 422
 
 
@@ -262,13 +267,13 @@ async def test_metrics_and_settings(app, make_client, sampler):
 
     text = (await admin.get("/metrics", headers={"Authorization": "Bearer m"})).text
     lane = (await admin.get("/api/lanes")).json()[0]["name"]
-    assert f'slotserve_gpu_utilization_ratio{{gpu="0",name="Fake GPU",lane="{lane}"}} 0.6' in text
+    assert f'slotserve_gpu_utilization_ratio{{node="local",gpu="0",name="Fake GPU",lane="{lane}"}} 0.6' in text
     assert f'slotserve_booked_gpu_hours_total{{user="bob",lane="{lane}",kind="gpu"}} 2.0' in text
-    assert f'slotserve_gpu_seconds_total{{lane="{lane}",gpu="0",kind="gpu"}} 60' in text
-    assert f'slotserve_gpu_busy_seconds_total{{lane="{lane}",gpu="1",kind="gpu"}} 0' in text
-    assert f'slotserve_gpu_energy_joules_total{{lane="{lane}",gpu="0"}} 6000.0' in text
+    assert f'slotserve_gpu_seconds_total{{node="local",lane="{lane}",gpu="0",kind="gpu"}} 60' in text
+    assert f'slotserve_gpu_busy_seconds_total{{node="local",lane="{lane}",gpu="1",kind="gpu"}} 0' in text
+    assert f'slotserve_gpu_energy_joules_total{{node="local",lane="{lane}",gpu="0"}} 6000.0' in text
     assert 'slotserve_user_gpu_busy_seconds_total{user="bob",kind="gpu"} 60' in text
-    assert f'slotserve_lane_occupant{{lane="{lane}",kind=' in text
+    assert f'slotserve_lane_occupant{{node="local",lane="{lane}",kind=' in text
     async with SessionLocal() as db:
         assert (await db.execute(select(func.count(UsageSample.id)))).scalar_one() == 2
 
