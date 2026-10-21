@@ -57,6 +57,7 @@ M_MODELS_DELETE = "models.delete"  # {path} -> {deleted}
 M_DOWNLOAD_START = "download.start"  # {task_id, url, filename, headers, min_free_gb} -> {}
 M_DOWNLOAD_CANCEL = "download.cancel"  # {task_id} -> {}
 M_PING = "ping"  # {} -> {time}
+M_WOL_SEND = "wol.send"  # {macs, broadcasts, port} -> {sent}: wake another machine in this one's network
 
 # Events the agent sends.
 E_METRICS = "metrics"  # {gpus: [...], cpu_percent, memory_used_mb, memory_total_mb, load}

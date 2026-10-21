@@ -4,6 +4,7 @@ import asyncio
 import shutil
 import subprocess
 import time
+from pathlib import Path
 
 from ..schemas import GpuOut
 
@@ -19,8 +20,20 @@ def _num(value: str, cast=int, default=0):
         return default
 
 
-def _query() -> list[GpuOut]:
+# Where nvidia-smi lives when it is not on the PATH: WSL2 (Docker Desktop on Windows mounts the Windows driver's
+# tools into /usr/lib/wsl/lib) and the NVIDIA container toolkit's default.
+FALLBACK_PATHS = ("/usr/lib/wsl/lib/nvidia-smi", "/usr/bin/nvidia-smi")
+
+
+def find_nvidia_smi() -> str | None:
     exe = shutil.which("nvidia-smi")
+    if exe is not None:
+        return exe
+    return next((p for p in FALLBACK_PATHS if Path(p).is_file()), None)
+
+
+def _query() -> list[GpuOut]:
+    exe = find_nvidia_smi()
     if exe is None:
         return []
     try:
