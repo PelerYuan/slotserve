@@ -100,6 +100,10 @@ class Reservation(Base):
     preset_id: Mapped[int | None] = mapped_column(ForeignKey("model_presets.id", ondelete="SET NULL"), nullable=True)
     series_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     lane_id: Mapped[int | None] = mapped_column(ForeignKey("lanes.id", ondelete="SET NULL"), nullable=True, index=True)
+    # A dev environment booking: the GPU is handed to a container built from this template.
+    devenv_template_id: Mapped[int | None] = mapped_column(
+        ForeignKey("devenv_templates.id", ondelete="SET NULL"), nullable=True
+    )
     start_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
     end_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
     # booked | pending (awaiting approval) | cancelled | rejected | expired
@@ -260,3 +264,61 @@ class Lane(Base):
     @property
     def devices(self) -> list[int] | None:
         return [int(i) for i in self.gpu_indices.split(",") if i.strip()] if self.gpu_indices else None
+
+
+class SshKey(Base):
+    """Public keys a person logs into dev environments with."""
+
+    __tablename__ = "ssh_keys"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(64))
+    public_key: Mapped[str] = mapped_column(Text)
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class DevTemplate(Base):
+    """An image to start dev environments from: built in, added by someone, or saved from a running one."""
+
+    __tablename__ = "devenv_templates"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(64))
+    image: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str] = mapped_column(Text, default="")
+    command: Mapped[str | None] = mapped_column(Text, nullable=True)  # main process; empty = keep running idle
+    env: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON {name: value}
+    kind: Mapped[str] = mapped_column(String(16), default="custom")  # builtin | custom | saved
+    builtin_key: Mapped[str | None] = mapped_column(String(32), nullable=True, unique=True)
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class DevSession(Base):
+    """The container behind one dev environment booking."""
+
+    __tablename__ = "devenv_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    reservation_id: Mapped[int] = mapped_column(ForeignKey("reservations.id", ondelete="CASCADE"), unique=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    template_id: Mapped[int | None] = mapped_column(
+        ForeignKey("devenv_templates.id", ondelete="SET NULL"), nullable=True
+    )
+    lane_id: Mapped[int | None] = mapped_column(ForeignKey("lanes.id", ondelete="SET NULL"), nullable=True)
+    image: Mapped[str] = mapped_column(String(255))
+    # waiting | pulling | starting | running | stopping | stopped | failed
+    state: Mapped[str] = mapped_column(String(16), default="waiting")
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)  # pull progress, saving, ...
+    progress: Mapped[float | None] = mapped_column(nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    container_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    container_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    ssh_port: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    started_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    stopped_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)

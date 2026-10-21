@@ -10,6 +10,10 @@ import type {
   Backup,
   BookingInput,
   CalendarLinks,
+  DevInfo,
+  DevSession,
+  DevTemplate,
+  DevTemplateInput,
   DownloadTask,
   HfFile,
   Lane,
@@ -21,6 +25,7 @@ import type {
   RequestLog,
   Reservation,
   SettingValue,
+  SshKey,
   Status,
   TelegramInfo,
   Usage,
@@ -178,6 +183,24 @@ export const api = {
     request<Usage>('GET', '/api/usage', undefined, { days, tz_offset: -new Date().getTimezoneOffset() }),
   usageExportUrl: (days: number, kind: 'summary' | 'requests') =>
     `/api/usage/export?days=${days}&kind=${kind}&tz_offset=${-new Date().getTimezoneOffset()}`,
+
+  // dev environments
+  devenv: {
+    info: () => request<DevInfo>('GET', '/api/devenv'),
+    templates: () => request<DevTemplate[]>('GET', '/api/devenv/templates'),
+    createTemplate: (body: DevTemplateInput) => request<DevTemplate>('POST', '/api/devenv/templates', body),
+    updateTemplate: (id: number, body: Partial<DevTemplateInput>) =>
+      request<DevTemplate>('PATCH', `/api/devenv/templates/${id}`, body),
+    deleteTemplate: (id: number) => request<void>('DELETE', `/api/devenv/templates/${id}`),
+    sessions: (everyone = false) =>
+      request<DevSession[]>('GET', '/api/devenv/sessions', undefined, { everyone: everyone || undefined }),
+    restart: (id: number) => request<{ ok: boolean }>('POST', `/api/devenv/sessions/${id}/restart`),
+    save: (id: number, name: string) => request<{ ok: boolean }>('POST', `/api/devenv/sessions/${id}/save`, { name }),
+    logs: (id: number) => request<{ text: string }>('GET', `/api/devenv/sessions/${id}/logs`),
+  },
+  sshKeys: () => request<SshKey[]>('GET', '/api/ssh-keys'),
+  addSshKey: (name: string, public_key: string) => request<SshKey>('POST', '/api/ssh-keys', { name, public_key }),
+  deleteSshKey: (id: number) => request<void>('DELETE', `/api/ssh-keys/${id}`),
 
   // admin
   admin: {

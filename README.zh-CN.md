@@ -35,6 +35,7 @@ SlotServe 把 GPU 服务器变成实验室或小团队可预约的共享服务�
 - **模型下载**：粘贴 `.gguf` 直链（支持 Hugging Face 的 `resolve` 链接），断点续传，逐个下载。
 - **用量看板**：按用户、按模型统计请求数、输入/输出 token 和预约时长。
 - **管理面板**：管理用户、预约和 API 密钥，在线修改系统设置，查看审计日志。
+- **开发环境**：把 GPU 时段预约成可 SSH 登录的 Docker 容器（PyTorch、TensorFlow、CUDA 或自己的镜像），`/workspace` 一直保留，环境可保存为镜像。
 - **多 GPU 与多后端**：把 GPU 划分成可独立预约的通道；用 llama.cpp、vLLM、SGLang 或任意 OpenAI 兼容服务提供模型。
 - **审批模式**：需要时由管理员审批长预约。
 - **灵活预约**：可整卡预约用于训练，支持参数预设、每周重复、延长、候补和每人配额。
@@ -125,6 +126,7 @@ flowchart LR
 | [使用指南](https://peleryuan.github.io/slotserve/zh/user-guide/) | 预约、模型、下载、密钥、用量、管理 |
 | [通知与集成](https://peleryuan.github.io/slotserve/zh/integrations/) | Telegram、日历订阅、CSV 导出、Prometheus |
 | [多 GPU 与推理后端](https://peleryuan.github.io/slotserve/zh/gpus-and-engines/) | 多 GPU、vLLM / SGLang / 自定义服务、审批模式 |
+| [开发环境](https://peleryuan.github.io/slotserve/zh/dev-environments/) | 带 SSH 的 Docker 容器、模板、保存镜像 |
 | [接口](https://peleryuan.github.io/slotserve/zh/api/) | 接口列表、`model` 字段、错误码 |
 | [开发](https://peleryuan.github.io/slotserve/zh/development/) | mock 推理服务、测试、前端开发服务器 |
 | [常见问题](https://peleryuan.github.io/slotserve/zh/faq/) | 加载慢、反向代理、备份 |

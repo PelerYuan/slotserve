@@ -43,6 +43,7 @@ plugins:
             User guide: 使用指南
             Notifications & integrations: 通知与集成
             GPUs, lanes & engines: 多 GPU 与推理后端
+            Dev environments: 开发环境
             API: 接口
             How scheduling works: 调度原理
             Development: 开发
@@ -73,6 +74,7 @@ nav:
   - User guide: user-guide.md
   - Notifications & integrations: integrations.md
   - GPUs, lanes & engines: gpus-and-engines.md
+  - Dev environments: dev-environments.md
   - API: api.md
   - How scheduling works: scheduling.md
   - Development: development.md

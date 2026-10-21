@@ -35,6 +35,7 @@ SlotServe turns a GPU server into a shared, bookable service for a lab or small 
 - **Model downloads**: paste a direct `.gguf` link (Hugging Face `resolve` URLs work). Downloads are resumable and run one at a time.
 - **Usage dashboard**: requests, prompt/completion tokens and booked hours per person and per model.
 - **Admin panel**: manage users, bookings and API keys, change settings at runtime, and review an audit log.
+- **Dev environments**: book GPU time as a Docker container you SSH into (PyTorch, TensorFlow, CUDA or your own image), keep `/workspace`, save the environment as an image.
 - **Multiple GPUs and engines**: split GPUs into independently booked lanes; serve models with llama.cpp, vLLM, SGLang or any OpenAI-compatible server.
 - **Approval mode** for teams that want an admin to sign off long bookings.
 - **Flexible bookings**: whole-GPU slots for training, argument presets, weekly repeats, extensions, a waitlist and per-person quotas.
@@ -125,6 +126,7 @@ See [How scheduling works](https://peleryuan.github.io/slotserve/scheduling/) fo
 | [User guide](https://peleryuan.github.io/slotserve/user-guide/) | Booking, models, downloads, keys, usage, administration |
 | [Notifications & integrations](https://peleryuan.github.io/slotserve/integrations/) | Telegram, calendar feeds, CSV export, Prometheus |
 | [GPUs, lanes & engines](https://peleryuan.github.io/slotserve/gpus-and-engines/) | Multiple GPUs, vLLM / SGLang / custom servers, approval mode |
+| [Dev environments](https://peleryuan.github.io/slotserve/dev-environments/) | Docker containers with SSH, templates, saving images |
 | [API](https://peleryuan.github.io/slotserve/api/) | Endpoints, the `model` field, error codes |
 | [Development](https://peleryuan.github.io/slotserve/development/) | Mock model server, tests, frontend dev server |
 | [FAQ](https://peleryuan.github.io/slotserve/faq/) | Slow loads, reverse proxy, backups |

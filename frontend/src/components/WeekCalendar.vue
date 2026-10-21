@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { reservationWhat } from '@/utils/reservation'
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Reservation } from '@/api/types'
@@ -20,7 +21,7 @@ const emit = defineEmits<{
 
 const { locale, t } = useI18n()
 const label = (r: Reservation) =>
-  r.exclusive ? t('schedule.kindExclusive') : r.preset_name ? `${r.model_name} · ${r.preset_name}` : (r.model_name ?? '')
+  reservationWhat(r, t)
 const HOUR_PX = 48
 const DAY_PX = 24 * HOUR_PX
 const slotPx = computed(() => (props.slotMinutes / 60) * HOUR_PX)

@@ -191,3 +191,20 @@ async def free_windows(db: AsyncSession, lane_id: int, start: datetime, end: dat
     if cursor < end:
         gaps.append((cursor, end))
     return gaps
+
+
+async def resolve_devenv(db: AsyncSession, settings: Settings, template_id: int | None, owner: User):
+    """The template of a dev environment booking, checked for the person it is for."""
+    from ..orm import DevTemplate, SshKey
+    from .devenv import visible
+
+    if template_id is None:
+        return None
+    if not settings.devenv_enabled:
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_disabled")
+    template = await db.get(DevTemplate, template_id)
+    if not visible(template, owner):
+        raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    if (await db.execute(select(SshKey.id).where(SshKey.user_id == owner.id).limit(1))).first() is None:
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "ssh_key_required")
+    return template

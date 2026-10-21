@@ -35,6 +35,16 @@ class Editable:
 EDITABLE: dict[str, Editable] = {
     "registration_open": Editable(bool),
     "api_key_reveal": Editable(bool),
+    "devenv_enabled": Editable(bool),
+    "devenv_ssh_host": Editable(str, max=255),
+    "devenv_ssh_ports": Editable(str, min=1, max=32),
+    "devenv_cpus": Editable(float, min=0, max=1024, unit="CPU"),
+    "devenv_memory_gb": Editable(float, min=0, max=8192, unit="GB"),
+    "devenv_shm_gb": Editable(float, min=0, max=1024, unit="GB"),
+    "devenv_custom_images": Editable(bool),
+    "devenv_allowed_registries": Editable(str, max=500),
+    "devenv_saved_images": Editable(int, min=0, max=100),
+    "devenv_pull_minutes": Editable(int, min=0, max=24 * 60, unit="min"),
     "invite_code": Editable(str, min=1, max=128, secret=True),
     "max_reservation_hours": Editable(int, min=1, max=24 * 7, unit="h"),
     "max_advance_days": Editable(int, min=1, max=365, unit="d"),
@@ -110,6 +120,13 @@ def validate(key: str, value: Any) -> Any:
     if key in ("default_llama_args", "vllm_cmd", "sglang_cmd", "custom_engine_cmd"):
         try:
             split_args(value)
+        except ValueError as exc:
+            raise InvalidSetting(key, str(exc)) from exc
+    if key == "devenv_ssh_ports":
+        from .devenv import parse_port_range
+
+        try:
+            parse_port_range(value)
         except ValueError as exc:
             raise InvalidSetting(key, str(exc)) from exc
     if key == "custom_engine_health" and not value.startswith("/"):

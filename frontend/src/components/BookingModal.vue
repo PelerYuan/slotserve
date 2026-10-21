@@ -17,9 +17,9 @@ import {
   NSwitch,
   useMessage,
 } from 'naive-ui'
-import { Cpu, Info, TriangleAlert } from 'lucide-vue-next'
+import { Cpu, Info, Terminal, TriangleAlert } from 'lucide-vue-next'
 import { ApiError, api } from '@/api/client'
-import type { AdminUser, BookingInput, Model, Reservation } from '@/api/types'
+import type { AdminUser, BookingInput, DevTemplate, Model, Reservation } from '@/api/types'
 import { session } from '@/composables/session'
 import { useLanes } from '@/composables/lanes'
 import { useErrorMessage } from '@/composables/useErrorMessage'
@@ -33,6 +33,7 @@ const props = defineProps<{
   reservations: Reservation[]
   editing?: Reservation | null
   laneId?: number | null
+  initialKind?: 'model' | 'exclusive' | 'devenv' | null
 }>()
 const emit = defineEmits<{ done: [] }>()
 
@@ -45,7 +46,16 @@ const lane = ref<number | null>(null)
 const laneOptions = computed(() =>
   lanes.value.map((l) => ({ label: l.gpus.length ? `${l.name}  ·  GPU ${l.gpus.join(',')}` : l.name, value: l.id })),
 )
-const kind = ref<'model' | 'exclusive'>('model')
+const kind = ref<'model' | 'exclusive' | 'devenv'>('model')
+const devenvEnabled = computed(() => !!session.config?.devenv_enabled)
+const templates = ref<DevTemplate[]>([])
+const templateId = ref<number | null>(null)
+const templateOptions = computed(() =>
+  templates.value
+    .filter((tpl) => tpl.enabled)
+    .map((tpl) => ({ label: `${tpl.name}  ·  ${tpl.image}`, value: tpl.id })),
+)
+const template = computed(() => templates.value.find((tpl) => tpl.id === templateId.value) ?? null)
 const modelId = ref<number | null>(null)
 const presetId = ref<number | null>(null)
 const startTs = ref<number | null>(null)
@@ -85,15 +95,22 @@ watch(show, async (open) => {
   forUser.value = null
   const r = editing.value
   lane.value = r?.lane_id ?? props.laneId ?? lanes.value[0]?.id ?? null
+  if (devenvEnabled.value) {
+    templates.value = await api.devenv.templates().catch(() => templates.value)
+  }
   if (r) {
-    kind.value = r.exclusive ? 'exclusive' : 'model'
+    kind.value = r.devenv_template_id ? 'devenv' : r.exclusive ? 'exclusive' : 'model'
+    templateId.value = r.devenv_template_id ?? templateId.value
     modelId.value = r.model_id ?? modelId.value
     presetId.value = r.preset_id
     startTs.value = new Date(r.start_at).getTime()
     endTs.value = new Date(r.end_at).getTime()
     note.value = r.note
   } else {
-    kind.value = 'model'
+    kind.value = props.initialKind && (props.initialKind !== 'devenv' || devenvEnabled.value) ? props.initialKind : 'model'
+    if (!templates.value.some((tpl) => tpl.id === templateId.value && tpl.enabled)) {
+      templateId.value = templates.value.find((tpl) => tpl.enabled)?.id ?? null
+    }
     note.value = ''
     presetId.value = null
     startTs.value = props.start?.getTime() ?? null
@@ -135,6 +152,7 @@ const needsApproval = computed(() => {
 })
 
 const loadHint = computed(() => {
+  if (kind.value === 'devenv') return { kind: 'devenv' as const }
   if (kind.value === 'exclusive') return { kind: 'exclusive' as const }
   if (!selected.value) return null
   if (previous.value && previous.value.model_id === selected.value.id) return { kind: 'same' as const }
@@ -146,7 +164,10 @@ const slotMs = computed(() => (session.config?.slot_minutes ?? 30) * 60_000)
 const maxWeeks = computed(() => Math.max(1, Math.floor((session.config?.max_advance_days ?? 30) / 7)))
 const canSubmit = computed(
   () =>
-    (kind.value === 'exclusive' || !!modelId.value) && !!startTs.value && !!endTs.value && endTs.value > startTs.value,
+    (kind.value === 'exclusive' || (kind.value === 'devenv' ? !!templateId.value : !!modelId.value)) &&
+    !!startTs.value &&
+    !!endTs.value &&
+    endTs.value > startTs.value,
 )
 
 function disablePast(ts: number) {
@@ -163,11 +184,12 @@ function startNow() {
 }
 
 function payload(): BookingInput {
-  const exclusive = kind.value === 'exclusive'
+  const exclusive = kind.value !== 'model'
   return {
     lane_id: lane.value,
     model_id: exclusive ? null : modelId.value,
     preset_id: exclusive ? null : presetId.value,
+    devenv_template_id: kind.value === 'devenv' ? templateId.value : null,
     start_at: new Date(startTs.value!).toISOString(),
     end_at: new Date(endTs.value!).toISOString(),
     note: note.value,
@@ -199,7 +221,12 @@ async function submit() {
     show.value = false
   } catch (e) {
     error.value = describe(e)
-    conflict.value = e instanceof ApiError && e.code === 'reservation_conflict' && !editing.value && !repeat.value
+    conflict.value =
+      e instanceof ApiError &&
+      e.code === 'reservation_conflict' &&
+      !editing.value &&
+      !repeat.value &&
+      kind.value !== 'devenv'
   } finally {
     busy.value = false
   }
@@ -225,6 +252,7 @@ async function joinWaitlist() {
     v-model:show="show"
     preset="card"
     :title="editing ? t('schedule.editTitle') : t('schedule.bookingTitle')"
+    :auto-focus="false"
     style="width: 540px; max-width: calc(100vw - 32px)"
     :bordered="false"
   >
@@ -236,8 +264,18 @@ async function joinWaitlist() {
         <NRadioGroup v-model:value="kind" :disabled="isActive" class="kind">
           <NRadioButton value="model">{{ t('schedule.kindModel') }}</NRadioButton>
           <NRadioButton value="exclusive">{{ t('schedule.kindExclusive') }}</NRadioButton>
+          <NRadioButton v-if="devenvEnabled" value="devenv">{{ t('devenv.short') }}</NRadioButton>
         </NRadioGroup>
       </NFormItem>
+
+      <template v-if="kind === 'devenv'">
+        <NFormItem :label="t('devenv.template')">
+          <NSelect v-model:value="templateId" :options="templateOptions" filterable :disabled="isActive" />
+        </NFormItem>
+        <p v-if="template?.description" class="faint small tpl-desc">
+          {{ template.builtin_key ? t(`devenv.builtin.${template.builtin_key}`) : template.description }}
+        </p>
+      </template>
 
       <template v-if="kind === 'model'">
         <div v-if="!ready.length" class="muted empty-models">{{ t('schedule.noModels') }}</div>
@@ -329,10 +367,12 @@ async function joinWaitlist() {
       <div v-if="loadHint" class="hint" :class="loadHint.kind">
         <TriangleAlert v-if="loadHint.kind === 'adjacent'" :size="15" />
         <Cpu v-else-if="loadHint.kind === 'exclusive'" :size="15" />
+        <Terminal v-else-if="loadHint.kind === 'devenv'" :size="15" />
         <Info v-else :size="15" />
         <span v-if="loadHint.kind === 'adjacent'">{{ t('schedule.adjacentWarning', { eta: formatDuration(selected?.est_load_seconds) }) }}</span>
         <span v-else-if="loadHint.kind === 'same'">{{ t('schedule.sameModelNote') }}</span>
         <span v-else-if="loadHint.kind === 'exclusive'">{{ t('schedule.exclusiveInfo') }}</span>
+        <span v-else-if="loadHint.kind === 'devenv'">{{ t('devenv.bookingInfo') }}</span>
         <span v-else>{{ t('schedule.preloadInfo') }}</span>
       </div>
 
@@ -360,6 +400,9 @@ async function joinWaitlist() {
 </template>
 
 <style scoped>
+.tpl-desc {
+  margin: -8px 0 14px;
+}
 .kind {
   width: 100%;
   display: flex;

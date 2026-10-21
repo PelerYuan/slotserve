@@ -76,6 +76,8 @@ export interface Reservation {
   preset_id: number | null
   preset_name: string | null
   exclusive: boolean
+  devenv_template_id?: number | null
+  devenv_template_name?: string | null
   series_id: string | null
   lane_id: number | null
   lane_name: string | null
@@ -169,6 +171,7 @@ export interface AppConfig {
   quota_upcoming: number
   approval_mode: 'off' | 'long' | 'all'
   approval_hours: number
+  devenv_enabled?: boolean
   telegram_enabled: boolean
   version: string
 }
@@ -300,6 +303,71 @@ export interface BookingInput {
   note?: string
   repeat_weeks?: number
   user_id?: number | null
+  devenv_template_id?: number | null
+}
+
+export interface DevInfo {
+  enabled: boolean
+  docker: { ok: boolean; error?: string | null; version?: string | null }
+  ssh_host: string
+  host_key_fingerprint: string | null
+  custom_images: boolean
+  saved_limit: number
+  pull_minutes: number
+}
+
+export interface DevTemplate {
+  id: number
+  name: string
+  image: string
+  description: string
+  command: string | null
+  env: Record<string, string>
+  kind: 'builtin' | 'custom' | 'saved'
+  builtin_key: string | null
+  owner: string | null
+  mine: boolean
+  enabled: boolean
+  created_at: string
+}
+
+export interface DevTemplateInput {
+  name: string
+  image: string
+  description?: string
+  command?: string | null
+  env?: Record<string, string>
+  shared?: boolean
+  enabled?: boolean
+}
+
+export type DevState = 'waiting' | 'pulling' | 'ready' | 'starting' | 'running' | 'stopping' | 'stopped' | 'failed'
+
+export interface DevSession {
+  id: number
+  reservation_id: number
+  username: string
+  template_name: string | null
+  image: string
+  lane_name: string | null
+  state: DevState
+  detail: string | null
+  progress: number | null
+  error: string | null
+  ssh_port: number | null
+  ssh_command: string | null
+  start_at: string | null
+  end_at: string | null
+  started_at: string | null
+  stopped_at: string | null
+}
+
+export interface SshKey {
+  id: number
+  name: string
+  fingerprint: string
+  key_type: string
+  created_at: string
 }
 
 export interface WaitlistEntry {

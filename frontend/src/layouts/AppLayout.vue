@@ -13,6 +13,7 @@ import {
   Menu,
   Settings,
   ShieldCheck,
+  Terminal,
 } from 'lucide-vue-next'
 import BrandMark from '@/components/BrandMark.vue'
 import StatusDot from '@/components/StatusDot.vue'
@@ -32,6 +33,7 @@ const nav = computed(() => [
   { name: 'schedule', label: t('nav.schedule'), icon: CalendarDays },
   { name: 'models', label: t('nav.models'), icon: Boxes },
   { name: 'keys', label: t('nav.keys'), icon: KeyRound },
+  ...(session.config?.devenv_enabled ? [{ name: 'devenv', label: t('nav.devenv'), icon: Terminal }] : []),
   { name: 'usage', label: t('nav.usage'), icon: BarChart3 },
   { name: 'settings', label: t('nav.settings'), icon: Settings },
   ...(session.user?.is_admin ? [{ name: 'admin', label: t('nav.admin'), icon: ShieldCheck }] : []),

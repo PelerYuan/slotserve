@@ -18,6 +18,7 @@ Open **Schedule** and drag across the calendar, or press **New booking**. Choose
 | --- | --- |
 | **Run a model** | Your model (optionally with one of its **presets**) is loaded before the slot starts. Only your API keys are accepted. |
 | **Whole GPU** | The model server is stopped shortly before the slot, so the GPU is completely free for training or any other program. The API returns `503 gpu_exclusive`. The default model comes back when the slot ends. |
+| **Dev environment** | A Docker container with the GPU and SSH runs for the slot; your `/workspace` is kept. See [Dev environments](dev-environments.md). |
 
 ### Changing bookings
 

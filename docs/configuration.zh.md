@@ -63,8 +63,17 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_USAGE_RETENTION_DAYS` | `365` | 逐条请求记录保留天数，之后合并为按天汇总（0 表示永久；否则至少 90） |
 | `SLOTSERVE_AUDIT_RETENTION_DAYS` | `730` | 审计日志保留天数（0 表示永久） |
 | `SLOTSERVE_BACKUP_KEEP` | `7` | 保留的每日数据库备份份数（0 表示关闭自动备份） |
+| `SLOTSERVE_DEVENV_ENABLED` | `false` | 开发环境：把 GPU 时段预约成带 SSH 的 Docker 容器 |
+| `SLOTSERVE_DOCKER_HOST` | `unix:///var/run/docker.sock` | 开发环境使用的 Docker（或 Podman）接口 |
+| `SLOTSERVE_DEVENV_SSH_HOST` | *空* | ssh 命令中显示的主机名；留空则使用浏览器访问的地址 |
+| `SLOTSERVE_DEVENV_SSH_PORTS` | `2200-2299` | 分配给开发环境的宿主机端口 |
+| `SLOTSERVE_DEVENV_CPUS` / `_MEMORY_GB` / `_SHM_GB` | `0` / `0` / `8` | 每个环境的资源上限（0 表示不限） |
+| `SLOTSERVE_DEVENV_CUSTOM_IMAGES` | `true` | 允许用户用任意镜像新建模板 |
+| `SLOTSERVE_DEVENV_ALLOWED_REGISTRIES` | *空* | 允许的镜像仓库，逗号分隔；留空表示不限 |
+| `SLOTSERVE_DEVENV_SAVED_IMAGES` | `3` | 每人可保存的环境镜像数 |
+| `SLOTSERVE_DEVENV_PULL_MINUTES` | `60` | 预约开始前多久下载镜像 |
 
-除部署相关的几项（`HOST`、`PORT`、`SECRET_KEY`、`COOKIE_SECURE`、`STATIC_DIR`、`DATA_DIR`、`MODELS_DIR`、`LLAMA_SERVER_CMD`、`LLAMA_HOST`、`LLAMA_PORT`、`TELEGRAM_API_BASE`，修改需要重启，因此只在 `.env` 中设置）外，其余所有设置都可由管理员在**管理 → 系统设置**中直接修改，无需重启。修改保存在数据库中，优先于 `.env`；点**恢复默认**即可取消覆盖。
+除部署相关的几项（`HOST`、`PORT`、`SECRET_KEY`、`COOKIE_SECURE`、`STATIC_DIR`、`DATA_DIR`、`MODELS_DIR`、`LLAMA_SERVER_CMD`、`LLAMA_HOST`、`LLAMA_PORT`、`TELEGRAM_API_BASE`、`DOCKER_HOST`、`DROPBEAR_PATH`，修改需要重启，因此只在 `.env` 中设置）外，其余所有设置都可由管理员在**管理 → 系统设置**中直接修改，无需重启。修改保存在数据库中，优先于 `.env`；点**恢复默认**即可取消覆盖。
 
 ## 每个模型的启动参数
 

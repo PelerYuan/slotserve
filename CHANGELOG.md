@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- **Dev environments**: a booking can be a Docker container with the lane's GPUs and SSH (a bundled static Dropbear, public-key login only, a port from a configurable range), a persistent `/workspace` volume and the models read-only. Built-in PyTorch, Jupyter + PyTorch, TensorFlow and CUDA templates, custom templates from any image, and saving a running environment as an image. Images are pulled ahead of time; failures, logs and every environment are visible on the page. Off by default; needs the Docker socket (or Podman's Docker-compatible API).
+
 ## [0.8.0] - 2026-10-21
 
 ### Added

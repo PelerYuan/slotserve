@@ -206,6 +206,7 @@ class ReservationCreateIn(BaseModel):
     repeat_weeks: int = Field(default=0, ge=0, le=52)
     user_id: int | None = None  # admins may book for someone else
     lane_id: int | None = None  # None = the first lane
+    devenv_template_id: int | None = None  # a dev environment booking (model_id stays None)
 
 
 class ReservationUpdateIn(BaseModel):
@@ -217,6 +218,7 @@ class ReservationUpdateIn(BaseModel):
     end_at: datetime | None = None
     note: str | None = Field(default=None, max_length=500)
     lane_id: int | None = None
+    devenv_template_id: int | None = None
 
 
 class ReviewIn(BaseModel):
@@ -237,6 +239,8 @@ class ReservationOut(BaseModel):
     preset_id: int | None = None
     preset_name: str | None = None
     exclusive: bool = False
+    devenv_template_id: int | None = None
+    devenv_template_name: str | None = None
     series_id: str | None = None
     lane_id: int | None = None
     lane_name: str | None = None
@@ -339,6 +343,7 @@ class ConfigOut(BaseModel):
     quota_upcoming: int = 0
     approval_mode: str = "off"
     approval_hours: int = 4
+    devenv_enabled: bool = False
     telegram_enabled: bool = False
     version: str
 

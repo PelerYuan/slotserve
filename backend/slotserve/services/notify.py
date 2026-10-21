@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from ..config import Settings
 from ..db import SessionLocal, utcnow
-from ..orm import Lane, LlmModel, ModelPreset, OutboxItem, Reservation, User
+from ..orm import DevTemplate, Lane, LlmModel, ModelPreset, OutboxItem, Reservation, User
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +30,8 @@ EVENT_PREF = {
     "reminder_end": "reminders",
     "model_ready": "model_ready",
     "exclusive_ready": "model_ready",
+    "devenv_ready": "model_ready",
+    "devenv_failed": "booking_changes",
     "booking_created": "booking_changes",
     "booking_changed": "booking_changes",
     "booking_cancelled": "booking_changes",
@@ -58,6 +60,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "reminder_end": "⌛ Your booking ends at {end}. Need more time?",
         "model_ready": "✅ {what} is loaded and ready for your booking.",
         "exclusive_ready": "✅ The GPU is yours until {end}. llama-server is stopped.",
+        "devenv_ready": "🖥 Your dev environment is ready until {end}:\nssh -p {port} root@{host}",
+        "devenv_failed": "⚠️ Your dev environment ({what}) could not start: {error}",
+        "devenv": "Dev environment",
         "booking_created": "📅 {by} booked {when} for you: {what}.",
         "booking_changed": "✏️ {by} changed your booking: {when}, {what}.",
         "booking_cancelled": "❌ {by} cancelled your booking {when}.",
@@ -90,6 +95,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "reminder_end": "⌛ 你的预约将在 {end} 结束，需要延长吗？",
         "model_ready": "✅ {what} 已加载完成，可以开始使用。",
         "exclusive_ready": "✅ 整张 GPU 归你使用到 {end}，llama-server 已停止。",
+        "devenv_ready": "🖥 开发环境已就绪，可用到 {end}：\nssh -p {port} root@{host}",
+        "devenv_failed": "⚠️ 你的开发环境（{what}）没能启动：{error}",
+        "devenv": "开发环境",
         "booking_created": "📅 {by} 替你预约了 {when}：{what}。",
         "booking_changed": "✏️ {by} 修改了你的预约：{when}，{what}。",
         "booking_cancelled": "❌ {by} 取消了你的预约 {when}。",
@@ -177,8 +185,19 @@ class Notifier:
         start = self.fmt_time(r.start_at)
         return f"{start}–{end[-5:]}" if start[:5] == end[:5] else f"{start} – {end}"
 
+    def ssh_host(self) -> str:
+        """Host name for ssh commands: the dev environment setting, else the public URL's host."""
+        if self.settings.devenv_ssh_host:
+            return self.settings.devenv_ssh_host
+        from urllib.parse import urlsplit
+
+        return urlsplit(self.settings.public_url).hostname or "<server>" if self.settings.public_url else "<server>"
+
     async def describe(self, db, r: Reservation, user: User | None) -> str:
-        if r.model_id is None:
+        if r.devenv_template_id is not None:
+            template = await db.get(DevTemplate, r.devenv_template_id)
+            name = f"{text(user, 'devenv')} · {template.name if template else '?'}"
+        elif r.model_id is None:
             name = text(user, "exclusive")
         else:
             model = await db.get(LlmModel, r.model_id)
@@ -225,6 +244,8 @@ class Notifier:
                 if event == "booking_rejected" and r.review_note:
                     params["reason"] = text(user, "reason", note=r.review_note)
                 params.setdefault("reason", "")
+                if event == "devenv_ready":
+                    params["host"] = self.ssh_host()
                 if event == "reminder_end":
                     buttons = [
                         [

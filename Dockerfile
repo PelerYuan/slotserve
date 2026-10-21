@@ -11,6 +11,22 @@ RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
 RUN npm run build
 
+# ---- SSH server for dev environments ------------------------------------------
+# A static (musl) Dropbear, copied into dev environment containers so any image can be reached over SSH.
+FROM alpine:3.22 AS dropbear
+ARG DROPBEAR_VERSION=2026.94
+ARG DROPBEAR_SHA256=e098034a843699200c8c977a991fff73159735bf795d5f72ef672c41a6b1ae81
+RUN apk add --no-cache build-base curl
+RUN curl -fsSL -o /tmp/dropbear.tar.bz2 "https://matt.ucc.asn.au/dropbear/releases/dropbear-${DROPBEAR_VERSION}.tar.bz2" \
+ && echo "${DROPBEAR_SHA256}  /tmp/dropbear.tar.bz2" | sha256sum -c - \
+ && tar xjf /tmp/dropbear.tar.bz2 -C /tmp \
+ && cd "/tmp/dropbear-${DROPBEAR_VERSION}" \
+ && ./configure --enable-static --disable-zlib --disable-syslog --disable-lastlog --disable-wtmp --disable-wtmpx \
+      --disable-utmp --disable-utmpx --disable-pututline --disable-pututxline \
+ && make -j"$(nproc)" PROGRAMS="dropbear dropbearkey" MULTI=1 STATIC=1 \
+ && strip dropbearmulti \
+ && install -D -m 755 dropbearmulti /out/dropbearmulti
+
 # ---- runtime ----------------------------------------------------------------
 FROM ${CUDA_IMAGE}
 
@@ -31,6 +47,7 @@ WORKDIR /app
 COPY backend/pyproject.toml /app/backend/pyproject.toml
 COPY backend/slotserve /app/backend/slotserve
 COPY --from=web /src/backend/slotserve/static /app/static
+COPY --from=dropbear /out/dropbearmulti /opt/slotserve/bin/dropbearmulti
 RUN pip install /app/backend
 
 ENV SLOTSERVE_HOST=0.0.0.0 \

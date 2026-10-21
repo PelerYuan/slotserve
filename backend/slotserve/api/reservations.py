@@ -86,6 +86,9 @@ async def create_core(app, db: AsyncSession, user: User, body: ReservationCreate
         raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_too_far", days=settings.max_advance_days)
     model, preset = await booking.resolve_model(db, body.model_id, body.preset_id)
     lane = await booking.resolve_lane(db, body.lane_id)
+    if body.devenv_template_id is not None and model is not None:
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_with_model")
+    template = await booking.resolve_devenv(db, settings, body.devenv_template_id, owner)
 
     pending = booking.needs_approval(settings, user, windows)
     async with booking.booking_lock:
@@ -100,6 +103,7 @@ async def create_core(app, db: AsyncSession, user: User, body: ReservationCreate
                 preset_id=preset.id if preset else None,
                 series_id=series,
                 lane_id=lane.id,
+                devenv_template_id=template.id if template else None,
                 start_at=s,
                 end_at=e,
                 note=body.note.strip(),
@@ -142,7 +146,7 @@ async def update_reservation_core(
     fields = body.model_fields_set
     if phase not in ("upcoming", "active", "pending"):
         raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_finished")
-    if phase == "active" and (fields & {"start_at", "model_id", "preset_id", "lane_id"}):
+    if phase == "active" and (fields & {"start_at", "model_id", "preset_id", "lane_id", "devenv_template_id"}):
         raise ApiError(status.HTTP_400_BAD_REQUEST, "reservation_active_locked")
 
     start = booking.aware(body.start_at) if body.start_at else r.start_at
@@ -161,6 +165,13 @@ async def update_reservation_core(
         model_id, preset_id = (model.id if model else None), (preset.id if preset else None)
 
     lane_id = (await booking.resolve_lane(db, body.lane_id)).id if "lane_id" in fields else r.lane_id
+    devenv_id = r.devenv_template_id
+    if "devenv_template_id" in fields:
+        owner_for_template = await db.get(User, r.user_id)
+        template = await booking.resolve_devenv(db, settings, body.devenv_template_id, owner_for_template)
+        devenv_id = template.id if template else None
+    if model_id is not None:
+        devenv_id = None  # running a model and a dev environment are different kinds of booking
     # Changing a not-yet-started booking is judged like a new one in approval mode.
     review = phase != "active" and r.user_id == user.id and booking.needs_approval(settings, user, [(start, end)])
     newly_pending = review and r.status != "pending"
@@ -170,6 +181,7 @@ async def update_reservation_core(
         if owner is not None and owner.id == user.id:
             await booking.check_quota(db, settings, owner, [(start, end)], exclude={r.id})
         r.start_at, r.end_at, r.model_id, r.preset_id, r.lane_id = start, end, model_id, preset_id, lane_id
+        r.devenv_template_id = devenv_id
         if body.note is not None:
             r.note = body.note.strip()
         if review:

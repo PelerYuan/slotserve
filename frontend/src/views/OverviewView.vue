@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { reservationWhat } from '@/utils/reservation'
 import { loadProgress as loadProgressOf } from '@/utils/progress'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -132,7 +133,7 @@ async function restart() {
           <StatusDot :state="l.runtime.state" />
         </div>
         <div class="lane-model mono">
-          {{ l.active_reservation?.exclusive ? t('schedule.kindExclusive') : (l.runtime.model_name ?? t('overview.noModel')) }}
+          {{ l.active_reservation?.exclusive ? reservationWhat(l.active_reservation, t) : (l.runtime.model_name ?? t('overview.noModel')) }}
         </div>
         <div class="muted small">
           <template v-if="l.active_reservation">
@@ -154,7 +155,7 @@ async function restart() {
           <span class="spacer" />
           <StatusDot v-if="runtime" :state="runtime.state" />
         </div>
-        <div class="model-name">{{ exclusive ? t('schedule.kindExclusive') : (modelLabel ?? t('overview.noModel')) }}</div>
+        <div class="model-name">{{ exclusive && holder ? reservationWhat(holder, t) : (modelLabel ?? t('overview.noModel')) }}</div>
         <div class="model-sub muted">
           <template v-if="loadProgress">
             {{

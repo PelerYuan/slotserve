@@ -21,6 +21,7 @@ Messages are sent in each person's interface language. Times use the **Time zone
 | An admin booked, changed, cancelled or ended your booking | Booker |
 | The booked model failed to load and the default model is serving instead | Booker and admins |
 | Your booking request was approved, rejected (with the reason) or expired | Booker |
+| Your dev environment is ready (with the ssh command) or could not start | Booker |
 | Time you waited for is free, or was booked for you | Waitlisted person |
 | Your download finished or failed | Person who started it |
 | A booking needs approval, with **Approve** and **Reject** buttons | Admins |

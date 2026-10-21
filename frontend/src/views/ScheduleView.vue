@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { reservationWhat } from '@/utils/reservation'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { NButton, NButtonGroup, NDropdown, NModal, useDialog, useMessage } from 'naive-ui'
 import { CalendarPlus, ChevronLeft, ChevronRight, Hourglass, Repeat } from 'lucide-vue-next'
@@ -103,6 +105,9 @@ const booking = ref(false)
 const draftStart = ref<Date | null>(null)
 const draftEnd = ref<Date | null>(null)
 const editing = ref<Reservation | null>(null)
+const route = useRoute()
+const router = useRouter()
+const initialKind = ref<'model' | 'exclusive' | 'devenv' | null>(null)
 
 function openBooking(start?: Date, end?: Date) {
   const slot = slotMinutes.value * 60_000
@@ -112,6 +117,19 @@ function openBooking(start?: Date, end?: Date) {
   editing.value = null
   booking.value = true
 }
+
+// /schedule?book=devenv opens the booking dialog for a dev environment (from the dev environments page).
+function bookFromQuery() {
+  if (route.query.book !== 'devenv') return
+  initialKind.value = 'devenv'
+  openBooking()
+  router.replace({ query: {} })
+}
+watch(() => route.query.book, bookFromQuery)
+onMounted(bookFromQuery)
+watch(booking, (open) => {
+  if (!open) initialKind.value = null
+})
 
 function openEdit(r: Reservation) {
   detail.value = null
@@ -182,7 +200,7 @@ function endReservation(r: Reservation) {
 }
 
 const what = (r: Reservation) =>
-  r.exclusive ? t('schedule.kindExclusive') : r.preset_name ? `${r.model_name} · ${r.preset_name}` : r.model_name
+  reservationWhat(r, t)
 </script>
 
 <template>
@@ -296,6 +314,7 @@ const what = (r: Reservation) =>
       :reservations="reservations"
       :editing="editing"
       :lane-id="currentLane"
+      :initial-kind="initialKind"
       @done="onBooked"
     />
 

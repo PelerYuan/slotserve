@@ -14,6 +14,7 @@ from .api import (
     admin,
     auth,
     calendar,
+    devenv,
     downloads,
     keys,
     lanes,
@@ -30,6 +31,7 @@ from .config import Settings, get_settings
 from .gateway import proxy
 from .runtime.lanes import LaneManager, ensure_default_lane
 from .services import app_settings
+from .services.devenv import DevEnvManager, seed_templates
 from .services.downloader import Downloader
 from .services.housekeeper import Housekeeper
 from .services.notify import Notifier
@@ -73,6 +75,9 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         app.state.downloader = Downloader(settings)
         app.state.downloader.events = app.state.notifier
         app.state.housekeeper = Housekeeper(app.state)
+        async with db.SessionLocal() as session:
+            await seed_templates(session)
+        app.state.devenv = DevEnvManager(app.state, docker=getattr(app.state, "docker_client", None))
         app.state.telegram = TelegramBot(app, transport=getattr(app.state, "telegram_transport", None))
         app.state.notifier.bot = app.state.telegram
         if restored := await app.state.notifier.restore_pending():
@@ -84,6 +89,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
                 asyncio.create_task(app.state.notifier.run(), name="notifier"),
                 asyncio.create_task(app.state.housekeeper.run(), name="housekeeper"),
                 asyncio.create_task(app.state.telegram.run(), name="telegram"),
+                asyncio.create_task(app.state.devenv.run(), name="devenv"),
             ]
         try:
             yield
@@ -96,6 +102,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
             await app.state.notifier.save_pending()
             await app.state.lanes.shutdown()
             await app.state.telegram.close()
+            await app.state.devenv.close()
             await app.state.http.aclose()
             await db.dispose()
 
@@ -130,8 +137,10 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         metrics,
         lanes,
         runtime_admin,
+        devenv,
     ):
         app.include_router(module.router)
+    app.include_router(devenv.keys_router)
     app.include_router(proxy.router)
 
     @app.get("/healthz", include_in_schema=False)

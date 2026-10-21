@@ -28,6 +28,9 @@ services:
       - ${MODELS_DIR:?Set MODELS_DIR in .env}:/models
       # SQLite database and llama-server logs.
       - ${DATA_DIR:-./data}:/data
+      # Dev environments (Admin > System settings): lets SlotServe start containers on this host.
+      # Mounting the Docker socket gives SlotServe root access to the host; only enable it if you want the feature.
+      # - /var/run/docker.sock:/var/run/docker.sock
     deploy:
       resources:
         reservations:

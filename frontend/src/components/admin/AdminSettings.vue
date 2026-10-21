@@ -51,6 +51,21 @@ async function save(payload: Record<string, SettingValue | null>) {
 const GROUPS: { id: string; keys: string[] }[] = [
   { id: 'access', keys: ['registration_open', 'invite_code', 'approval_mode', 'approval_hours', 'api_key_reveal'] },
   {
+    id: 'devenv',
+    keys: [
+      'devenv_enabled',
+      'devenv_ssh_host',
+      'devenv_ssh_ports',
+      'devenv_cpus',
+      'devenv_memory_gb',
+      'devenv_shm_gb',
+      'devenv_custom_images',
+      'devenv_allowed_registries',
+      'devenv_saved_images',
+      'devenv_pull_minutes',
+    ],
+  },
+  {
     id: 'booking',
     keys: [
       'slot_minutes',

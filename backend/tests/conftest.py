@@ -5,10 +5,12 @@ from pathlib import Path
 
 import httpx
 import pytest
+from docker_mock import FakeDocker
 from tg_mock import FakeTelegram
 
 from slotserve.config import get_settings
 from slotserve.main import create_app
+from slotserve.services.docker_api import DockerClient
 
 ROOT = Path(__file__).resolve().parents[2]
 MOCK_SERVER = ROOT / "tools" / "mock_llama_server.py"
@@ -42,6 +44,10 @@ async def app(tmp_path, monkeypatch):
     application = create_app()
     application.state.fake_telegram = FakeTelegram()
     application.state.telegram_transport = httpx.ASGITransport(app=application.state.fake_telegram.app)
+    application.state.fake_docker = FakeDocker()
+    application.state.docker_client = DockerClient(
+        "unix:///fake/docker.sock", transport=httpx.ASGITransport(app=application.state.fake_docker.app)
+    )
     async with application.router.lifespan_context(application):
         yield application
     get_settings.cache_clear()

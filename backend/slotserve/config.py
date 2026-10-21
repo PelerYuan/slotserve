@@ -79,6 +79,22 @@ class Settings(BaseSettings):
     audit_retention_days: int = 730
     backup_keep: int = 7
 
+    # Dev environments: Docker containers with SSH, booked like GPU time. Off until an admin turns them on.
+    devenv_enabled: bool = False
+    # Docker (or Podman's Docker-compatible) API: unix:///path/to.sock or tcp://host:port
+    docker_host: str = "unix:///var/run/docker.sock"
+    # Static Dropbear (dropbearmulti) copied into each container; bundled in the Docker image.
+    dropbear_path: str = "/opt/slotserve/bin/dropbearmulti"
+    devenv_ssh_host: str = ""  # host name shown in the ssh command; empty = the address the browser uses
+    devenv_ssh_ports: str = "2200-2299"
+    devenv_cpus: float = 0.0  # 0 = no limit
+    devenv_memory_gb: float = 0.0  # 0 = no limit
+    devenv_shm_gb: float = 8.0
+    devenv_custom_images: bool = True
+    devenv_allowed_registries: str = ""  # comma separated, e.g. docker.io,nvcr.io; empty = any
+    devenv_saved_images: int = 3  # saved images per person
+    devenv_pull_minutes: int = 60  # start pulling the image this long before the booking
+
     @property
     def database_url(self) -> str:
         return f"sqlite+aiosqlite:///{(self.data_dir / 'slotserve.db').as_posix()}"

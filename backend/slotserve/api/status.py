@@ -25,6 +25,7 @@ async def config(request: Request):
         quota_upcoming=s.quota_upcoming,
         approval_mode=s.approval_mode,
         approval_hours=s.approval_hours,
+        devenv_enabled=s.devenv_enabled,
         telegram_enabled=request.app.state.telegram.enabled,
         slot_minutes=s.slot_minutes,
         max_reservation_hours=s.max_reservation_hours,

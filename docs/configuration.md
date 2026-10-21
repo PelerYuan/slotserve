@@ -63,8 +63,17 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | `SLOTSERVE_USAGE_RETENTION_DAYS` | `365` | Keep per-request rows this long, then fold them into daily totals (0 = forever; otherwise ≥ 90) |
 | `SLOTSERVE_AUDIT_RETENTION_DAYS` | `730` | Keep audit log entries this long (0 = forever) |
 | `SLOTSERVE_BACKUP_KEEP` | `7` | Daily database backups to keep (0 = no automatic backups) |
+| `SLOTSERVE_DEVENV_ENABLED` | `false` | Dev environments: book GPU time as a Docker container with SSH |
+| `SLOTSERVE_DOCKER_HOST` | `unix:///var/run/docker.sock` | Docker (or Podman) API used for dev environments |
+| `SLOTSERVE_DEVENV_SSH_HOST` | *empty* | Host name shown in ssh commands; empty = the address the browser uses |
+| `SLOTSERVE_DEVENV_SSH_PORTS` | `2200-2299` | Host ports given to dev environments |
+| `SLOTSERVE_DEVENV_CPUS` / `_MEMORY_GB` / `_SHM_GB` | `0` / `0` / `8` | Per-environment limits (0 = no limit) |
+| `SLOTSERVE_DEVENV_CUSTOM_IMAGES` | `true` | Let people create templates from any image |
+| `SLOTSERVE_DEVENV_ALLOWED_REGISTRIES` | *empty* | Comma-separated registries images may come from; empty = any |
+| `SLOTSERVE_DEVENV_SAVED_IMAGES` | `3` | Saved environment images per person |
+| `SLOTSERVE_DEVENV_PULL_MINUTES` | `60` | Download the image this long before a booking |
 
-Admins can change every setting in **Admin → System settings** without a restart, except the deployment ones (`HOST`, `PORT`, `SECRET_KEY`, `COOKIE_SECURE`, `STATIC_DIR`, `DATA_DIR`, `MODELS_DIR`, `LLAMA_SERVER_CMD`, `LLAMA_HOST`, `LLAMA_PORT`, `TELEGRAM_API_BASE`), which need a restart and therefore stay in `.env`. Overrides live in the database and win over `.env`; **Use default** removes an override.
+Admins can change every setting in **Admin → System settings** without a restart, except the deployment ones (`HOST`, `PORT`, `SECRET_KEY`, `COOKIE_SECURE`, `STATIC_DIR`, `DATA_DIR`, `MODELS_DIR`, `LLAMA_SERVER_CMD`, `LLAMA_HOST`, `LLAMA_PORT`, `TELEGRAM_API_BASE`, `DOCKER_HOST`, `DROPBEAR_PATH`), which need a restart and therefore stay in `.env`. Overrides live in the database and win over `.env`; **Use default** removes an override.
 
 ## Per-model launch arguments
 
