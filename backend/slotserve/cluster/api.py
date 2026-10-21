@@ -99,6 +99,7 @@ def _commands(server_url: str, token: str, name: str) -> tuple[str, str]:
             "-v /path/to/llama.cpp:/opt/llama.cpp:ro",
             "-v /path/to/models:/models",
             "-v slotserve-agent:/data",
+            "-v /var/run/docker.sock:/var/run/docker.sock",
             f"-e SLOTSERVE_AGENT_SERVER={shlex.quote(server_url)}",
             f"-e SLOTSERVE_AGENT_TOKEN={shlex.quote(token)}",
             f"{AGENT_IMAGE} slotserve agent",

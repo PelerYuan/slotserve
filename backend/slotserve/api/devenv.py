@@ -122,6 +122,8 @@ class SessionOut(BaseModel):
     template_name: str | None
     image: str
     lane_name: str | None
+    node_id: int | None = None  # the machine it runs on (None: the server's own)
+    node_name: str | None = None
     state: str
     detail: str | None
     progress: float | None
@@ -365,8 +367,15 @@ async def delete_template(
 # ---- sessions -----------------------------------------------------------------
 
 
+def node_name(request: Request, node_id: int | None) -> str | None:
+    """The name of the machine an environment runs on (None: the server's own)."""
+    manager = request.app.state.devenv
+    executor = manager.executor(node_id)
+    return executor.name if executor is not None else None
+
+
 async def _session_out(db: AsyncSession, request: Request, rows: list[DevSession], user: User) -> list[SessionOut]:
-    host = ssh_host(request)
+    host = ssh_host(request)  # also for environments on other machines: the server relays their SSH
     names: dict[int, str] = {}
     if any(s.kind == "shared" for s in rows):
         users = list((await db.execute(select(User).where(User.disabled_at.is_(None)))).scalars())
@@ -395,6 +404,8 @@ async def _session_out(db: AsyncSession, request: Request, rows: list[DevSession
                 template_name=template.name if template else None,
                 image=s.image,
                 lane_name=lane.name if lane else None,
+                node_id=request.app.state.devenv.node_key(s.node_id),
+                node_name=node_name(request, s.node_id),
                 state=s.state,
                 detail=s.detail,
                 progress=s.progress,

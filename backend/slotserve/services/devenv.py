@@ -16,6 +16,12 @@ the environment (see ``gateway/devenv_web.py``). A template declares the ports o
 the browser, JupyterLab, VS Code or any HTTP app) with a name and kind. SlotServe reaches a port over the
 environment's network when it runs in a container itself (it joins that network), otherwise through a random port
 bound to 127.0.0.1 (declared ports) or the container's address on its network. Web ports are never published.
+
+Environments run on the lane's machine (a CPU-only one on the machine its owner picks). Another machine's (node's)
+Docker API is reached through the relay its agent keeps open (``cluster/relay.py``), so every step below is the same
+code on every machine (``self.dk(s)`` is the session's Docker). Their SSH, direct ports and web interfaces are
+served by the control plane and relayed to the container (``devenv_relay.py``); only images that exist nowhere but
+on another machine (snapshots, saved images) are copied over (``docker save | docker load`` through the relay).
 """
 
 import asyncio
@@ -43,6 +49,7 @@ from ..orm import HOLDING_STATUSES, DevProject, DevSession, DevTemplate, Lane, R
 from ..runtime.manager import RuntimeState
 from . import storage
 from .devenv_cpu import CpuEnvs
+from .devenv_relay import RelayPorts
 from .docker_api import DockerClient, DockerError, registry_of, tar_files
 
 log = logging.getLogger(__name__)
@@ -53,6 +60,8 @@ HOUSEKEEPING_SECONDS = 3600.0
 OPEN_STATES = ("waiting", "pulling", "ready", "starting", "running", "stopping", "failed")
 GPU_STATES = ("starting", "running", "stopping")
 LABEL = "slotserve.devenv"
+NODE_LABEL = "slotserve.node"  # the machine a container or network belongs to ("local" or a node id)
+NODE_CHECK_SECONDS = 30.0
 UID_BASE = 20000  # Unix uid of a SlotServe user in shared environments: UID_BASE + user id
 MAX_AUTH_TRIES = 3
 KEY_TYPES = (
@@ -575,7 +584,7 @@ class DevEnvManager:
         self._docker_host: str | None = None
         self._wake = asyncio.Event()
         self._lock = asyncio.Lock()
-        self._pulls: dict[str, asyncio.Task] = {}
+        self._pulls: dict[tuple[int | None, str], asyncio.Task] = {}  # (machine, image) -> pull or copy
         self._saves: dict[int, asyncio.Task] = {}
         self._bundle: SshBundle | None = None
         self._models_source: str | bool | None = False  # False = not looked up yet
@@ -594,6 +603,9 @@ class DevEnvManager:
         self._web_http: httpx.AsyncClient | None = None
         self.self_container = socket.gethostname()
         self.cpu = CpuEnvs(self)  # devenv_cpu: environments without a GPU
+        self.relays = RelayPorts(self)  # SSH, direct ports and web interfaces of environments on other machines
+        self.node_status: dict[int, tuple[float, bool, str | None]] = {}  # node -> (checked at, Docker ok, error)
+        self._cleaned_nodes: dict[int, object] = {}  # node -> the agent connection its leftovers were removed for
         # [ports hook] direct ports and their forwarder containers (services/devenv_ports.py)
         from .devenv_ports import PortManager
 
@@ -610,6 +622,79 @@ class DevEnvManager:
 
     def poke(self) -> None:
         self._wake.set()
+
+    # ---- machines -----------------------------------------------------------------
+
+    def _registry(self):
+        return getattr(self.state, "nodes", None)
+
+    def node_key(self, node_id: int | None) -> int | None:
+        """``None`` for the control plane's own machine, else the node id."""
+        nodes = self._registry()
+        return None if nodes is None or node_id is None or nodes.is_local(node_id) else node_id
+
+    def remote(self, node_id: int | None) -> bool:
+        return self.node_key(node_id) is not None
+
+    def executor(self, node_id: int | None):
+        """The executor of another machine (None for this one or an unknown node)."""
+        key = self.node_key(node_id)
+        found = self._registry().find(key) if key is not None else None
+        return found if found is not None and not found.is_local else None
+
+    def docker_on(self, node_id: int | None) -> DockerClient:
+        """A machine's Docker API: this machine's, or another's through its agent."""
+        if self.node_key(node_id) is None:
+            return self.docker
+        executor = self.executor(node_id)
+        if executor is None:
+            raise DevEnvError("devenv_node_missing")
+        return executor.docker()
+
+    def dk(self, s: DevSession) -> DockerClient:
+        """The Docker API of the machine a session runs on."""
+        return self.docker_on(s.node_id)
+
+    def _online_nodes(self) -> list[int]:
+        nodes = self._registry()
+        return [e.node_id for e in nodes.all() if not e.is_local and e.online] if nodes is not None else []
+
+    async def node_ready(self, node_id: int | None) -> bool:
+        """Whether a machine's Docker can be used now (another machine: connected, Docker answering)."""
+        key = self.node_key(node_id)
+        if key is None:
+            return bool(self.status["ok"])
+        executor = self.executor(key)
+        if executor is None or not executor.online:
+            return False
+        now = asyncio.get_running_loop().time()
+        cached = self.node_status.get(key)
+        if cached is not None and now - cached[0] < NODE_CHECK_SECONDS:
+            return cached[1]
+        try:
+            await executor.docker().version()
+            ok, error = True, None
+        except (DockerError, httpx.HTTPError, OSError, ValueError) as exc:
+            ok, error = False, str(exc) or type(exc).__name__
+            log.warning("node %s: Docker is not usable: %s", executor.name, error)
+        self.node_status[key] = (now, ok, error)
+        return ok
+
+    def node_label(self, node_id: int | None) -> str:
+        key = self.node_key(node_id)
+        return "local" if key is None else str(key)
+
+    def _node_filter(self, node_id: int | None):
+        key = self.node_key(node_id)
+        if key is not None:
+            return DevSession.node_id == key
+        nodes = self._registry()
+        local_id = nodes.local.node_id if nodes is not None else None
+        return or_(DevSession.node_id.is_(None), DevSession.node_id == local_id)
+
+    async def lane_node(self, db, lane_id: int | None) -> int | None:
+        lane = await db.get(Lane, lane_id) if lane_id else None
+        return self.node_key(lane.node_id) if lane is not None else None
 
     def accounts_changed(self) -> None:
         """Someone's keys or password changed: refresh the accounts in shared environments soon."""
@@ -631,6 +716,7 @@ class DevEnvManager:
         return self._web_http
 
     async def close(self) -> None:
+        await self.relays.close()
         if self._web_http is not None:
             await self._web_http.aclose()
         for task in [*self._pulls.values(), *self._saves.values()]:
@@ -692,8 +778,12 @@ class DevEnvManager:
         self._bundle = SshBundle(binary_path.read_bytes(), key.read_bytes(), m.group(1) if m else "")
         return self._bundle
 
-    async def _models_mount(self) -> str | None:
-        """Host path of the models directory: SlotServe's own bind mount when it runs in a container."""
+    async def _models_mount(self, node_id: int | None = None) -> str | None:
+        """Host path of the models directory: SlotServe's own bind mount when it runs in a container; on another
+        machine the one its agent reports."""
+        if self.remote(node_id):
+            executor = self.executor(node_id)
+            return (executor.inventory.get("models_mount") or None) if executor is not None else None
         if self._models_source is not False:
             return self._models_source or None
         source: str | None = None
@@ -720,16 +810,25 @@ class DevEnvManager:
                     self._holding = set()
                     return
                 await self.refresh_status()
-                if not self.status["ok"]:
+                remote_nodes = self._online_nodes()
+                if not self.status["ok"] and not remote_nodes:
                     return
-                if not self._cleaned:
+                if not self._cleaned and self.status["ok"]:
                     await self._cleanup(db)
                     self._cleaned = True
+                for node_id in remote_nodes:
+                    await self._cleanup_node(db, node_id)
                 sessions = (
                     (await db.execute(select(DevSession).where(DevSession.state.in_(OPEN_STATES)))).scalars().all()
                 )
+                ready: dict[int | None, bool] = {}
                 # Shared environments first, so they leave the GPUs before a booking's container starts.
                 for s in sorted(sessions, key=lambda x: (x.kind != "shared", x.id)):
+                    key = self.node_key(s.node_id)
+                    if key not in ready:
+                        ready[key] = await self.node_ready(key)
+                    if not ready[key]:
+                        continue  # its machine is offline or has no Docker now; nothing can change there
                     try:
                         await self._advance(db, s)
                     except DevEnvError as exc:
@@ -792,6 +891,7 @@ class DevEnvManager:
                     template_id=project.template_id if project else template.id,
                     project_id=project.id if project else None,
                     lane_id=r.lane_id,
+                    node_id=await self.lane_node(db, r.lane_id),
                     image=project.image if project else template.image,
                     state="waiting",
                 )
@@ -840,7 +940,12 @@ class DevEnvManager:
             template = await db.get(DevTemplate, template_id)
             db.add(
                 DevSession(
-                    kind="shared", lane_id=lane_id, template_id=template_id, image=template.image, state="waiting"
+                    kind="shared",
+                    lane_id=lane_id,
+                    node_id=await self.lane_node(db, lane_id),
+                    template_id=template_id,
+                    image=template.image,
+                    state="waiting",
                 )
             )
         await db.commit()
@@ -865,22 +970,29 @@ class DevEnvManager:
         if s.project_id and s.state in ("waiting", "pulling", "ready"):
             await self.cpu.follow_project_image(db, s)  # devenv_cpu: the project may have been snapshotted meanwhile
         if s.state in ("waiting", "pulling"):
-            if await self.docker.image_exists(s.image):
+            if s.project_id and await self._move_project(db, s):
+                return
+            if await self.dk(s).image_exists(s.image):
                 s.state, s.detail, s.progress = "ready", None, None
+            elif (source := await self._image_source(s.image, s.node_id)) is not False:
+                # an image only another machine has (a snapshot or saved image): copy it over
+                self._ensure_copy(s.image, source, s.node_id)
+                s.state = "pulling"
+                return
             elif await self._project_image_lost(db, s):
                 return
             else:
-                self._ensure_pull(s.image)
+                self._ensure_pull(s.image, s.node_id)
                 s.state = "pulling"
                 return
         if s.state == "ready" and (r is None or r.start_at <= now) and await self._gpu_free(db, s):
             await self._start(db, s)
             return
         if s.state == "running" and s.container_id and s.id not in self._saves:
-            info = await self.docker.inspect(s.container_id)
+            info = await self.dk(s).inspect(s.container_id)
             if info is None or not info.get("State", {}).get("Running"):
                 code = (info or {}).get("State", {}).get("ExitCode")
-                tail = await self.docker.logs(s.container_id, 40) if info else ""
+                tail = await self.dk(s).logs(s.container_id, 40) if info else ""
                 reason = f"container stopped (exit code {code})" if code is not None else "container is gone"
                 await self._fail(db, s, f"{reason}\n{tail}".strip(), notify=True)
             elif s.kind == "shared":
@@ -914,12 +1026,14 @@ class DevEnvManager:
         )
         return other.first() is None
 
-    def _ensure_pull(self, image: str) -> None:
-        task = self._pulls.get(image)
+    def _ensure_pull(self, image: str, node_id: int | None = None) -> None:
+        """Pulls an image on a machine (another machine pulls it itself; the progress comes through the relay)."""
+        key = (self.node_key(node_id), image)
+        task = self._pulls.get(key)
         if task is None or task.done():
-            self._pulls[image] = asyncio.create_task(self._pull(image), name=f"pull {image}")
+            self._pulls[key] = asyncio.create_task(self._pull(image, key[0]), name=f"pull {image}")
 
-    async def _pull(self, image: str) -> None:
+    async def _pull(self, image: str, node_id: int | None = None) -> None:
         last = 0.0
 
         async def progress(pct: float | None, status: str) -> None:
@@ -928,39 +1042,137 @@ class DevEnvManager:
             if loop.time() - last < 1.0:
                 return
             last = loop.time()
-            await self._update_pulling(image, pct, status)
+            await self._update_pulling(image, node_id, pct, status)
 
         try:
-            await self.docker.pull(image, progress)
-            await self._update_pulling(image, 100.0, "done")
-        except (DockerError, httpx.HTTPError, OSError) as exc:
+            await self.docker_on(node_id).pull(image, progress)
+            await self._update_pulling(image, node_id, 100.0, "done")
+        except (DockerError, httpx.HTTPError, OSError, DevEnvError) as exc:
             message = exc.message if isinstance(exc, DockerError) else (str(exc) or type(exc).__name__)
-            async with SessionLocal() as db:
-                rows = (
-                    (
-                        await db.execute(
-                            select(DevSession).where(DevSession.image == image, DevSession.state == "pulling")
-                        )
-                    )
-                    .scalars()
-                    .all()
-                )
-                for s in rows:
-                    await self._fail(db, s, f"pulling {image} failed: {message}", notify=True)
-                await db.commit()
+            await self._fail_pulling(image, node_id, f"pulling {image} failed: {message}")
         finally:
             self.poke()
 
-    async def _update_pulling(self, image: str, pct: float | None, status: str) -> None:
+    async def _image_source(self, image: str, node_id: int | None) -> int | bool | None:
+        """Another machine that has an image only SlotServe made (``slotserve/...``: snapshots, saved images);
+        ``False`` when none has it (or the image comes from a registry and is pulled)."""
+        if not image.startswith("slotserve/"):
+            return False
+        target = self.node_key(node_id)
+        for key in [None, *self._online_nodes()]:
+            if key == target or not await self.node_ready(key):
+                continue
+            with contextlib.suppress(DockerError, httpx.HTTPError, OSError, DevEnvError):
+                if await self.docker_on(key).image_exists(image):
+                    return key
+        return False
+
+    def _ensure_copy(self, image: str, source: int | None, node_id: int | None) -> None:
+        key = (self.node_key(node_id), image)
+        task = self._pulls.get(key)
+        if task is None or task.done():
+            self._pulls[key] = asyncio.create_task(self._copy(image, source, key[0]), name=f"copy {image}")
+
+    async def _copy(self, image: str, source: int | None, node_id: int | None) -> None:
+        """Copies an image from one machine to another (``docker save | docker load``, through the relay)."""
+        last = 0.0
+        executor = self.executor(source)
+        origin = executor.name if executor is not None else "server"
+
+        async def progress(copied: int) -> None:
+            nonlocal last
+            loop = asyncio.get_running_loop()
+            if loop.time() - last < 1.0:
+                return
+            last = loop.time()
+            await self._update_pulling(image, node_id, None, f"copying from {origin}: {copied // 2**20} MiB")
+
+        try:
+            await self.docker_on(source).copy_image_to(image, self.docker_on(node_id), progress)
+            await self._update_pulling(image, node_id, 100.0, "done")
+        except (DockerError, httpx.HTTPError, OSError, DevEnvError) as exc:
+            message = exc.message if isinstance(exc, DockerError) else (str(exc) or type(exc).__name__)
+            await self._fail_pulling(image, node_id, f"copying {image} from {origin} failed: {message}")
+        finally:
+            self.poke()
+
+    async def _fail_pulling(self, image: str, node_id: int | None, message: str) -> None:
         async with SessionLocal() as db:
             rows = (
-                (await db.execute(select(DevSession).where(DevSession.image == image, DevSession.state == "pulling")))
+                (
+                    await db.execute(
+                        select(DevSession).where(
+                            DevSession.image == image, DevSession.state == "pulling", self._node_filter(node_id)
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for s in rows:
+                await self._fail(db, s, message, notify=True)
+            await db.commit()
+
+    async def _update_pulling(self, image: str, node_id: int | None, pct: float | None, status: str) -> None:
+        async with SessionLocal() as db:
+            rows = (
+                (
+                    await db.execute(
+                        select(DevSession).where(
+                            DevSession.image == image, DevSession.state == "pulling", self._node_filter(node_id)
+                        )
+                    )
+                )
                 .scalars()
                 .all()
             )
             for s in rows:
                 s.progress, s.detail = pct, status[:200]
             await db.commit()
+
+    async def _move_project(self, db, s: DevSession) -> bool:
+        """A kept environment whose container lives on another machine than this booking's: it is snapshotted there
+        (what was installed is kept) and the snapshot follows the session to its machine. Returns True while the
+        session has to wait (the other machine is offline)."""
+        project = await db.get(DevProject, s.project_id)
+        if project is None or not project.container_id:
+            return False
+        source = self.node_key(project.container_node_id)
+        if source == self.node_key(s.node_id):
+            return False
+        if not await self.node_ready(source):
+            s.detail = "devenv_project_node_offline"
+            return True
+        docker = self.docker_on(source)
+        info = await docker.inspect(project.container_id)
+        if info is None:
+            project.state, project.container_id, project.container_node_id = "missing", None, None
+            return False
+        s.detail = "snapshot"
+        await db.commit()
+        if info.get("State", {}).get("Running"):
+            with contextlib.suppress(DockerError):
+                await docker.stop(project.container_id, timeout=10)
+        ref = f"slotserve/project-{project.id}:{utcnow().strftime('%Y%m%d%H%M%S')}"
+        await docker.commit(project.container_id, ref, comment=f"SlotServe project {project.name}")
+        await docker.remove(project.container_id)
+        await self._drop_network(project_network_name(project.id), source)
+        old = project.image
+        project.image, project.container_id, project.container_port = ref, None, None
+        project.container_web, project.container_node_id = None, None
+        s.image, s.detail = ref, None
+        if old != ref and old.startswith(f"slotserve/project-{project.id}:"):
+            await self._remove_image_everywhere(old)
+        await db.commit()
+        return False
+
+    async def _remove_image_everywhere(self, image: str) -> None:
+        """Removes an image SlotServe made from every machine that can be reached now."""
+        for key in [None, *self._online_nodes()]:
+            if key is None and not self.status["ok"]:
+                continue
+            with contextlib.suppress(DockerError, httpx.HTTPError, OSError, DevEnvError):
+                await self.docker_on(key).remove_image(image)
 
     # ---- starting -----------------------------------------------------------------
 
@@ -995,8 +1207,8 @@ class DevEnvManager:
         files, digest = await self._account_files(db)
         if self._accounts_digest.get(s.id) == digest:
             return
-        await self.docker.put_archive(s.container_id, "/", tar_files(files))
-        code, output = await self.docker.exec(s.container_id, ["/bin/sh", "/opt/slotserve/accounts.sh"])
+        await self.dk(s).put_archive(s.container_id, "/", tar_files(files))
+        code, output = await self.dk(s).exec(s.container_id, ["/bin/sh", "/opt/slotserve/accounts.sh"])
         if code != 0:
             log.warning("dev environment %s: refreshing accounts failed (%s): %s", s.id, code, output.strip()[-500:])
             s.error = f"refreshing accounts failed:\n{output.strip()[-2000:]}"
@@ -1005,11 +1217,19 @@ class DevEnvManager:
         self._accounts_digest[s.id] = digest
 
     def _volume(
-        self, plan_binds: list, mounts: list, volume: str, rel: str, target: str, read_only: bool = False
+        self,
+        plan_binds: list,
+        mounts: list,
+        volume: str,
+        rel: str,
+        target: str,
+        read_only: bool = False,
+        node_id: int | None = None,
     ) -> None:
-        """A persistent directory: a bind mount under the storage directory, or a Docker named volume."""
+        """A persistent directory: a bind mount under the storage directory, or a Docker named volume (always on
+        another machine: the storage directory is the control plane's)."""
         storage = self.settings.devenv_storage_dir.rstrip("/")
-        if storage:
+        if storage and not self.remote(node_id):
             plan_binds.append((rel, target))
             mounts.append({"Type": "bind", "Source": f"{storage}/{rel}", "Target": target, "ReadOnly": read_only})
         else:
@@ -1038,7 +1258,8 @@ class DevEnvManager:
         mounts: list[dict] = []
         digest = None
         # storage hook: storages from Admin -> Storage (personal /workspace, project data, shared data, libraries)
-        sp = await storage.plan_for(db, self.settings.secret_key, user, shared=s.kind == "shared")
+        node = self.node_key(s.node_id)
+        sp = await storage.plan_for(db, self.settings.secret_key, user, shared=s.kind == "shared", node_id=node)
         if s.kind == "shared":
             account_files, digest = await self._account_files(db)
             files.update(account_files)
@@ -1049,7 +1270,9 @@ class DevEnvManager:
             start = START_SCRIPT.format(cd="")
             files["opt/slotserve/ssh.sh"] = (ssh.encode(), 0o755)
             files["opt/slotserve/start.sh"] = (start.encode(), 0o755)
-            self._volume(binds, mounts, f"slotserve-idle-home-l{s.lane_id}", f"lanes/l{s.lane_id}/home", "/home")
+            self._volume(
+                binds, mounts, f"slotserve-idle-home-l{s.lane_id}", f"lanes/l{s.lane_id}/home", "/home", node_id=node
+            )
             name = f"slotserve-idle-{s.lane_id}"
             hostname = f"{re.sub(r'[^a-z0-9-]', '-', (lane.name if lane else 'lane').lower())[:40]}-idle"
             env = {"SLOTSERVE_SHARED": "1"}
@@ -1063,7 +1286,9 @@ class DevEnvManager:
             if sp.personal is not None:  # storage hook
                 mounts.append(sp.sub(sp.personal, f"users/u{uid}", "/workspace", seed="/workspace"))
             else:
-                self._volume(binds, mounts, f"slotserve-workspace-u{uid}", f"users/u{uid}/workspace", "/workspace")
+                self._volume(
+                    binds, mounts, f"slotserve-workspace-u{uid}", f"users/u{uid}/workspace", "/workspace", node_id=node
+                )
             for path in self._project_paths(s, project, template):
                 slug = _slug(path)
                 if project is not None:
@@ -1071,13 +1296,14 @@ class DevEnvManager:
                         mounts.append(sp.sub(sp.projects, f"projects/p{project.id}/{slug}", path, seed=path))
                         continue
                     volume, rel = f"slotserve-project{project.id}-{slug}", f"projects/p{project.id}/{slug}"
-                    self._volume(binds, mounts, volume, rel, path)
+                    self._volume(binds, mounts, volume, rel, path, node_id=node)
                 else:
                     tid = template.id if template else 0
                     if sp.projects is not None:  # storage hook
                         mounts.append(sp.sub(sp.projects, f"templates/u{uid}-t{tid}/{slug}", path, seed=path))
                         continue
-                    self._volume(binds, mounts, f"slotserve-u{uid}-t{tid}-{slug}", f"users/u{uid}/t{tid}/{slug}", path)
+                    volume, rel = f"slotserve-u{uid}-t{tid}-{slug}", f"users/u{uid}/t{tid}/{slug}"
+                    self._volume(binds, mounts, volume, rel, path, node_id=node)
             name = f"slotserve-proj-{project.id}" if project is not None else f"slotserve-dev-{s.id}"
             hostname = f"{(user.username if user else 'dev')[:40]}-dev"
             env = {"SLOTSERVE_USER": user.username if user else "", "SLOTSERVE_END": r.end_at.isoformat() if r else ""}
@@ -1089,6 +1315,7 @@ class DevEnvManager:
         else:
             network = network_name(s.id)
             network_labels = {LABEL: "1", "slotserve.session": str(s.id)}
+        network_labels[NODE_LABEL] = self.node_label(node)
         web = self._web_spec(s, template)
         values = placeholder_values(s.id, web["ports"], web["token"])
         if web["ports"]:
@@ -1113,7 +1340,7 @@ class DevEnvManager:
             device_request["DeviceIDs"] = [str(d) for d in devices]
         else:
             device_request["Count"] = -1
-        if models := await self._models_mount():
+        if models := await self._models_mount(node):
             mounts.append({"Type": "bind", "Source": models, "Target": "/models", "ReadOnly": True})
         host_config: dict = {
             "DeviceRequests": [device_request],
@@ -1128,15 +1355,20 @@ class DevEnvManager:
         exposed: dict = {"22/tcp": {}}
         for p in web["ports"]:
             exposed[f"{p['port']}/tcp"] = {}
-            if not self.in_container:
-                # only SlotServe (on this host) reaches it; Docker picks a free port
+            if not self.in_container or node is not None:
+                # only SlotServe (on this host, or the agent on another machine) reaches it; Docker picks a port
                 host_config["PortBindings"][f"{p['port']}/tcp"] = [{"HostIp": "127.0.0.1", "HostPort": ""}]
         if self.settings.devenv_cpus > 0:
             host_config["NanoCpus"] = int(self.settings.devenv_cpus * 1e9)
         if self.settings.devenv_memory_gb > 0:
             host_config["Memory"] = int(self.settings.devenv_memory_gb * 1024**3)
         await self.cpu.apply_resources(db, s, lane, host_config, env)  # devenv_cpu: cpuset, CPU-only limits
-        labels = {LABEL: "1", "slotserve.session": str(s.id), "slotserve.kind": s.kind or "booking"}
+        labels = {
+            LABEL: "1",
+            "slotserve.session": str(s.id),
+            "slotserve.kind": s.kind or "booking",
+            NODE_LABEL: self.node_label(node),
+        }
         if user is not None:
             labels["slotserve.user"] = user.username
         if project is not None:
@@ -1175,25 +1407,26 @@ class DevEnvManager:
             p["strip"] = not knows_base
         return {"token": secrets.token_urlsafe(24), "ports": ports, "base_session": s.id}
 
-    async def _ensure_network(self, plan: Plan, fresh: bool) -> None:
+    async def _ensure_network(self, plan: Plan, fresh: bool, node_id: int | None = None) -> None:
         """Creates a container's network (``fresh``: drops a leftover one first; a kept environment's stays)."""
         if fresh:
-            await self._drop_network(plan.network)
+            await self._drop_network(plan.network, node_id)
         try:
-            await self.docker.network_create(plan.network, plan.network_labels)
+            await self.docker_on(node_id).network_create(plan.network, plan.network_labels)
         except DockerError as exc:
             if exc.status != 409 and "already exists" not in exc.message:
                 raise
 
-    async def _drop_network(self, name: str) -> None:
-        with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
-            if self.in_container:
-                await self.docker.network_disconnect(name, self.self_container)
-            await self.docker.network_remove(name)
+    async def _drop_network(self, name: str, node_id: int | None = None) -> None:
+        with contextlib.suppress(DockerError, httpx.HTTPError, OSError, DevEnvError):
+            docker = self.docker_on(node_id)
+            if self.in_container and not self.remote(node_id):
+                await docker.network_disconnect(name, self.self_container)
+            await docker.network_remove(name)
 
-    async def _leave_network(self, name: str) -> None:
+    async def _leave_network(self, name: str, node_id: int | None = None) -> None:
         """SlotServe no longer needs to reach a (paused) container: it leaves the network, which stays."""
-        if self.in_container:
+        if self.in_container and not self.remote(node_id):
             with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
                 await self.docker.network_disconnect(name, self.self_container)
 
@@ -1202,17 +1435,21 @@ class DevEnvManager:
         ``spec`` is what the container was created with (token, ports, base_session)."""
         if plan.keep_entrypoint:
             # the image runs its own init system; add the SSH server (and the logins) next to it
-            await self.docker.exec_detached(cid, ["/bin/sh", "/opt/slotserve/ssh.sh"])
+            await self.dk(s).exec_detached(cid, ["/bin/sh", "/opt/slotserve/ssh.sh"])
         web = {**spec, "network": plan.network, "container": None, "ip": None, "published": {}}
-        await self._reach(cid, name, web)
+        await self._reach(cid, name, web, s.node_id)
         s.web = json.dumps(web)
 
-    async def _reach(self, cid: str, name: str, web: dict) -> None:
+    async def _reach(self, cid: str, name: str, web: dict, node_id: int | None = None) -> None:
         """Records how SlotServe reaches the container's ports: in a container itself it joins the environment's
         network (any port is then reachable by name); on the host, declared ports were bound to 127.0.0.1 and
-        the others are tried on the container's address in its network."""
+        the others are tried on the container's address in its network. On another machine every port is reached
+        through the relay (``devenv_relay.py``)."""
         web["container"] = name
         network = web["network"]
+        if self.remote(node_id):
+            web["node"] = self.node_key(node_id)
+            return
         if self.in_container:
             await self.docker.network_connect(network, self.self_container)
             return
@@ -1230,7 +1467,7 @@ class DevEnvManager:
         """The upstream base URL (``http://host:port``) for one of a running session's container ports, or None.
         The single place the proxy resolves addresses (tests replace it)."""
         web = session_web(s)
-        if s.state != "running" or not web or not 1 <= port <= 65535:
+        if s.state != "running" or not web or not 1 <= port <= 65535 or web.get("node") or self.remote(s.node_id):
             return None
         if published := (web.get("published") or {}).get(str(port)):
             return f"http://{published}"
@@ -1239,6 +1476,12 @@ class DevEnvManager:
         if web.get("ip"):
             return f"http://{web['ip']}:{port}"
         return None
+
+    async def port_upstream(self, s: DevSession, port: int) -> str | None:
+        """Like ``port_target``; a session on another machine is reached through a relay on a loopback port."""
+        if self.remote(s.node_id):
+            return await self.relays.web_upstream(s, port)
+        return self.port_target(s, port)
 
     async def _used_ports(self, db, s: DevSession) -> tuple[set[int], set[int]]:
         """Ports of running containers, and ports that paused kept environments would like back."""
@@ -1269,7 +1512,7 @@ class DevEnvManager:
         short-lived helper container from the environment's image does the work.
         """
         storage = self.settings.devenv_storage_dir.rstrip("/")
-        if not storage or not plan.binds:
+        if not storage or not plan.binds or self.remote(s.node_id):
             return
         lines = ["set -e"]
         for rel, target in plan.binds:
@@ -1280,7 +1523,10 @@ class DevEnvManager:
             )
         await self._helper(f"slotserve-prep-{s.id}", s.image, storage, "\n".join(lines))
 
-    async def _helper(self, name: str, image: str, storage: str, script: str) -> None:
+    async def _helper(
+        self, name: str, image: str, storage: str, script: str, docker: DockerClient | None = None
+    ) -> None:
+        docker = docker or self.docker
         config = {
             "Image": image,
             "Entrypoint": ["/bin/sh", "-c", script],
@@ -1289,17 +1535,17 @@ class DevEnvManager:
             "Labels": {LABEL: "helper"},
             "HostConfig": {"Binds": [f"{storage}:/slotserve-storage"]},
         }
-        await self.docker.remove(name)
-        cid = await self.docker.create(name, config)
+        await docker.remove(name)
+        cid = await docker.create(name, config)
         try:
-            await self.docker.start(cid)
-            code = await self.docker.wait(cid)
+            await docker.start(cid)
+            code = await docker.wait(cid)
             if code != 0:
-                tail = await self.docker.logs(cid, 20)
+                tail = await docker.logs(cid, 20)
                 raise DevEnvError("devenv_storage_failed", detail=f"exit code {code}: {tail.strip()[-500:]}")
         finally:
             with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
-                await self.docker.remove(cid)
+                await docker.remove(cid)
 
     async def _start(self, db, s: DevSession) -> None:
         used, kept = await self._used_ports(db, s)
@@ -1309,10 +1555,12 @@ class DevEnvManager:
         project = await db.get(DevProject, s.project_id) if s.project_id else None
         if project is not None and await self._resume(db, s, project, plan, used):
             return
+        docker = self.dk(s)
+        remote = self.remote(s.node_id)
         await self._prepare_storage(s, plan)
         if plan.storage is not None:  # storage hook: volumes and folders of managed storages
             try:
-                await storage.prepare(self.docker, s.image, plan.storage, f"slotserve-prep-{s.id}")
+                await storage.prepare(docker, s.image, plan.storage, f"slotserve-prep-{s.id}")
             except storage.StorageError as exc:
                 raise DevEnvError(exc.code, **exc.params) from exc
         lo, hi = parse_port_range(self.settings.devenv_ssh_ports)
@@ -1322,24 +1570,38 @@ class DevEnvManager:
             raise DevEnvError("devenv_no_ports")
         archive = tar_files(plan.files)
         # a kept environment's network outlives its containers; any other container gets a new one
-        await self._ensure_network(plan, fresh=project is None)
+        await self._ensure_network(plan, fresh=project is None, node_id=s.node_id)
         last_error = ""
         for port in candidates[:5]:
-            plan.config["HostConfig"]["PortBindings"]["22/tcp"] = [{"HostIp": "0.0.0.0", "HostPort": str(port)}]
-            await self.docker.remove(plan.name)
-            cid = await self.docker.create(plan.name, plan.config)
+            if remote:
+                # the control plane listens on the SSH port and relays to the container's port 22 on its machine,
+                # where Docker publishes it on the loopback interface only
+                try:
+                    await self.relays.open_ssh(s, port, plan.name, plan.network)
+                except OSError as exc:
+                    last_error = f"port {port}: {exc}"
+                    continue  # something else on the server holds this port
+                binding = [{"HostIp": "127.0.0.1", "HostPort": ""}]
+            else:
+                binding = [{"HostIp": "0.0.0.0", "HostPort": str(port)}]
+            plan.config["HostConfig"]["PortBindings"]["22/tcp"] = binding
+            await docker.remove(plan.name)
+            cid = await docker.create(plan.name, plan.config)
             try:
-                await self.docker.put_archive(cid, "/", archive)
-                await self.docker.start(cid)
+                await docker.put_archive(cid, "/", archive)
+                await docker.start(cid)
             except DockerError as exc:
-                await self.docker.remove(cid)
+                await docker.remove(cid)
                 last_error = exc.message
-                if _port_taken(exc):
+                if remote:
+                    await self.relays.close_ssh(s.id)
+                elif _port_taken(exc):
                     continue  # something else on the host holds this port
                 raise
             if project is not None:
                 lane = await db.get(Lane, s.lane_id) if s.lane_id else None
                 project.container_id, project.container_port = cid, port
+                project.container_node_id = self.node_key(s.node_id)
                 project.container_devices = self._devices_key(s, lane)
                 project.container_paths = project.persist_paths or ""
                 project.container_web = json.dumps(plan.web)
@@ -1373,10 +1635,12 @@ class DevEnvManager:
 
         Returns True when the old container runs again; False when a new one has to be created.
         """
-        info = await self.docker.inspect(project.container_id) if project.container_id else None
+        docker = self.dk(s)
+        remote = self.remote(s.node_id)
+        info = await docker.inspect(project.container_id) if project.container_id else None
         if info is None:
             if project.container_id:
-                project.state, project.container_id = "missing", None
+                project.state, project.container_id, project.container_node_id = "missing", None, None
             return False
         lane = await db.get(Lane, s.lane_id) if s.lane_id else None
         devices = self._devices_key(s, lane)
@@ -1386,20 +1650,25 @@ class DevEnvManager:
             # storage hook: the managed storage mounts are the same
             and (project.container_storage or "") == (plan.storage.signature if plan.storage else "")
             and project.container_port is not None
-            and project.container_port not in used
+            # on another machine the SSH port is the control plane's listener, not baked into the container
+            and (remote or project.container_port not in used)
         )
+        if same and remote:
+            project.container_port = await self._relay_ssh_port(s, plan, project.container_port, used)
         if same:
             if info.get("State", {}).get("Running"):
                 with contextlib.suppress(DockerError):
-                    await self.docker.stop(project.container_id, timeout=10)
+                    await docker.stop(project.container_id, timeout=10)
             # the container's network stays while the project exists, but it may have been removed by hand
-            await self._ensure_network(plan, fresh=False)
-            await self.cpu.refresh_limits(project.container_id, plan.config["HostConfig"])  # devenv_cpu
+            await self._ensure_network(plan, fresh=False, node_id=s.node_id)
+            await self.cpu.refresh_limits(project.container_id, plan.config["HostConfig"], s.node_id)  # devenv_cpu
             try:
-                await self.docker.put_archive(project.container_id, "/", tar_files(plan.files))
-                await self.docker.start(project.container_id)
+                await docker.put_archive(project.container_id, "/", tar_files(plan.files))
+                await docker.start(project.container_id)
             except DockerError as exc:
-                if not _port_taken(exc):
+                if remote:
+                    await self.relays.close_ssh(s.id)
+                if remote or not _port_taken(exc):
                     raise
             else:
                 project.state, project.last_used_at = "running", utcnow()
@@ -1419,49 +1688,67 @@ class DevEnvManager:
         s.detail = "snapshot"
         await db.commit()
         ref = f"slotserve/project-{project.id}:{utcnow().strftime('%Y%m%d%H%M%S')}"
-        await self.docker.commit(project.container_id, ref, comment=f"SlotServe project {project.name}")
-        await self.docker.remove(project.container_id)
+        await docker.commit(project.container_id, ref, comment=f"SlotServe project {project.name}")
+        await docker.remove(project.container_id)
         old = project.image
         project.image, project.container_id, project.container_port = ref, None, None
-        project.container_web = None
+        project.container_web, project.container_node_id = None, None
         s.image, s.detail = ref, None
         plan.config["Image"] = ref
         if old != ref and old.startswith(f"slotserve/project-{project.id}:"):
             with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
-                await self.docker.remove_image(old)
+                await docker.remove_image(old)
         await db.commit()
         return False
+
+    async def _relay_ssh_port(self, s: DevSession, plan: Plan, preferred: int, used: set[int]) -> int:
+        """The control plane's SSH port of a resumed environment on another machine: its own if it can be
+        listened on, else another free one of the range."""
+        lo, hi = parse_port_range(self.settings.devenv_ssh_ports)
+        for port in [preferred, *(p for p in range(lo, hi + 1) if p != preferred)]:
+            if port in used:
+                continue
+            try:
+                await self.relays.open_ssh(s, port, plan.name, plan.network)
+            except OSError:
+                continue
+            return port
+        raise DevEnvError("devenv_no_ports")
 
     # ---- stopping -----------------------------------------------------------------
 
     async def _pause(self, db, project: DevProject, container_id: str) -> None:
         """Stops a kept environment's container; it keeps its network until the project is deleted."""
-        with contextlib.suppress(DockerError):
-            await self.docker.stop(container_id, timeout=10)
-        await self._leave_network(project_network_name(project.id))
+        node = project.container_node_id
+        with contextlib.suppress(DockerError, httpx.HTTPError, OSError, DevEnvError):
+            await self.docker_on(node).stop(container_id, timeout=10)
+        await self._leave_network(project_network_name(project.id), node)
         project.state, project.last_used_at = "paused", utcnow()
-        with contextlib.suppress(DockerError, httpx.HTTPError, OSError, ValueError, TypeError):
-            info = await self.docker.inspect(container_id, size=True)
+        with contextlib.suppress(DockerError, httpx.HTTPError, OSError, ValueError, TypeError, DevEnvError):
+            info = await self.docker_on(node).inspect(container_id, size=True)
             if info and info.get("SizeRw") is not None:
                 project.size_bytes = int(info["SizeRw"])
 
     async def _discard(self, db, s: DevSession, stop_first: bool) -> None:
-        """Ends a session's container: a kept environment's is paused, any other removed with its network."""
+        """Ends a session's container: a kept environment's is paused, any other removed with its network.
+        (On a machine that is offline now, what is left there is cleaned up when it reconnects.)"""
         project = await db.get(DevProject, s.project_id) if s.project_id else None
         await self.ports.drop_forwarders(s)  # [ports hook] before the network goes or the container pauses
+        await self.relays.drop(s)  # SSH and ports of an environment on another machine
         if s.container_id:
             if project is not None and project.container_id == s.container_id:
                 await self._pause(db, project, s.container_id)  # keep what is installed in it
             else:
-                if stop_first:
-                    with contextlib.suppress(DockerError):
-                        await self.docker.stop(s.container_id, timeout=10)
-                with contextlib.suppress(DockerError):
-                    await self.docker.remove(s.container_id)
+                unreachable = (httpx.HTTPError, OSError, DevEnvError) if self.remote(s.node_id) else ()
+                with contextlib.suppress(DockerError, *unreachable):
+                    if stop_first:
+                        with contextlib.suppress(DockerError):
+                            await self.dk(s).stop(s.container_id, timeout=10)
+                    await self.dk(s).remove(s.container_id)
         elif project is not None and project.state == "running":
             project.state = "paused"
         if project is None:
-            await self._drop_network(network_name(s.id))
+            await self._drop_network(network_name(s.id), s.node_id)
         s.web = None
 
     async def _stop(self, db, s: DevSession, state: str) -> None:
@@ -1484,18 +1771,41 @@ class DevEnvManager:
                 "devenv_failed", user_id=s.user_id, reservation_id=s.reservation_id, error=message.splitlines()[0][:300]
             )
 
-    async def _cleanup(self, db) -> None:
-        """After a restart: keep containers whose session is still running (and their networks), pause kept ones,
-        remove the rest and leftover networks."""
-        await self.ports.remove_all()  # [ports hook] the next tick starts the forwarders that are still wanted
-        running = {
-            s.container_id: s
-            for s in (await db.execute(select(DevSession).where(DevSession.state == "running"))).scalars()
-            if s.container_id
-        }
+    async def _cleanup_node(self, db, node_id: int) -> None:
+        """Leftovers on another machine are removed once per connection of its agent (it may have been away while
+        environments there ended)."""
+        executor = self.executor(node_id)
+        if executor is None or self._cleaned_nodes.get(node_id) == executor.connected_since:
+            return
+        if not await self.node_ready(node_id):
+            return
+        try:
+            await self._cleanup(db, node_id)
+        except (DockerError, httpx.HTTPError, OSError) as exc:
+            log.warning("cleaning up dev environments on node %s failed: %s", executor.name, exc)
+            return
+        self._cleaned_nodes[node_id] = executor.connected_since
+
+    async def _cleanup(self, db, node_id: int | None = None) -> None:
+        """After a restart (or a machine's reconnect): keep containers whose session is still running (and their
+        networks), pause kept ones, remove the rest and leftover networks. Only containers of that machine are
+        touched (their ``slotserve.node`` label; older ones without it belong to the control plane's machine)."""
+        key = self.node_key(node_id)
+        docker = self.docker_on(key)
+        mine = self.node_label(key)
+
+        def ours(labels: dict) -> bool:
+            return (labels.get(NODE_LABEL) or "local") == mine
+
+        if key is None:
+            await self.ports.remove_all()  # [ports hook] the next tick starts the forwarders that are still wanted
+        rows = await db.execute(select(DevSession).where(DevSession.state == "running", self._node_filter(key)))
+        running = {s.container_id: s for s in rows.scalars() if s.container_id}
         reach: set[str] = set()  # networks of running containers: SlotServe joins them again
-        for c in await self.docker.list(f"{LABEL}=1"):
+        for c in await docker.list(f"{LABEL}=1"):
             labels = c.get("Labels") or {}
+            if not ours(labels):
+                continue
             if c["Id"] in running and c.get("State") == "running":
                 s = running[c["Id"]]
                 reach.add(project_network_name(s.project_id) if s.project_id else network_name(s.id))
@@ -1506,22 +1816,24 @@ class DevEnvManager:
                 if c.get("State") == "running":
                     await self._pause(db, project, c["Id"])
                 continue
-            await self.docker.remove(c["Id"])
+            await docker.remove(c["Id"])
         projects = set((await db.execute(select(DevProject.id))).scalars())
-        for n in await self.docker.networks(f"{LABEL}=1"):
+        for n in await docker.networks(f"{LABEL}=1"):
             name = n.get("Name") or n["Id"]
             labels = n.get("Labels") or {}
+            if not ours(labels):
+                continue
             project_id = labels.get("slotserve.project")
             if name in reach:
-                if self.in_container:
+                if self.in_container and key is None:
                     # SlotServe may have been recreated: join the network again to reach the web interface
                     with contextlib.suppress(DockerError):
                         await self.docker.network_connect(name, self.self_container)
                 continue
             if project_id and project_id.isdigit() and int(project_id) in projects:
-                await self._leave_network(name)  # a paused kept environment's: stays with it
+                await self._leave_network(name, key)  # a paused kept environment's: stays with it
                 continue
-            await self._drop_network(name)
+            await self._drop_network(name, key)
         await db.commit()
 
     async def _housekeeping(self, db) -> None:
@@ -1533,8 +1845,10 @@ class DevEnvManager:
         days = self.settings.devenv_project_days
         projects = (await db.execute(select(DevProject).where(DevProject.state != "running"))).scalars().all()
         for p in projects:
-            if p.container_id and await self.docker.inspect(p.container_id) is None:
-                p.state, p.container_id = "missing", None
+            if p.container_id and await self.node_ready(p.container_node_id):
+                with contextlib.suppress(DockerError, httpx.HTTPError, OSError, DevEnvError):
+                    if await self.docker_on(p.container_node_id).inspect(p.container_id) is None:
+                        p.state, p.container_id, p.container_node_id = "missing", None, None
             last = p.last_used_at or p.created_at
             if days and last < now - timedelta(days=days):
                 booked = await db.execute(
@@ -1591,7 +1905,7 @@ class DevEnvManager:
             slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:30] or "env"
             ref = f"slotserve/u{owner_id}-{slug}:{utcnow().strftime('%Y%m%d%H%M%S')}"
             try:
-                await self.docker.commit(s.container_id, ref, comment=f"saved in SlotServe from {s.image}")
+                await self.dk(s).commit(s.container_id, ref, comment=f"saved in SlotServe from {s.image}")
                 db.add(
                     DevTemplate(
                         name=name,
@@ -1608,7 +1922,7 @@ class DevEnvManager:
                     )
                 )
                 s.detail = None
-            except (DockerError, httpx.HTTPError, OSError) as exc:
+            except (DockerError, httpx.HTTPError, OSError, DevEnvError) as exc:
                 s.detail = None
                 s.error = f"saving failed: {exc.message if isinstance(exc, DockerError) else exc}"
                 log.warning("saving dev environment %s failed: %s", session_id, exc)
@@ -1626,8 +1940,7 @@ class DevEnvManager:
             ).scalar_one()
             if in_use:
                 raise DevEnvError("devenv_template_in_use")
-            with contextlib.suppress(DockerError, OSError):
-                await self.docker.remove_image(template.image)
+            await self._remove_image_everywhere(template.image)  # it may have been copied to other machines
         template.deleted_at = utcnow()
 
     async def delete_project(self, db, project: DevProject, data: bool) -> None:
@@ -1639,9 +1952,10 @@ class DevEnvManager:
         )
         if busy.first() is not None:
             raise DevEnvError("devenv_project_in_use")
+        node = project.container_node_id
         if project.container_id:
-            with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
-                await self.docker.remove(project.container_id)
+            with contextlib.suppress(DockerError, httpx.HTTPError, OSError, DevEnvError):
+                await self.docker_on(node).remove(project.container_id)
         if data:
             storage_dir = self.settings.devenv_storage_dir.rstrip("/")
             # storage hook: the project storage of Admin -> Storage keeps the data under projects/p<id>
@@ -1667,19 +1981,18 @@ class DevEnvManager:
                 await self._helper(f"slotserve-clean-p{project.id}", image, storage_dir, script)
             else:
                 for path in {*load_paths(project.persist_paths), *load_paths(project.container_paths)}:
-                    with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
-                        await self.docker.remove_volume(f"slotserve-project{project.id}-{_slug(path)}")
+                    with contextlib.suppress(DockerError, httpx.HTTPError, OSError, DevEnvError):
+                        await self.docker_on(node).remove_volume(f"slotserve-project{project.id}-{_slug(path)}")
         await self.ports.release_project(db, project)  # [ports hook] its fixed host ports go back to the pool
-        await self._drop_network(project_network_name(project.id))
+        await self._drop_network(project_network_name(project.id), node)
         if project.image.startswith(f"slotserve/project-{project.id}:"):
-            with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
-                await self.docker.remove_image(project.image)
+            await self._remove_image_everywhere(project.image)
         await db.delete(project)
 
     async def logs(self, s: DevSession, tail: int = 300) -> str:
         if not s.container_id:
             return s.error or ""
-        return await self.docker.logs(s.container_id, tail)
+        return await self.dk(s).logs(s.container_id, tail)
 
 
 def _json(value: str | None) -> dict | None:

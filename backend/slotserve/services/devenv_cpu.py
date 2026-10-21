@@ -18,6 +18,10 @@ booking ends it is paused as usual, or - when its owner asked for it - continues
 Usage: running CPU-only environments are read through Docker's stats API every few seconds (live CPU and memory for
 the web page) and written once a minute as ``UsageSample`` rows of resource "cpu", kind "cpu_devenv".
 
+Machines: a CPU-only environment runs on the machine its owner picks (the control plane's by default). Each
+machine has its own layout: its cores (from its Docker, or its agent's report) minus what that machine's lanes
+reserve. Another machine's Docker (stats included) is reached through the relay.
+
 ``DevEnvManager`` calls into this module from a few marked places (``self.cpu``).
 """
 
@@ -149,8 +153,9 @@ class CpuEnvs:
     def __init__(self, manager):
         self.m = manager
         self.settings = manager.settings
-        self.host: dict | None = None  # {"cpus": n, "memory": bytes}
+        self.host: dict | None = None  # this machine's {"cpus": n, "memory": bytes}
         self._host_at: float | None = None
+        self._hosts: dict[int, tuple[float, dict | None]] = {}  # other machines: node -> (read at, host)
         self.live: dict[int, Live] = {}  # session id -> last reading
         self._pending: dict[int, Pending] = {}
         self._since = utcnow()
@@ -162,8 +167,30 @@ class CpuEnvs:
 
     # ---- host and CPU placement ------------------------------------------------------
 
-    async def host_info(self, force: bool = False) -> dict | None:
+    async def host_info(self, force: bool = False, node_id: int | None = None) -> dict | None:
+        """Cores and memory of a machine: this one's from Docker; another's from its Docker (through the relay),
+        else what its agent reported."""
+        key = self.m.node_key(node_id)
         loop = asyncio.get_running_loop()
+        if key is not None:
+            cached = self._hosts.get(key)
+            if not force and cached is not None and loop.time() - cached[0] < HOST_INFO_SECONDS:
+                return cached[1]
+            host = None
+            executor = self.m.executor(key)
+            if executor is not None and executor.online:
+                try:
+                    info = await executor.docker().info()
+                    cpus, memory = int(info.get("NCPU") or 0), int(info.get("MemTotal") or 0)
+                    host = {"cpus": cpus, "memory": memory} if cpus > 0 else None
+                except Exception as exc:  # noqa: BLE001 - best effort, the agent's report is next
+                    log.debug("docker info of node %s failed: %s", key, exc)
+            if host is None and executor is not None:
+                cpus = int(executor.info.get("cpu_cores") or 0)
+                memory = int(executor.info.get("memory_total_mb") or 0) * 2**20
+                host = {"cpus": cpus, "memory": memory} if cpus > 0 else None
+            self._hosts[key] = (loop.time(), host)
+            return host
         if not force and self._host_at is not None and loop.time() - self._host_at < HOST_INFO_SECONDS:
             return self.host
         self._host_at = loop.time()
@@ -176,21 +203,28 @@ class CpuEnvs:
             self.host = None
         return self.host
 
-    async def layout(self, db) -> CoreLayout | None:
-        host = await self.host_info()
+    async def layout(self, db, node_id: int | None = None) -> CoreLayout | None:
+        """A machine's cores: what each of its lanes reserves, and the pool for CPU-only environments."""
+        key = self.m.node_key(node_id)
+        host = await self.host_info() if key is None else await self.host_info(node_id=key)
         if host is None:
             return None
-        from ..cluster import inventory
-
-        local_id = await inventory.local_node_id(db)
-        lanes = [  # lanes of other machines (node agents) do not use this host's cores
+        lanes = [  # only the lanes of that machine use its cores
             lane
             for lane in (await db.execute(select(Lane).order_by(Lane.position, Lane.id))).scalars()
-            if lane.node_id is None or lane.node_id == local_id
+            if self.m.node_key(lane.node_id) == key
         ]
         return layout_cores(
             host["cpus"], [(lane.id, lane_gpu_count(lane)) for lane in lanes], self.settings.devenv_cpu_cores_per_gpu
         )
+
+    def host_of(self, node_id: int | None) -> dict | None:
+        """The last known cores and memory of a machine (no lookup)."""
+        key = self.m.node_key(node_id)
+        if key is None:
+            return self.host
+        cached = self._hosts.get(key)
+        return cached[1] if cached is not None else None
 
     def core_limit(self, layout: CoreLayout | None) -> float | None:
         """Cores one CPU-only environment may use at most (None: no limit known)."""
@@ -201,8 +235,8 @@ class CpuEnvs:
         return float(pool) if pool else None
 
     async def apply_resources(self, db, s: DevSession, lane: Lane | None, host_config: dict, env: dict) -> None:
-        """Called from ``DevEnvManager._plan``: CPU placement and limits of a new container."""
-        layout = await self.layout(db)
+        """Called from ``DevEnvManager._plan``: CPU placement and limits of a new container (on its machine)."""
+        layout = await self.layout(db, s.node_id)
         if s.kind != KIND:
             # a lane's containers (bookings, its shared idle environment) get the lane's reserved cores
             cores = layout.lanes.get(lane.id) if layout is not None and lane is not None else None
@@ -223,10 +257,10 @@ class CpuEnvs:
             host_config["Memory"] = int(self.settings.devenv_cpu_memory_gb * 1024**3)
         host_config["CpuShares"] = POOL_SHARES
 
-    async def refresh_limits(self, container_id: str, host_config: dict) -> None:
+    async def refresh_limits(self, container_id: str, host_config: dict, node_id: int | None = None) -> None:
         """Called before a kept container starts again: brings its CPU placement and limits up to date."""
         body: dict = {}
-        host = self.host
+        host = self.host_of(node_id)
         cpuset = host_config.get("CpusetCpus") or (f"0-{host['cpus'] - 1}" if host else None)
         if cpuset:
             body["CpusetCpus"] = cpuset
@@ -240,7 +274,7 @@ class CpuEnvs:
         if not body:
             return
         try:
-            await self.m.docker.update(container_id, body)
+            await self.m.docker_on(node_id).update(container_id, body)
         except (DockerError, httpx.HTTPError, OSError) as exc:
             log.warning("could not update the CPU limits of container %s: %s", container_id[:12], exc)
 
@@ -295,11 +329,22 @@ class CpuEnvs:
         return (await db.execute(stmt.limit(1))).first() is not None
 
     async def start(
-        self, db, user: User, template: DevTemplate | None = None, project: DevProject | None = None
+        self,
+        db,
+        user: User,
+        template: DevTemplate | None = None,
+        project: DevProject | None = None,
+        node_id: int | None = None,
     ) -> DevSession:
-        """Starts a CPU-only environment from a template, or continues a kept environment without a GPU."""
+        """Starts a CPU-only environment from a template, or continues a kept environment without a GPU, on a
+        machine (``node_id``; by default a kept environment's own machine, else the control plane's)."""
         from .devenv import DevEnvError
 
+        if node_id is None and project is not None:
+            node_id = project.container_node_id if project.container_id else None
+        node = self.m.node_key(node_id)
+        if node is not None and self.m.executor(node) is None:
+            raise DevEnvError("devenv_node_missing")
         await self.check_room(db, user.id)
         has_key = (await db.execute(select(SshKey.id).where(SshKey.user_id == user.id).limit(1))).first()
         password = self.settings.devenv_password_login and user.devenv_password_hash
@@ -320,6 +365,7 @@ class CpuEnvs:
             user_id=user.id,
             template_id=template_id,
             project_id=project.id if project else None,
+            node_id=node,
             image=image,
             state="waiting",
         )
@@ -394,6 +440,7 @@ class CpuEnvs:
                 user_id=user.id,
                 template_id=project.template_id,
                 project_id=project.id,
+                node_id=self.m.node_key(s.node_id),  # stays on the machine of the booking
                 image=project.image,
                 state="waiting",
             )
@@ -432,21 +479,33 @@ class CpuEnvs:
         async with SessionLocal() as db:
             rows = (
                 await db.execute(
-                    select(DevSession.id, DevSession.container_id, DevSession.user_id, DevSession.started_at).where(
+                    select(
+                        DevSession.id,
+                        DevSession.container_id,
+                        DevSession.user_id,
+                        DevSession.started_at,
+                        DevSession.node_id,
+                    ).where(
                         DevSession.kind == KIND, DevSession.state == "running", DevSession.container_id.is_not(None)
                     )
                 )
             ).all()
-            layout = await self.layout(db) if rows else None
+            layouts: dict[int | None, CoreLayout | None] = {}
+            for node in {self.m.node_key(r[4]) for r in rows}:
+                if node is None or self._online(node):
+                    layouts[node] = await self.layout(db, node)
         running = {r[0] for r in rows}
         for sid in [k for k in self.live if k not in running]:
             del self.live[sid]
         loop = asyncio.get_running_loop()
-        cores_limit = self.core_limit(layout)
-        for sid, cid, user_id, started_at in rows:
+        for sid, cid, user_id, started_at, node_id in rows:
+            node = self.m.node_key(node_id)
+            if node not in layouts:
+                continue  # its machine is offline: no readings (nothing is counted for that time)
+            cores_limit = self.core_limit(layouts[node])
             try:
-                st = await self.m.docker.stats(cid)
-            except (DockerError, httpx.HTTPError, OSError, ValueError) as exc:
+                st = await self.m.docker_on(node).stats(cid)
+            except Exception as exc:  # noqa: BLE001 - Docker or the relay; the next reading tries again
                 log.debug("stats of %s failed: %s", cid, exc)
                 continue
             if not st:
@@ -470,6 +529,10 @@ class CpuEnvs:
             acc.peak = max(acc.peak, memory)
             acc.limit = memory_limit
             acc.cores_limit = cores_limit or (float(online) if online else None)
+
+    def _online(self, node: int) -> bool:
+        executor = self.m.executor(node)
+        return executor is not None and executor.online
 
     async def write_usage(self, db, minute: datetime, seconds: int) -> int:
         """Called by the usage sampler once a minute: one "cpu" row per CPU-only environment that ran."""

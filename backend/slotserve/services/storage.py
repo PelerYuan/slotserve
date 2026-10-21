@@ -122,6 +122,16 @@ def user_ids(st: Storage) -> list[int]:
     return [int(i) for i in load_json(st.user_ids, []) if isinstance(i, int)]
 
 
+def node_ids(st: Storage) -> list[int]:
+    return [int(i) for i in load_json(st.node_ids, []) if isinstance(i, int)]
+
+
+def reachable(st: Storage, node_id: int | None) -> bool:
+    """Whether a container on a machine can use a storage: NFS/SMB volumes are mounted by that machine's Docker;
+    a host directory exists on the control plane's machine (``node_id`` None) and the machines listed with it."""
+    return node_id is None or st.kind != "host" or node_id in node_ids(st)
+
+
 def allows(st: Storage, user: User | None) -> bool:
     """Whether a person may use a storage (disabled accounts never)."""
     if user is None or user.disabled_at is not None or not st.enabled:
@@ -328,10 +338,13 @@ async def enabled_storages(db) -> list[Storage]:
     return list((await db.execute(select(Storage).where(Storage.enabled.is_(True)).order_by(Storage.id))).scalars())
 
 
-async def plan_for(db, secret_key: str, user: User | None, shared: bool = False) -> StoragePlan:
+async def plan_for(
+    db, secret_key: str, user: User | None, shared: bool = False, node_id: int | None = None
+) -> StoragePlan:
     """The storages a container gets: a person's own environment those the person may use; a shared idle
-    environment only those open to everyone, plus every person's folder of the personal storage."""
-    rows = await enabled_storages(db)
+    environment only those open to everyone, plus every person's folder of the personal storage. On another
+    machine (``node_id``) only the storages it can reach (see ``reachable``)."""
+    rows = [st for st in await enabled_storages(db) if reachable(st, node_id)]
     plan = StoragePlan(secret_key)
     if shared:
         usable = [st for st in rows if st.access == "everyone"]

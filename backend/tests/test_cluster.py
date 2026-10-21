@@ -416,11 +416,6 @@ async def test_models_are_per_node(app, make_client, start_agent, models_dir):
     assert r.status_code == 409 and r.json()["detail"]["code"] == "lane_gpus_overlap"
     r = await admin.post("/api/admin/lanes", json={"name": "C", "gpus": [1], "node_id": node_id})
     assert r.status_code == 201
-    # Dev environments do not run on other machines yet.
-    r = await admin.post(
-        "/api/reservations", json={**booking, "devenv_template_id": 1, "lane_id": lane["id"], "model_id": None}
-    )
-    assert r.status_code == 400 and r.json()["detail"]["code"] == "devenv_remote_lane"
 
     # The same file on shared storage (same path everywhere) is one model, available on both machines.
     shared = make_gguf(agent.settings.models_dir, "shared.gguf")
@@ -518,8 +513,8 @@ async def test_reconnect_reconciles_running_servers(app, make_client, start_agen
     status = await _until(lambda: _lane_ready(admin, "B"), what="lane ready again")
     assert status["runtime"]["model_name"] == "remote"
     assert agent.runtimes[lane["id"]].pid == pid  # the running server was kept, not restarted
-    await _until(lambda: _is(lane_c["id"] not in agent.runtimes), what="orphan stopped")
-    assert orphan.state.value == "stopped"
+    await _until(lambda: _is(lane_c["id"] not in agent.runtimes), what="orphan removed")
+    await _until(lambda: _is(orphan.state.value == "stopped"), what="orphan stopped")  # shutdown takes a moment
 
 
 async def _lane_ready(admin, name: str):

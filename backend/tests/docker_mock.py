@@ -25,6 +25,7 @@ class FakeDocker:
         self.wait_code: int | None = None  # exit code reported for helper containers (default: their own)
         self.removed_volumes: list[str] = []
         self.commits: list[tuple[str, str]] = []
+        self.loads: list[tuple[str, int]] = []  # (image, bytes) of every docker load
         self.created: list[tuple[str, dict]] = []  # (name, config) of every container ever created
         # Storage (services/storage.py): named volumes, what helper containers print, mounts that fail
         self.volumes: dict[str, dict] = {}  # name -> {Name, Driver, Options, Labels}
@@ -98,6 +99,22 @@ class FakeDocker:
                 yield json.dumps({"status": f"Status: Downloaded newer image for {full}"}) + "\n"
 
             return StreamingResponse(events(), media_type="application/json")
+
+        @self.app.get("/v1.41/images/{name:path}/get")
+        async def image_save(name: str):
+            # ``docker save``: a stand-in archive naming the image, large enough to need several chunks
+            if unquote(name) not in self.images:
+                return JSONResponse({"message": f"No such image: {unquote(name)}"}, status_code=404)
+            payload = b"IMAGE:" + unquote(name).encode() + b"\n" + b"\0" * 300_000
+            return Response(content=payload, media_type="application/x-tar")
+
+        @self.app.post("/v1.41/images/load")
+        async def image_load(request: Request):
+            body = await request.body()
+            name = body.split(b"\n", 1)[0].removeprefix(b"IMAGE:").decode()
+            self.images.add(name)
+            self.loads.append((name, len(body)))
+            return {"stream": f"Loaded image: {name}\n"}
 
         @self.app.delete("/v1.41/images/{name:path}")
         async def remove_image(name: str):

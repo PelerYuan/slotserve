@@ -429,6 +429,8 @@ class DevProject(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     # devenv_cpu: when a booking of it ends, keep it running without a GPU instead of pausing it
     cpu_after_booking: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False)
+    # The machine the container lives on (NULL = the control plane's own); a booking on another machine moves it.
+    container_node_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class DevSession(Base):
@@ -449,6 +451,9 @@ class DevSession(Base):
         ForeignKey("devenv_templates.id", ondelete="SET NULL"), nullable=True
     )
     lane_id: Mapped[int | None] = mapped_column(ForeignKey("lanes.id", ondelete="SET NULL"), nullable=True)
+    # The machine (node) the container runs on: the lane's, or the one chosen for a CPU-only environment.
+    # NULL = the control plane's own machine. Other machines are driven through the relay (cluster/relay.py).
+    node_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     image: Mapped[str] = mapped_column(String(255))
     # waiting | pulling | ready | starting | running | stopping | stopped | failed
     state: Mapped[str] = mapped_column(String(16), default="waiting")
@@ -601,6 +606,9 @@ class Storage(Base):
     user_ids: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list (access "users")
     local_path: Mapped[str | None] = mapped_column(Text, nullable=True)  # models: where SlotServe sees it
     quota_gb: Mapped[float | None] = mapped_column(Float, nullable=True)  # personal: soft limit per person
+    # host: other machines (node ids, JSON list) where the same directory exists (e.g. the same NFS mount), so their
+    # dev environments can use it too; a host directory is otherwise the control plane's machine only.
+    node_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     status: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON: the last check
     usage: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON {user id: bytes} (personal)

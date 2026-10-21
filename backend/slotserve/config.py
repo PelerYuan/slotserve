@@ -158,6 +158,9 @@ class Settings(BaseSettings):
     devenv_public_ports: str = "2300-2399"  # host ports for them; keep it apart from devenv_ssh_ports
     devenv_public_port_limit: int = 5  # direct ports per person (admins: no limit); 0 = only admins
     devenv_forwarder_image: str = "alpine/socat:1.8.1.1"  # any image with socat on its PATH
+    # Environments on other machines (nodes): the control plane itself listens on their SSH and direct ports (from
+    # the two ranges above) and relays the connections through the node's agent. This is the address it listens on.
+    devenv_relay_host: str = "0.0.0.0"
     # Web interfaces behind the SlotServe login are served on their own port, so the browser keeps them apart from
     # SlotServe itself (a separate origin). 0 = serve them on SlotServe's own port (not recommended).
     devenv_web_port: int = 8001

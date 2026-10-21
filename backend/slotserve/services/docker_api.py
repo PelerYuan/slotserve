@@ -145,6 +145,41 @@ class DockerClient:
                     pct = 100.0 * sum(c for c, _ in layers.values()) / total if total else None
                     await progress(pct, event.get("status", ""))
 
+    async def copy_image_to(
+        self, ref: str, other: "DockerClient", progress: Callable[[int], Awaitable[None]] | None = None
+    ) -> None:
+        """Streams an image from this Docker to another one (``docker save | docker load``), e.g. a snapshot that
+        only exists on one machine; ``progress`` gets the bytes copied so far."""
+        copied = 0
+
+        async def chunks():
+            nonlocal copied
+            async with self._http.stream("GET", f"/images/{quote(ref, safe='')}/get", timeout=None) as resp:
+                if resp.status_code != 200:
+                    body = (await resp.aread()).decode(errors="replace")
+                    raise DockerError(resp.status_code, body.strip() or f"HTTP {resp.status_code}")
+                async for chunk in resp.aiter_bytes():
+                    copied += len(chunk)
+                    if progress is not None:
+                        await progress(copied)
+                    yield chunk
+
+        resp = await other._request(
+            "POST",
+            "/images/load",
+            params={"quiet": "1"},
+            content=chunks(),
+            headers={"Content-Type": "application/x-tar"},
+            timeout=None,
+        )
+        for line in resp.text.splitlines():
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(event, dict) and event.get("error"):
+                raise DockerError(500, str(event["error"]))
+
     async def remove_image(self, ref: str) -> None:
         await self._request("DELETE", f"/images/{quote(ref, safe='')}", ok=(200, 404))
 

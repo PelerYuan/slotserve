@@ -19,13 +19,13 @@ services:
     environment:
       SLOTSERVE_AGENT_SERVER: ${SLOTSERVE_AGENT_SERVER:?Set SLOTSERVE_AGENT_SERVER in .env}
       SLOTSERVE_AGENT_TOKEN: ${SLOTSERVE_AGENT_TOKEN:?Set SLOTSERVE_AGENT_TOKEN in .env}
-      # Optional: the address the server should use to reach this machine (default: where it connects from).
+      # Optional: the address shown for this machine in Admin > Nodes (default: where it connects from).
       SLOTSERVE_AGENT_ADDRESS: ${SLOTSERVE_AGENT_ADDRESS:-}
       SLOTSERVE_DATA_DIR: /data
       SLOTSERVE_MODELS_DIR: /models
       SLOTSERVE_LLAMA_SERVER_CMD: /opt/llama.cpp/llama-server
-    # The server forwards model requests to this machine's model servers (SLOTSERVE_LLAMA_PORT + lane id - 1),
-    # so they must be reachable on the machine's address. Without host networking, publish those ports instead.
+    # Nothing connects to this machine: the agent relays model requests, SSH and ports through its own outgoing
+    # connections to the server. Host networking lets it reach the model servers and containers' ports on loopback.
     network_mode: host
     volumes:
       - ${LLAMA_CPP_DIR:?Set LLAMA_CPP_DIR in .env}:/opt/llama.cpp:ro
@@ -33,6 +33,8 @@ services:
       - ${MODELS_DIR:?Set MODELS_DIR in .env}:/models
       # Model server logs.
       - ${DATA_DIR:-./data}:/data
+      # Dev environments on this machine: the server drives its Docker through the agent.
+      - /var/run/docker.sock:/var/run/docker.sock
     # Remove this block on machines without NVIDIA GPUs.
     deploy:
       resources:

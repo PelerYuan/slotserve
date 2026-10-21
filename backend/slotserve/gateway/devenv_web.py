@@ -3,7 +3,8 @@ WebSocket).
 
 Any port of a running environment can be opened; the ports a template declares carry a kind (desktop, JupyterLab,
 VS Code, http) that decides whether the app gets the full path and which token is added. Upstream addresses come
-from ``DevEnvManager.port_target(session, port)`` only.
+from ``DevEnvManager.port_upstream(session, port)`` only (an environment on another machine: a loopback port of the
+control plane relayed to the container through that machine's agent).
 
 These routes are served by the web listener on its own port (``devenv_web_port``, see ``devenv_web_auth.py`` and
 ``devenv_web_app.py``), so pages in environments are a different origin than SlotServe; there people are recognized
@@ -142,7 +143,7 @@ async def _target(app, uid: int | None, session_id: int, port: int) -> Target:
     async with SessionLocal() as db:
         s = await _session_for(db, session_id, uid)
     web = session_web(s)
-    base = app.state.devenv.port_target(s, port) if s.state == "running" else None
+    base = await app.state.devenv.port_upstream(s, port) if s.state == "running" else None
     if not base:
         raise Denied(503, "devenv_web_unavailable")
     entry = port_entry(web, port)

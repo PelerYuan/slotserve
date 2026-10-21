@@ -89,8 +89,6 @@ async def create_core(app, db: AsyncSession, user: User, body: ReservationCreate
     await booking.check_model_on_lane(db, model, lane)
     if (body.devenv_template_id is not None or body.devenv_project_id is not None) and model is not None:
         raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_with_model")
-    if body.devenv_template_id is not None or body.devenv_project_id is not None:
-        await booking.check_devenv_lane(db, lane)
     if body.devenv_project_id is not None:
         project = await booking.resolve_project(db, settings, owner, body.devenv_project_id, None, None)
         template = await db.get(DevTemplate, project.template_id) if project.template_id else None
@@ -191,8 +189,6 @@ async def update_reservation_core(
             devenv_id, project_id = (template.id if template else None), None
     if model_id is not None:
         devenv_id = project_id = None  # running a model and a dev environment are different kinds of booking
-    if devenv_id is not None or project_id is not None:
-        await booking.check_devenv_lane(db, await db.get(Lane, lane_id) if lane_id is not None else None)
     # Changing a not-yet-started booking is judged like a new one in approval mode.
     review = phase != "active" and r.user_id == user.id and booking.needs_approval(settings, user, [(start, end)])
     newly_pending = review and r.status != "pending"

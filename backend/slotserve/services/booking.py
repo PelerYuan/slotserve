@@ -76,16 +76,6 @@ async def check_model_on_lane(db: AsyncSession, model: LlmModel | None, lane: La
         raise ApiError(status.HTTP_400_BAD_REQUEST, "model_not_on_node")
 
 
-async def check_devenv_lane(db: AsyncSession, lane: Lane | None) -> None:
-    """Dev environments run on the server's own machine only (not yet on other nodes)."""
-    if lane is None or lane.node_id is None:
-        return
-    from ..cluster import inventory
-
-    if lane.node_id != await inventory.local_node_id(db):
-        raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_remote_lane")
-
-
 async def resolve_lane(db: AsyncSession, lane_id: int | None) -> Lane:
     """The lane a booking goes to (``None``: the first lane)."""
     if lane_id is None:

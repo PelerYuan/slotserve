@@ -99,8 +99,6 @@ async def _validate(
             raise ApiError(status.HTTP_400_BAD_REQUEST, "model_not_ready")
         if not await inventory.model_on_node(db, model.id, node_id, manager.nodes.local.node_id):
             raise ApiError(status.HTTP_400_BAD_REQUEST, "model_not_on_node")
-    if body.idle_mode == "devenv" and node_id is not None:
-        raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_remote_lane")
     if body.idle_mode == "devenv":
         # The shared environment is built from a template offered to everyone (a built-in or shared one).
         template = await db.get(DevTemplate, body.idle_template_id) if body.idle_template_id else None

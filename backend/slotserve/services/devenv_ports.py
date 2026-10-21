@@ -13,6 +13,9 @@ tick of the dev environment loop) starts the missing ones and removes the rest.
 Host ports are fixed: a kept environment's direct port belongs to its project (the number stays while it is paused
 and comes back when it resumes) until the project is deleted; any other environment's belongs to its session and is
 released when the booking ends. Admins can reclaim any of them.
+
+Environments on other machines need no forwarder: the control plane itself listens on the host port and relays
+connections through the machine's agent (``devenv_relay.py``).
 """
 
 import asyncio
@@ -175,6 +178,8 @@ class PortManager:
 
     async def drop_forwarders(self, s: DevSession) -> None:
         """An environment stops, pauses or restarts: its forwarders go (its host ports stay assigned)."""
+        if self.m.remote(s.node_id):
+            return  # served by relay listeners (DevEnvManager.relays)
         with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
             for c in await self._forwarders():
                 if (c.get("Labels") or {}).get("slotserve.env") == env_key(s):
@@ -192,6 +197,7 @@ class PortManager:
         """Releases a port now (its forwarder too)."""
         with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
             await self.docker.remove(forwarder_name(row))
+        await self.m.relays.close_port(row.id)
         self.active.discard(row.id)
         await db.delete(row)
 
@@ -199,6 +205,7 @@ class PortManager:
         """The port stays listed but loses its host port (and forwarder)."""
         with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
             await self.docker.remove(forwarder_name(row))
+        await self.m.relays.close_port(row.id)
         self.active.discard(row.id)
         row.host_port, row.active_at, row.error = None, None, None
 
@@ -259,23 +266,36 @@ class PortManager:
                 await db.delete(row)  # the booking is over; nothing runs on it any more
         running = (await db.execute(select(DevSession).where(DevSession.state == "running"))).scalars().all()
         wanted: dict[str, tuple[DevPort, DevSession, str]] = {}
+        remote: list[DevSession] = []
+        remote_rows: dict[int, list[DevPort]] = {}
         for s in running:
             if not s.container_name:
                 continue
             rows = await self._declare(db, s, await self.rows(db, s))
+            if self.m.remote(s.node_id):
+                remote.append(s)
+                remote_rows[s.id] = rows
+                continue
             network = _session_web(s).get("network") or ""
             for row in rows:
                 if row.mode == "direct" and row.host_port and network and self.settings.devenv_public_ports_enabled:
                     spec = f"{s.container_name}:{row.container_port}>{row.host_port}@{network}"
                     wanted[forwarder_name(row)] = (row, s, spec)
+        # environments on other machines: SSH and direct ports are listeners here, relayed to the machine
+        before = set(self.m.relays.direct)
+        relayed = await self.m.relays.reconcile(db, remote, remote_rows)
         await db.commit()
+        if not wanted and not self.m.status["ok"]:
+            self.active = relayed
+            return
         try:
             existing = await self._forwarders()
         except (DockerError, httpx.HTTPError, OSError) as exc:
             log.warning("listing port forwarders failed: %s", exc)
+            self.active = (self.active - before) | relayed
             return
         have: set[str] = set()
-        active: set[int] = set()
+        active: set[int] = set(relayed)
         for c in existing:
             labels = c.get("Labels") or {}
             name = labels.get("slotserve.name", "")
@@ -402,12 +422,14 @@ class PortManager:
         if cached is not None and cached[0] > loop.time():
             return cached[1]
         result: dict[int, str] | None
+        from .devenv import DevEnvError
+
         try:
-            _code, out = await self.docker.exec(
+            _code, out = await self.m.dk(s).exec(
                 s.container_id, ["/bin/sh", "-c", "cat /proc/net/tcp /proc/net/tcp6 2>/dev/null"], timeout=10
             )
             result = parse_listening(out) if out.strip() else None
-        except (DockerError, httpx.HTTPError, OSError, ValueError):
+        except (DockerError, httpx.HTTPError, OSError, ValueError, DevEnvError):
             result = None
         self._probes[s.id] = (loop.time() + PROBE_SECONDS, result)
         if len(self._probes) > 200:
