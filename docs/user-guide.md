@@ -25,7 +25,7 @@ Open **Schedule** and drag across the calendar, or press **New booking**. Choose
 - **Edit** an upcoming booking to move it or change its model, preset or note.
 - **Extend** a running booking by 30 minutes, 1 hour or 2 hours, if the time after it is free. You can also shorten it with **Edit**.
 - **Repeat weekly** creates the same slot for several weeks. Either every week fits, or nothing is booked and the dialog says which week clashes. Cancelling one booking of a series asks whether to cancel only that one or the rest of the series as well.
-- Admins can edit or cancel anyone's booking and **book for someone else**. The person is notified on Telegram.
+- Admins can edit or cancel anyone's booking and **book for someone else**. The person is notified on the chat platforms they linked.
 
 ### Waitlist
 
@@ -85,7 +85,7 @@ SlotServe records every GPU once a minute: utilization, memory, power and who he
 ## Settings
 
 - **Appearance**: language and light, dark or system theme. The same choices are in the menu under your name, and the sign-in page has a light/dark button.
-- **Telegram**: link your account and choose which notifications you get. See [Notifications & integrations](integrations.md).
+- **Chat notifications**: link Telegram, Feishu / Lark, DingTalk, WeCom or QQ and choose which notifications you get. See [Notifications & integrations](integrations.md).
 - **Calendar subscription**: private links that show bookings in your calendar app.
 
 ![Usage](assets/screenshots/usage.png)
@@ -106,7 +106,8 @@ The first account is the admin. Admins see an **Admin** entry in the sidebar.
 | Requests | Every API request with person, key, model, status, duration and tokens; filter to errors |
 | Overview → Backups | Daily database copies; back up now and download |
 | API keys | Every active key with its owner and last use; revoke any key |
-| System settings | Every operational setting: registration, booking limits and quotas, approval, preloading and timeouts, engine commands, downloads, Telegram, retention and backups |
+| Chat channels | Whether each chat bot is connected and how many people linked it, the WeCom callback URL, group webhook tests and announcements |
+| System settings | Every operational setting: registration, booking limits and quotas, approval, preloading and timeouts, engine commands, downloads, chat platforms and group webhooks, retention and backups |
 | Audit log | Who did what and when, for every admin action |
 
 Rules that protect the system:

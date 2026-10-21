@@ -2,9 +2,11 @@ import asyncio
 import socket
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 import pytest
+from chat_mocks import FakeDingTalk, FakeFeishu, FakeFeishuHook, FakeQQ, FakeWebhooks, FakeWeCom
 from docker_mock import FakeDocker
 from tg_mock import FakeTelegram
 
@@ -44,12 +46,25 @@ async def app(tmp_path, monkeypatch):
     application = create_app()
     application.state.fake_telegram = FakeTelegram()
     application.state.telegram_transport = httpx.ASGITransport(app=application.state.fake_telegram.app)
+    fakes = SimpleNamespace(
+        feishu=FakeFeishu(), dingtalk=FakeDingTalk(), wecom=FakeWeCom(), qq=FakeQQ(), feishu_hook=FakeFeishuHook()
+    )
+    application.state.fake_chat = fakes
+    application.state.chat_transports = {
+        "feishu": httpx.ASGITransport(app=fakes.feishu.app),
+        "dingtalk": httpx.ASGITransport(app=fakes.dingtalk.app),
+        "wecom": httpx.ASGITransport(app=fakes.wecom.app),
+        "qq": httpx.ASGITransport(app=fakes.qq.app),
+        "webhooks": httpx.ASGITransport(app=FakeWebhooks(fakes.feishu_hook, fakes.dingtalk, fakes.wecom)),
+    }
     application.state.fake_docker = FakeDocker()
     application.state.docker_client = DockerClient(
         "unix:///fake/docker.sock", transport=httpx.ASGITransport(app=application.state.fake_docker.app)
     )
     async with application.router.lifespan_context(application):
         yield application
+    for fake in (fakes.feishu, fakes.dingtalk, fakes.qq):
+        await fake.close()
     get_settings.cache_clear()
 
 

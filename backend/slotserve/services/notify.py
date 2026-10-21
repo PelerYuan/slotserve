@@ -1,4 +1,5 @@
-"""Turns events into per-person messages and sends them through the Telegram bot."""
+"""Turns events into per-person messages and sends them to every chat channel a person linked,
+and selected events to group webhooks."""
 
 import asyncio
 import json
@@ -52,6 +53,15 @@ EVENT_PREF = {
 }
 
 ADMIN_EVENTS = {"load_failed", "user_registered", "disk_low"}
+# Events that can also go to group webhooks, by the kind admins switch on (setting group_events).
+GROUP_KIND = {
+    "load_failed": "admin_alerts",
+    "user_registered": "admin_alerts",
+    "disk_low": "admin_alerts",
+    "fallback_admin": "admin_alerts",
+    "approval_requested": "approvals",
+    "announcement": "announcements",
+}
 RETRY_SECONDS = (30, 120, 600, 1800, 7200)  # then the message is dropped
 
 MESSAGES: dict[str, dict[str, str]] = {
@@ -89,6 +99,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "reason": " Reason: {note}",
         "approve": "Approve",
         "reject": "Reject",
+        "announcement": "📢 {text}",
+        "review_on_web": " Review it in SlotServe.",
     },
     "zh-CN": {
         "reminder_start": "⏰ 你的预约将在 {start} 开始：{what}。",
@@ -123,6 +135,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "reason": "理由：{note}",
         "approve": "通过",
         "reject": "拒绝",
+        "announcement": "📢 {text}",
+        "review_on_web": "请到 SlotServe 审批。",
     },
 }
 
@@ -146,14 +160,29 @@ def prefs(user: User) -> dict[str, bool]:
     return {k: bool(stored.get(k, v)) for k, v in PREF_DEFAULTS.items()}
 
 
+def channels_off(user: User) -> set[str]:
+    """Chat channels the person switched notifications off for."""
+    try:
+        return {str(c) for c in json.loads(user.channels_off or "[]")}
+    except (ValueError, TypeError):
+        return set()
+
+
+class _Locale:
+    """Stands in for a recipient when only the language matters (group chats)."""
+
+    def __init__(self, locale: str):
+        self.locale = locale
+
+
 class Notifier:
     """Queue of events; ``emit`` never blocks, a worker formats and delivers them."""
 
     def __init__(self, settings: Settings):
         self.settings = settings
         self.queue: asyncio.Queue[tuple[str, dict]] = asyncio.Queue(maxsize=1000)
-        self.bot = None  # set by the app when the Telegram bot exists
-        self.sent: list[tuple[int, str]] = []  # (chat_id, text) - kept for tests and debugging
+        self.hub = None  # chat.hub.ChannelHub, set by the app
+        self.sent: list[tuple[str, str]] = []  # ("channel:address", text) - kept for tests and debugging
 
     def emit(self, event: str, **data: Any) -> None:
         try:
@@ -218,7 +247,11 @@ class Notifier:
                     await db.execute(select(User).where(User.is_admin.is_(True), User.disabled_at.is_(None)))
                 ).scalars()
                 for admin in admins:
-                    await self._deliver(admin, event, text(admin, event, **_clean(data)))
+                    await self._deliver(db, admin, event, text(admin, event, **_clean(data)))
+                await self._to_groups(event, lambda who: text(who, event, **_clean(data)))
+                return
+            if event == "announcement":
+                await self._to_groups(event, lambda who: text(who, "announcement", text=data.get("text", "")))
                 return
             if event == "fallback":
                 await self._fallback(db, data)
@@ -254,64 +287,110 @@ class Notifier:
                             (text(user, "release"), f"rel:{r.id}"),
                         ]
                     ]
-            await self._deliver(user, event, text(user, event, **params), buttons)
+            await self._deliver(db, user, event, text(user, event, **params), buttons)
 
     async def _approval_requested(self, db, data: dict) -> None:
         r = await db.get(Reservation, data["reservation_id"])
         owner = await db.get(User, data["owner_id"])
         if r is None or r.status != "pending":
             return
-        admins = (await db.execute(select(User).where(User.is_admin.is_(True), User.disabled_at.is_(None)))).scalars()
-        for admin in admins:
-            count = int(data.get("count") or 1)
-            message = text(
-                admin,
+        count = int(data.get("count") or 1)
+
+        async def message(who) -> str:
+            return text(
+                who,
                 "approval_requested",
                 user=owner.username if owner else "?",
                 when=self.fmt_window(r),
-                what=await self.describe(db, r, admin),
-                series=text(admin, "series_suffix", count=count) if count > 1 else "",
+                what=await self.describe(db, r, who),
+                series=text(who, "series_suffix", count=count) if count > 1 else "",
             )
+
+        admins = (await db.execute(select(User).where(User.is_admin.is_(True), User.disabled_at.is_(None)))).scalars()
+        for admin in admins:
             buttons = [[(text(admin, "approve"), f"apr:{r.id}"), (text(admin, "reject"), f"rej:{r.id}")]]
-            await self._deliver(admin, "approval_requested", message, buttons)
+            await self._deliver(db, admin, "approval_requested", await message(admin), buttons)
+        group = _Locale(self.settings.chat_default_locale)
+        if self._group_targets("approval_requested"):
+            body = await message(group) + text(group, "review_on_web")
+            await self._to_groups("approval_requested", lambda who: body)
 
     async def _fallback(self, db, data: dict) -> None:
         owner = await db.get(User, data["user_id"])
         params = {"model": data.get("model"), "default": data.get("default"), "user": owner.username if owner else "?"}
         if owner is not None:
-            await self._deliver(owner, "fallback", text(owner, "fallback", **params))
+            await self._deliver(db, owner, "fallback", text(owner, "fallback", **params))
         admins = (await db.execute(select(User).where(User.is_admin.is_(True), User.disabled_at.is_(None)))).scalars()
         for admin in admins:
             if owner is None or admin.id != owner.id:
-                await self._deliver(admin, "fallback_admin", text(admin, "fallback_admin", **params))
+                await self._deliver(db, admin, "fallback_admin", text(admin, "fallback_admin", **params))
+        await self._to_groups("fallback_admin", lambda who: text(who, "fallback_admin", **params))
 
-    async def _deliver(self, user: User, event: str, message: str, buttons=None) -> None:
-        if user.telegram_chat_id is None or user.disabled_at is not None:
+    async def _deliver(self, db, user: User, event: str, message: str, buttons=None) -> None:
+        """Sends to every chat channel the person linked and did not switch off."""
+        if user.disabled_at is not None or self.hub is None:
             return
         if not prefs(user).get(EVENT_PREF.get(event, "admin_alerts"), True):
             return
-        self.sent.append((user.telegram_chat_id, message))
-        del self.sent[:-200]
-        if self.bot is not None and not await self.bot.send(user.telegram_chat_id, message, buttons):
-            await self._queue_retry(user.telegram_chat_id, message, buttons)
+        locale = lang(user)
+        for channel, address in await self.hub.addresses(db, user):
+            self.sent.append((f"{channel.id}:{address}", message))
+            del self.sent[:-200]
+            if not await channel.send(address, message, buttons, locale=locale):
+                await self._queue_retry(channel.id, address, message, buttons, locale)
+
+    # ---- group webhooks ---------------------------------------------------------
+
+    def _group_targets(self, event: str) -> list[str]:
+        kind = GROUP_KIND.get(event)
+        if self.hub is None or kind is None:
+            return []
+        if kind not in {k.strip() for k in (self.settings.group_events or "").split(",")}:
+            return []
+        return self.hub.webhooks.configured_ids()
+
+    async def _to_groups(self, event: str, render) -> None:
+        targets = self._group_targets(event)
+        if not targets:
+            return
+        message = render(_Locale(self.settings.chat_default_locale))
+        for target in targets:
+            self.sent.append((f"group:{target}", message))
+            if not await self.hub.webhooks.send(target, message):
+                await self._queue_retry(f"group:{target}", "", message, None, "en")
 
     # ---- outbox: retries and restarts ----------------------------------------
 
-    async def _queue_retry(self, chat_id: int, message: str, buttons, attempts: int = 1) -> None:
+    async def _queue_retry(self, channel: str, address, message: str, buttons, locale: str = "en") -> None:
+        payload = {"channel": channel, "chat_id": address, "text": message, "buttons": buttons, "locale": locale}
         async with SessionLocal() as db:
             db.add(
                 OutboxItem(
                     kind="message",
-                    payload=json.dumps({"chat_id": chat_id, "text": message, "buttons": buttons}),
-                    attempts=attempts,
+                    payload=json.dumps(payload),
+                    attempts=1,
                     next_attempt_at=utcnow() + timedelta(seconds=RETRY_SECONDS[0]),
                 )
             )
             await db.commit()
 
+    async def _resend(self, data: dict) -> bool | None:
+        """``None`` when the channel is switched off now: the message waits."""
+        name = data.get("channel") or "telegram"  # messages queued before 0.10 were all Telegram
+        if name.startswith("group:"):
+            target = name.split(":", 1)[1]
+            if target not in self.hub.webhooks.configured_ids():
+                return None
+            return await self.hub.webhooks.send(target, data["text"])
+        channel = self.hub.get(name)
+        if channel is None or not channel.enabled:
+            return None
+        buttons = [[tuple(b) for b in row] for row in data["buttons"]] if data.get("buttons") else None
+        return await channel.send(data["chat_id"], data["text"], buttons, locale=data.get("locale") or "en")
+
     async def retry_due(self, db) -> None:
         """Re-sends messages whose earlier delivery failed (called by the housekeeper)."""
-        if self.bot is None or not self.bot.enabled:
+        if self.hub is None:
             return
         due = (
             (
@@ -326,9 +405,11 @@ class Notifier:
             .all()
         )
         for item in due:
-            data = json.loads(item.payload)
-            buttons = [[tuple(b) for b in row] for row in data["buttons"]] if data.get("buttons") else None
-            if await self.bot.send(data["chat_id"], data["text"], buttons):
+            result = await self._resend(json.loads(item.payload))
+            if result is None:  # channel switched off: keep it, look again later
+                item.next_attempt_at = utcnow() + timedelta(minutes=10)
+                continue
+            if result:
                 await db.delete(item)
             elif item.attempts >= len(RETRY_SECONDS):
                 log.warning("dropping notification after %s attempts", item.attempts)

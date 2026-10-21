@@ -27,7 +27,7 @@
 | 灵活预约 | 整卡预约、参数预设、每周重复、延长、候补、配额 |
 | 开发环境 | 把 GPU 时段预约成可 SSH 登录的 Docker 容器：PyTorch、TensorFlow、CUDA 或自己的镜像，可保存为镜像下次直接用 |
 | 多 GPU 与多后端 | GPU 分通道独立预约；llama.cpp、vLLM、SGLang 或自定义服务；可选审批模式 |
-| 集成 | Telegram 通知与机器人、日历订阅、CSV 导出、Prometheus 指标 |
+| 集成 | Telegram、飞书 / Lark、钉钉、企业微信和 QQ 上的通知与预约机器人、群机器人、日历订阅、CSV 导出、Prometheus 指标 |
 | GPU 状态 | 来自 `nvidia-smi` 的显存、利用率、温度和功耗 |
 | 双语界面 | 简体中文与英文 |
 | 部署简单 | 一个容器、SQLite、三个目录挂载 |

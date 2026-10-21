@@ -18,7 +18,9 @@ dependencies = [
   "itsdangerous>=2.2",
   "tzdata>=2024.1",
   "cryptography>=42",
-  "websockets>=14",  # the dev environment web proxy (also installed by uvicorn[standard])
+  # the dev environment web proxy, Feishu long connection, DingTalk Stream and the QQ gateway
+  # (also installed by uvicorn[standard])
+  "websockets>=14",
 ]
 
 [project.optional-dependencies]

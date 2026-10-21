@@ -71,6 +71,43 @@ class Settings(BaseSettings):
     telegram_proxy: str = ""
     telegram_api_base: str = "https://api.telegram.org"
 
+    # Other chat platforms (see services/chat). Each needs its switch on and its credentials.
+    # Language for group chats, group webhooks and chats that are not linked yet.
+    chat_default_locale: str = "en"
+    # Feishu / Lark self-built app, events over the long connection. Lark: https://open.larksuite.com
+    feishu_enabled: bool = False
+    feishu_app_id: str = ""
+    feishu_app_secret: str = ""
+    feishu_domain: str = "https://open.feishu.cn"
+    # DingTalk internal app robot in Stream mode. robot code empty = the client id.
+    dingtalk_enabled: bool = False
+    dingtalk_client_id: str = ""
+    dingtalk_client_secret: str = ""
+    dingtalk_robot_code: str = ""
+    dingtalk_api_base: str = "https://api.dingtalk.com"
+    # WeCom self-built app; receiving needs the callback URL to be reachable from WeCom.
+    wecom_enabled: bool = False
+    wecom_corp_id: str = ""
+    wecom_agent_id: str = ""
+    wecom_secret: str = ""
+    wecom_token: str = ""
+    wecom_aes_key: str = ""
+    wecom_api_base: str = "https://qyapi.weixin.qq.com"
+    # QQ official bot (QQ open platform), WebSocket gateway.
+    qq_enabled: bool = False
+    qq_app_id: str = ""
+    qq_app_secret: str = ""
+    qq_sandbox: bool = False
+    qq_api_base: str = "https://api.sgroup.qq.com"
+    qq_token_url: str = "https://bots.qq.com/app/getAppAccessToken"
+    # Group robot webhooks; group_events picks what they receive (admin_alerts, approvals, announcements).
+    feishu_webhook_url: str = ""
+    feishu_webhook_secret: str = ""
+    dingtalk_webhook_url: str = ""
+    dingtalk_webhook_secret: str = ""
+    wecom_webhook_url: str = ""
+    group_events: str = "admin_alerts,announcements"
+
     # Prometheus /metrics; empty token disables the endpoint.
     metrics_token: str = ""
 

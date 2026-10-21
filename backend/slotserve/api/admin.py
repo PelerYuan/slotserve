@@ -393,8 +393,8 @@ async def put_settings(
         # Off means off: no copy of any key stays readable.
         await db.execute(update(ApiKey).values(key_encrypted=None))
     await db.commit()
-    if app_settings.TELEGRAM_KEYS & applied.keys():
-        request.app.state.telegram.reload()
+    if applied:
+        request.app.state.channels.reload_for(applied.keys())
     return await get_settings_view(request, admin, db)
 
 

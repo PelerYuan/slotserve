@@ -86,7 +86,7 @@ Pin `VLLM_IMAGE` (a build argument) to a vLLM version that supports your GPU and
 | Long bookings | bookings longer than **Approval needed above** (default 4 hours) |
 | All bookings | every booking |
 
-Admins' own bookings, and bookings an admin makes for someone, never need approval. A pending booking holds its time (nobody else can book it) and counts towards quotas, but no model is loaded for it. Admins approve or reject in **Admin → Bookings → Awaiting approval** or with the buttons in the Telegram message; a weekly series can be handled at once. Requests still pending when they would start expire automatically and free their time for the waitlist.
+Admins' own bookings, and bookings an admin makes for someone, never need approval. A pending booking holds its time (nobody else can book it) and counts towards quotas, but no model is loaded for it. Admins approve or reject in **Admin → Bookings → Awaiting approval** or with the buttons in the chat message (Telegram, Feishu / Lark) or its numbered choices (DingTalk, WeCom, QQ); a weekly series can be handled at once. Requests still pending when they would start expire automatically and free their time for the waitlist.
 
 ```mermaid
 stateDiagram-v2

@@ -39,7 +39,7 @@ SlotServe turns a GPU server into a shared, bookable service for a lab or small 
 - **Multiple GPUs and engines**: split GPUs into independently booked lanes; serve models with llama.cpp, vLLM, SGLang or any OpenAI-compatible server.
 - **Approval mode** for teams that want an admin to sign off long bookings.
 - **Flexible bookings**: whole-GPU slots for training, argument presets, weekly repeats, extensions, a waitlist and per-person quotas.
-- **Telegram notifications** with reminders and one-tap extend, plus **calendar feeds**, **CSV export** and **Prometheus metrics**.
+- **Chat notifications and a booking bot** on Telegram, Feishu / Lark, DingTalk, WeCom and QQ, with reminders and one-tap extend; group webhooks, **calendar feeds**, **CSV export** and **Prometheus metrics**.
 - **GPU status**: live memory, utilization, temperature and power.
 - **English and Chinese UI**, light, minimal design, works on phones.
 - **One container**: SQLite, three bind mounts, no external services.
@@ -124,7 +124,7 @@ See [How scheduling works](https://peleryuan.github.io/slotserve/scheduling/) fo
 | [Getting started](https://peleryuan.github.io/slotserve/getting-started/) | Build llama.cpp, configure, deploy, run without Docker |
 | [Configuration](https://peleryuan.github.io/slotserve/configuration/) | Every environment variable, per-model launch arguments, admin CLI |
 | [User guide](https://peleryuan.github.io/slotserve/user-guide/) | Booking, models, downloads, keys, usage, administration |
-| [Notifications & integrations](https://peleryuan.github.io/slotserve/integrations/) | Telegram, calendar feeds, CSV export, Prometheus |
+| [Notifications & integrations](https://peleryuan.github.io/slotserve/integrations/) | Telegram, Feishu / Lark, DingTalk, WeCom, QQ, group webhooks, calendar feeds, CSV export, Prometheus |
 | [GPUs, lanes & engines](https://peleryuan.github.io/slotserve/gpus-and-engines/) | Multiple GPUs, vLLM / SGLang / custom servers, approval mode |
 | [Dev environments](https://peleryuan.github.io/slotserve/dev-environments/) | Docker containers with SSH, templates, saving images |
 | [API](https://peleryuan.github.io/slotserve/api/) | Endpoints, the `model` field, error codes |

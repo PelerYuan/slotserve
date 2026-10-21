@@ -1,122 +1,62 @@
-"""Telegram bot: long polling (no public URL needed), account linking, a few commands and buttons."""
+"""Telegram bot: long polling (no public URL needed), account linking with a deep link, commands and buttons.
+
+Commands and buttons are handled by ``chat.commands`` like on every other platform.
+"""
 
 import asyncio
 import logging
 import secrets
-from datetime import timedelta
 from typing import Any
 
 import httpx
 from fastapi import FastAPI
 from sqlalchemy import select
 
-from ..db import SessionLocal, utcnow
-from ..errors import ApiError
-from ..orm import HOLDING_STATUSES, Reservation, User
-from . import queries
-from .notify import lang
-from .telegram_booking import TEXT as BOOKING_TEXT
-from .telegram_booking import BookingFlow, Reply
+from ..orm import User
+from .chat.booking import Reply
+from .chat.channel import Channel
+from .chat.commands import HELP, REPLIES, reply
 
 log = logging.getLogger(__name__)
 
 POLL_TIMEOUT = 25
 
-HELP = {
-    "en": (
-        "SlotServe bot\n"
-        "/status – what the GPU is doing\n"
-        "/book – book GPU time\n"
-        "/free – free time today and tomorrow\n"
-        "/cancel – cancel an upcoming booking\n"
-        "/today – today's bookings\n"
-        "/mine – your upcoming bookings\n"
-        "/extend [minutes] – extend your running booking (default 30)\n"
-        "/release – end your running booking now\n"
-        "/unlink – stop notifications to this chat"
-    ),
-    "zh-CN": (
-        "SlotServe 机器人\n"
-        "/status – GPU 当前状态\n"
-        "/book – 预约 GPU 时段\n"
-        "/free – 今天和明天的空闲时段\n"
-        "/cancel – 取消一个未开始的预约\n"
-        "/today – 今天的预约\n"
-        "/mine – 我接下来的预约\n"
-        "/extend [分钟] – 延长我正在进行的预约（默认 30）\n"
-        "/release – 立即结束我正在进行的预约\n"
-        "/unlink – 解除与此聊天的绑定"
-    ),
-}
-
-REPLIES = {
-    "en": {
-        "linked": "Linked to SlotServe account {username}. Send /help for commands.",
-        "bad_token": "This link has expired. Open Settings in SlotServe and press “Link Telegram” again.",
-        "not_linked": "This chat is not linked. Open Settings in SlotServe and press “Link Telegram”.",
-        "unlinked": "Unlinked. You will not get notifications here any more.",
-        "no_active": "You have no running booking.",
-        "extended": "Extended until {end}.",
-        "released": "Booking ended. Thanks!",
-        "none_today": "No bookings today.",
-        "none_mine": "You have no upcoming bookings.",
-        "state": "Model: {model} ({state})\n{holder}",
-        "holder_free": "Open to everyone.",
-        "holder": "Booked by {user} until {end}.",
-        "error": "Could not do that: {code}",
-        "approved": "Approved ({count}).",
-        "rejected": "Rejected ({count}).",
-    },
-    "zh-CN": {
-        "linked": "已绑定 SlotServe 账号 {username}。发送 /help 查看命令。",
-        "bad_token": "链接已失效。请在 SlotServe 的「设置」里重新点「绑定 Telegram」。",
-        "not_linked": "此聊天尚未绑定。请在 SlotServe 的「设置」里点「绑定 Telegram」。",
-        "unlinked": "已解除绑定，之后不会再在这里收到通知。",
-        "no_active": "你当前没有进行中的预约。",
-        "extended": "已延长到 {end}。",
-        "released": "预约已结束，谢谢！",
-        "none_today": "今天没有预约。",
-        "none_mine": "你接下来没有预约。",
-        "state": "模型：{model}（{state}）\n{holder}",
-        "holder_free": "当前所有人可用。",
-        "holder": "{user} 预约中，直到 {end}。",
-        "error": "操作失败：{code}",
-        "approved": "已通过（{count} 个）。",
-        "rejected": "已拒绝（{count} 个）。",
-    },
-}
-
-
-def reply(user: User | None, key: str, **params: Any) -> str:
-    return REPLIES[lang(user)][key].format(**params)
+__all__ = ["HELP", "REPLIES", "TelegramBot", "TelegramError", "new_link_token", "reply"]
 
 
 class TelegramError(Exception):
     pass
 
 
-class TelegramBot:
+class TelegramBot(Channel):
+    id = "telegram"
+    label = "Telegram"
+    receive_mode = "polling"
+    native_buttons = True
+
     def __init__(self, app: FastAPI, transport: httpx.AsyncBaseTransport | None = None):
-        self.app = app
-        self.settings = app.state.settings
-        self.transport = transport
-        self.username: str | None = None
-        self._client: httpx.AsyncClient | None = None
+        super().__init__(app, transport)
         self._client_key: tuple | None = None
-        self._reload = asyncio.Event()
         self.offset = 0
-        self.flow = BookingFlow(app)
+        self.flow = self.commands.flow
 
     # ---- plumbing -----------------------------------------------------------
 
     @property
-    def enabled(self) -> bool:
-        return bool(self.settings.telegram_bot_token)
+    def username(self) -> str | None:
+        return self.bot_name
 
-    def reload(self) -> None:
-        """Called after the token or proxy changed."""
-        self.username = None
-        self._reload.set()
+    @username.setter
+    def username(self, value: str | None) -> None:
+        self.bot_name = value
+
+    @property
+    def switched_on(self) -> bool:
+        return bool(self.settings.telegram_bot_token)  # an empty token is the off switch
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.settings.telegram_bot_token)
 
     def _http(self) -> httpx.AsyncClient:
         key = (self.settings.telegram_bot_token, self.settings.telegram_proxy, self.settings.telegram_api_base)
@@ -143,11 +83,13 @@ class TelegramBot:
     def _markup(buttons: list[list[tuple[str, str]]] | None) -> dict:
         return {"inline_keyboard": [[{"text": t, "callback_data": d} for t, d in row] for row in buttons or []]}
 
-    async def send(self, chat_id: int, message: str, buttons: list[list[tuple[str, str]]] | None = None) -> bool:
+    async def send(
+        self, chat_id, message: str, buttons: list[list[tuple[str, str]]] | None = None, locale: str = "en"
+    ) -> bool:
         """Returns ``False`` when Telegram could not be reached, so the caller can retry later."""
         if not self.enabled:
             return True
-        params: dict[str, Any] = {"chat_id": chat_id, "text": message, "disable_web_page_preview": True}
+        params: dict[str, Any] = {"chat_id": int(chat_id), "text": message, "disable_web_page_preview": True}
         if buttons:
             params["reply_markup"] = self._markup(buttons)
         try:
@@ -160,21 +102,17 @@ class TelegramBot:
             return False
         return True
 
-    async def close(self) -> None:
-        if self._client is not None:
-            await self._client.aclose()
-
     async def run(self) -> None:
         delay = 5
         while True:
             self._reload.clear()
             if not self.enabled:
+                self.connected = False
                 await self._reload.wait()
                 continue
             try:
                 me = await self.call("getMe")
-                self.username = me.get("username")
-                log.info("telegram bot @%s connected", self.username)
+                self.mark_connected(me.get("username"))
                 await self._register_commands()
                 delay = 5
                 while not self._reload.is_set():
@@ -182,11 +120,10 @@ class TelegramBot:
             except asyncio.CancelledError:
                 raise
             except (httpx.HTTPError, TelegramError, ValueError) as exc:
+                self.connected = False
+                self.error = str(exc)[:300] or type(exc).__name__
                 log.warning("telegram polling error: %s (retrying in %ss)", exc, delay)
-                try:
-                    await asyncio.wait_for(self._reload.wait(), delay)
-                except TimeoutError:
-                    pass
+                await self._sleep(delay)
                 delay = min(delay * 2, 300)
 
     async def _register_commands(self) -> None:
@@ -219,6 +156,9 @@ class TelegramBot:
     # ---- handling -----------------------------------------------------------
 
     async def handle(self, update: dict) -> None:
+        from ..db import utcnow
+
+        self.last_event_at = utcnow()
         if cq := update.get("callback_query"):
             message = cq.get("message") or {}
             chat_id = message.get("chat", {}).get("id")
@@ -257,201 +197,47 @@ class TelegramBot:
         elif answer:
             await self.send(chat["id"], answer)
 
-    async def _user_for_chat(self, db, chat_id: int) -> User | None:
-        return (
-            await db.execute(select(User).where(User.telegram_chat_id == chat_id, User.disabled_at.is_(None)))
-        ).scalar_one_or_none()
-
     async def on_command(self, chat_id: int, tg_username: str | None, command: str, arg: str) -> str | Reply | None:
-        async with SessionLocal() as db:
-            if command == "/start" and arg:
-                user = (await db.execute(select(User).where(User.telegram_link_token == arg))).scalar_one_or_none()
-                if user is None or user.disabled_at is not None:
-                    return reply(None, "bad_token")
-                for other in (await db.execute(select(User).where(User.telegram_chat_id == chat_id))).scalars():
-                    other.telegram_chat_id = None
-                user.telegram_chat_id = chat_id
-                user.telegram_username = tg_username
-                user.telegram_link_token = None
-                await db.commit()
-                return reply(user, "linked", username=user.username)
-
-            user = await self._user_for_chat(db, chat_id)
-            if user is None:
-                return reply(None, "not_linked")
-            if command in ("/start", "/help"):
-                return HELP[lang(user)]
-            if command == "/unlink":
-                user.telegram_chat_id = None
-                user.telegram_username = None
-                await db.commit()
-                return reply(user, "unlinked")
-            if command == "/status":
-                return await self._status(db, user)
-            if command == "/book":
-                return await self.flow.step(db, user, [])
-            if command == "/free":
-                return await self.flow.free(db, user)
-            if command == "/cancel":
-                return await self.flow.cancel_list(db, user)
-            if command == "/today":
-                return await self._today(db, user)
-            if command == "/mine":
-                return await self._mine(db, user)
-            if command == "/extend":
-                minutes = int(arg) if arg.isdigit() else 30
-                return await self._extend(db, user, None, minutes)
-            if command == "/release":
-                return await self._release(db, user, None)
-            return HELP[lang(user)]
+        return await self.commands.command(self, chat_id, tg_username, command, arg)
 
     async def on_button(self, chat_id: int | None, data: str) -> str | Reply:
-        async with SessionLocal() as db:
-            user = await self._user_for_chat(db, chat_id) if chat_id else None
-            if user is None:
-                return reply(None, "not_linked")
-            parts = data.split(":")
-            if parts[0] == "bk":
-                return await self.flow.step(db, user, parts[1:])
-            if parts[0] in ("bko", "bkw"):
-                return await self.flow.book(db, user, parts[1:], waitlist=parts[0] == "bkw")
-            if parts[0] in ("cx", "cxy") and len(parts) == 2 and parts[1].isdigit():
-                return await self.flow.cancel(db, user, int(parts[1]), confirmed=parts[0] == "cxy")
-            if parts[0] == "cxn":
-                return Reply(BOOKING_TEXT[lang(user)]["kept"], edit=True)
-            if parts[0] == "ext" and len(parts) == 3 and parts[1].isdigit() and parts[2].isdigit():
-                return await self._extend(db, user, int(parts[1]), int(parts[2]))
-            if parts[0] == "rel" and len(parts) == 2 and parts[1].isdigit():
-                return await self._release(db, user, int(parts[1]))
-            if parts[0] in ("apr", "rej") and len(parts) == 2 and parts[1].isdigit():
-                return await self._review(db, user, int(parts[1]), approve=parts[0] == "apr")
-            return ""
+        return await self.commands.button(self, chat_id, data)
 
-    # ---- commands -----------------------------------------------------------
+    # ---- linking: kept on the users table -------------------------------------------
 
-    async def _status(self, db, user: User) -> str:
-        notifier = self.app.state.notifier
-        lanes = self.app.state.lanes.ordered()
-        parts = []
-        for ctx in lanes:
-            snap = ctx.runtime.snapshot()
-            active = await queries.active_reservation(db, utcnow(), ctx.id)
-            if active is None:
-                holder = reply(user, "holder_free")
-            else:
-                owner = await db.get(User, active.user_id)
-                end = notifier.fmt_time(active.end_at)
-                holder = reply(user, "holder", user=owner.username if owner else "?", end=end)
-            text = reply(user, "state", model=snap.model_name or "—", state=snap.state.value, holder=holder)
-            parts.append(f"[{ctx.name}]\n{text}" if len(lanes) > 1 else text)
-        return "\n\n".join(parts)
+    async def find_user(self, db, address) -> User | None:
+        if address is None:
+            return None
+        return (
+            await db.execute(select(User).where(User.telegram_chat_id == int(address), User.disabled_at.is_(None)))
+        ).scalar_one_or_none()
 
-    async def _list(self, db, user: User, rows: list[Reservation]) -> str:
-        notifier = self.app.state.notifier
-        lines = []
-        for r in rows:
-            owner = await db.get(User, r.user_id)
-            what = await notifier.describe(db, r, user)
-            lines.append(f"• {notifier.fmt_window(r)}  {owner.username if owner else '?'}  {what}")
-        return "\n".join(lines)
+    def address_of(self, user: User, link) -> int | None:
+        return user.telegram_chat_id
 
-    async def _today(self, db, user: User) -> str:
-        now = utcnow()
-        rows = (
-            (
-                await db.execute(
-                    select(Reservation)
-                    .where(
-                        Reservation.status == "booked",
-                        Reservation.end_at > now,
-                        Reservation.start_at < now + timedelta(hours=24),
-                    )
-                    .order_by(Reservation.start_at)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        return await self._list(db, user, list(rows)) if rows else reply(user, "none_today")
+    async def link_of(self, db, user: User):
+        return None
 
-    async def _mine(self, db, user: User) -> str:
-        rows = (
-            (
-                await db.execute(
-                    select(Reservation)
-                    .where(
-                        Reservation.user_id == user.id,
-                        Reservation.status.in_(HOLDING_STATUSES),
-                        Reservation.end_at > utcnow(),
-                    )
-                    .order_by(Reservation.start_at)
-                    .limit(10)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        return await self._list(db, user, list(rows)) if rows else reply(user, "none_mine")
+    async def start_link(self, db, user: User) -> dict[str, Any]:
+        user.telegram_link_token = new_link_token()
+        url = f"https://t.me/{self.username}?start={user.telegram_link_token}" if self.username else None
+        return {"code": None, "expires_at": None, "link_url": url}
 
-    async def _own_reservation(self, db, user: User, reservation_id: int | None) -> Reservation | None:
-        if reservation_id is None:
-            rows = await db.execute(
-                select(Reservation).where(
-                    Reservation.user_id == user.id,
-                    Reservation.status == "booked",
-                    Reservation.start_at <= utcnow(),
-                    Reservation.end_at > utcnow(),
-                )
-            )
-            return rows.scalars().first()
-        r = await db.get(Reservation, reservation_id)
-        return r if r is not None and (r.user_id == user.id or user.is_admin) else None
+    async def redeem(self, db, code: str, address, name: str | None) -> User | None:
+        user = (await db.execute(select(User).where(User.telegram_link_token == code))).scalar_one_or_none()
+        if user is None or user.disabled_at is not None:
+            return None
+        for other in (await db.execute(select(User).where(User.telegram_chat_id == int(address)))).scalars():
+            other.telegram_chat_id = None
+        user.telegram_chat_id = int(address)
+        user.telegram_username = name
+        user.telegram_link_token = None
+        return user
 
-    async def _extend(self, db, user: User, reservation_id: int | None, minutes: int) -> str:
-        from ..api.reservations import extend_core
-
-        r = await self._own_reservation(db, user, reservation_id)
-        if r is None:
-            return reply(user, "no_active")
-        try:
-            r = await extend_core(db, user, r, max(5, min(minutes, 24 * 60)))
-        except ApiError as exc:
-            return reply(user, "error", code=exc.detail.get("code"))
-        self.app.state.lanes.poke()
-        return reply(user, "extended", end=self.app.state.notifier.fmt_time(r.end_at))
-
-    async def _review(self, db, user: User, reservation_id: int, approve: bool) -> str:
-        from .review import review
-
-        if not user.is_admin:
-            return reply(user, "error", code="admin_required")
-        r = await db.get(Reservation, reservation_id)
-        if r is None:
-            return reply(user, "error", code="not_found")
-        try:
-            done = await review(db, user, r, approve, series=True)
-        except ApiError as exc:
-            return reply(user, "error", code=exc.detail.get("code"))
-        event = "booking_approved" if approve else "booking_rejected"
-        self.app.state.notifier.emit(event, user_id=r.user_id, reservation_id=r.id, count=len(done))
-        self.app.state.lanes.poke()
-        self.app.state.housekeeper.poke()
-        return reply(user, "approved" if approve else "rejected", count=len(done))
-
-    async def _release(self, db, user: User, reservation_id: int | None) -> str:
-        from ..api.reservations import end_core
-
-        r = await self._own_reservation(db, user, reservation_id)
-        if r is None or queries.reservation_phase(r, utcnow()) != "active":
-            return reply(user, "no_active")
-        try:
-            await end_core(db, user, r)
-            await db.commit()
-        except ApiError as exc:
-            return reply(user, "error", code=exc.detail.get("code"))
-        self.app.state.lanes.poke()
-        self.app.state.housekeeper.poke()
-        return reply(user, "released")
+    async def unlink(self, db, user: User) -> None:
+        user.telegram_chat_id = None
+        user.telegram_username = None
+        user.telegram_link_token = None
 
 
 def new_link_token() -> str:
