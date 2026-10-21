@@ -1,40 +1,12 @@
-async function save() {
-  saving.value = true
-  try {
-    if (creating.value) {
-      await api.createModel({
-        name: form.name.trim(),
-        engine: form.engine,
-        path: form.path.trim(),
-        args: form.args,
-        description: form.description,
-      })
-      creating.value = false
-    } else if (editing.value) {
-      const moved = form.engine !== editing.value.engine || form.path.trim() !== editing.value.file_path
-      await api.updateModel(editing.value.id, {
-        name: form.name.trim(),
-        args: form.args,
-        description: form.description,
-        ...(moved ? { engine: form.engine, path: form.path.trim() } : {}),
-      })
-      editing.value = null
-    }
-    await loadModels()
-  } catch (e) {
-    showError(e)
-  } finally {
-    saving.value = false
-  }
-}
-
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { NButton, NCheckbox, NDropdown, NForm, NFormItem, NInput, NModal, NProgress, NTabPane, NTabs, useDialog } from 'naive-ui'
+import { NButton, NCheckbox, NDropdown, NForm, NFormItem, NInput, NModal, NProgress, NTab, NTabPane, NTabs, useDialog } from 'naive-ui'
 import { Download, FolderSearch, MoreHorizontal, Plus, RotateCw, ScrollText, Search, Star, Trash2, X } from 'lucide-vue-next'
 import { NRadioButton, NRadioGroup } from 'naive-ui'
 import LogDrawer from '@/components/LogDrawer.vue'
+import ModelCatalog from '@/components/catalog/ModelCatalog.vue'
 import { api } from '@/api/client'
 import type { DownloadTask, HfFile, Model } from '@/api/types'
 import { session } from '@/composables/session'
@@ -44,6 +16,12 @@ import { formatBytes, formatDateTime, formatDuration } from '@/utils/format'
 
 const { t } = useI18n()
 const dialog = useDialog()
+const route = useRoute()
+const router = useRouter()
+const view = computed<'installed' | 'catalog'>({
+  get: () => (route.query.tab === 'catalog' ? 'catalog' : 'installed'),
+  set: (v) => router.replace({ query: v === 'catalog' ? { tab: 'catalog' } : {} }),
+})
 const { showError, message } = useErrorMessage()
 
 const models = ref<Model[]>([])
@@ -56,6 +34,12 @@ async function loadModels() {
 }
 async function loadDownloads() {
   downloads.value = await api.downloads().catch(() => downloads.value)
+}
+
+async function refreshAll() {
+  await Promise.all([loadModels(), loadDownloads()])
+  window.clearTimeout(timer)
+  schedulePoll()
 }
 
 let timer: number | undefined
@@ -205,17 +189,27 @@ async function removePreset(r: PresetRow) {
 }
 
 async function save() {
-  if (!editing.value) return
   saving.value = true
   try {
-    const moved = form.engine !== editing.value.engine || form.path.trim() !== editing.value.file_path
-    await api.updateModel(editing.value.id, {
-      name: form.name.trim(),
-      args: form.args,
-      description: form.description,
-      ...(moved ? { engine: form.engine, path: form.path.trim() } : {}),
-    })
-    editing.value = null
+    if (creating.value) {
+      await api.createModel({
+        name: form.name.trim(),
+        engine: form.engine,
+        path: form.path.trim(),
+        args: form.args,
+        description: form.description,
+      })
+      creating.value = false
+    } else if (editing.value) {
+      const moved = form.engine !== editing.value.engine || form.path.trim() !== editing.value.file_path
+      await api.updateModel(editing.value.id, {
+        name: form.name.trim(),
+        args: form.args,
+        description: form.description,
+        ...(moved ? { engine: form.engine, path: form.path.trim() } : {}),
+      })
+      editing.value = null
+    }
     await loadModels()
   } catch (e) {
     showError(e)
@@ -370,7 +364,14 @@ function eta(d: DownloadTask) {
       </div>
     </div>
 
-    <section class="card">
+    <NTabs v-model:value="view" type="line" class="view-tabs" :tabs-padding="0">
+      <NTab name="installed">{{ t('models.tabs.installed') }}</NTab>
+      <NTab name="catalog">{{ t('models.tabs.catalog') }}</NTab>
+    </NTabs>
+
+    <ModelCatalog v-if="view === 'catalog'" @changed="refreshAll" />
+
+    <section v-else class="card">
       <div v-if="!models.length" class="empty">{{ t('models.empty') }}</div>
       <ul v-else class="models">
         <li v-for="m in models" :key="m.id">
@@ -556,6 +557,9 @@ function eta(d: DownloadTask) {
 </template>
 
 <style scoped>
+.view-tabs {
+  margin: -4px 0 16px;
+}
 .small {
   font-size: 12.5px;
 }

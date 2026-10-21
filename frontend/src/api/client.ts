@@ -10,6 +10,11 @@ import type {
   Backup,
   BookingInput,
   CalendarLinks,
+  Catalog,
+  CatalogDeploy,
+  CatalogDeployInput,
+  CatalogEntry,
+  CatalogEntryInput,
   DevInfo,
   DevSession,
   DevTemplate,
@@ -154,6 +159,22 @@ export const api = {
     }),
   hfDownload: (repo: string, files: string[], revision = 'main') =>
     request<DownloadTask[]>('POST', '/api/downloads/hf', { repo, revision, files }),
+
+  // model catalog
+  catalog: {
+    list: (ctx?: number) => request<Catalog>('GET', '/api/catalog', undefined, { ctx }),
+    entry: (id: string, ctx?: number) =>
+      request<CatalogEntry>('GET', `/api/catalog/${encodeURIComponent(id)}`, undefined, { ctx }),
+    deploys: () => request<CatalogDeploy[]>('GET', '/api/catalog/deploys'),
+    deploy: (body: CatalogDeployInput) => request<CatalogDeploy>('POST', '/api/catalog/deploy', body),
+    dismiss: (id: number) => request<void>('DELETE', `/api/catalog/deploys/${id}`),
+    setHidden: (id: string, hidden: boolean) =>
+      request<void>('PUT', `/api/catalog/${encodeURIComponent(id)}/hidden`, { hidden }),
+    createEntry: (body: CatalogEntryInput) => request<CatalogEntry>('POST', '/api/catalog/entries', body),
+    updateEntry: (id: string, body: CatalogEntryInput) =>
+      request<CatalogEntry>('PUT', `/api/catalog/entries/${encodeURIComponent(id)}`, body),
+    deleteEntry: (id: string) => request<void>('DELETE', `/api/catalog/entries/${encodeURIComponent(id)}`),
+  },
 
   // reservations
   reservations: (start: Date, end: Date, mine = false, laneId?: number | null) =>

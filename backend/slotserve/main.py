@@ -15,6 +15,7 @@ from .api import (
     admin,
     auth,
     calendar,
+    catalog,
     devenv,
     downloads,
     keys,
@@ -32,6 +33,7 @@ from .config import Settings, get_settings
 from .gateway import devenv_web, proxy
 from .runtime.lanes import LaneManager, ensure_default_lane
 from .services import app_settings
+from .services.catalog_deploy import Deployer
 from .services.devenv import DevEnvManager, seed_templates
 from .services.downloader import Downloader
 from .services.housekeeper import Housekeeper
@@ -76,6 +78,8 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         app.state.scheduler = app.state.lanes.primary.scheduler
         app.state.downloader = Downloader(settings)
         app.state.downloader.events = app.state.notifier
+        app.state.deployer = Deployer(settings, app.state.lanes)
+        app.state.downloader.deployer = app.state.deployer
         app.state.housekeeper = Housekeeper(app.state)
         async with db.SessionLocal() as session:
             await seed_templates(session)
@@ -140,6 +144,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         lanes,
         runtime_admin,
         devenv,
+        catalog,
     ):
         app.include_router(module.router)
     app.include_router(devenv.keys_router)

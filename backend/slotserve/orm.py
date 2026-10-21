@@ -88,6 +88,45 @@ class DownloadTask(Base):
     finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
+class CatalogEntryRow(Base):
+    """A model catalog entry an admin added (same shape as the built-in catalog file)."""
+
+    __tablename__ = "catalog_entries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    entry_id: Mapped[str] = mapped_column(String(64), unique=True)
+    data: Mapped[str] = mapped_column(Text)  # JSON, services.catalog.Entry
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class CatalogDeploy(Base):
+    """A one-click deployment from the catalog: downloads, then a model registered with launch arguments."""
+
+    __tablename__ = "catalog_deploys"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    entry_id: Mapped[str] = mapped_column(String(64))
+    variant_id: Mapped[str] = mapped_column(String(64))
+    engine: Mapped[str] = mapped_column(String(16))
+    model_name: Mapped[str] = mapped_column(String(128))
+    args: Mapped[str] = mapped_column(Text, default="")
+    description: Mapped[str] = mapped_column(Text, default="")
+    # The GGUF file (first part) or the directory the model is registered with.
+    target_path: Mapped[str] = mapped_column(Text)
+    lane_id: Mapped[int | None] = mapped_column(ForeignKey("lanes.id", ondelete="SET NULL"), nullable=True)
+    set_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    task_ids: Mapped[str] = mapped_column(Text, default="[]")  # JSON list of download_tasks ids
+    # downloading | done | failed | cancelled
+    status: Mapped[str] = mapped_column(String(16), default="downloading", index=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
 class Reservation(Base):
     __tablename__ = "reservations"
 

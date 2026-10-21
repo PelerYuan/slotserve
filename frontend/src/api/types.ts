@@ -65,6 +65,127 @@ export interface DownloadTask {
   finished_at: string | null
 }
 
+// ---- model catalog ----
+
+export type CatalogTask = 'chat' | 'code' | 'reasoning' | 'embedding' | 'vision'
+export type FitStatus = 'fits' | 'tight' | 'no' | 'unknown'
+export type CatalogEngine = 'llama.cpp' | 'vllm' | 'sglang'
+
+export interface CatalogEstimate {
+  ctx: number
+  weights: number
+  kv_cache: number
+  overhead: number
+  total: number
+}
+
+export interface CatalogVariant {
+  id: string
+  format: 'gguf' | 'safetensors'
+  repo: string
+  revision: string
+  quant: string
+  files: string[]
+  size_bytes: number
+  file_count: number | null
+  mmproj: string | null
+  mmproj_size_bytes: number
+  download_bytes: number
+  gated: boolean
+  engines: CatalogEngine[]
+  estimate: CatalogEstimate
+  fits: { lane_id: number; status: FitStatus }[]
+  downloaded: boolean
+  models: { id: number; name: string; engine: string }[]
+}
+
+export interface CatalogEntry {
+  id: string
+  name: string
+  family: string
+  publisher: string
+  license: string
+  tasks: CatalogTask[]
+  params_b: number
+  active_params_b: number | null
+  context_length: number
+  default_ctx: number
+  tags: string[]
+  description: { en: string; zh: string }
+  source_repo: string | null
+  arch: { layers: number; kv_heads: number; head_dim: number } | null
+  extra_args: Record<string, string>
+  source: 'builtin' | 'custom'
+  hidden: boolean
+  variants: CatalogVariant[]
+}
+
+export interface CatalogLane {
+  id: number
+  name: string
+  gpus: number[]
+  memory_bytes: number | null
+}
+
+export interface Catalog {
+  updated: string
+  lanes: CatalogLane[]
+  entries: CatalogEntry[]
+}
+
+export interface CatalogDeploy {
+  id: number
+  entry_id: string
+  variant_id: string
+  engine: string
+  model_name: string
+  args: string
+  status: 'downloading' | 'done' | 'failed' | 'stalled'
+  error: string | null
+  model_id: number | null
+  lane_id: number | null
+  set_default: boolean
+  files: number
+  downloaded_bytes: number
+  total_bytes: number | null
+  created_at: string
+  finished_at: string | null
+}
+
+export interface CatalogDeployInput {
+  entry_id: string
+  variant_id: string
+  engine?: CatalogEngine
+  lane_id?: number | null
+  set_default?: boolean
+  ctx?: number
+  name?: string
+}
+
+/** What an admin submits for their own entry (file sizes and split parts are looked up on Hugging Face). */
+export interface CatalogEntryInput {
+  id: string
+  name: string
+  family: string
+  publisher: string
+  license: string
+  tasks: CatalogTask[]
+  params_b: number
+  context_length: number
+  tags: string[]
+  description: { en: string; zh: string }
+  source_repo: string | null
+  extra_args: Record<string, string>
+  variants: {
+    id: string
+    format: 'gguf' | 'safetensors'
+    repo: string
+    quant: string
+    files: string[]
+    mmproj: string | null
+  }[]
+}
+
 export type ReservationPhase = 'upcoming' | 'active' | 'finished' | 'cancelled' | 'pending' | 'rejected' | 'expired'
 
 export interface Reservation {

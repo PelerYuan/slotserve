@@ -52,6 +52,10 @@ Admins can limit how many hours one person may book per calendar week and how ma
 - **Server log** shows the tail of the model server's output - the first place to look when a model fails to start.
 - **Presets** (in **Edit**) store alternative argument sets for the same file, for example a long-context variant with a larger `-c`. People pick a preset when booking; the model's own arguments are the default.
 
+### Model catalog
+
+The **Catalog** tab lists popular open models with exact download sizes, an estimate of the GPU memory each variant needs and whether it fits on each lane. **Deploy** downloads a variant through the queue below and registers it with suitable launch arguments. See [Model catalog](model-catalog.md).
+
 ### Downloading models
 
 Paste a direct link to a `.gguf` file and press **Download**, for example:
