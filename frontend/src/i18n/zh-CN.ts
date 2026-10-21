@@ -1,5 +1,6 @@
 import type en from './en'
 import { storageZh } from './storage' // storage hook
+import { machinesZh } from './machines' // machines
 
 const zh: typeof en = {
   app: {
@@ -14,6 +15,7 @@ const zh: typeof en = {
     usage: '用量',
     settings: '设置',
     admin: '管理',
+    machines: machinesZh.nav, // machines
   },
   common: {
     save: '保存',
@@ -1281,7 +1283,9 @@ const zh: typeof en = {
     done: '完成',
   },
   storage: storageZh.storage, // storage hook
+  machines: machinesZh.machines, // machines
   errors: {
+    ...machinesZh.errors, // machines
     ...storageZh.errors, // storage hook
     hf_token_required: '{repo} 是受限仓库：请先在「管理 → 系统设置」中填写 Hugging Face Token。',
     insufficient_disk: '磁盘空间不足：剩余 {free_gb} GB，需要 {need_gb} GB。',

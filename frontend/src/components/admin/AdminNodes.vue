@@ -6,6 +6,7 @@ import { Cpu, Plus, Server } from 'lucide-vue-next'
 import { api } from '@/api/client'
 import type { ClusterNode, ClusterNodeToken, NodeStatus } from '@/api/types'
 import CodeBlock from '@/components/CodeBlock.vue'
+import MachineDrawer from '@/components/machines/MachineDrawer.vue'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { formatDateTime, relativeFromNow } from '@/utils/format'
 
@@ -40,6 +41,9 @@ const STATUS_CLASS: Record<NodeStatus, string> = {
   revoked: '',
   mismatch: 'warn',
 }
+
+// the same machine card everyone sees on the Machines page
+const openId = ref<number | null>(null)
 
 const gb = (mb: number | null) => (mb == null ? '—' : `${(mb / 1024).toFixed(mb >= 10240 ? 0 : 1)} GB`)
 
@@ -181,6 +185,9 @@ async function scan(n: ClusterNode) {
                 <div v-if="n.protocol_version != null" class="faint">{{ t('cluster.protocol', { n: n.protocol_version }) }}</div>
               </td>
               <td class="right nowrap">
+                <NButton size="small" quaternary :disabled="n.status === 'revoked'" data-action="node-details" @click="openId = n.id">
+                  {{ t('machines.details') }}
+                </NButton>
                 <NButton size="small" quaternary :disabled="n.status !== 'online'" @click="scan(n)">
                   {{ t('cluster.scan') }}
                 </NButton>
@@ -204,6 +211,8 @@ async function scan(n: ClusterNode) {
       </table>
     </div>
   </section>
+
+  <MachineDrawer :machine-id="openId" @close="openId = null" />
 
   <NModal
     v-model:show="form.open"

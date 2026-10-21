@@ -10,6 +10,7 @@ export const router = createRouter({
       component: () => import('@/layouts/AppLayout.vue'),
       children: [
         { path: '', name: 'overview', component: () => import('@/views/OverviewView.vue') },
+        { path: 'machines', name: 'machines', component: () => import('@/views/MachinesView.vue') },
         { path: 'schedule', name: 'schedule', component: () => import('@/views/ScheduleView.vue') },
         { path: 'models', name: 'models', component: () => import('@/views/ModelsView.vue') },
         { path: 'keys', name: 'keys', component: () => import('@/views/KeysView.vue') },

@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NDropdown, NRadioButton, NRadioGroup } from 'naive-ui'
+import { NButton, NDropdown, NRadioButton, NRadioGroup, NSelect } from 'naive-ui'
 import { FileDown } from 'lucide-vue-next'
 import UsageChart from '@/components/UsageChart.vue'
 import LineChart from '@/components/LineChart.vue'
 import { api } from '@/api/client'
 import type { Usage, UsageExport, UsageKind } from '@/api/types'
 import { useErrorMessage } from '@/composables/useErrorMessage'
+import { useMachines } from '@/composables/machines'
 import { isDark } from '@/composables/theme'
 import { formatCompact, formatNumber } from '@/utils/format'
 
@@ -39,15 +40,20 @@ function exportCsv(kind: UsageExport) {
   a.click()
 }
 
+// Narrow everything to one machine's lanes (with several machines).
+const { machines, multi: multiMachine } = useMachines()
+const machineId = ref<number | null>(null)
+const machineOptions = computed(() => machines.value.map((m) => ({ label: m.name, value: m.id })))
+
 async function load() {
   try {
-    data.value = await api.usage(days.value, scope.value)
+    data.value = await api.usage(days.value, scope.value, machineId.value)
   } catch (e) {
     showError(e)
   }
 }
 onMounted(load)
-watch([days, scope], load)
+watch([days, scope, machineId], load)
 
 // ---- formatting --------------------------------------------------------------
 
@@ -138,6 +144,16 @@ const hasData = computed(() => {
         <p>{{ t('usage.subtitle') }}</p>
       </div>
       <div class="head-actions">
+        <NSelect
+          v-if="multiMachine"
+          v-model:value="machineId"
+          :options="machineOptions"
+          :placeholder="t('machines.allMachines')"
+          clearable
+          size="small"
+          class="machine-filter"
+          data-filter="usage-machine"
+        />
         <NRadioGroup v-model:value="scope" size="small" class="scope">
           <NRadioButton value="all">{{ t('usage.everyone') }}</NRadioButton>
           <NRadioButton value="mine">{{ t('usage.mine') }}</NRadioButton>
@@ -536,5 +552,8 @@ const hasData = computed(() => {
   .tile-value {
     font-size: 22px;
   }
+}
+.machine-filter {
+  width: 160px;
 }
 </style>

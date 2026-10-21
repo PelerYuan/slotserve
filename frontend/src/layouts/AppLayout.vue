@@ -11,6 +11,7 @@ import {
   KeyRound,
   LayoutDashboard,
   Menu,
+  Server,
   Settings,
   ShieldCheck,
   Terminal,
@@ -30,6 +31,7 @@ const drawer = ref(false)
 
 const nav = computed(() => [
   { name: 'overview', label: t('nav.overview'), icon: LayoutDashboard },
+  { name: 'machines', label: t('nav.machines'), icon: Server },
   { name: 'schedule', label: t('nav.schedule'), icon: CalendarDays },
   { name: 'models', label: t('nav.models'), icon: Boxes },
   { name: 'keys', label: t('nav.keys'), icon: KeyRound },

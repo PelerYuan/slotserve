@@ -129,6 +129,9 @@ export interface CatalogLane {
   name: string
   gpus: number[]
   memory_bytes: number | null
+  /** the machine the lane's GPUs are in */
+  node_id?: number | null
+  node_name?: string | null
 }
 
 export interface Catalog {

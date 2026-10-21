@@ -1,4 +1,5 @@
 import { storageEn } from './storage' // storage hook
+import { machinesEn } from './machines' // machines
 
 export default {
   app: {
@@ -13,6 +14,7 @@ export default {
     usage: 'Usage',
     settings: 'Settings',
     admin: 'Admin',
+    machines: machinesEn.nav, // machines
   },
   common: {
     save: 'Save',
@@ -1282,7 +1284,9 @@ export default {
     done: 'Done',
   },
   storage: storageEn.storage, // storage hook
+  machines: machinesEn.machines, // machines
   errors: {
+    ...machinesEn.errors, // machines
     ...storageEn.errors, // storage hook
     hf_token_required: '{repo} is gated: add a Hugging Face token in Admin → System settings first.',
     insufficient_disk: 'Not enough disk space: {free_gb} GB free, {need_gb} GB needed.',
