@@ -90,6 +90,11 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | `SLOTSERVE_STORAGE_CHECK_MINUTES` | `30` | How often storages are checked (free space, per-person usage); 0 = only on demand |
 | `SLOTSERVE_DEVENV_PROJECTS` | `3` | Kept (paused) environments per person; 0 = none |
 | `SLOTSERVE_DEVENV_PROJECT_DAYS` | `0` | Remove kept environments unused this many days (0 = never) |
+| `SLOTSERVE_DEVENV_CPU_ENABLED` | `true` | Let people start dev environments without a GPU (no booking) |
+| `SLOTSERVE_DEVENV_CPU_PER_USER` | `2` | Environments without a GPU one person can run at once |
+| `SLOTSERVE_DEVENV_CPU_CORES_PER_GPU` | `8` | CPU cores each lane reserves per GPU for its bookings (cpuset); 0 = none |
+| `SLOTSERVE_DEVENV_CPU_CORES` / `_MEMORY_GB` | `4` / `16` | Limits of one environment without a GPU (0 = the whole pool / no limit) |
+| `SLOTSERVE_DEVENV_CPU_MEMORY_POOL_GB` | `0` | Memory all environments without a GPU may claim together (0 = no limit) |
 
 Admins can change every setting in **Admin → System settings** without a restart, except the deployment ones (`HOST`, `PORT`, `SECRET_KEY`, `COOKIE_SECURE`, `STATIC_DIR`, `DATA_DIR`, `MODELS_DIR`, `LLAMA_SERVER_CMD`, `LLAMA_HOST`, `LLAMA_PORT`, `TELEGRAM_API_BASE`, the `…_API_BASE` and `QQ_TOKEN_URL` addresses, `DOCKER_HOST`, `DROPBEAR_PATH`), which need a restart and therefore stay in `.env`. Overrides live in the database and win over `.env`; **Use default** removes an override.
 

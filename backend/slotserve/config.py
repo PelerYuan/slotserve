@@ -145,6 +145,13 @@ class Settings(BaseSettings):
     # and how often they are checked; 0 = only when an admin asks.
     storage_helper_image: str = "busybox:1.37"
     storage_check_minutes: int = 30
+    # -- devenv_cpu: environments without a GPU (no booking), on the CPU cores no lane reserves --
+    devenv_cpu_enabled: bool = True
+    devenv_cpu_per_user: int = 2  # CPU-only environments one person can run at the same time
+    devenv_cpu_cores_per_gpu: int = 8  # CPU cores each GPU lane reserves for whoever uses it; 0 = none
+    devenv_cpu_cores: float = 4.0  # cores one CPU-only environment may use at most; 0 = the whole shared pool
+    devenv_cpu_memory_gb: float = 16.0  # RAM one CPU-only environment may use at most; 0 = no limit
+    devenv_cpu_memory_pool_gb: float = 0.0  # RAM all CPU-only environments together may claim; 0 = no limit
 
     @property
     def database_url(self) -> str:

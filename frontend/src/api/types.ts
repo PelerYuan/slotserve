@@ -446,7 +446,7 @@ export type DevState = 'waiting' | 'pulling' | 'ready' | 'starting' | 'running' 
 export interface DevSession {
   id: number
   /** shared: the environment of an idle lane, which everyone can log into with their own account */
-  kind: 'booking' | 'shared'
+  kind: 'booking' | 'shared' | 'cpu' // cpu: started without a GPU and without a booking
   reservation_id: number | null
   username: string | null
   mine: boolean

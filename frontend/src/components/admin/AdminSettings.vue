@@ -67,6 +67,13 @@ const GROUPS: { id: string; keys: string[] }[] = [
       'devenv_storage_dir',
       'devenv_projects',
       'devenv_project_days',
+      // devenv_cpu: environments without a GPU
+      'devenv_cpu_enabled',
+      'devenv_cpu_per_user',
+      'devenv_cpu_cores_per_gpu',
+      'devenv_cpu_cores',
+      'devenv_cpu_memory_gb',
+      'devenv_cpu_memory_pool_gb',
     ],
   },
   {

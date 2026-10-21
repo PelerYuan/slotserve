@@ -222,4 +222,25 @@ def test_storage_tab(page: Page, server: str):
     row.get_by_role("button", name="Delete").click()
     page.get_by_role("dialog").get_by_role("button", name="Delete").click()
     expect(page.get_by_text("No storage yet", exact=False)).to_be_visible()
+
+
+def test_devenv_without_gpu_ui(page: Page, server: str):
+    """Dev environments without a GPU: the section on the dev environments page and the admin settings."""
+    sign_in(page, server, "admin")
+    _api(page, server, "PUT", "/api/admin/settings", {"devenv_enabled": True})
+    try:
+        info = _api(page, server, "GET", "/api/devenv/cpu")
+        assert info["enabled"] is True and info["per_user"] == 2 and info["sessions"] == []
+        page.goto(f"{server}/devenv")
+        panel = page.locator("[data-test=cpu-panel]")
+        expect(panel.get_by_role("heading", name="Without a GPU")).to_be_visible()
+        expect(panel.get_by_text("0 of 2 running for you")).to_be_visible()
+        expect(panel.get_by_role("button", name="Start without GPU")).to_be_visible()
+        expect(page.locator("[data-test=cpu-start]").first).to_be_visible()
+
+        page.goto(f"{server}/admin?tab=settings")
+        expect(page.get_by_text("CPU cores reserved per GPU")).to_be_visible()
+        expect(page.get_by_text("Without-GPU environments per person")).to_be_visible()
+    finally:
+        _api(page, server, "PUT", "/api/admin/settings", {"devenv_enabled": None})
     assert not page.errors  # type: ignore[attr-defined]

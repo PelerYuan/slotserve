@@ -187,6 +187,22 @@ class DockerClient:
                 return None
             raise
 
+    async def stats(self, container: str) -> dict | None:
+        """One reading of a container's resource use (CPU time in ns, memory); None when it is gone."""
+        try:
+            resp = await self._request(
+                "GET", f"/containers/{container}/stats", params={"stream": "false", "one-shot": "true"}
+            )
+        except DockerError as exc:
+            if exc.status == 404:
+                return None
+            raise
+        return resp.json()
+
+    async def update(self, container: str, resources: dict) -> None:
+        """Changes a container's CPU and memory limits (``docker update``)."""
+        await self._request("POST", f"/containers/{container}/update", json=resources)
+
     async def wait(self, container: str, timeout: float = 600) -> int:
         """Waits for a container to exit; returns its exit code."""
         resp = await self._request("POST", f"/containers/{container}/wait", timeout=timeout)

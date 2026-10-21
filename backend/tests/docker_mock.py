@@ -30,6 +30,11 @@ class FakeDocker:
         self.helper_output: dict[str, str] = {}  # text in a helper's script -> its output (logs)
         self.mount_errors: dict[str, str] = {}  # mount source (prefix) -> error when a container starts
         self._exec_ids: dict[str, int] = {}
+        self.ncpu = 32  # what /info reports
+        self.mem_total = 128 * 2**30
+        self.cpu_ns: dict[str, int] = {}  # container id -> CPU time reported by /stats
+        self.mem_used: dict[str, int] = {}
+        self.updates: list[tuple[str, dict]] = []  # (container id, body) of every docker update
         self._next = 1
 
         def ref(name: str, tag: str) -> str:
@@ -38,6 +43,35 @@ class FakeDocker:
         @self.app.get("/v1.41/version")
         async def version():
             return {"Version": "27.0-fake", "ApiVersion": "1.41"}
+
+        @self.app.get("/v1.41/info")
+        async def info():
+            return {"NCPU": self.ncpu, "MemTotal": self.mem_total, "ServerVersion": "27.0-fake"}
+
+        @self.app.get("/v1.41/containers/{cid}/stats")
+        async def stats(cid: str):
+            c = find(cid)
+            if c is None:
+                return JSONResponse({"message": "no such container"}, status_code=404)
+            host = c["Config"].get("HostConfig", {})
+            return {
+                "cpu_stats": {"cpu_usage": {"total_usage": self.cpu_ns.get(c["Id"], 0)}, "online_cpus": self.ncpu},
+                "memory_stats": {
+                    "usage": self.mem_used.get(c["Id"], 0) + 4096,
+                    "limit": host.get("Memory") or self.mem_total,
+                    "stats": {"inactive_file": 4096},
+                },
+            }
+
+        @self.app.post("/v1.41/containers/{cid}/update")
+        async def update(cid: str, request: Request):
+            c = find(cid)
+            if c is None:
+                return JSONResponse({"message": "no such container"}, status_code=404)
+            body = await request.json()
+            self.updates.append((c["Id"], body))
+            c["Config"].setdefault("HostConfig", {}).update(body)
+            return {"Warnings": []}
 
         @self.app.get("/v1.41/images/{name:path}/json")
         async def image(name: str):

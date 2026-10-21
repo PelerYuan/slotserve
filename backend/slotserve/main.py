@@ -17,6 +17,7 @@ from .api import (
     calendar,
     channels,
     devenv,
+    devenv_cpu,
     downloads,
     keys,
     lanes,
@@ -159,6 +160,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
     app.include_router(devenv.keys_router)
     app.include_router(storage.router)  # storage hook
     app.include_router(storage.user_router)
+    app.include_router(devenv_cpu.router)  # devenv_cpu: environments without a GPU
     app.include_router(proxy.router)
     app.include_router(devenv_web.router)
 
