@@ -24,6 +24,8 @@ services:
       SLOTSERVE_DATA_DIR: /data
       SLOTSERVE_MODELS_DIR: /models
       SLOTSERVE_LLAMA_SERVER_CMD: /opt/llama.cpp/llama-server
+    # Docker Desktop (Windows / macOS): remove network_mode below; the agent only connects out. On Windows, put a
+    # Linux build of llama.cpp in LLAMA_CPP_DIR. Simpler: the one-line installers in Admin > Nodes (docs: Personal computers).
     # The server forwards model requests to this machine's model servers (SLOTSERVE_LLAMA_PORT + lane id - 1),
     # so they must be reachable on the machine's address. Without host networking, publish those ports instead.
     network_mode: host
