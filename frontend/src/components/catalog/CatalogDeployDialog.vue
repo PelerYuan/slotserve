@@ -66,7 +66,12 @@ watch(machineId, () => {
 })
 if (multiMachine.value) void loadMachines(true)
 const laneOptions = computed(() =>
-  machineLanes.value.map((l) => ({ value: l.id, label: `${l.name}  ·  ${t(`catalog.fit.${fitOn(variant.value, l.id)}`)}` })),
+  machineLanes.value.map((l) => ({
+    value: l.id,
+    label:
+      `${l.name}  ·  ${t(`catalog.fit.${fitOn(variant.value, l.id)}`)}` +
+      (l.node_online === false ? ` (${t('cluster.statuses.offline')})` : ''),
+  })),
 )
 const lane = computed(() => props.lanes.find((l) => l.id === laneId.value) ?? null)
 const fit = computed(() => (laneId.value != null ? fitOn(variant.value, laneId.value) : 'unknown'))

@@ -99,7 +99,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         app.state.downloader = Downloader(settings)
         app.state.downloader.events = app.state.notifier
         app.state.downloader.cluster = app.state.cluster
-        app.state.deployer = Deployer(settings, app.state.lanes)
+        app.state.deployer = Deployer(settings, app.state.lanes, app.state.cluster)
         app.state.downloader.deployer = app.state.deployer
         app.state.housekeeper = Housekeeper(app.state)
         # GPU metrics come from nvidia-smi unless a reader was injected (tests, other hardware).

@@ -100,6 +100,7 @@ export interface CatalogVariant {
   estimate: CatalogEstimate
   fits: { lane_id: number; status: FitStatus }[]
   downloaded: boolean
+  node_ids?: number[] // machines it is registered on already
   models: { id: number; name: string; engine: string }[]
 }
 
@@ -129,9 +130,9 @@ export interface CatalogLane {
   name: string
   gpus: number[]
   memory_bytes: number | null
-  /** the machine the lane's GPUs are in */
   node_id?: number | null
   node_name?: string | null
+  node_online?: boolean
 }
 
 export interface Catalog {
@@ -376,6 +377,8 @@ export interface Usage {
   lanes: {
     lane_id: number | null
     lane_name: string
+    node_id?: number | null
+    node_name?: string | null
     gpus: number
     booked_gpu_hours: number
     used_gpu_hours: number
@@ -387,6 +390,8 @@ export interface Usage {
   gpus: {
     lane_id: number | null
     lane_name: string
+    node_id?: number | null
+    node_name?: string | null
     gpu_index: number
     gpu_hours: number
     used_gpu_hours: number
@@ -395,6 +400,7 @@ export interface Usage {
     peak_memory_mb: number | null
     memory_total_mb: number | null
   }[]
+  nodes?: UsageNode[]
   kinds: { kind: UsageKind; gpu_hours: number; used_gpu_hours: number; avg_utilization: number | null; energy_wh: number }[]
   bucket_hours: number
   buckets: string[]
@@ -403,7 +409,22 @@ export interface Usage {
   utilization_by_lane: UsageSeries[]
 }
 
-export type UsageExport = 'summary' | 'requests' | 'compute' | 'people'
+export interface UsageNode {
+  node_id: number | null
+  node_name: string
+  lanes: number
+  gpus: number
+  booked_gpu_hours: number
+  used_gpu_hours: number
+  sampled_gpu_hours: number
+  avg_utilization: number | null
+  energy_wh: number
+  peak_memory_mb: number | null
+  occupancy: Partial<Record<UsageKind, number>>
+  occupied_pct: number | null
+}
+
+export type UsageExport = 'summary' | 'requests' | 'compute' | 'people' | 'nodes'
 
 // ---- admin ----------------------------------------------------------------
 
@@ -791,6 +812,24 @@ export interface ClusterNode {
   mac_addresses?: string
   wol_macs?: string[]
   woken_at?: string | null
+  clock_skew_seconds?: number | null
+  clock_skew_warning?: boolean
+  version_status?: 'current' | 'outdated' | 'newer' | 'unknown'
+  update_commands?: Record<string, string>
+  libraries?: { storage_id: number; path: string | null; error: string | null }[]
+  downloads_queued?: number
+  download_running?: number | null
+  on_exit?: string | null
+}
+
+export interface ServerLink {
+  server_url: string
+  tls: boolean
+  fingerprint: string | null
+  fingerprint_source: 'certificate_file' | 'public_url' | null
+  fingerprint_error: string | null
+  version: string
+  protocol: number
 }
 
 export interface ClusterNodeToken {
@@ -801,4 +840,5 @@ export interface ClusterNodeToken {
   agent_command: string
   install_linux?: string
   install_windows?: string
+  delivered?: boolean
 }

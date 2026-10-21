@@ -6,7 +6,18 @@ from sqlalchemy import func, select
 
 from ..config import get_settings
 from ..db import SessionLocal, utcnow
-from ..orm import DownloadTask, Lane, LlmModel, ModelLoadEvent, Reservation, UsageDaily, UsageLog, UsageSample, User
+from ..orm import (
+    DownloadTask,
+    Lane,
+    LlmModel,
+    ModelLoadEvent,
+    Node,
+    Reservation,
+    UsageDaily,
+    UsageLog,
+    UsageSample,
+    User,
+)
 from ..runtime.gpu import gpu_stats
 from ..runtime.manager import RuntimeState
 from ..security import constant_time_equals
@@ -145,12 +156,40 @@ async def metrics(request: Request):
 
         sampler = getattr(request.app.state, "usage_sampler", None)
         gpus = await sampler.stats() if sampler is not None else await gpu_stats()
-        await _compute_metrics(w, db, lanes, users, gpus, sampler, now)
+        node_names = dict((await db.execute(select(Node.id, Node.name))).all())
+        await _compute_metrics(w, db, lanes, users, gpus, sampler, now, node_names)
 
-    lane_of: dict[int, str] = {}
+    # Every machine's GPUs, labelled with the node (GPU indexes are per machine). Offline nodes report none.
+    registry = getattr(request.app.state, "nodes", None)
+    executors = registry.all() if registry is not None else []
+    local_id = registry.local.node_id if registry is not None else None
+    per_node: list[tuple[str, int | None, list]] = []
+    for ex in executors:
+        per_node.append((ex.name, ex.node_id, gpus if ex.is_local else await ex.gpu_stats()))
+    if not executors:
+        per_node.append(("local", None, gpus))
+    lane_of: dict[tuple[int | None, int], str] = {}
     for ctx in lanes:
-        for g in usage_sampler.lane_gpus(ctx.devices, gpus):
-            lane_of.setdefault(g.index, ctx.name)
+        node_id = getattr(ctx, "node_id", None) or local_id
+        own = next((g for name, nid, g in per_node if nid == node_id), [])
+        for g in usage_sampler.lane_gpus(ctx.devices, own):
+            lane_of.setdefault((node_id, g.index), ctx.name)
+    w.metric(
+        "slotserve_node_up",
+        "gauge",
+        "1 while a machine (node) is connected; the built-in node is always up.",
+        [({"node": ex.name}, int(ex.online)) for ex in executors],
+    )
+    w.metric(
+        "slotserve_node_clock_skew_seconds",
+        "gauge",
+        "A node's clock minus the server's (samples and events always use the server's clock).",
+        [
+            ({"node": ex.name}, round(ex.clock_skew, 3))
+            for ex in executors
+            if getattr(ex, "clock_skew", None) is not None and ex.online
+        ],
+    )
     for name, help_text, attr, scale in (
         ("slotserve_gpu_memory_used_bytes", "GPU memory in use.", "memory_used_mb", 1024 * 1024),
         ("slotserve_gpu_memory_total_bytes", "GPU memory size.", "memory_total_mb", 1024 * 1024),
@@ -159,21 +198,32 @@ async def metrics(request: Request):
         ("slotserve_gpu_power_watts", "GPU power draw.", "power_w", 1),
     ):
         samples = [
-            ({"gpu": g.index, "name": g.name, "lane": lane_of.get(g.index, "")}, round(getattr(g, attr) * scale, 3))
-            for g in gpus
+            (
+                {"node": node, "gpu": g.index, "name": g.name, "lane": lane_of.get((nid, g.index), "")},
+                round(getattr(g, attr) * scale, 3),
+            )
+            for node, nid, node_gpus in per_node
+            for g in node_gpus
             if getattr(g, attr) is not None
         ]
         w.metric(name, "gauge", help_text, samples)
     return PlainTextResponse(w.text(), media_type="text/plain; version=0.0.4; charset=utf-8")
 
 
-async def _compute_metrics(w: _Writer, db, lanes, users: dict[int, str], gpus, sampler, now) -> None:
+async def _compute_metrics(
+    w: _Writer, db, lanes, users: dict[int, str], gpus, sampler, now, node_names: dict[int, str] | None = None
+) -> None:
     """Who holds each lane now, booked GPU-hours, and the sampled GPU time, busy time and energy."""
+    node_names = node_names or {}
+    local_id = next(iter(sorted(node_names)), None)
+    if sampler is not None and sampler.local_node_id() is not None:
+        local_id = sampler.local_node_id()
     occupants = []
     for ctx in lanes:
         occ = await usage_sampler.attribute(db, ctx, now, sampler.probes if sampler is not None else ())
         user = users.get(occ.user_id, "?") if occ.user_id is not None else ""
-        occupants.append(({"lane": ctx.name, "kind": occ.kind, "user": user}, 1))
+        node = node_names.get(getattr(ctx, "node_id", None) or local_id, "")
+        occupants.append(({"node": node, "lane": ctx.name, "kind": occ.kind, "user": user}, 1))
     w.metric(
         "slotserve_lane_occupant",
         "gauge",
@@ -183,6 +233,7 @@ async def _compute_metrics(w: _Writer, db, lanes, users: dict[int, str], gpus, s
 
     lane_rows = list((await db.execute(select(Lane))).scalars())
     names = {lane.id: lane.name for lane in lane_rows}
+    lane_node = {lane.id: lane.node_id or local_id for lane in lane_rows}
     sizes = {lane.id: usage_sampler.gpu_count(lane.devices, len(gpus)) for lane in lane_rows}
     booked: dict[tuple[str, str, str], float] = {}
     rows = await db.execute(select(Reservation).where(Reservation.status == "booked", Reservation.start_at < now))
@@ -200,6 +251,7 @@ async def _compute_metrics(w: _Writer, db, lanes, users: dict[int, str], gpus, s
     sampled = (
         await db.execute(
             select(
+                UsageSample.node_id,
                 UsageSample.lane_id,
                 UsageSample.gpu_index,
                 UsageSample.kind,
@@ -208,23 +260,36 @@ async def _compute_metrics(w: _Writer, db, lanes, users: dict[int, str], gpus, s
                 func.sum(UsageSample.energy_wh),
             )
             .where(UsageSample.resource == "gpu")
-            .group_by(UsageSample.lane_id, UsageSample.gpu_index, UsageSample.kind)
+            .group_by(UsageSample.node_id, UsageSample.lane_id, UsageSample.gpu_index, UsageSample.kind)
         )
     ).all()
-    seconds, busy, energy = [], [], {}
-    for lane_id, gpu, kind, sec, busy_sec, wh in sampled:
-        labels = {"lane": names.get(lane_id, "?"), "gpu": "" if gpu < 0 else gpu, "kind": kind}
-        seconds.append((labels, int(sec or 0)))
-        busy.append((labels, int(busy_sec or 0)))
-        key = (labels["lane"], labels["gpu"])
+    seconds, busy, energy = {}, {}, {}
+    for node_id, lane_id, gpu, kind, sec, busy_sec, wh in sampled:
+        node = node_names.get(node_id or lane_node.get(lane_id) or local_id, "")
+        labels = (node, names.get(lane_id, "?"), "" if gpu < 0 else gpu, kind)
+        seconds[labels] = seconds.get(labels, 0) + int(sec or 0)
+        busy[labels] = busy.get(labels, 0) + int(busy_sec or 0)
+        key = labels[:3]
         energy[key] = energy.get(key, 0.0) + float(wh or 0)
-    w.metric("slotserve_gpu_seconds_total", "counter", "Sampled GPU time by what the GPU was doing.", seconds)
-    w.metric("slotserve_gpu_busy_seconds_total", "counter", "Sampled GPU time at or above the busy threshold.", busy)
+
+    def keyed(values: dict) -> list[tuple[dict, float]]:
+        return [
+            ({"node": n, "lane": lane, "gpu": g, "kind": k}, v)
+            for (n, lane, g, k), v in sorted(values.items(), key=str)
+        ]
+
+    w.metric("slotserve_gpu_seconds_total", "counter", "Sampled GPU time by what the GPU was doing.", keyed(seconds))
+    w.metric(
+        "slotserve_gpu_busy_seconds_total", "counter", "Sampled GPU time at or above the busy threshold.", keyed(busy)
+    )
     w.metric(
         "slotserve_gpu_energy_joules_total",
         "counter",
         "Energy drawn by the GPU, from sampled power.",
-        [({"lane": lane, "gpu": g}, round(wh * 3600, 1)) for (lane, g), wh in sorted(energy.items(), key=str)],
+        [
+            ({"node": n, "lane": lane, "gpu": g}, round(wh * 3600, 1))
+            for (n, lane, g), wh in sorted(energy.items(), key=str)
+        ],
     )
     per_user = (
         await db.execute(

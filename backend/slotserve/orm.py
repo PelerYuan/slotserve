@@ -138,6 +138,8 @@ class CatalogDeploy(Base):
     lane_id: Mapped[int | None] = mapped_column(ForeignKey("lanes.id", ondelete="SET NULL"), nullable=True)
     set_default: Mapped[bool] = mapped_column(Boolean, default=False)
     task_ids: Mapped[str] = mapped_column(Text, default="[]")  # JSON list of download_tasks ids
+    # The node (agent) the files are downloaded to and the model is registered on; NULL = this machine.
+    node_id: Mapped[int | None] = mapped_column(ForeignKey("nodes.id", ondelete="CASCADE"), nullable=True)
     # downloading | done | failed | cancelled
     status: Mapped[str] = mapped_column(String(16), default="downloading", index=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -535,6 +537,8 @@ class UsageSample(Base):
     mem_peak_mb: Mapped[int | None] = mapped_column(Integer, nullable=True)
     mem_total_mb: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cpu_core_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)  # resource "cpu" only
+    # The machine the lane ran on at that time (NULL in rows from before multiple machines: the lane's node).
+    node_id: Mapped[int | None] = mapped_column(ForeignKey("nodes.id", ondelete="SET NULL"), nullable=True)
 
 
 class Node(Base):
@@ -635,6 +639,9 @@ class Storage(Base):
     access: Mapped[str] = mapped_column(String(16), default="everyone")  # everyone | users | admins
     user_ids: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list (access "users")
     local_path: Mapped[str | None] = mapped_column(Text, nullable=True)  # models: where SlotServe sees it
+    # models: JSON list of other nodes (agents) that use the library too - a host directory at the same path there,
+    # an NFS / SMB share mounted by that node's agent through Docker
+    node_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
     quota_gb: Mapped[float | None] = mapped_column(Float, nullable=True)  # personal: soft limit per person
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     status: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON: the last check

@@ -33,6 +33,7 @@ export interface Storage {
   user_ids: number[]
   usernames: string[]
   local_path: string | null
+  node_ids?: number[]
   quota_gb: number | null
   enabled: boolean
   status: StorageCheck | null
@@ -58,6 +59,7 @@ export interface StorageInput {
   access: StorageAccess
   user_ids: number[]
   local_path?: string | null
+  node_ids?: number[]
   quota_gb?: number | null
   enabled: boolean
 }

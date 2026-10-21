@@ -135,6 +135,8 @@ const occupancyOf = (occ: Partial<Record<UsageKind, number>>) => {
     : []
 }
 const multiLane = computed(() => (data.value?.lanes.length ?? 0) > 1)
+// Several machines (nodes): GPU time and occupancy per machine.
+const multiNode = computed(() => (data.value?.nodes?.length ?? 0) > 1)
 const kindsPresent = computed(() =>
   KINDS.filter((k) => (data.value?.lanes ?? []).some((l) => (l.occupancy[k] ?? 0) > 0)),
 )
@@ -177,6 +179,7 @@ const hasData = computed(() => {
           :options="[
             { key: 'people', label: t('usage.exportPeople') },
             { key: 'compute', label: t('usage.exportCompute') },
+            ...(multiNode ? [{ key: 'nodes', label: t('usage.exportNodes') }] : []),
             { key: 'summary', label: t('usage.exportSummary') },
             { key: 'requests', label: t('usage.exportRequests') },
           ]"
@@ -302,6 +305,46 @@ const hasData = computed(() => {
       </div>
     </section>
 
+    <section v-if="hasData && multiNode" class="card" data-section="usage-nodes">
+      <div class="card-header"><h3 class="card-title">{{ t('usage.byNode') }}</h3></div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>{{ t('usage.node') }}</th>
+              <th class="right">{{ t('usage.bookedGpuHoursShort') }}</th>
+              <th class="right">{{ t('usage.usedGpuHoursShort') }}</th>
+              <th class="right">{{ t('usage.avgUtilizationShort') }}</th>
+              <th class="right">{{ t('usage.occupied') }}</th>
+              <th class="occ-col">{{ t('usage.occupancy') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="n in data!.nodes" :key="String(n.node_id)" :data-node="n.node_name">
+              <td class="strong">
+                {{ n.node_name }}
+                <span class="faint">· {{ t('usage.gpuCount', { n: n.gpus }) }}</span>
+              </td>
+              <td class="right num">{{ hours(n.booked_gpu_hours) }}</td>
+              <td class="right num">{{ hours(n.used_gpu_hours) }}</td>
+              <td class="right num">{{ pct(n.avg_utilization) }}</td>
+              <td class="right num">{{ pct(n.occupied_pct) }}</td>
+              <td class="occ-col">
+                <div class="occ" role="img" :aria-label="occupancyOf(n.occupancy).map((o) => `${kindName(o.kind)} ${Math.round(o.share)}%`).join(', ')">
+                  <span
+                    v-for="o in occupancyOf(n.occupancy)"
+                    :key="o.kind"
+                    :style="{ width: `${o.share}%`, background: kindColor(o.kind) }"
+                    :title="`${kindName(o.kind)}: ${hours(o.hours)} h (${Math.round(o.share)}%)`"
+                  />
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <section v-if="contribution.some((r) => r.nodes.length)" class="card contribution" data-section="contribution">
       <div class="card-header">
         <h3 class="card-title">{{ t('sharing.usageTitle') }}</h3>
@@ -354,7 +397,10 @@ const hasData = computed(() => {
             </thead>
             <tbody>
               <tr v-for="l in data!.lanes" :key="String(l.lane_id)">
-                <td class="strong">{{ l.lane_name }} <span class="faint">· {{ t('usage.gpuCount', { n: l.gpus }) }}</span></td>
+                <td class="strong">
+                  {{ l.lane_name }}
+                  <span class="faint">· <template v-if="multiNode && l.node_name">{{ l.node_name }} · </template>{{ t('usage.gpuCount', { n: l.gpus }) }}</span>
+                </td>
                 <td class="right num">{{ hours(l.booked_gpu_hours) }}</td>
                 <td class="right num">{{ pct(l.avg_utilization) }}</td>
                 <td class="occ-col">

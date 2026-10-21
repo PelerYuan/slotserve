@@ -1,4 +1,9 @@
-"""Serial background download queue with HTTP Range resume."""
+"""Background download queues with HTTP Range resume: one queue per machine (node).
+
+Each node downloads one file at a time, but nodes download in parallel: a slow or offline node never holds up
+the others. A download whose node goes offline goes back to the queue and resumes where it stopped (the
+``.part`` file stays on the node) once the node is back.
+"""
 
 import asyncio
 import contextlib
@@ -44,7 +49,9 @@ class Downloader:
         self.settings = settings
         self._wake = asyncio.Event()
         self._cancel: set[int] = set()
-        self.current_id: int | None = None
+        self.current_id: int | None = None  # the last download started (any node)
+        self.active: dict[int | None, int] = {}  # node id (None: this machine) -> running task id
+        self._workers: dict[int | None, asyncio.Task] = {}
         self.events = None  # Notifier, set by the app
         self.cluster = None  # ClusterHub, set by the app: downloads that run on other machines
         self._remote_calls: set[asyncio.Task] = set()
@@ -92,29 +99,69 @@ class Downloader:
             await db.execute(update(DownloadTask).where(DownloadTask.status == "running").values(status="queued"))
             await db.commit()
 
+    def _key(self, node_id: int | None) -> int | None:
+        """The queue a task belongs to: its node, ``None`` for this machine."""
+        return node_id if self.is_remote(node_id) else None
+
     async def run(self) -> None:
         await self.recover()
-        while True:
-            try:
-                task_id = await self._next_task()
-                if task_id is not None:
-                    await self._process(task_id)
-                    continue
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                log.exception("download loop error")
-            try:
-                await asyncio.wait_for(self._wake.wait(), 10)
-            except TimeoutError:
-                pass
-            self._wake.clear()
+        try:
+            while True:
+                self._wake.clear()
+                try:
+                    await self._dispatch()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    log.exception("download loop error")
+                try:
+                    await asyncio.wait_for(self._wake.wait(), 10)
+                except TimeoutError:
+                    pass
+        finally:
+            workers = list(self._workers.values())
+            for worker in workers:
+                worker.cancel()
+            for worker in workers:
+                with contextlib.suppress(BaseException):
+                    await worker
 
-    async def _next_task(self) -> int | None:
+    async def _dispatch(self) -> None:
+        """Starts a worker for every node that has queued downloads, is reachable and has none running."""
+        async with SessionLocal() as db:
+            stmt = select(DownloadTask.node_id).where(DownloadTask.status == "queued").distinct()
+            nodes = {self._key(node_id) for node_id in (await db.execute(stmt)).scalars()}
+        for key in nodes:
+            worker = self._workers.get(key)
+            if worker is not None and not worker.done():
+                continue
+            if not self._available(key):  # downloads of an offline node wait for it
+                continue
+            self._workers[key] = asyncio.get_running_loop().create_task(self._worker(key), name=f"downloads-{key}")
+
+    async def _worker(self, key: int | None) -> None:
+        try:
+            while self._available(key):
+                task_id = await self._next_task(key)
+                if task_id is None:
+                    return
+                try:
+                    await self._process(task_id)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    log.exception("download %s: unexpected error", task_id)
+                    await self._set(task_id, status="failed", error="internal error", finished_at=utcnow())
+        finally:
+            if self._workers.get(key) is asyncio.current_task():
+                self._workers.pop(key, None)
+            self.poke()  # another node may be waiting for a worker slot
+
+    async def _next_task(self, key: int | None = None) -> int | None:
         async with SessionLocal() as db:
             stmt = select(DownloadTask.id, DownloadTask.node_id).where(DownloadTask.status == "queued")
             for task_id, node_id in (await db.execute(stmt.order_by(DownloadTask.id))).all():
-                if self._available(node_id):  # downloads of an offline node wait for it
+                if self._key(node_id) == key:
                     return task_id
             return None
 
@@ -129,19 +176,35 @@ class Downloader:
             if task is None or task.status != "queued":
                 return
             url, filename, user_id, node_id = task.url, task.filename, task.user_id, task.node_id
-            try:
-                base = await self.task_dir(db, task)
-            except RuntimeError as exc:
-                await self._set(task_id, status="failed", error=str(exc), finished_at=utcnow())
-                return
+            storage_id, expected = task.storage_id, task.total_bytes
+            remote = self.is_remote(node_id)
+            base = None
+            if not remote:
+                try:
+                    base = await self.task_dir(db, task)
+                except RuntimeError as exc:
+                    await self._set(task_id, status="failed", error=str(exc), finished_at=utcnow())
+                    return
+            owned = self.deployer is not None and await self.deployer.owns(task_id)
+        key = self._key(node_id)
         self._cancel.discard(task_id)
         self.current_id = task_id
+        self.active[key] = task_id
         await self._set(task_id, status="running", error=None, speed_bps=0.0)
-        remote = self.is_remote(node_id)
         remote_path = ""
         try:
             if remote:
-                remote_path = await self.cluster.run_download(node_id, task_id, url, filename, self.auth_headers(url))
+                remote_base = await self.cluster.library_dir(node_id, storage_id) if storage_id is not None else None
+                remote_path = await self.cluster.run_download(
+                    node_id,
+                    task_id,
+                    url,
+                    filename,
+                    self.auth_headers(url),
+                    base=remote_base,
+                    expected_bytes=expected,
+                    existing_ok=owned,  # catalog files already on the node count as downloaded
+                )
             else:
                 await self._download(task_id, url, filename, base)
         except DownloadCancelled:
@@ -157,8 +220,17 @@ class Downloader:
             self._emit("download_failed", user_id=user_id, filename=filename, error=str(exc)[:200])
             return
         finally:
-            self.current_id = None
+            if self.current_id == task_id:
+                self.current_id = None
+            if self.active.get(key) == task_id:
+                self.active.pop(key, None)
 
+        if owned:
+            # Part of a catalog deployment (on any node): it registers the model itself once every file is there.
+            await self._set(task_id, status="done", speed_bps=0.0, finished_at=utcnow())
+            self._emit("download_done", user_id=user_id, filename=filename)
+            await self.deployer.task_done(task_id)
+            return
         if remote:
             model_id = await self._register_remote(node_id, remote_path, filename, user_id)
             await self._set(task_id, status="done", speed_bps=0.0, finished_at=utcnow(), model_id=model_id)
@@ -166,12 +238,6 @@ class Downloader:
             return
         dest = self.dest_path(filename, base)
         model_id = None
-        if self.deployer is not None and await self.deployer.owns(task_id):
-            # Part of a catalog deployment: it registers the model itself once every file is here.
-            await self._set(task_id, status="done", speed_bps=0.0, finished_at=utcnow())
-            self._emit("download_done", user_id=user_id, filename=filename)
-            await self.deployer.task_done(task_id)
-            return
         if scanner.is_primary_gguf(dest):
             async with SessionLocal() as db:
                 model = await scanner.register_file(db, dest, self.settings, user_id)

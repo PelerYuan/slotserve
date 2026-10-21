@@ -21,6 +21,7 @@ import type {
   CatalogEntryInput,
   ClusterNode,
   ClusterNodeToken,
+  ServerLink,
   DevInfo,
   DevProject,
   DevSession,
@@ -311,6 +312,7 @@ export const api = {
     rotateNodeToken: (id: number) => request<ClusterNodeToken>('POST', `/api/admin/nodes/${id}/token`),
     revokeNode: (id: number) => request<ClusterNode>('POST', `/api/admin/nodes/${id}/revoke`),
     deleteNode: (id: number) => request<void>('DELETE', `/api/admin/nodes/${id}`),
+    serverLink: () => request<ServerLink>('GET', '/api/admin/nodes/server'),
     scanNode: (id: number) =>
       request<{ added: string[]; skipped: number }>('POST', '/api/models/scan', undefined, { node_id: id }),
     manual: (body: {

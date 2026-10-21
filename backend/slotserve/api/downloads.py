@@ -11,11 +11,11 @@ from ..config import get_settings
 from ..db import get_db, utcnow
 from ..deps import current_user, get_downloader
 from ..errors import ApiError
-from ..orm import DownloadTask, Node, User
+from ..orm import DownloadTask, Node, Storage, User
 from ..schemas import DownloadCreateIn, DownloadOut, HfDownloadIn, HfFileOut, HfFilesOut
 from ..services.downloader import Downloader, filename_from_url, safe_filename
 from ..services.scanner import SPLIT_RE
-from ..services.storage import StorageError, library_dir
+from ..services.storage import StorageError, allows, library_dir, library_nodes
 
 router = APIRouter(prefix="/api/downloads", tags=["downloads"])
 
@@ -51,12 +51,18 @@ async def _queue(
     node_id = await _node(db, downloader, node_id)
     base = None
     if storage_id is not None:  # storage hook: download into a model library from Admin -> Storage
-        if node_id is not None:  # libraries are mounted on this machine; other machines use their models directory
-            raise ApiError(status.HTTP_400_BAD_REQUEST, "storage_remote_node")
-        try:
-            base = await library_dir(db, storage_id, user)
-        except StorageError as exc:
-            raise ApiError(status.HTTP_400_BAD_REQUEST, exc.code, **exc.params) from exc
+        if node_id is not None:
+            # Another machine: only libraries an admin made available there (Admin -> Storage).
+            st = await db.get(Storage, storage_id)
+            if st is None or st.purpose != "models" or not allows(st, user) or not st.enabled:
+                raise ApiError(status.HTTP_400_BAD_REQUEST, "storage_library_invalid")
+            if node_id not in library_nodes(st):
+                raise ApiError(status.HTTP_400_BAD_REQUEST, "storage_remote_node")
+        else:
+            try:
+                base = await library_dir(db, storage_id, user)
+            except StorageError as exc:
+                raise ApiError(status.HTTP_400_BAD_REQUEST, exc.code, **exc.params) from exc
     if node_id is None and downloader.dest_path(name, base).exists():
         raise ApiError(status.HTTP_409_CONFLICT, "file_exists", filename=name)
     busy = await db.execute(

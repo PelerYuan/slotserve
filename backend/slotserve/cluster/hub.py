@@ -16,10 +16,12 @@ from sqlalchemy import select
 from sqlalchemy import update as sa_update
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
+from .. import __version__
 from ..config import Settings
 from ..db import SessionLocal, utcnow
 from ..orm import HOLDING_STATUSES, DownloadTask, Lane, ModelLoadEvent, Node, Reservation
 from ..runtime.executor import NodeRegistry
+from ..services.ratelimit import AttemptLimiter
 from . import inventory
 from . import protocol as p
 from .remote import RemoteExecutor
@@ -40,6 +42,18 @@ def hash_token(token: str) -> str:
 
 def new_token() -> str:
     return p.TOKEN_PREFIX + secrets.token_urlsafe(32)
+
+
+def _agent_time(value: Any) -> datetime | None:
+    try:
+        moment = datetime.fromisoformat(str(value)) if value else None
+    except ValueError:
+        return None
+    if moment is not None and moment.tzinfo is None:
+        from datetime import UTC
+
+        moment = moment.replace(tzinfo=UTC)
+    return moment
 
 
 def _bearer(websocket: WebSocket) -> str:
@@ -74,6 +88,8 @@ class ClusterHub:
         self._closing = False
         # Downloads running on nodes: task id -> (node id, future resolved by the agent's "download" events).
         self.downloads: dict[int, tuple[int, asyncio.Future]] = {}
+        # Failed agent logins (unknown or rotated tokens) per address.
+        self.logins = AttemptLimiter()
 
     # ---- setup --------------------------------------------------------------
 
@@ -132,8 +148,29 @@ class ClusterHub:
 
     # ---- agent connections --------------------------------------------------
 
+    def _login_limit(self) -> int:
+        return max(1, int(self.settings.node_login_attempts))
+
+    def _throttled(self, ip: str) -> int | None:
+        """Minutes until an address may try again after too many failed agent logins, or None."""
+        q = self.logins._recent(f"agent:{ip}", time.monotonic())
+        if len(q) < self._login_limit():
+            return None
+        wait = q[0] + self.logins.window - time.monotonic()
+        return max(1, int(wait // 60) + 1)
+
     async def serve(self, websocket: WebSocket) -> None:
         await websocket.accept()
+        ip = websocket.client.host if websocket.client else "?"
+        minutes = self._throttled(ip)
+        if minutes is not None:
+            await self._reject(
+                websocket,
+                p.CLOSE_RATE_LIMITED,
+                "rate_limited",
+                f"too many failed node logins from {ip}; try again in {minutes} minute(s)",
+            )
+            return
         token = _bearer(websocket)
         async with SessionLocal() as db:
             node = (
@@ -142,6 +179,8 @@ class ClusterHub:
                 else None
             )
         if node is None or node.is_local:
+            self.logins._recent(f"agent:{ip}", time.monotonic()).append(time.monotonic())
+            log.warning("refused a node agent from %s: unknown or rotated token", ip)
             await self._reject(websocket, p.CLOSE_INVALID_TOKEN, "invalid_token", "unknown or rotated node token")
             return
         if node.revoked_at is not None:
@@ -156,8 +195,9 @@ class ClusterHub:
             await self._reject(websocket, p.CLOSE_BAD_HELLO, "bad_hello", "expected a hello frame")
             return
         version = hello.get("protocol")
+        received = utcnow()
         if not p.compatible(version):
-            message = p.mismatch_message(version, "agent")
+            message = p.mismatch_message(version, "agent", __version__)
             log.warning("node %s: %s", node.name, message)
             async with SessionLocal() as db:
                 row = await db.get(Node, node.id)
@@ -189,6 +229,7 @@ class ClusterHub:
         executor.reported_address = str(hello.get("address") or "")
         executor.seen_address = websocket.client.host if websocket.client else ""
         executor.connected_since = utcnow()
+        executor.note_clock(_agent_time(hello.get("time")), received)
         # Reconciliation, part 1: what the node is actually running replaces what this side assumed.
         for report in hello.get("runtimes") or []:
             runtime = executor.runtimes.get(report.get("lane_id"))
@@ -208,8 +249,19 @@ class ClusterHub:
                 )
                 row.last_error = None
             await inventory.sync_node_files(db, node.id, executor.inventory.get("models") or [], self.local_id)
+            wanted = list(
+                (
+                    await db.execute(
+                        select(DownloadTask.id).where(
+                            DownloadTask.node_id == node.id, DownloadTask.status.in_(("queued", "running"))
+                        )
+                    )
+                ).scalars()
+            )
+            libraries = await self.library_specs(db, node.id)
             await db.commit()
-        # Reconciliation, part 2: the agent stops whatever runs for lanes it no longer owns.
+        # Reconciliation, part 2: the agent stops whatever runs for lanes it no longer owns, and cancels
+        # downloads that were cancelled or removed while it was away.
         welcome = {
             "type": "welcome",
             "protocol": p.PROTOCOL_VERSION,
@@ -217,6 +269,10 @@ class ClusterHub:
             "name": node.name,
             "heartbeat_seconds": self.settings.node_heartbeat_seconds,
             "lanes": [{"lane_id": lane.id, "devices": lane.devices} for lane in lanes],
+            "server_version": __version__,
+            "server_time": utcnow().isoformat(),
+            "downloads": wanted,
+            "libraries": libraries,
         }
         try:
             await websocket.send_text(p.encode(welcome))
@@ -225,13 +281,23 @@ class ClusterHub:
             await peer.close()
             return
         log.info("node %s connected from %s (agent %s)", node.name, executor.seen_address, executor.agent_version)
+        if p.version_status(executor.agent_version, __version__) == "outdated":
+            log.warning(
+                "node %s runs agent %s, older than this server (%s): %s",
+                node.name,
+                executor.agent_version,
+                __version__,
+                p.update_commands(__version__)["compose"],
+            )
         self._back_online(executor)
         self._poke_lanes(node.id)
+        self._poke_downloads()  # downloads that waited for this node resume (HTTP Range) where they stopped
 
         try:
             while True:
                 text = await websocket.receive_text()
                 executor.last_seen = time.monotonic()
+                executor.received_at = utcnow()
                 try:
                     message = p.decode(text)
                 except p.ProtocolError as exc:
@@ -252,7 +318,8 @@ class ClusterHub:
         with contextlib.suppress(Exception):
             await websocket.send_text(p.encode(p.error(code, message)))
         with contextlib.suppress(Exception):
-            await websocket.close(close_code)
+            # the reason too: an agent may see the close before it reads the error frame
+            await websocket.close(close_code, reason=message.encode()[:120].decode(errors="ignore"))
 
     # ---- events from agents ---------------------------------------------------
 
@@ -260,6 +327,7 @@ class ClusterHub:
         if name == p.E_METRICS:
             executor.metrics = data
             executor.metrics_at = time.monotonic()
+            executor.note_clock(_agent_time(data.get("time")), executor.received_at or utcnow())
         elif name == p.E_RUNTIME:
             runtime = executor.runtimes.get(data.get("lane_id"))
             if runtime is not None:
@@ -284,18 +352,18 @@ class ClusterHub:
         if lane_id not in executor.runtimes:
             return  # only lanes of this node
 
-        def when(key: str) -> datetime:
-            try:
-                return datetime.fromisoformat(str(data.get(key)))
-            except ValueError:
-                return utcnow()
+        # Recorded at the time it arrived (the node's clock may be off): the load took as long as the node says.
+        finished = executor.received_at or utcnow()
+        started_agent, finished_agent = _agent_time(data.get("started_at")), _agent_time(data.get("finished_at"))
+        took = (finished_agent - started_agent) if started_agent and finished_agent else timedelta(0)
+        started = finished - max(took, timedelta(0))
 
         async with SessionLocal() as db:
             db.add(
                 ModelLoadEvent(
                     model_id=data.get("model_id"),
-                    started_at=when("started_at"),
-                    finished_at=when("finished_at"),
+                    started_at=started,
+                    finished_at=finished,
                     success=bool(data.get("success")),
                     error=data.get("error"),
                     lane_id=lane_id,
@@ -323,6 +391,11 @@ class ClusterHub:
         if not self._closing:
             self._offline_since[executor.node_id] = time.monotonic()
             self._poke_lanes(executor.node_id)
+
+    def _poke_downloads(self) -> None:
+        downloader = getattr(self.state, "downloader", None)
+        if downloader is not None:
+            downloader.poke()
 
     def _back_online(self, executor: RemoteExecutor) -> None:
         self._offline_since.pop(executor.node_id, None)
@@ -395,8 +468,18 @@ class ClusterHub:
 
     # ---- downloads executed by nodes ----------------------------------------------
 
-    async def run_download(self, node_id: int, task_id: int, url: str, filename: str, headers: dict) -> str:
-        """Has the node download into its models directory; returns the file's path there.
+    async def run_download(
+        self,
+        node_id: int,
+        task_id: int,
+        url: str,
+        filename: str,
+        headers: dict,
+        base: str | None = None,
+        expected_bytes: int | None = None,
+        existing_ok: bool = False,
+    ) -> str:
+        """Has the node download into its models directory (or ``base``); returns the file's path there.
 
         Raises ``RemoteError`` when the node is or goes offline (the task is then retried later),
         ``RuntimeError`` when the download failed and ``DownloadCancelled`` when it was cancelled.
@@ -408,11 +491,17 @@ class ClusterHub:
             raise RuntimeError("the node no longer exists")
         future: asyncio.Future = asyncio.get_running_loop().create_future()
         self.downloads[task_id] = (node_id, future)
+        params: dict[str, Any] = {"task_id": task_id, "url": url, "filename": filename, "headers": headers}
+        if base:
+            params["base"] = base
+        if expected_bytes:
+            params["expected_bytes"] = expected_bytes
+        if existing_ok:
+            params["existing_ok"] = True
         try:
-            await executor.request(
-                p.M_DOWNLOAD_START, {"task_id": task_id, "url": url, "filename": filename, "headers": headers}
-            )
-            result = await future
+            started = await executor.request(p.M_DOWNLOAD_START, params)
+            # Finished while the connection was down: the agent remembers how it ended.
+            result = started["result"] if isinstance(started, dict) and started.get("result") else await future
         finally:
             self.downloads.pop(task_id, None)
         if result.get("status") == "cancelled":
@@ -442,6 +531,59 @@ class ClusterHub:
                     await db.commit()
         elif status in ("done", "failed", "cancelled") and not entry[1].done():
             entry[1].set_result(data)
+
+    async def deliver_token(self, node_id: int, token: str) -> bool:
+        """Hands a new token to a connected agent, which stores it and uses it from then on."""
+        executor = self.executor(node_id)
+        if executor is None or not executor.online:
+            return False
+        try:
+            result = await executor.request(p.M_TOKEN_ROTATE, {"token": token}, timeout=15)
+        except p.RemoteError as exc:
+            log.info("node %s could not take the new token in-band: %s", executor.name, exc)
+            return False
+        return bool(isinstance(result, dict) and result.get("stored"))
+
+    async def library_specs(self, db, node_id: int) -> list[dict]:
+        """The model libraries this node uses (Admin -> Storage, "available on nodes")."""
+        from ..services import storage as storage_service
+
+        out = []
+        for st in await storage_service.enabled_storages(db):
+            if st.purpose == "models" and node_id in storage_service.library_nodes(st):
+                out.append(storage_service.node_library_spec(st, self.settings.secret_key))
+        return out
+
+    async def library_dir(self, node_id: int, storage_id: int) -> str:
+        """Where a model library is on a node (the agent mounts NFS / SMB libraries on first use)."""
+        from ..orm import Storage
+        from ..services import storage as storage_service
+
+        executor = self.executor(node_id)
+        if executor is None:
+            raise RuntimeError("the node no longer exists")
+        known = next(
+            (
+                lib.get("path")
+                for lib in executor.inventory.get("libraries") or []
+                if lib.get("storage_id") == storage_id and lib.get("path")
+            ),
+            None,
+        )
+        if known:
+            return str(known)
+        async with SessionLocal() as db:
+            st = await db.get(Storage, storage_id)
+            if st is None or st.purpose != "models" or node_id not in storage_service.library_nodes(st):
+                raise RuntimeError("the model library is not available on this node")
+            spec = storage_service.node_library_spec(st, self.settings.secret_key)
+        try:
+            result = await executor.request(p.M_LIBRARY_PREPARE, spec, timeout=180)
+        except p.RemoteError as exc:
+            if exc.code in ("offline", "disconnected", "timeout"):
+                raise
+            raise RuntimeError(f"the model library is not available on node {executor.name!r}: {exc.message}") from exc
+        return str(result["path"])
 
     def offline_lanes(self) -> set[int]:
         return {

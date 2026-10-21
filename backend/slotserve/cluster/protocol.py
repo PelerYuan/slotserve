@@ -4,13 +4,17 @@ A node agent opens a WebSocket to ``/api/cluster/agent`` on the control plane wi
 (``Authorization: Bearer <token>``). Every frame is one JSON object with a ``type``:
 
 ``hello`` (agent -> server, first frame)
-    ``{"type": "hello", "protocol": 1, "agent_version": "...", "info": {...}, "inventory": {...},
-    "runtimes": [...]}`` - who the agent is, what the machine has and what it is running right now.
+    ``{"type": "hello", "protocol": 1, "agent_version": "...", "time": "<agent clock, ISO>", "info": {...},
+    "inventory": {...}, "runtimes": [...], "downloads": [...]}`` - who the agent is, what the machine has and what
+    it is running (and downloading) right now. Timestamps an agent sends are only used to measure its clock skew;
+    the control plane records samples and events at the time it receives them.
     ``info.hardware`` (optional): CPU model and cores, memory, disks, OS, Docker and GPU driver (``system.hardware``).
 ``welcome`` (server -> agent)
     ``{"type": "welcome", "protocol": 1, "node_id": 3, "name": "gpu-b", "heartbeat_seconds": 5,
-    "lanes": [{"lane_id": 2, "devices": [0]}]}`` - accepted; ``lanes`` are the lanes the node owns, anything
-    else the agent still runs is stopped (reconciliation after a reconnect).
+    "lanes": [{"lane_id": 2, "devices": [0]}], "server_version": "...", "server_time": "...",
+    "libraries": [...], "downloads": [...]}`` - accepted; ``lanes`` are the lanes the node owns, anything
+    else the agent still runs is stopped (reconciliation after a reconnect); ``downloads`` are the task ids the
+    control plane still wants, anything else the agent downloads is cancelled.
 ``error`` (server -> agent, then the socket closes)
     ``{"type": "error", "code": "protocol_mismatch" | "invalid_token" | "revoked" | ..., "message": "..."}``
 ``request`` / ``response`` (both directions; RPC with request ids and timeouts)
@@ -43,7 +47,8 @@ CLOSE_REVOKED = 4002
 CLOSE_PROTOCOL = 4003
 CLOSE_REPLACED = 4004  # another connection with the same token took over
 CLOSE_BAD_HELLO = 4005
-FATAL_CLOSE_CODES = {CLOSE_INVALID_TOKEN, CLOSE_REVOKED, CLOSE_PROTOCOL}
+CLOSE_RATE_LIMITED = 4006  # too many failed logins from this address; try again later
+FATAL_CLOSE_CODES = {CLOSE_INVALID_TOKEN, CLOSE_REVOKED, CLOSE_PROTOCOL, CLOSE_RATE_LIMITED}
 
 # Methods the server calls on the agent.
 M_RUNTIME_ENSURE = "runtime.ensure"  # {lane_id, devices, model, preset, est_load_seconds, force} -> runtime
@@ -57,6 +62,9 @@ M_MODELS_STAT = "models.stat"  # {path, engine} -> {path, size_bytes, exists}
 M_MODELS_DELETE = "models.delete"  # {path} -> {deleted}
 M_DOWNLOAD_START = "download.start"  # {task_id, url, filename, headers, min_free_gb} -> {}
 M_DOWNLOAD_CANCEL = "download.cancel"  # {task_id} -> {}
+M_DOWNLOAD_LIST = "download.list"  # {} -> {downloads: [{task_id, status, ...}]}
+M_LIBRARY_PREPARE = "library.prepare"  # {storage_id, path | volume: {name, driver_opts, labels}} -> {path}
+M_TOKEN_ROTATE = "token.rotate"  # {token} -> {stored}: the agent uses the new token from now on
 M_PING = "ping"  # {} -> {time}
 M_WOL_SEND = "wol.send"  # {macs, broadcasts, port} -> {sent}: wake another machine in this one's network
 
@@ -88,12 +96,70 @@ def compatible(version: Any) -> bool:
     return isinstance(version, int) and MIN_PROTOCOL <= version <= PROTOCOL_VERSION
 
 
-def mismatch_message(remote: Any, side: str = "agent") -> str:
+AGENT_IMAGE = "ghcr.io/peleryuan/slotserve"
+
+
+def update_commands(version: str) -> dict[str, str]:
+    """How to bring a node agent to ``version`` (the control plane's), for each way of running it."""
+    return {
+        "compose": "docker compose -f docker-compose.node.yml pull && docker compose -f docker-compose.node.yml up -d",
+        "docker": f"docker pull {AGENT_IMAGE}:{version}  # then re-create the slotserve-agent container with it",
+        "pip": f"pip install --upgrade 'slotserve=={version}'  # then restart `slotserve agent`",
+    }
+
+
+def mismatch_message(remote: Any, side: str = "agent", server_version: str | None = None) -> str:
     supported = str(PROTOCOL_VERSION) if MIN_PROTOCOL == PROTOCOL_VERSION else f"{MIN_PROTOCOL}-{PROTOCOL_VERSION}"
-    return (
+    text = (
         f"protocol version mismatch: the {side} speaks version {remote!r}, this side supports {supported}. "
         "Run the same SlotServe version on the control plane and the nodes."
     )
+    if server_version:
+        text += f" Update the agent to {server_version}: {update_commands(server_version)['compose']}"
+    return text
+
+
+def version_tuple(version: str | None) -> tuple[int, ...] | None:
+    """``"0.8.1"`` -> ``(0, 8, 1)``; None when it is not a plain dotted version."""
+    if not version:
+        return None
+    parts = []
+    for piece in str(version).split("+")[0].split("-")[0].split("."):
+        if not piece.isdigit():
+            return None
+        parts.append(int(piece))
+    return tuple(parts) or None
+
+
+def version_status(agent: str | None, server: str) -> str:
+    """``current`` | ``outdated`` (older than the control plane) | ``newer`` | ``unknown``."""
+    a, s = version_tuple(agent), version_tuple(server)
+    if a is None or s is None:
+        return "unknown"
+    if a == s:
+        return "current"
+    return "outdated" if a < s else "newer"
+
+
+def fingerprint(der: bytes) -> str:
+    """SHA-256 of a DER certificate as colon-separated upper-case hex (what browsers and openssl show)."""
+    import hashlib
+
+    digest = hashlib.sha256(der).hexdigest().upper()
+    return ":".join(digest[i : i + 2] for i in range(0, len(digest), 2))
+
+
+def normalize_fingerprint(value: str) -> str:
+    """Accepts ``AB:CD:...``, ``abcd...`` or ``sha256/AB:CD...``; returns the colon form ("" when empty)."""
+    text = value.strip()
+    if text.lower().startswith("sha256"):
+        text = text[6:].lstrip("/:= ")
+    digest = text.replace(":", "").replace(" ", "").upper()
+    if not digest:
+        return ""
+    if len(digest) != 64 or any(c not in "0123456789ABCDEF" for c in digest):
+        raise ValueError("a SHA-256 fingerprint has 64 hex digits")
+    return ":".join(digest[i : i + 2] for i in range(0, 64, 2))
 
 
 def new_id() -> str:

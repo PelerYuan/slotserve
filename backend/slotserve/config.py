@@ -191,6 +191,24 @@ class Settings(BaseSettings):
     # Wake a sleeping machine this many minutes before a booking on it starts (0 = never wake automatically).
     wol_lead_minutes: int = 5
     wol_port: int = 9  # UDP port of the magic packet (7 or 9)
+    # TLS for the agent link (https:// / wss:// server URLs): a CA bundle to trust (self-signed or private CA) and /
+    # or the SHA-256 fingerprint of the server's certificate (shown in Admin -> Nodes) to pin.
+    agent_ca_bundle: str = ""
+    agent_server_fingerprint: str = ""
+    # What happens to running model servers when the agent stops: "stop" them, or "keep" them running and take
+    # them over again when the agent starts (agent updates without interrupting models).
+    agent_on_exit: str = "stop"
+    # Reconnect delays (seconds): the first one, doubled up to the maximum, with random jitter.
+    agent_retry_seconds: float = 1.0
+    agent_max_retry_seconds: float = 60.0
+    # Failed agent logins (unknown or rotated tokens) allowed per address within 15 minutes before it is refused.
+    node_login_attempts: int = 20
+    # Clock difference between the control plane and a node above which Admin -> Nodes warns.
+    node_clock_skew_warn_seconds: float = 10.0
+    # Serve HTTPS directly (``slotserve serve``); the certificate's fingerprint is shown in Admin -> Nodes so agents
+    # can pin it. Behind a reverse proxy leave these empty (the fingerprint is then read from SLOTSERVE_PUBLIC_URL).
+    ssl_certfile: str = ""
+    ssl_keyfile: str = ""
 
     @property
     def database_url(self) -> str:

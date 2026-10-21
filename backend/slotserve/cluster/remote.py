@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
@@ -58,6 +58,10 @@ class RemoteExecutor(NodeExecutor):
         self.metrics_at: float = 0.0
         self.last_seen: float = 0.0  # monotonic
         self.connected_since: datetime | None = None
+        self.received_at: datetime | None = None  # control plane time of the last frame from the agent
+        # The agent's clock minus the control plane's (seconds), from timestamps in hello and metrics; times the
+        # agent reports are shifted by it, and samples and events are recorded at the control plane's time.
+        self.clock_skew: float | None = None
         self.runtimes: dict[int, RemoteRuntime] = {}
 
     # ---- NodeExecutor -------------------------------------------------------
@@ -107,6 +111,20 @@ class RemoteExecutor(NodeExecutor):
         self.peer = None
         self.websocket = None
         self.metrics = {}
+
+    def note_clock(self, agent_time: datetime | None, received: datetime) -> None:
+        if agent_time is None:
+            return
+        skew = (agent_time - received).total_seconds()
+        # Smoothed, so one frame delayed in transit does not make the clock look wrong.
+        self.clock_skew = skew if self.clock_skew is None else round(self.clock_skew * 0.7 + skew * 0.3, 3)
+
+    def server_time(self, value: Any) -> datetime | None:
+        """A time the agent reported, on the control plane's clock."""
+        moment = _dt(value)
+        if moment is None or not self.clock_skew:
+            return moment
+        return moment - timedelta(seconds=self.clock_skew)
 
     def describe(self) -> dict[str, Any]:
         return {**super().describe(), "address": self.address, "protocol": self.protocol}
@@ -169,8 +187,8 @@ class RemoteRuntime(RequestTracker):
         self.model_name = data.get("model_name")
         self.preset_id = data.get("preset_id")
         self.preset_name = data.get("preset_name")
-        self.load_started_at = _dt(data.get("load_started_at"))
-        self.ready_at = _dt(data.get("ready_at"))
+        self.load_started_at = self.executor.server_time(data.get("load_started_at"))
+        self.ready_at = self.executor.server_time(data.get("ready_at"))
         self.est_load_seconds = data.get("est_load_seconds")
         self.error = data.get("error")
         self.error_hint = data.get("error_hint")
@@ -179,9 +197,9 @@ class RemoteRuntime(RequestTracker):
         self.pid = data.get("pid")
         self.exit_code = data.get("exit_code")
         self.failure_log = list(data.get("failure_log") or [])
-        self._failed_at = _dt(data.get("failed_at"))
+        self._failed_at = self.executor.server_time(data.get("failed_at"))
         self._fail_count = int(data.get("fail_count") or 0)
-        self._next_retry_at = _dt(data.get("next_retry_at"))
+        self._next_retry_at = self.executor.server_time(data.get("next_retry_at"))
         self._port = data.get("port") or self._port
         self._log_name = data.get("log_name") or self._log_name
         self._progress = LogProgress(stage=data.get("stage"), percent=data.get("percent"))
