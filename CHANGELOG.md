@@ -4,15 +4,18 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-21
+
+### Added
+
+- **Admin → GPUs & lanes**: per-lane **Reload** and **Arguments** (edit the running model's launch arguments and reload the lanes using it).
+
 ### Changed
 
 - Documentation brought up to date for lanes, engines and approval; architecture, scheduling, routing and booking-status diagrams are drawn with Mermaid.
 - The sidebar no longer shows the GPU status card; the overview page has it.
 - The sign-in page keeps its content next to the divider on wide screens.
-
-### Added
-
-- **Admin → GPUs & lanes**: per-lane **Reload** and **Arguments** (edit the running model's launch arguments and reload the lanes using it).
+- `.env.example` only sets deployment values; settings admins change at runtime are listed as optional.
 
 ## [0.7.0] - 2026-10-20
 
@@ -126,7 +129,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - Admin CLI: `slotserve reset-password`, `slotserve set-admin`.
 - Bilingual documentation site (MkDocs Material).
 
-[Unreleased]: https://github.com/PelerYuan/slotserve/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/PelerYuan/slotserve/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/PelerYuan/slotserve/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/PelerYuan/slotserve/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/PelerYuan/slotserve/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/PelerYuan/slotserve/compare/v0.4.0...v0.5.0
