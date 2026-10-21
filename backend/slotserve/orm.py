@@ -1,6 +1,17 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, ForeignKey, Integer, PrimaryKeyConstraint, String, Text, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    PrimaryKeyConstraint,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base, UTCDateTime, utcnow
@@ -322,3 +333,45 @@ class DevSession(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     started_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     stopped_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+# What a resource was doing: bookings, shared use while nobody books, or nothing.
+# ``cpu_devenv`` is reserved for CPU-only dev environments (resource "cpu").
+BOOKING_KINDS = ("model", "gpu", "devenv", "cpu_devenv")
+IDLE_KINDS = ("idle_model", "idle_devenv")
+USAGE_KINDS = (*BOOKING_KINDS, *IDLE_KINDS, "free")
+USAGE_RESOURCES = ("gpu", "cpu")
+
+
+class UsageSample(Base):
+    """What one resource did over a stretch of time: a row per minute, rolled up per hour later.
+
+    ``resource`` "gpu": one row per GPU of a lane; ``gpu_index`` -1 stands for a lane without GPU
+    metrics (no nvidia-smi), where occupancy is still recorded. ``resource`` "cpu" (CPU-only
+    environments, not sampled yet) uses ``gpu_index`` -1, ``util_seconds`` for CPU %, ``cpu_core_seconds``
+    for cores in use and ``mem_peak_mb`` for RAM.
+    """
+
+    __tablename__ = "usage_samples"
+    __table_args__ = (Index("ix_usage_samples_start_lane", "start", "lane_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    start: Mapped[datetime] = mapped_column(UTCDateTime)
+    hourly: Mapped[bool] = mapped_column(Boolean, default=False)  # a roll-up of minute samples
+    seconds: Mapped[int] = mapped_column(Integer)  # time this row stands for
+    resource: Mapped[str] = mapped_column(String(8), default="gpu")  # see USAGE_RESOURCES
+    lane_id: Mapped[int | None] = mapped_column(ForeignKey("lanes.id", ondelete="SET NULL"), nullable=True)
+    gpu_index: Mapped[int] = mapped_column(Integer, default=-1)
+    kind: Mapped[str] = mapped_column(String(16))  # see USAGE_KINDS
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    reservation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("reservations.id", ondelete="SET NULL"), nullable=True
+    )
+    model_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    metered_seconds: Mapped[int] = mapped_column(Integer, default=0)  # time with GPU metrics
+    util_seconds: Mapped[float] = mapped_column(Float, default=0.0)  # utilization % x seconds
+    busy_seconds: Mapped[int] = mapped_column(Integer, default=0)  # time at or above the "busy" threshold
+    energy_wh: Mapped[float] = mapped_column(Float, default=0.0)
+    mem_peak_mb: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    mem_total_mb: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cpu_core_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)  # resource "cpu" only

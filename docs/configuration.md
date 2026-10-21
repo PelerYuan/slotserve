@@ -61,6 +61,8 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | `SLOTSERVE_METRICS_TOKEN` | *empty* | Bearer token for `/metrics`; empty disables it |
 | `SLOTSERVE_DRAIN_SECONDS` | `30` | Before a model switch, wait this long for running requests to finish |
 | `SLOTSERVE_USAGE_RETENTION_DAYS` | `365` | Keep per-request rows this long, then fold them into daily totals (0 = forever; otherwise ≥ 90) |
+| `SLOTSERVE_USAGE_SAMPLE_DAYS` | `30` | Keep per-minute GPU usage samples this long, then fold them into hourly totals (0 = never fold) |
+| `SLOTSERVE_USAGE_BUSY_PERCENT` | `10` | A GPU counts as used in a minute when its utilization is at least this (applies to new samples) |
 | `SLOTSERVE_AUDIT_RETENTION_DAYS` | `730` | Keep audit log entries this long (0 = forever) |
 | `SLOTSERVE_BACKUP_KEEP` | `7` | Daily database backups to keep (0 = no automatic backups) |
 | `SLOTSERVE_DEVENV_ENABLED` | `false` | Dev environments: book GPU time as a Docker container with SSH |

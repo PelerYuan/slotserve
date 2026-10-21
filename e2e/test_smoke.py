@@ -129,3 +129,15 @@ def test_lanes_and_approval_ui(page: Page, server: str):
     expect(page.get_by_text("No bookings match these filters.")).to_be_visible()
     _api(page, server, "PUT", "/api/admin/settings", {"approval_mode": None})
     assert not page.errors  # type: ignore[attr-defined]
+
+
+def test_usage_page(page: Page, server: str):
+    sign_in(page, server, "admin")
+    page.get_by_role("link", name="Usage", exact=True).click()
+    expect(page.get_by_text("GPU-hours booked", exact=True)).to_be_visible()
+    expect(page.get_by_text("GPU-hours over time", exact=True)).to_be_visible()
+    page.get_by_text("By kind (recorded)", exact=True).click()
+    page.get_by_text("Just me", exact=True).click()
+    page.wait_for_load_state("networkidle")
+    expect(page.get_by_text("During your bookings", exact=True)).to_be_visible()
+    assert not page.errors  # type: ignore[attr-defined]

@@ -51,7 +51,16 @@ SlotServe 可以通过 Telegram 给大家发消息、把预约发布成日历订
 
 ## CSV 导出
 
-**用量 → 导出 CSV** 可下载所选时间段的按天汇总（日期、用户、模型、请求数、tokens）或逐条请求（时间、用户、API 密钥、模型、接口、状态码、tokens、耗时）。文件为带 BOM 的 UTF-8，Excel 可直接打开。
+**用量 → 导出 CSV** 按所选时间段和范围（所有人或只看我）下载：
+
+| 导出 | 列 |
+| --- | --- |
+| 按人汇总 | 用户、预约次数、预约时长、预约 GPU 时、使用 GPU 时、预约期间平均利用率 %、显存峰值（MB）、能耗（Wh）、请求数、输入与输出 tokens |
+| GPU 时间 | 日期、通道、GPU、类型、用户、GPU 时、使用 GPU 时、平均利用率 %、显存峰值（MB）、能耗（Wh），每天/通道/GPU/类型/用户一行 |
+| 按天汇总 | 日期、用户、模型、请求数、输入与输出 tokens |
+| 逐条请求 | 时间、用户、API 密钥、模型、接口、是否流式、状态码、tokens、耗时 |
+
+类型为 `model`、`gpu`（整卡预约）、`devenv`、`idle_model` 和 `idle_devenv`（无人预约时的共享使用）以及 `free`。没有 GPU 指标的通道 GPU 列为空。也可以通过 `GET /api/usage/export?kind=people|compute|summary|requests&days=30&scope=all|mine` 获取。文件为带 BOM 的 UTF-8，Excel 可直接打开。
 
 ## Prometheus
 
@@ -79,6 +88,12 @@ scrape_configs:
 | `slotserve_model_loads_total` | counter | `model`、`result` |
 | `slotserve_model_load_seconds` | gauge | `model` |
 | `slotserve_downloads_pending` | gauge | |
-| `slotserve_gpu_memory_used_bytes`、`…_total_bytes`、`slotserve_gpu_utilization_ratio`、`slotserve_gpu_temperature_celsius`、`slotserve_gpu_power_watts` | gauge | `gpu`、`name` |
+| `slotserve_gpu_memory_used_bytes`、`…_total_bytes`、`slotserve_gpu_utilization_ratio`、`slotserve_gpu_temperature_celsius`、`slotserve_gpu_power_watts` | gauge | `gpu`、`name`、`lane` |
+| `slotserve_lane_occupant` | gauge | `lane`、`kind`、`user`（通道当前在做什么） |
+| `slotserve_booked_gpu_hours_total` | counter | `user`、`lane`、`kind`（已过去的预约时长 × 通道 GPU 数） |
+| `slotserve_gpu_seconds_total` | counter | `lane`、`gpu`、`kind`（已记录的 GPU 时间） |
+| `slotserve_gpu_busy_seconds_total` | counter | `lane`、`gpu`、`kind`（利用率不低于繁忙阈值的时间） |
+| `slotserve_gpu_energy_joules_total` | counter | `lane`、`gpu` |
+| `slotserve_user_gpu_busy_seconds_total` | counter | `user`、`kind` |
 
 未设置 Token 时该接口返回 404。

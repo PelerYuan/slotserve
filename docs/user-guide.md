@@ -73,7 +73,14 @@ If an admin turns on **Let people view their API keys again** (**Admin → Syste
 
 ## Usage
 
-**Usage** shows requests, tokens and booked hours per person and per model for the last 7, 30 or 90 days. **Export CSV** downloads a daily summary or every request.
+**Usage** is about GPU time: how much was booked, how much of it the GPUs actually worked, and what that cost in energy. Pick the last 7, 30 or 90 days, and **Everyone** or **Just me** (everyone can see everyone's usage).
+
+- **Tiles**: GPU-hours booked (booked time × the number of GPUs in the lane), GPU-hours used (time a GPU's utilization was at or above the busy threshold, 10 % by default), average utilization while GPUs were booked (or during your bookings), energy with peak memory, and tokens with requests.
+- **GPU-hours over time**: stacked by person (booked, from the calendar) or by kind (recorded). Kinds are model bookings, whole-GPU bookings, dev environments, shared use while nobody has the lane booked (the lane's idle model or a shared environment) and unused time. Up to 7 days are shown in 6-hour steps, longer periods per day.
+- **Utilization by lane** over time.
+- **Tables** by person (booked and used GPU-hours, utilization while booked, peak memory, energy, tokens), by lane with its occupancy, by kind, by GPU and by model. Many booked hours with low utilization means GPUs are booked but sit idle.
+
+SlotServe records every GPU once a minute: utilization, memory, power and who held it as what. On machines without GPU metrics (no `nvidia-smi`) it still records who held each lane, but used time, utilization, memory and energy stay empty. Per-minute samples are folded into hourly totals after 30 days (**Admin → System settings → Maintenance**). **Export CSV** downloads per-person totals, GPU time per day, lane, GPU, kind and person, a daily request summary, or every request.
 
 ## Settings
 

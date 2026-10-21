@@ -37,6 +37,7 @@ from .services.housekeeper import Housekeeper
 from .services.notify import Notifier
 from .services.ratelimit import AttemptLimiter
 from .services.telegram import TelegramBot
+from .services.usage_sampler import UsageSampler
 
 log = logging.getLogger("slotserve")
 PACKAGE_STATIC = Path(__file__).parent / "static"
@@ -75,6 +76,8 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         app.state.downloader = Downloader(settings)
         app.state.downloader.events = app.state.notifier
         app.state.housekeeper = Housekeeper(app.state)
+        # GPU metrics come from nvidia-smi unless a reader was injected (tests, other hardware).
+        app.state.usage_sampler = UsageSampler(app.state, stats=getattr(app.state, "gpu_stats_fn", None))
         async with db.SessionLocal() as session:
             await seed_templates(session)
         app.state.devenv = DevEnvManager(app.state, docker=getattr(app.state, "docker_client", None))
@@ -90,6 +93,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
                 asyncio.create_task(app.state.housekeeper.run(), name="housekeeper"),
                 asyncio.create_task(app.state.telegram.run(), name="telegram"),
                 asyncio.create_task(app.state.devenv.run(), name="devenv"),
+                asyncio.create_task(app.state.usage_sampler.run(), name="usage-sampler"),
             ]
         try:
             yield

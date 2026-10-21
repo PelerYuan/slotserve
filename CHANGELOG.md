@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- **Compute usage**: every minute SlotServe records each GPU's utilization, memory and power together with what it was doing (model booking, whole-GPU booking, dev environment, shared idle use, or nothing) and for whom. Works without GPU metrics too (occupancy only). Per-minute samples are folded into hourly totals after `usage_sample_days` (30); `usage_busy_percent` (10) sets when a GPU counts as used. Both are editable in **Admin → System settings**.
+- The **Usage** page is now about GPU time: booked vs. used GPU-hours, average utilization while booked ("booked but idle" made visible), energy, peak memory and tokens; GPU-hours over time by person or by kind; utilization per lane; tables by person, lane (with occupancy), kind, GPU and model; **Everyone** / **Just me**.
+- CSV exports per person and of GPU time per day, lane, GPU, kind and person; all exports take `scope=mine`.
+- Prometheus: GPU gauges carry a `lane` label; new `slotserve_lane_occupant`, `slotserve_booked_gpu_hours_total`, `slotserve_gpu_seconds_total`, `slotserve_gpu_busy_seconds_total`, `slotserve_gpu_energy_joules_total` and `slotserve_user_gpu_busy_seconds_total`.
+
 - **Dev environments**: a booking can be a Docker container with the lane's GPUs and SSH (a bundled static Dropbear, public-key login only, a port from a configurable range), a persistent `/workspace` volume and the models read-only. Built-in PyTorch, Jupyter + PyTorch, TensorFlow and CUDA templates, custom templates from any image, and saving a running environment as an image. Images are pulled ahead of time; failures, logs and every environment are visible on the page. Off by default; needs the Docker socket (or Podman's Docker-compatible API).
 
 ## [0.8.0] - 2026-10-21

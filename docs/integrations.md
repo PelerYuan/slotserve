@@ -51,7 +51,16 @@ Anyone with a link can read the bookings in it. **New link** invalidates the old
 
 ## CSV export
 
-**Usage → Export CSV** downloads either a daily summary (date, person, model, requests, tokens) or every request (time, person, API key, model, endpoint, status, tokens, duration) for the selected period. Files are UTF-8 with a BOM so Excel opens them correctly.
+**Usage → Export CSV** downloads, for the selected period and scope (everyone or just you):
+
+| Export | Columns |
+| --- | --- |
+| Per person | person, bookings, booked hours, booked GPU-hours, used GPU-hours, average utilization % while booked, peak memory (MB), energy (Wh), requests, prompt and completion tokens |
+| GPU time | date, lane, GPU, kind, person, GPU-hours, used GPU-hours, average utilization %, peak memory (MB), energy (Wh); one row per day, lane, GPU, kind and person |
+| Daily summary | date, person, model, requests, prompt and completion tokens |
+| Every request | time, person, API key, model, endpoint, stream, status, tokens, duration |
+
+Kinds are `model`, `gpu` (whole-GPU booking), `devenv`, `idle_model` and `idle_devenv` (shared use while nobody books the lane) and `free`. The GPU column is empty for a lane without GPU metrics. The same files are available at `GET /api/usage/export?kind=people|compute|summary|requests&days=30&scope=all|mine`. Files are UTF-8 with a BOM so Excel opens them correctly.
 
 ## Prometheus
 
@@ -79,6 +88,12 @@ scrape_configs:
 | `slotserve_model_loads_total` | counter | `model`, `result` |
 | `slotserve_model_load_seconds` | gauge | `model` |
 | `slotserve_downloads_pending` | gauge | |
-| `slotserve_gpu_memory_used_bytes`, `…_total_bytes`, `slotserve_gpu_utilization_ratio`, `slotserve_gpu_temperature_celsius`, `slotserve_gpu_power_watts` | gauge | `gpu`, `name` |
+| `slotserve_gpu_memory_used_bytes`, `…_total_bytes`, `slotserve_gpu_utilization_ratio`, `slotserve_gpu_temperature_celsius`, `slotserve_gpu_power_watts` | gauge | `gpu`, `name`, `lane` |
+| `slotserve_lane_occupant` | gauge | `lane`, `kind`, `user` (what the lane is doing now) |
+| `slotserve_booked_gpu_hours_total` | counter | `user`, `lane`, `kind` (elapsed booked time × GPUs of the lane) |
+| `slotserve_gpu_seconds_total` | counter | `lane`, `gpu`, `kind` (recorded GPU time) |
+| `slotserve_gpu_busy_seconds_total` | counter | `lane`, `gpu`, `kind` (time at or above the busy threshold) |
+| `slotserve_gpu_energy_joules_total` | counter | `lane`, `gpu` |
+| `slotserve_user_gpu_busy_seconds_total` | counter | `user`, `kind` |
 
 Without a token the endpoint returns 404.

@@ -176,8 +176,20 @@ export interface AppConfig {
   version: string
 }
 
+/** model | gpu | devenv | cpu_devenv (bookings) | idle_model | idle_devenv (shared while nobody books) | free */
+export type UsageKind = 'model' | 'gpu' | 'devenv' | 'cpu_devenv' | 'idle_model' | 'idle_devenv' | 'free'
+
+export interface UsageSeries {
+  key: string
+  name: string
+  values: (number | null)[]
+}
+
 export interface Usage {
   days: number
+  scope: 'all' | 'mine'
+  busy_percent: number
+  metered: boolean
   users: {
     user_id: number
     username: string
@@ -185,10 +197,58 @@ export interface Usage {
     prompt_tokens: number
     completion_tokens: number
     reserved_hours: number
+    bookings: number
+    booked_gpu_hours: number
+    used_gpu_hours: number
+    avg_utilization: number | null
+    peak_memory_mb: number | null
+    energy_wh: number
+    cpu_core_hours: number
   }[]
   models: { model_name: string; requests: number; prompt_tokens: number; completion_tokens: number }[]
   daily: { date: string; username: string; requests: number; tokens: number }[]
+  totals: {
+    booked_gpu_hours: number
+    used_gpu_hours: number
+    sampled_gpu_hours: number
+    avg_utilization: number | null
+    energy_wh: number
+    peak_memory_mb: number | null
+    requests: number
+    tokens: number
+    cpu_core_hours: number
+  }
+  lanes: {
+    lane_id: number | null
+    lane_name: string
+    gpus: number
+    booked_gpu_hours: number
+    used_gpu_hours: number
+    avg_utilization: number | null
+    energy_wh: number
+    peak_memory_mb: number | null
+    occupancy: Partial<Record<UsageKind, number>>
+  }[]
+  gpus: {
+    lane_id: number | null
+    lane_name: string
+    gpu_index: number
+    gpu_hours: number
+    used_gpu_hours: number
+    avg_utilization: number | null
+    energy_wh: number
+    peak_memory_mb: number | null
+    memory_total_mb: number | null
+  }[]
+  kinds: { kind: UsageKind; gpu_hours: number; used_gpu_hours: number; avg_utilization: number | null; energy_wh: number }[]
+  bucket_hours: number
+  buckets: string[]
+  hours_by_person: UsageSeries[]
+  hours_by_kind: UsageSeries[]
+  utilization_by_lane: UsageSeries[]
 }
+
+export type UsageExport = 'summary' | 'requests' | 'compute' | 'people'
 
 // ---- admin ----------------------------------------------------------------
 
