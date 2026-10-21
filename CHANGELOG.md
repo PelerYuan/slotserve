@@ -53,6 +53,11 @@ All notable changes to this project are documented here. The format follows [Kee
 - Usage sampling records remote lanes with the GPU metrics their agents report.
 - New settings: `SLOTSERVE_LOCAL_NODE_NAME`, `SLOTSERVE_NODE_HEARTBEAT_SECONDS`, `SLOTSERVE_NODE_OFFLINE_SECONDS`, `SLOTSERVE_NODE_RPC_TIMEOUT_SECONDS`; for agents `SLOTSERVE_AGENT_SERVER`, `SLOTSERVE_AGENT_TOKEN`, `SLOTSERVE_AGENT_ADDRESS`, `SLOTSERVE_AGENT_MODEL_HOST`. Docs: "Multiple machines".
 
+- **Machines page** (for everyone): a card per machine with CPU or GPU compute, memory, current load, GPU lanes free now and who holds them, CPU cores and memory left for work without a GPU, and models present; filters (has GPU, CPU only, GPU memory, free RAM, free cores, free now), sorting, and details with per-GPU bars, today's and tomorrow's bookings, disks, Docker, GPU driver and a load history. Admin → Nodes opens the same details.
+- Node agents (and the server's own machine) report full hardware: CPU model, threads and cores, memory, disks of the models directory and Docker data, operating system, Docker version and container runtimes, GPU driver; live CPU, memory, network and disk readings with every heartbeat. Machines without GPUs, a GPU driver or a GPU container runtime work and offer CPU compute.
+- **Choosing a machine** everywhere: the booking dialog goes machine → lane → time, the schedule groups lane tabs by machine and can show one machine, *Start without GPU* and catalog deploys pick a machine, and usage can be narrowed to one machine (`node_id`). **Pick for me** recommends the best fitting machine and lane (server-side scorer: fits the request, online, most free capacity, low load), always overridable. API: `/api/machines`, `/api/machines/{id}`, `/api/machines/{id}/history`, `POST /api/machines/recommend`; `POST /api/devenv/cpu/start` takes `node_id`.
+- The model catalog's fit per lane uses the GPUs of the lane's own machine.
+
 ### Not yet
 
 - Dev environments (containers, SSH, web ports, environments without a GPU) still run on the server's machine only.

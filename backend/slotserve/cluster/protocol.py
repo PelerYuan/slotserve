@@ -6,6 +6,7 @@ A node agent opens a WebSocket to ``/api/cluster/agent`` on the control plane wi
 ``hello`` (agent -> server, first frame)
     ``{"type": "hello", "protocol": 1, "agent_version": "...", "info": {...}, "inventory": {...},
     "runtimes": [...]}`` - who the agent is, what the machine has and what it is running right now.
+    ``info.hardware`` (optional): CPU model and cores, memory, disks, OS, Docker and GPU driver (``system.hardware``).
 ``welcome`` (server -> agent)
     ``{"type": "welcome", "protocol": 1, "node_id": 3, "name": "gpu-b", "heartbeat_seconds": 5,
     "lanes": [{"lane_id": 2, "devices": [0]}]}`` - accepted; ``lanes`` are the lanes the node owns, anything

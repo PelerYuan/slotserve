@@ -80,6 +80,42 @@ On a machine without NVIDIA GPUs leave out `--gpus all`; its lanes then have no 
 engines. `--network host` lets the server reach the model servers on the node's own address. Without it, publish the model
 server ports (`-p 8081-8090:8081-8090`) and set the node's **Address** accordingly.
 
+## Choosing a machine
+
+The **Machines** page (for everyone) shows a card per machine: whether it offers GPU or only CPU compute, its CPU
+(model, threads and cores), memory, GPUs with their memory, current load (CPU, memory, per-GPU memory and utilization),
+which GPU lanes are free now and who holds the others until when, the CPU cores and memory left for work without a GPU,
+and the models it has. Filter by *has GPU*, *CPU only*, GPU memory, free RAM, free cores and *free now*, and sort by
+free GPU memory, free cores, free RAM or load. **Details** opens everything else: per-GPU bars, today's and
+tomorrow's bookings per lane, disks (models directory and Docker data), Docker version and runtimes, the GPU driver,
+the models on the machine and a load history (one point a minute for the last hours, plus GPU use per hour of the last
+day from the usage samples). Admins open the same view from **Admin → Nodes**.
+
+Node agents report this themselves (CPU, memory, disks, operating system, Docker and its container runtimes, GPU
+driver, then live CPU, memory, network and disk readings with every heartbeat). Nothing GPU-specific is required: a
+machine without a GPU driver or GPU container runtime reports what it has and offers CPU compute; it has no GPU lanes.
+
+**CPU left for work without a GPU** is the machine's logical cores minus the cores its GPU lanes reserve
+(`SLOTSERVE_DEVENV_CPU_CORES_PER_GPU` per GPU) minus what running environments without a GPU there claim (their core
+limit); memory left is the total minus what is in use or claimed by those environments, whichever is more.
+
+Everywhere a machine is chosen, its numbers are visible while choosing:
+
+- **Booking**: machine, then lane, then time. With lanes on several machines the booking dialog lists the machines
+  first; the schedule groups lane tabs by machine and can show one machine only.
+- **Start without GPU** (dev environments): pick the machine with the free cores and memory shown. For now these
+  environments start on the server's own machine; others are listed but cannot be chosen yet.
+- **Model catalog → Deploy**: pick the machine, then a lane; each lane shows whether the model fits.
+- **Usage**: narrow the page to one machine's lanes.
+
+**Pick for me** (in each of these, and on the Machines page using its filters as the requirements) asks the server for
+the best machine and lane: it must fit the request (a GPU or not, GPU memory, cores, RAM, the model being on the machine,
+the lane being free in the booking's time), and among those it prefers online machines with the most free capacity
+and a low current load. CPU work prefers machines without GPUs, so GPU machines keep their cores for whoever books their
+GPUs. The choice is a suggestion; you can always pick another machine. Machines that do not fit are listed with the
+reason. The API is `GET /api/machines`, `GET /api/machines/{id}`, `GET /api/machines/{id}/history` and
+`POST /api/machines/recommend`.
+
 ## When a node goes offline
 
 - A node that sent nothing for `SLOTSERVE_NODE_OFFLINE_SECONDS` (30) is **offline**: its lanes show as offline, the
