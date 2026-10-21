@@ -3,8 +3,11 @@
 It connects out to the control plane over a WebSocket with the node's token, reports the machine (GPUs, CPU,
 memory, model files) and live metrics, and carries out commands: start / stop model servers (the same
 ``LlamaRuntime`` a single-machine SlotServe uses), read their logs, scan the models directory and download
-models into it. Model servers keep running while the control plane is away; when the agent reconnects it reports
-what runs and the control plane reconciles (lanes that no longer belong to the node are stopped).
+models into it. Everything else travels through relayed streams the agent opens to the control plane on request
+(``relay.py``): model requests, the machine's Docker API (dev environments), SSH and container ports. Nothing on
+the node has to accept connections. Model servers keep running while the control plane is away; when the agent
+reconnects it reports what runs and the control plane reconciles (lanes that no longer belong to the node are
+stopped).
 """
 
 from __future__ import annotations
@@ -32,6 +35,7 @@ from ..runtime.manager import LlamaRuntime
 from ..schemas import GpuOut
 from ..services import scanner
 from .downloads import AgentDownloads
+from .relay import AgentRelay
 
 log = logging.getLogger("slotserve.agent")
 
@@ -98,6 +102,9 @@ class NodeAgent:
         self._stats = stats
         self.runtimes: dict[int, LlamaRuntime] = {}
         self.downloads = AgentDownloads(self.settings, self._emit_download)
+        self.relay = AgentRelay(self)
+        self._docker = None
+        self._models_mount: str | bool | None = False  # False = not looked up yet
         self.peer: Peer | None = None
         self.node_id: int | None = None
         self.node_name: str | None = None
@@ -238,7 +245,11 @@ class NodeAgent:
         """Agent shutdown: stops every model server and download it started."""
         await self.stop()
         await self.downloads.close()
+        await self.relay.close()
         await self.stop_runtimes()
+        if self._docker is not None:
+            await self._docker.close()
+            self._docker = None
 
     async def stop_runtimes(self) -> None:
         for lane_id in list(self.runtimes):
@@ -268,7 +279,35 @@ class NodeAgent:
             "models": [{"path": f.path, "name": f.name, "size_bytes": f.size_bytes} for f in files],
             "engines": {e.id: " ".join(e.base_command(self.settings)) for e in ENGINES.values() if e.id != "custom"},
             "llama_port": self.settings.llama_port,
+            "models_mount": await self.models_mount(),
         }
+
+    def docker(self):
+        """This machine's Docker API (used to find containers; the control plane drives Docker through the relay)."""
+        if self._docker is None:
+            from ..services.docker_api import DockerClient
+
+            self._docker = DockerClient(self.settings.docker_host)
+        return self._docker
+
+    async def models_mount(self) -> str | None:
+        """Host path of the models directory for dev environment containers (their read-only ``/models``)."""
+        if self._models_mount is not False:
+            return self._models_mount or None
+        found: str | None = None
+        models = str(Path(self.settings.models_dir).resolve())
+        if Path("/.dockerenv").exists():
+            import socket
+
+            with contextlib.suppress(Exception):
+                me = await asyncio.wait_for(self.docker().inspect(socket.gethostname()), 5)
+                for m in (me or {}).get("Mounts", []):
+                    if m.get("Destination") == models and m.get("Type") == "bind":
+                        found = m.get("Source")
+        elif os.name != "nt":
+            found = models
+        self._models_mount = found or ""
+        return found
 
     async def _hello(self) -> dict:
         return {
@@ -356,6 +395,7 @@ class NodeAgent:
             p.M_MODELS_DELETE: self._delete_model,
             p.M_DOWNLOAD_START: self.downloads.start,
             p.M_DOWNLOAD_CANCEL: self.downloads.cancel,
+            p.M_STREAM_OPEN: self.relay.open,
         }
 
     async def _ping(self, _params: dict) -> dict:

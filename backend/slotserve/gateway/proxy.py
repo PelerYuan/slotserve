@@ -345,6 +345,10 @@ async def _forward(request: Request, path: str, body, raw: bytes, admission: Adm
         raw = json.dumps(body).encode()
 
     client: httpx.AsyncClient = request.app.state.http
+    executor = getattr(admission.runtime, "executor", None)
+    if executor is not None and not executor.is_local:
+        # a lane on another machine: through the relay its agent keeps open (nothing connects to nodes)
+        client = executor.http_client()
     url = f"{admission.runtime.base_url}/v1/{path}"
     headers = {"content-type": request.headers.get("content-type", "application/json")}
     if accept := request.headers.get("accept"):

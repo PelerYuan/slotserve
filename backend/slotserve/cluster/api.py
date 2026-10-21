@@ -361,3 +361,9 @@ async def delete_node(
 @router.websocket(p.AGENT_PATH)
 async def agent_socket(websocket: WebSocket):
     await websocket.app.state.cluster.serve(websocket)
+
+
+@router.websocket(p.STREAM_PATH + "/{stream_id}")
+async def stream_socket(websocket: WebSocket, stream_id: str):
+    """The data connection of one relayed stream (cluster/relay.py), opened by the node's agent."""
+    await websocket.app.state.cluster.serve_stream(websocket, stream_id)

@@ -77,10 +77,17 @@ async def live(app):
 async def start_agent(app, live, tmp_path):
     agents: list[tuple[NodeAgent, asyncio.Task]] = []
 
-    async def start(token: str, name: str = "b", wait: bool = True, protocol_version: int | None = None) -> NodeAgent:
+    async def start(
+        token: str,
+        name: str = "b",
+        wait: bool = True,
+        protocol_version: int | None = None,
+        docker_host: str = "unix:///nonexistent/docker.sock",
+    ) -> NodeAgent:
         root = tmp_path / f"node-{name}"
         settings = Settings(
             _env_file=None,
+            docker_host=docker_host,
             data_dir=root / "data",
             models_dir=root / "models",
             llama_server_cmd=f'"{sys.executable}" "{MOCK_SERVER}"',

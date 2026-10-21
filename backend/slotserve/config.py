@@ -170,13 +170,18 @@ class Settings(BaseSettings):
     node_heartbeat_seconds: float = 5.0  # how often agents report metrics
     node_offline_seconds: float = 30.0  # a node that sent nothing for this long is offline
     node_rpc_timeout_seconds: float = 30.0
+    # Relay: every byte to and from a node (model requests, Docker, SSH, ports, web interfaces) travels over
+    # connections the node agent opens to the control plane (cluster/relay.py).
+    relay_max_streams: int = 256  # relayed connections one node may have open at the same time
+    relay_idle_seconds: float = 3600.0  # a relayed connection without traffic for this long is closed
+    relay_open_seconds: float = 15.0  # how long opening a relayed connection may take
     # Node agent (``slotserve agent``): the control plane URL and this node's token.
     agent_server: str = ""
     agent_token: str = ""
-    # Address the control plane should use to reach this node; empty = the address it connects from.
+    # Shown for the node in Admin -> Nodes; empty = the address it connects from. Nothing connects to it.
     agent_address: str = ""
-    # Interface the node's model servers listen on (the control plane forwards requests to them).
-    agent_model_host: str = "0.0.0.0"
+    # Interface the node's model servers listen on; the agent relays requests to them, so loopback is enough.
+    agent_model_host: str = "127.0.0.1"
 
     @property
     def database_url(self) -> str:

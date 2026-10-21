@@ -1,4 +1,4 @@
-"""Executors for node agents: commands go over the agent's WebSocket, the data plane goes to the node directly."""
+"""Executors for node agents: commands go over the agent's WebSocket, data through the relay (``relay.py``)."""
 
 from __future__ import annotations
 
@@ -21,7 +21,11 @@ from . import protocol as p
 from .rpc import Peer
 
 if TYPE_CHECKING:
+    import httpx
     from starlette.websockets import WebSocket
+
+    from ..services.docker_api import DockerClient
+    from .relay import Relay
 
 log = logging.getLogger(__name__)
 LOG_CHUNK_BYTES = 2 * 1024 * 1024
@@ -45,9 +49,13 @@ class RemoteExecutor(NodeExecutor):
         self.settings = settings
         self.node_id = node_id
         self.name = name
-        self.configured_address = address  # set by an admin
+        self.configured_address = address  # set by an admin (shown only: nothing connects to nodes)
         self.reported_address = ""  # sent by the agent (SLOTSERVE_AGENT_ADDRESS)
         self.seen_address = ""  # where the agent connected from
+        self.relay: Relay | None = None  # set by the hub
+        self.token_hash: str | None = None  # of the connected agent's token (authenticates its data connections)
+        self._docker: DockerClient | None = None
+        self._http: httpx.AsyncClient | None = None
         self.peer: Peer | None = None
         self.websocket: WebSocket | None = None
         self.protocol: int | None = None
@@ -84,6 +92,44 @@ class RemoteExecutor(NodeExecutor):
         """GPUs from the last inventory or metrics, also while the node is offline (for configuring lanes)."""
         return [GpuOut(**g) for g in self.metrics.get("gpus") or self.inventory.get("gpus") or []]
 
+    def docker(self) -> DockerClient:
+        """The node's Docker API, relayed by its agent (same client and code paths as the local Docker)."""
+        if self._docker is None:
+            from ..services.docker_api import DockerClient
+
+            self._docker = DockerClient(
+                f"relay://{self.name}", transport=self._relay().transport(self, _docker_target), connect_timeout=None
+            )
+        return self._docker
+
+    def http_client(self) -> httpx.AsyncClient:
+        """HTTP to the node's model servers (``http://<anything>:<port>``), relayed by its agent."""
+        if self._http is None:
+            import httpx
+
+            self._http = httpx.AsyncClient(
+                transport=self._relay().transport(self, _model_target, keepalive=15.0, connections=200),
+                timeout=httpx.Timeout(None, connect=self.settings.relay_open_seconds + 5),
+                trust_env=False,
+            )
+        return self._http
+
+    def _relay(self) -> Relay:
+        if self.relay is None:
+            raise RuntimeError("the relay is not set up")
+        return self.relay
+
+    def relay_stats(self) -> dict:
+        return self.relay.stats(self.node_id).out() if self.relay is not None else {}
+
+    async def close_clients(self) -> None:
+        if self._docker is not None:
+            await self._docker.close()
+            self._docker = None
+        if self._http is not None:
+            await self._http.aclose()
+            self._http = None
+
     async def scan_models(self) -> list[ModelFile]:
         result = await self.request(p.M_MODELS_SCAN, timeout=120)
         return [
@@ -109,7 +155,15 @@ class RemoteExecutor(NodeExecutor):
         self.metrics = {}
 
     def describe(self) -> dict[str, Any]:
-        return {**super().describe(), "address": self.address, "protocol": self.protocol}
+        return {**super().describe(), "address": self.address, "protocol": self.protocol, "relay": self.relay_stats()}
+
+
+def _docker_target(_host: str, _port: int) -> dict:
+    return {"kind": "docker"}
+
+
+def _model_target(_host: str, port: int) -> dict:
+    return {"kind": "model", "port": port}
 
 
 class RemoteRuntime(RequestTracker):

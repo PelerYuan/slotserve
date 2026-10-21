@@ -22,6 +22,7 @@ from ..orm import HOLDING_STATUSES, DownloadTask, Lane, ModelLoadEvent, Node, Re
 from ..runtime.executor import NodeRegistry
 from . import inventory
 from . import protocol as p
+from .relay import Relay
 from .remote import RemoteExecutor
 from .rpc import Peer
 
@@ -67,6 +68,7 @@ class ClusterHub:
         self.state = app_state
         self.settings: Settings = app_state.settings
         self.registry = registry
+        self.relay = Relay(self.settings)  # every byte to and from nodes (relay.py)
         self.local_id: int | None = None
         self._offline_since: dict[int, float] = {}
         self._alerted: set[int] = set()
@@ -91,6 +93,7 @@ class ClusterHub:
 
     def add_node(self, node: Node) -> RemoteExecutor:
         executor = RemoteExecutor(self.settings, node.id, node.name, node.address or "")
+        executor.relay = self.relay
         executor.seen_address = node.seen_address or ""
         if node.inventory:
             with contextlib.suppress(ValueError):
@@ -110,6 +113,8 @@ class ClusterHub:
         if executor is None or executor.websocket is None:
             return
         if code in p.FATAL_CLOSE_CODES:  # tell the agent why, so it does not just reconnect
+            executor.token_hash = None  # its relayed connections are refused from now on
+            await self.relay.close_node(node_id)
             with contextlib.suppress(Exception):
                 await executor.websocket.send_text(p.encode(p.error(reason or "disconnected", reason)))
         with contextlib.suppress(Exception):
@@ -117,18 +122,24 @@ class ClusterHub:
 
     async def remove_node(self, node_id: int) -> None:
         await self.disconnect(node_id, p.CLOSE_REVOKED, "revoked")
-        self.registry.remove(node_id)
+        await self.relay.close_node(node_id)
+        removed = self.registry.remove(node_id)
+        if isinstance(removed, RemoteExecutor):
+            await removed.close_clients()
         self._offline_since.pop(node_id, None)
         self._alerted.discard(node_id)
 
     async def close(self) -> None:
         """App shutdown: drop agent connections; model servers on nodes keep running and are reconciled later."""
         self._closing = True
+        await self.relay.close()
         for executor in self.registry.all():
-            if isinstance(executor, RemoteExecutor) and executor.peer is not None:
-                peer = executor.peer
-                executor.detach()
-                await peer.close()
+            if isinstance(executor, RemoteExecutor):
+                if executor.peer is not None:
+                    peer = executor.peer
+                    executor.detach()
+                    await peer.close()
+                await executor.close_clients()
 
     # ---- agent connections --------------------------------------------------
 
@@ -182,6 +193,7 @@ class ClusterHub:
 
         peer = Peer(websocket.send_text, on_event=lambda name, data: self._on_event(executor, name, data))
         executor.attach(peer, websocket)
+        executor.token_hash = node.token_hash
         executor.protocol = version
         executor.agent_version = str(hello.get("agent_version") or "")[:32]
         executor.info = hello.get("info") or {}
@@ -451,10 +463,19 @@ class ClusterHub:
             for lane_id in executor.runtimes
         }
 
+    def token_hash_of(self, node_id: int) -> str | None:
+        """The token hash of a node's connected agent (its relayed data connections must carry the same token)."""
+        executor = self.executor(node_id)
+        return executor.token_hash if executor is not None and executor.online else None
+
+    async def serve_stream(self, websocket: WebSocket, stream_id: str) -> None:
+        await self.relay.serve(websocket, stream_id, self.token_hash_of)
+
     async def run(self) -> None:
         while True:
             try:
                 await self.check()
+                await self.relay.sweep()
             except asyncio.CancelledError:
                 raise
             except Exception:

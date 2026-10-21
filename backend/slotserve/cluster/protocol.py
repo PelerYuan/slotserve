@@ -19,6 +19,12 @@ A node agent opens a WebSocket to ``/api/cluster/agent`` on the control plane wi
 ``event`` (agent -> server, no reply)
     ``{"type": "event", "event": "metrics" | "runtime" | "load_event" | "inventory" | "download", "data": {...}}``
 
+Relayed connections (see ``relay.py``) never use the control connection for their bytes: the server asks the agent
+to open stream ``<id>`` to a target on the node (``stream.open``); the agent connects to that target, then opens a
+WebSocket of its own to ``/api/cluster/stream/<id>`` (node token + the stream's one-time secret) and the bytes flow
+over it: binary frames carry data, the text frame ``{"t": "eof"}`` says that side sends nothing more (half-close),
+closing the WebSocket ends the stream.
+
 The protocol version is a single integer. The server accepts agents speaking any version between
 ``MIN_PROTOCOL`` and ``PROTOCOL_VERSION``; otherwise both sides report a clear version mismatch.
 New optional fields do not need a new version; removed or changed fields and methods do.
@@ -34,6 +40,9 @@ from typing import Any
 PROTOCOL_VERSION = 1
 MIN_PROTOCOL = 1
 AGENT_PATH = "/api/cluster/agent"
+STREAM_PATH = "/api/cluster/stream"  # + "/<stream id>": the data connections of relayed streams
+STREAM_SECRET_HEADER = "x-slotserve-stream"
+EOF_FRAME = '{"t":"eof"}'
 TOKEN_PREFIX = "ssn-"
 
 # WebSocket close codes (4000-4999 are free for applications).
@@ -57,6 +66,11 @@ M_MODELS_DELETE = "models.delete"  # {path} -> {deleted}
 M_DOWNLOAD_START = "download.start"  # {task_id, url, filename, headers, min_free_gb} -> {}
 M_DOWNLOAD_CANCEL = "download.cancel"  # {task_id} -> {}
 M_PING = "ping"  # {} -> {time}
+# {id, secret, target} -> {}: connect to target and open the stream's data connection (relay.py). Targets:
+# {"kind": "model", "port": n} a model server on the node; {"kind": "docker"} the node's Docker API;
+# {"kind": "container", "container": name, "port": n, "network": name} a container port;
+# {"kind": "tcp", "host": loopback, "port": n} a port on the node's loopback interface.
+M_STREAM_OPEN = "stream.open"
 
 # Events the agent sends.
 E_METRICS = "metrics"  # {gpus: [...], cpu_percent, memory_used_mb, memory_total_mb, load}

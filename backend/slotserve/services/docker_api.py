@@ -67,7 +67,9 @@ def tar_files(files: dict[str, tuple[bytes, int]]) -> bytes:
 
 
 class DockerClient:
-    def __init__(self, host: str, transport: httpx.AsyncBaseTransport | None = None):
+    def __init__(
+        self, host: str, transport: httpx.AsyncBaseTransport | None = None, connect_timeout: float | None = 5.0
+    ):
         self.host = host
         base = "http://docker"
         if host.startswith("tcp://"):
@@ -75,7 +77,7 @@ class DockerClient:
         elif transport is None and host.startswith("unix://"):
             transport = httpx.AsyncHTTPTransport(uds=host[len("unix://") :])
         self._http = httpx.AsyncClient(
-            base_url=base + API, transport=transport, timeout=httpx.Timeout(60.0, connect=5.0)
+            base_url=base + API, transport=transport, timeout=httpx.Timeout(60.0, connect=connect_timeout)
         )
 
     async def close(self) -> None:
