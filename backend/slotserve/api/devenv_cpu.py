@@ -116,7 +116,7 @@ async def cpu_info(request: Request, user: User = Depends(current_user), db: Asy
                 live=LiveOut(**live) if live else None,
             )
         )
-    active_all = sum(1 for r in rows if r.state in ACTIVE_STATES) if user.is_admin else await cpu._active(db)
+    active_all = sum(1 for r in rows if r.state in ACTIVE_STATES) if user.is_admin else await cpu.active_count(db)
     after = (
         await db.execute(
             select(DevProject.id).where(DevProject.owner_id == user.id, DevProject.cpu_after_booking.is_(True))

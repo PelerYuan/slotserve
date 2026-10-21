@@ -88,6 +88,11 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_DEVENV_STORAGE_DIR` | *空* | Docker 主机上存放持久数据的目录（绑定挂载）；留空则使用 Docker 命名卷 |
 | `SLOTSERVE_DEVENV_PROJECTS` | `3` | 每人可保留（暂停）的环境数；0 表示不允许 |
 | `SLOTSERVE_DEVENV_PROJECT_DAYS` | `0` | 自动删除闲置这么多天的保留环境（0 表示从不） |
+| `SLOTSERVE_DEVENV_CPU_ENABLED` | `true` | 允许以无 GPU 模式启动开发环境（无需预约） |
+| `SLOTSERVE_DEVENV_CPU_PER_USER` | `2` | 每人同时可运行的无 GPU 环境数 |
+| `SLOTSERVE_DEVENV_CPU_CORES_PER_GPU` | `8` | 每个通道按每块 GPU 为其预约保留的 CPU 核心数（cpuset）；0 表示不保留 |
+| `SLOTSERVE_DEVENV_CPU_CORES` / `_MEMORY_GB` | `4` / `16` | 单个无 GPU 环境的上限（0 表示整个共享池 / 不限） |
+| `SLOTSERVE_DEVENV_CPU_MEMORY_POOL_GB` | `0` | 所有无 GPU 环境合计可占用的内存（0 表示不限） |
 
 除部署相关的几项（`HOST`、`PORT`、`SECRET_KEY`、`COOKIE_SECURE`、`STATIC_DIR`、`DATA_DIR`、`MODELS_DIR`、`LLAMA_SERVER_CMD`、`LLAMA_HOST`、`LLAMA_PORT`、`TELEGRAM_API_BASE`、各 `…_API_BASE` 与 `QQ_TOKEN_URL` 地址、`DOCKER_HOST`、`DROPBEAR_PATH`，修改需要重启，因此只在 `.env` 中设置）外，其余所有设置都可由管理员在**管理 → 系统设置**中直接修改，无需重启。修改保存在数据库中，优先于 `.env`；点**恢复默认**即可取消覆盖。
 

@@ -5,6 +5,11 @@ import { useRouter } from 'vue-router'
 import { NButton, NCheckbox, NInput, NInputNumber, NModal, NSelect, NSwitch, useDialog, useMessage } from 'naive-ui'
 import { ExternalLink, KeyRound, Plus, Terminal, Users } from 'lucide-vue-next'
 import CodeBlock from '@/components/CodeBlock.vue'
+// devenv_cpu: environments without a GPU
+import CpuPanel from '@/components/devenv/CpuPanel.vue'
+import CpuProjectControls from '@/components/devenv/CpuProjectControls.vue'
+import CpuSessionInfo from '@/components/devenv/CpuSessionInfo.vue'
+import CpuStartButton from '@/components/devenv/CpuStartButton.vue'
 import { api } from '@/api/client'
 import type { DevInfo, DevProject, DevSession, DevTemplate, DevWebKind, Reservation } from '@/api/types'
 import { session } from '@/composables/session'
@@ -364,6 +369,9 @@ const stateTone: Record<string, string> = {
       </article>
     </section>
 
+    <!-- devenv_cpu: environments without a GPU -->
+    <CpuPanel v-if="info?.enabled" :templates="templates" :projects="projects" :can-log-in="canLogIn" @changed="load" />
+
     <!-- environments -->
     <section class="block">
       <div class="block-head">
@@ -387,6 +395,7 @@ const stateTone: Record<string, string> = {
           </span>
         </div>
         <div class="mono small faint image">{{ s.image }}</div>
+        <CpuSessionInfo v-if="s.kind === 'cpu'" :session="s" :projects="projects" @changed="load" />
 
         <div v-if="s.state === 'pulling'" class="progress">
           <div class="bar"><span :style="{ width: `${s.progress ?? 3}%` }" /></div>
@@ -395,7 +404,9 @@ const stateTone: Record<string, string> = {
             <span v-if="s.detail" class="mono"> · {{ s.detail }}</span>
           </div>
         </div>
-        <p v-else-if="s.state === 'ready' || s.state === 'waiting'" class="muted small">{{ t('devenv.waitingStart') }}</p>
+        <p v-else-if="(s.state === 'ready' || s.state === 'waiting') && s.kind !== 'cpu'" class="muted small">
+          {{ t('devenv.waitingStart') }}
+        </p>
         <p v-else-if="s.state === 'starting'" class="muted small">
           {{ s.detail === 'snapshot' ? t('devenv.snapshot') : t('devenv.starting') }}
         </p>
@@ -492,6 +503,7 @@ const stateTone: Record<string, string> = {
             <template v-if="p.upcoming"> · {{ t('devenv.upcomingBookings', { n: p.upcoming }) }}</template>
           </p>
           <p v-if="p.persist_paths.length" class="mono small faint">{{ p.persist_paths.join('  ') }}</p>
+          <CpuProjectControls :project="p" @changed="load" />
           <div class="row actions">
             <NButton size="tiny" quaternary @click="openProject(p)">{{ t('common.edit') }}</NButton>
             <NButton size="tiny" quaternary type="error" :disabled="p.state === 'running'" @click="removeProject(p)">
@@ -525,6 +537,7 @@ const stateTone: Record<string, string> = {
           </div>
           <div class="mono small faint image">{{ x.image }}</div>
           <p class="small muted">{{ describeTemplate(x) }}</p>
+          <div v-if="x.enabled" class="row actions"><CpuStartButton :template-id="x.id" @started="load" /></div>
           <div v-if="isAdmin" class="row actions">
             <NButton size="tiny" quaternary @click="openTemplate(x)">{{ t('common.edit') }}</NButton>
             <NButton size="tiny" quaternary type="error" @click="removeTemplate(x)">{{ t('common.delete') }}</NButton>
@@ -543,6 +556,7 @@ const stateTone: Record<string, string> = {
           <div class="mono small faint image">{{ x.image }}</div>
           <p v-if="x.description" class="small muted">{{ x.description }}</p>
           <div class="row actions">
+            <CpuStartButton :template-id="x.id" @started="load" />
             <NButton size="tiny" quaternary @click="openTemplate(x)">{{ t('common.edit') }}</NButton>
             <NButton size="tiny" quaternary type="error" @click="removeTemplate(x)">{{ t('common.delete') }}</NButton>
           </div>

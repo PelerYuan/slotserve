@@ -171,7 +171,7 @@ class CpuEnvs:
             info = await self.m.docker.info()
             cpus, memory = int(info.get("NCPU") or 0), int(info.get("MemTotal") or 0)
             self.host = {"cpus": cpus, "memory": memory} if cpus > 0 else None
-        except (DockerError, httpx.HTTPError, OSError, ValueError, TypeError) as exc:
+        except Exception as exc:  # noqa: BLE001 - best effort: without it nothing gets a cpuset
             log.debug("docker info failed: %s", exc)
             self.host = None
         return self.host
@@ -242,7 +242,7 @@ class CpuEnvs:
     def enabled(self) -> bool:
         return bool(self.settings.devenv_enabled and self.settings.devenv_cpu_enabled)
 
-    async def _active(self, db, user_id: int | None = None) -> int:
+    async def active_count(self, db, user_id: int | None = None) -> int:
         stmt = select(func.count(DevSession.id)).where(DevSession.kind == KIND, DevSession.state.in_(ACTIVE_STATES))
         if user_id is not None:
             stmt = stmt.where(DevSession.user_id == user_id)
@@ -258,11 +258,11 @@ class CpuEnvs:
         if not self.enabled():
             raise DevEnvError("devenv_cpu_disabled")
         limit = self.settings.devenv_cpu_per_user
-        if await self._active(db, user_id) >= limit:
+        if await self.active_count(db, user_id) >= limit:
             raise DevEnvError("devenv_cpu_limit", limit=limit)
         pool, each = self.settings.devenv_cpu_memory_pool_gb, self.settings.devenv_cpu_memory_gb
         if pool > 0 and each > 0:
-            claimed = self.memory_claimed_gb(await self._active(db))
+            claimed = self.memory_claimed_gb(await self.active_count(db))
             if claimed + each > pool:
                 raise DevEnvError("devenv_cpu_memory_full", free=_gb(max(0.0, pool - claimed)), need=_gb(each))
 
@@ -366,8 +366,8 @@ class CpuEnvs:
 
     async def after_booking(self, db, s: DevSession) -> None:
         """Called when a booking's session ends: continues its project without a GPU when its owner asked for it."""
-        if s.kind == KIND or not s.project_id or not self.enabled():
-            return
+        if s.kind == KIND or not s.project_id or s.started_at is None or not self.enabled():
+            return  # (a booking cancelled before it started does not start anything)
         project = await db.get(DevProject, s.project_id)
         user = await db.get(User, s.user_id) if s.user_id else None
         if project is None or not project.cpu_after_booking or user is None or user.disabled_at is not None:

@@ -1,6 +1,6 @@
 # Dev environments
 
-Besides running a model or taking the whole GPU, a booking can be a **dev environment**: for the length of the booking SlotServe runs a Docker container with the lane's GPUs and an SSH server, and you log in with your SSH key or your environment password. Your files in `/workspace` are kept between bookings, and you can keep the whole environment too. Lanes can also run a **shared environment** everyone can log into while nobody has them booked.
+Besides running a model or taking the whole GPU, a booking can be a **dev environment**: for the length of the booking SlotServe runs a Docker container with the lane's GPUs and an SSH server, and you log in with your SSH key or your environment password. Your files in `/workspace` are kept between bookings, and you can keep the whole environment too. Lanes can also run a **shared environment** everyone can log into while nobody has them booked, and anyone can run an environment [without a GPU](#without-a-gpu) on the shared CPU cores at any time.
 
 ```mermaid
 sequenceDiagram
@@ -122,6 +122,49 @@ Normally the container is removed when the booking ends and only `/workspace` st
 - **Kept directories**: besides `/workspace`, a template or kept environment can list more directories to keep, e.g. `/root` or `/opt/conda` (absolute paths; system directories such as `/etc`, `/usr`, `/proc` or `/opt/slotserve` are not allowed). A new directory starts with the image's content. Changing the list takes effect the next time the container is created.
 - The **Dev environments** page lists your kept environments with their state (paused, running, not started yet, container missing), size and last use. You can rename them, change their kept directories and delete them; deleting removes the container and its snapshot, and optionally its kept directories. `/workspace` is never deleted.
 - One kept environment cannot be booked twice at the same time. Admins limit how many each person may keep (**Kept environments per person**, default 3) and can remove kept environments unused for a number of days (**Remove unused kept environments after**; 0 = never; their data stays).
+
+## Without a GPU
+
+Not everything needs a GPU. Editing code, moving data, installing packages or a CPU job can run in a dev environment **without a GPU**, at any time and without a booking:
+
+- On the **Dev environments** page, press **Start without GPU** in the **Without a GPU** section (or on a template or kept environment) and pick a template or one of your kept environments. It starts right away on the server's shared CPU cores, with the same SSH login, `/workspace`, kept directories and web interfaces as a booked environment, but no GPU.
+- It runs until you **Pause** it (a kept environment keeps its container) or **Stop** it (any other environment; `/workspace` stays). There is no idle timeout and no end time. Its card shows the CPU cores and memory it uses right now.
+- Admins limit how many each person may run at once (**Without-GPU environments per person**, default 2).
+
+**One kept environment, two modes.** A kept environment can run without a GPU between its bookings. When a booking of it starts, SlotServe stops it and continues it with the booked lane's GPUs: the container is saved as a snapshot and recreated with the GPUs, so everything installed stays (as when a kept environment moves to other GPUs). When the booking ends it is paused as usual; with **Continue without GPU after bookings** switched on for that kept environment it goes on running without a GPU instead. You can also start it without a GPU again at any time. While a booking of it runs, it cannot be started without a GPU.
+
+!!! note "Snapshots"
+    Each switch between the CPU and a booking's GPUs saves the container as an image layer. If a kept environment switches very often over a long time, delete it and keep a fresh one now and then (or save it as an image and start a kept environment from that), because images have a limit on the number of layers.
+
+### Sharing the CPU fairly
+
+```mermaid
+flowchart LR
+    subgraph Host CPU cores
+        A["Lane A: cores per GPU x its GPUs"]
+        B["Lane B: cores per GPU x its GPUs"]
+        P["Shared pool: all other cores"]
+    end
+    A --- BA["Booking / shared environment on lane A"]
+    B --- BB["Booking / shared environment on lane B"]
+    P --- C1["Environment without GPU"]
+    P --- C2["Environment without GPU"]
+```
+
+- Every GPU lane **reserves CPU cores** for whoever uses it: **CPU cores reserved per GPU** (default 8) times its number of GPUs (a lane that does not restrict its GPUs counts as one). Its booking containers and its shared idle environment run on exactly those cores (Docker cpuset), so CPU-only work cannot slow a GPU booking down. 0 reserves nothing.
+- Environments without a GPU share **all other cores** (the pool). They all get the same CPU weight, so an idle core can be used by anyone and a busy pool is split evenly. On top of that each has a hard limit: **CPU limit without GPU** (cores, default 4; 0 = the whole pool) and **Memory limit without GPU** (default 16 GB; 0 = no limit).
+- **Memory pool without GPU** caps how much memory all environments without a GPU may claim together: when one starts, the memory limits of all running ones are added up, and a new one that would not fit is refused until another is paused. 0 = no total.
+- SlotServe reads the number of cores and the memory of the host from Docker. If there are fewer cores than the lanes want, each lane gets its share and at least one core stays in the pool. The section on the Dev environments page shows the pool and each lane's cores. Reserved cores are assigned by logical CPU number, in lane order.
+
+Changing these settings applies to containers created afterwards; a kept container gets its new CPU placement and limits the next time it starts.
+
+### Usage
+
+The CPU time and memory of every environment without a GPU are read from Docker every few seconds and recorded each minute for its owner (kind "CPU-only environments"). The **Usage** page then shows **CPU core-hours** per person.
+
+### What admins see
+
+The **Without a GPU** section lists every running environment without a GPU with its owner, state, CPU cores and memory in use, and a **Pause** / **Stop** button (logged in the audit log). Admins find the settings in **Admin → System settings → Dev environments**.
 
 ## Idle lanes: a shared environment
 
