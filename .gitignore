@@ -34,3 +34,6 @@ site/
 *.swp
 .DS_Store
 Thumbs.db
+
+# Local agent worktrees and settings
+.claude/
