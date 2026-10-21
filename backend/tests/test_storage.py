@@ -225,6 +225,9 @@ async def test_failed_helper_and_host_check(app, make_client):
 
 async def test_environment_mounts(app, make_client):
     docker = app.state.fake_docker
+    # SlotServe's own models directory is mounted at /models only on Linux hosts; leave it out so the mounts
+    # below are the same on every platform
+    app.state.devenv._models_source = ""
     admin, bob = await _setup(app, make_client)
     carol = await make_client("carol")
     await bob.post("/api/ssh-keys", json={"public_key": ed25519_key()})

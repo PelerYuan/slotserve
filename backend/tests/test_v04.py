@@ -188,6 +188,11 @@ async def test_backups(app, make_client):
 
 
 async def test_retention_rolls_up_old_usage(app, make_client):
+    # The housekeeper's own retention run would race this test's explicit one; stop it first.
+    housekeeper = [t for t in asyncio.all_tasks() if t.get_name() == "housekeeper"]
+    for task in housekeeper:
+        task.cancel()
+    await asyncio.gather(*housekeeper, return_exceptions=True)
     admin = await make_client("root")
     r = await admin.put("/api/admin/settings", json={"usage_retention_days": 30})
     assert r.json()["detail"]["code"] == "invalid_setting"
