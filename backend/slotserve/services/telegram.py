@@ -15,6 +15,8 @@ from ..errors import ApiError
 from ..orm import HOLDING_STATUSES, Reservation, User
 from . import queries
 from .notify import lang
+from .telegram_booking import TEXT as BOOKING_TEXT
+from .telegram_booking import BookingFlow, Reply
 
 log = logging.getLogger(__name__)
 
@@ -24,6 +26,9 @@ HELP = {
     "en": (
         "SlotServe bot\n"
         "/status – what the GPU is doing\n"
+        "/book – book GPU time\n"
+        "/free – free time today and tomorrow\n"
+        "/cancel – cancel an upcoming booking\n"
         "/today – today's bookings\n"
         "/mine – your upcoming bookings\n"
         "/extend [minutes] – extend your running booking (default 30)\n"
@@ -33,6 +38,9 @@ HELP = {
     "zh-CN": (
         "SlotServe 机器人\n"
         "/status – GPU 当前状态\n"
+        "/book – 预约 GPU 时段\n"
+        "/free – 今天和明天的空闲时段\n"
+        "/cancel – 取消一个未开始的预约\n"
         "/today – 今天的预约\n"
         "/mine – 我接下来的预约\n"
         "/extend [分钟] – 延长我正在进行的预约（默认 30）\n"
@@ -97,6 +105,7 @@ class TelegramBot:
         self._client_key: tuple | None = None
         self._reload = asyncio.Event()
         self.offset = 0
+        self.flow = BookingFlow(app)
 
     # ---- plumbing -----------------------------------------------------------
 
@@ -130,15 +139,17 @@ class TelegramBot:
             raise TelegramError(f"{method}: {data.get('description') or resp.status_code}")
         return data.get("result")
 
+    @staticmethod
+    def _markup(buttons: list[list[tuple[str, str]]] | None) -> dict:
+        return {"inline_keyboard": [[{"text": t, "callback_data": d} for t, d in row] for row in buttons or []]}
+
     async def send(self, chat_id: int, message: str, buttons: list[list[tuple[str, str]]] | None = None) -> bool:
         """Returns ``False`` when Telegram could not be reached, so the caller can retry later."""
         if not self.enabled:
             return True
         params: dict[str, Any] = {"chat_id": chat_id, "text": message, "disable_web_page_preview": True}
         if buttons:
-            params["reply_markup"] = {
-                "inline_keyboard": [[{"text": t, "callback_data": d} for t, d in row] for row in buttons]
-            }
+            params["reply_markup"] = self._markup(buttons)
         try:
             await self.call("sendMessage", **params)
         except TelegramError as exc:
@@ -164,6 +175,7 @@ class TelegramBot:
                 me = await self.call("getMe")
                 self.username = me.get("username")
                 log.info("telegram bot @%s connected", self.username)
+                await self._register_commands()
                 delay = 5
                 while not self._reload.is_set():
                     await self.poll_once()
@@ -176,6 +188,22 @@ class TelegramBot:
                 except TimeoutError:
                     pass
                 delay = min(delay * 2, 300)
+
+    async def _register_commands(self) -> None:
+        """The command menu Telegram shows when typing "/" (English by default, Chinese for Chinese clients)."""
+        for language, text in HELP.items():
+            commands = [
+                {"command": line[1:].split(" ", 1)[0], "description": line.split(" – ", 1)[1]}
+                for line in text.splitlines()
+                if line.startswith("/")
+            ]
+            params: dict[str, Any] = {"commands": commands}
+            if language != "en":
+                params["language_code"] = language.split("-")[0]
+            try:
+                await self.call("setMyCommands", **params)
+            except TelegramError as exc:
+                log.info("telegram command menu not set: %s", exc)
 
     async def poll_once(self, timeout: int = POLL_TIMEOUT) -> None:
         updates = await self.call(
@@ -192,8 +220,26 @@ class TelegramBot:
 
     async def handle(self, update: dict) -> None:
         if cq := update.get("callback_query"):
-            chat_id = cq.get("message", {}).get("chat", {}).get("id")
+            message = cq.get("message") or {}
+            chat_id = message.get("chat", {}).get("id")
             answer = await self.on_button(chat_id, cq.get("data") or "")
+            if isinstance(answer, Reply):
+                await self.call("answerCallbackQuery", callback_query_id=cq["id"])
+                if chat_id and answer.edit and message.get("message_id"):
+                    try:
+                        await self.call(
+                            "editMessageText",
+                            chat_id=chat_id,
+                            message_id=message["message_id"],
+                            text=answer.text,
+                            reply_markup=self._markup(answer.buttons),
+                        )
+                    except TelegramError as exc:  # e.g. the message is too old to edit
+                        log.info("telegram edit failed (%s); sending instead", exc)
+                        await self.send(chat_id, answer.text, answer.buttons)
+                elif chat_id:
+                    await self.send(chat_id, answer.text, answer.buttons)
+                return
             await self.call("answerCallbackQuery", callback_query_id=cq["id"], text=answer[:190])
             if answer and chat_id:
                 await self.send(chat_id, answer)
@@ -206,7 +252,9 @@ class TelegramBot:
         command, _, arg = body.partition(" ")
         command = command.split("@", 1)[0].lower()
         answer = await self.on_command(chat["id"], (msg.get("from") or {}).get("username"), command, arg.strip())
-        if answer:
+        if isinstance(answer, Reply):
+            await self.send(chat["id"], answer.text, answer.buttons)
+        elif answer:
             await self.send(chat["id"], answer)
 
     async def _user_for_chat(self, db, chat_id: int) -> User | None:
@@ -214,7 +262,7 @@ class TelegramBot:
             await db.execute(select(User).where(User.telegram_chat_id == chat_id, User.disabled_at.is_(None)))
         ).scalar_one_or_none()
 
-    async def on_command(self, chat_id: int, tg_username: str | None, command: str, arg: str) -> str | None:
+    async def on_command(self, chat_id: int, tg_username: str | None, command: str, arg: str) -> str | Reply | None:
         async with SessionLocal() as db:
             if command == "/start" and arg:
                 user = (await db.execute(select(User).where(User.telegram_link_token == arg))).scalar_one_or_none()
@@ -240,6 +288,12 @@ class TelegramBot:
                 return reply(user, "unlinked")
             if command == "/status":
                 return await self._status(db, user)
+            if command == "/book":
+                return await self.flow.step(db, user, [])
+            if command == "/free":
+                return await self.flow.free(db, user)
+            if command == "/cancel":
+                return await self.flow.cancel_list(db, user)
             if command == "/today":
                 return await self._today(db, user)
             if command == "/mine":
@@ -251,12 +305,20 @@ class TelegramBot:
                 return await self._release(db, user, None)
             return HELP[lang(user)]
 
-    async def on_button(self, chat_id: int | None, data: str) -> str:
+    async def on_button(self, chat_id: int | None, data: str) -> str | Reply:
         async with SessionLocal() as db:
             user = await self._user_for_chat(db, chat_id) if chat_id else None
             if user is None:
                 return reply(None, "not_linked")
             parts = data.split(":")
+            if parts[0] == "bk":
+                return await self.flow.step(db, user, parts[1:])
+            if parts[0] in ("bko", "bkw"):
+                return await self.flow.book(db, user, parts[1:], waitlist=parts[0] == "bkw")
+            if parts[0] in ("cx", "cxy") and len(parts) == 2 and parts[1].isdigit():
+                return await self.flow.cancel(db, user, int(parts[1]), confirmed=parts[0] == "cxy")
+            if parts[0] == "cxn":
+                return Reply(BOOKING_TEXT[lang(user)]["kept"], edit=True)
             if parts[0] == "ext" and len(parts) == 3 and parts[1].isdigit() and parts[2].isdigit():
                 return await self._extend(db, user, int(parts[1]), int(parts[2]))
             if parts[0] == "rel" and len(parts) == 2 and parts[1].isdigit():

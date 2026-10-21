@@ -10,6 +10,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - The overview's loading bar uses the progress the model server reports when available.
 - Admin switch **Let people view their API keys again**: new keys keep an encrypted copy (Fernet, keyed from `SECRET_KEY`) and owners can **View** them; switching it off deletes every copy. Off by default.
 - Light/dark switch in the user menu, the mobile menu and on the sign-in page.
+- Telegram: `/book` books GPU time with buttons (lane, model or whole GPU, day, start, length) under the same rules as the web, offering the waitlist when the time was just taken; `/free` lists free time for today and tomorrow; `/cancel` cancels an upcoming booking. The bot registers its command menu.
 
 ## [0.7.1] - 2026-10-21
 

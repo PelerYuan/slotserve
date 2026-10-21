@@ -31,13 +31,16 @@ Commands (private chat with the bot):
 | Command | What it does |
 | --- | --- |
 | `/status` | Loaded model and who has the GPU |
+| `/book` | Book GPU time with buttons: lane, model (or whole GPU), day, start, length, confirm |
+| `/free` | Free time today and tomorrow, per lane |
+| `/cancel` | Pick one of your upcoming bookings and cancel it |
 | `/today` | Bookings in the next 24 hours |
 | `/mine` | Your upcoming bookings |
 | `/extend [minutes]` | Extend your running booking (default 30) |
 | `/release` | End your running booking now |
 | `/unlink` | Stop notifications to this chat |
 
-New bookings are made on the web.
+Bookings made with `/book` follow exactly the same rules as the web: conflicts, the longest booking, how far ahead, quotas and approval. The bot offers whole-hour start times (and **Now**); use the web for other times, presets or weekly repeats. If the time is taken by the moment you confirm, the bot offers to put you on the waitlist. Typing `/` in Telegram shows the command list.
 
 ## Calendar subscription
 

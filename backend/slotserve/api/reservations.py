@@ -64,6 +64,12 @@ async def create_reservation(
     db: AsyncSession = Depends(get_db),
 ):
     """Creates one booking, or a weekly series when ``repeat_weeks`` > 0. Returns every booking created."""
+    created = await create_core(request.app, db, user, body)
+    return await queries.reservation_out(db, created, utcnow())
+
+
+async def create_core(app, db: AsyncSession, user: User, body: ReservationCreateIn) -> list[Reservation]:
+    """Checks and stores new bookings and tells whoever needs to know (shared by the web API and the bot)."""
     settings = get_settings()
     owner = user
     if body.user_id is not None and body.user_id != user.id:
@@ -107,12 +113,14 @@ async def create_reservation(
             record(db, user, "reservation.create_for", f"#{created[0].id} {owner.username}", count=len(created))
         await db.commit()
 
+    notifier = app.state.notifier
     for r in created:
-        notify_owner(request, user, r, "booking_created")
+        if r.user_id != user.id:
+            notifier.emit("booking_created", user_id=r.user_id, reservation_id=r.id, by=user.username)
     if pending:
-        request_review(request, created[0], len(created))
-    request.app.state.lanes.poke(lane.id)
-    return await queries.reservation_out(db, created, utcnow())
+        notifier.emit("approval_requested", reservation_id=created[0].id, owner_id=owner.id, count=len(created))
+    app.state.lanes.poke(lane.id)
+    return created
 
 
 async def _editable(db: AsyncSession, reservation_id: int, user: User) -> Reservation:

@@ -12,6 +12,8 @@ class FakeTelegram:
         self.updates: list[dict] = []
         self.sent: list[dict] = []
         self.answers: list[dict] = []
+        self.edits: list[dict] = []
+        self.commands: dict[str, list] = {}
         self.fail_sends = False  # simulate Telegram being unreachable
         self._next_id = 1
 
@@ -31,6 +33,12 @@ class FakeTelegram:
                     return PlainTextResponse("bad gateway", status_code=502)
                 self.sent.append(params)
                 return {"ok": True, "result": {"message_id": len(self.sent)}}
+            if method == "setMyCommands":
+                self.commands[params.get("language_code", "")] = params["commands"]
+                return {"ok": True, "result": True}
+            if method == "editMessageText":
+                self.edits.append(params)
+                return {"ok": True, "result": True}
             if method == "answerCallbackQuery":
                 self.answers.append(params)
                 return {"ok": True, "result": True}

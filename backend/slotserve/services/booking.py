@@ -165,3 +165,29 @@ def needs_approval(settings: Settings, actor: User, windows: list[Window]) -> bo
         return True
     limit = timedelta(hours=settings.approval_hours)
     return any(end - start > limit for start, end in windows)
+
+
+async def free_windows(db: AsyncSession, lane_id: int, start: datetime, end: datetime) -> list[Window]:
+    """Gaps between holding bookings on a lane within [start, end)."""
+    rows = (
+        await db.execute(
+            select(Reservation.start_at, Reservation.end_at)
+            .where(
+                Reservation.lane_id == lane_id,
+                Reservation.status.in_(HOLDING_STATUSES),
+                Reservation.start_at < end,
+                Reservation.end_at > start,
+            )
+            .order_by(Reservation.start_at)
+        )
+    ).all()
+    gaps: list[Window] = []
+    cursor = start
+    for s, e in rows:
+        s, e = aware(s), aware(e)
+        if s > cursor:
+            gaps.append((cursor, min(s, end)))
+        cursor = max(cursor, e)
+    if cursor < end:
+        gaps.append((cursor, end))
+    return gaps
