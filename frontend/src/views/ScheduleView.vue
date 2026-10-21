@@ -15,6 +15,7 @@ import { useStatus } from '@/composables/useStatus'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { loadLanes, useLanes } from '@/composables/lanes'
 import { formatDate, formatRange, relativeFromNow } from '@/utils/format'
+import { sharingApi, type LaneAvailability } from '@/api/sharing'
 
 const { t } = useI18n()
 const dialog = useDialog()
@@ -80,6 +81,12 @@ watch(machineFilter, (id) => {
   }
 })
 const currentLane = computed(() => laneId.value ?? lanes.value[0]?.id ?? null)
+// Hours the machines of personal computers are not shared (hatched in the calendar; the owner may book them).
+const availability = ref<LaneAvailability[]>([])
+const blocks = computed(() => {
+  const info = availability.value.find((a) => a.lane_id === currentLane.value)
+  return info && info.owner_id !== session.user?.id ? info.blocks : []
+})
 
 async function load() {
   try {
@@ -90,6 +97,7 @@ async function load() {
       api.waitlist(),
     ])
     reservations.value = all
+    availability.value = await sharingApi.unavailable(rangeStart.value, rangeEnd.value).catch(() => [])
     waiting.value = wl
     mine.value = my.filter((r) => r.phase === 'upcoming' || r.phase === 'active' || r.phase === 'pending')
   } catch (e) {
@@ -276,6 +284,7 @@ const what = (r: Reservation) =>
           <div class="legend">
             <span class="sw mine" />{{ t('common.you') }}
             <span class="sw other" />{{ t('schedule.booked') }}
+            <template v-if="blocks.length"><span class="sw unshared" />{{ t('sharing.unavailable') }}</template>
           </div>
         </div>
         <WeekCalendar
@@ -285,6 +294,8 @@ const what = (r: Reservation) =>
           :reservations="reservations"
           :current-user-id="session.user?.id ?? null"
           :now="now"
+          :blocks="blocks"
+          :block-label="t('sharing.unavailable')"
           @select="openBooking"
           @open="detail = $event"
         />
@@ -351,6 +362,7 @@ const what = (r: Reservation) =>
       :editing="editing"
       :lane-id="currentLane"
       :initial-kind="initialKind"
+      :unavailable="availability"
       @done="onBooked"
     />
 
@@ -490,6 +502,10 @@ const what = (r: Reservation) =>
 }
 .sw.other {
   background: var(--event-accent);
+  margin-left: 10px;
+}
+.sw.unshared {
+  background: repeating-linear-gradient(45deg, var(--text-3, #9b9bab) 0 2px, transparent 2px 4px);
   margin-left: 10px;
 }
 .mine {

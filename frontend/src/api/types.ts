@@ -775,6 +775,22 @@ export interface ClusterNode {
   model_count: number
   gpus: Gpu[]
   lanes: NodeLane[]
+  // what kind of machine, e.g. "Windows · WSL2 (Docker Desktop)"
+  platform?: string | null
+  host_os?: 'linux' | 'windows' | 'macos' | null
+  // personal computers (see api/sharing.ts)
+  owner_id?: number | null
+  owner_name?: string | null
+  sharing_schedule?: { days: number[]; start: string; end: string }[] | null
+  shared_now?: boolean
+  sharing_paused?: boolean
+  sharing_paused_until?: string | null
+  sharing_stops_at?: string | null
+  sharing_next_change?: string | null
+  network?: string | null
+  mac_addresses?: string
+  wol_macs?: string[]
+  woken_at?: string | null
 }
 
 export interface ClusterNodeToken {
@@ -783,4 +799,6 @@ export interface ClusterNodeToken {
   server_url: string
   docker_command: string
   agent_command: string
+  install_linux?: string
+  install_windows?: string
 }

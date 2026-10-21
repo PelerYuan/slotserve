@@ -16,6 +16,7 @@ export const router = createRouter({
         { path: 'keys', name: 'keys', component: () => import('@/views/KeysView.vue') },
         { path: 'devenv', name: 'devenv', component: () => import('@/views/DevEnvView.vue') },
         { path: 'usage', name: 'usage', component: () => import('@/views/UsageView.vue') },
+        { path: 'my-machines', name: 'my-machines', component: () => import('@/views/MyMachinesView.vue') },
         { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
         { path: 'admin', name: 'admin', component: () => import('@/views/AdminView.vue'), meta: { admin: true } },
       ],

@@ -11,6 +11,7 @@ import { useErrorMessage } from '@/composables/useErrorMessage'
 import { useMachines } from '@/composables/machines'
 import { isDark } from '@/composables/theme'
 import { formatCompact, formatNumber } from '@/utils/format'
+import { sharingApi, type ContributionRow } from '@/api/sharing'
 
 // Categorical slots in fixed order (validated reference palette, stepped per theme); color follows the entity.
 const SERIES_LIGHT = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6']
@@ -44,13 +45,23 @@ function exportCsv(kind: UsageExport) {
 const { machines, multi: multiMachine } = useMachines()
 const machineId = ref<number | null>(null)
 const machineOptions = computed(() => machines.value.map((m) => ({ label: m.name, value: m.id })))
+// Personal computers: what the machines people own offered, and what everyone used.
+const contribution = ref<ContributionRow[]>([])
 
 async function load() {
   try {
     data.value = await api.usage(days.value, scope.value, machineId.value)
+    contribution.value = (await sharingApi.usage(days.value).catch(() => ({ rows: [] }))).rows
   } catch (e) {
     showError(e)
   }
+}
+
+function exportContribution() {
+  const a = document.createElement('a')
+  a.href = sharingApi.usageExportUrl(days.value)
+  a.download = ''
+  a.click()
 }
 onMounted(load)
 watch([days, scope, machineId], load)
@@ -291,6 +302,43 @@ const hasData = computed(() => {
       </div>
     </section>
 
+    <section v-if="contribution.some((r) => r.nodes.length)" class="card contribution" data-section="contribution">
+      <div class="card-header">
+        <h3 class="card-title">{{ t('sharing.usageTitle') }}</h3>
+        <NButton size="tiny" quaternary @click="exportContribution">
+          <template #icon><FileDown :size="13" /></template>
+          {{ t('sharing.exportCsv') }}
+        </NButton>
+      </div>
+      <p class="faint small contribution-hint">{{ t('sharing.usageHint') }}</p>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>{{ t('sharing.person') }}</th>
+              <th>{{ t('sharing.machines') }}</th>
+              <th class="right">{{ t('sharing.onlineHours') }}</th>
+              <th class="right">{{ t('sharing.sharedHours') }}</th>
+              <th class="right">{{ t('sharing.gpuOffered') }}</th>
+              <th class="right">{{ t('sharing.usedByOthers') }}</th>
+              <th class="right">{{ t('sharing.consumed') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in contribution" :key="r.user_id">
+              <td>{{ r.username }}</td>
+              <td class="faint">{{ r.nodes.join(', ') || '—' }}</td>
+              <td class="right num">{{ hours(r.online_hours) }}</td>
+              <td class="right num">{{ hours(r.shared_hours) }}</td>
+              <td class="right num">{{ hours(r.gpu_hours_shared) }}</td>
+              <td class="right num">{{ hours(r.gpu_hours_used_by_others) }}</td>
+              <td class="right num">{{ hours(r.gpu_hours_consumed) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <div v-if="hasData" class="two">
       <section class="card">
         <div class="card-header"><h3 class="card-title">{{ multiLane ? t('usage.byLane') : t('usage.occupancy') }}</h3></div>
@@ -417,6 +465,12 @@ const hasData = computed(() => {
 </template>
 
 <style scoped>
+.contribution {
+  margin-bottom: 16px;
+}
+.contribution-hint {
+  margin: 0 16px 8px;
+}
 .head-actions {
   display: flex;
   align-items: center;

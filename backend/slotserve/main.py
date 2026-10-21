@@ -28,13 +28,15 @@ from .api import (
     notifications,
     reservations,
     runtime_admin,
+    sharing,
     status,
     storage,
     usage,
     waitlist,
 )
 from .cluster import api as cluster_api
-from .cluster import machines_api
+from .cluster import install as cluster_install
+from .cluster import machines, machines_api
 from .cluster.hub import ClusterHub
 from .cluster.machines import MachineMonitor
 from .config import Settings, get_settings
@@ -50,6 +52,7 @@ from .services.downloader import Downloader
 from .services.housekeeper import Housekeeper
 from .services.notify import Notifier
 from .services.ratelimit import AttemptLimiter
+from .services.sharing import SharingService, machine_extras
 from .services.storage import StorageService
 from .services.usage_sampler import UsageSampler
 
@@ -107,6 +110,9 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         app.state.lanes.gpu_holder = app.state.devenv.holds_gpu
         app.state.nodes.local.docker_provider = lambda: app.state.devenv.docker
         app.state.storage = StorageService(app.state)  # storage hook: Admin -> Storage checks
+        app.state.sharing = SharingService(app.state)  # personal computers: sharing hours, pause, Wake-on-LAN
+        if not any(getattr(fn, "__qualname__", "").startswith("machine_extras") for fn in machines.EXTRAS):
+            machines.EXTRAS.append(machine_extras(app.state.settings))  # owner and sharing hours on machine cards
         # [web origin] dev environment web interfaces on their own port (gateway/devenv_web_app.py)
         app.state.web_app = devenv_web_app.create_web_app(app.state)
         web_listener = None
@@ -131,6 +137,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
                 asyncio.create_task(app.state.cluster.run(), name="node-watchdog"),
                 asyncio.create_task(app.state.machines.run(), name="machines"),
                 asyncio.create_task(app.state.storage.run(), name="storage"),  # storage hook
+                asyncio.create_task(app.state.sharing.run(), name="sharing"),
             ]
         try:
             yield
@@ -189,6 +196,8 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
     app.include_router(devenv.keys_router)
     app.include_router(cluster_api.router)
     app.include_router(machines_api.router)  # the Machines page and machine selection
+    app.include_router(cluster_install.router)
+    app.include_router(sharing.router)
     app.include_router(storage.router)  # storage hook
     app.include_router(storage.user_router)
     app.include_router(devenv_cpu.router)  # devenv_cpu: environments without a GPU

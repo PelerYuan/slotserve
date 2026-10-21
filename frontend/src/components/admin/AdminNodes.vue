@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NInput, NModal, useDialog, useMessage } from 'naive-ui'
+import { NButton, NInput, NModal, NSelect, useDialog, useMessage } from 'naive-ui'
 import { Cpu, Plus, Server } from 'lucide-vue-next'
 import { api } from '@/api/client'
-import type { ClusterNode, ClusterNodeToken, NodeStatus } from '@/api/types'
+import type { AdminUser, ClusterNode, ClusterNodeToken, NodeStatus } from '@/api/types'
 import CodeBlock from '@/components/CodeBlock.vue'
 import MachineDrawer from '@/components/machines/MachineDrawer.vue'
+import SharingPanel from '@/components/sharing/SharingPanel.vue'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { formatDateTime, relativeFromNow } from '@/utils/format'
 
@@ -49,15 +50,26 @@ const gb = (mb: number | null) => (mb == null ? '—' : `${(mb / 1024).toFixed(m
 
 // ---- add / edit -----------------------------------------------------------------
 
-const form = reactive({ open: false, id: null as number | null, name: '', address: '' })
+const form = reactive({ open: false, id: null as number | null, name: '', address: '', owner: null as number | null })
+const users = ref<AdminUser[]>([])
+const ownerOptions = computed(() => [
+  { label: t('sharing.noOwner'), value: -1 },
+  ...users.value.map((u) => ({ label: u.username, value: u.id })),
+])
+async function loadUsers() {
+  if (!users.value.length) users.value = await api.admin.users().catch(() => [])
+}
+// Owner controls of one machine (sharing hours, pause, what runs, Wake-on-LAN).
+const sharingNode = ref<ClusterNode | null>(null)
 const busy = ref(false)
 const issued = ref<ClusterNodeToken | null>(null)
 
 function openNew() {
-  Object.assign(form, { open: true, id: null, name: '', address: '' })
+  Object.assign(form, { open: true, id: null, name: '', address: '', owner: null })
 }
 function openEdit(n: ClusterNode) {
-  Object.assign(form, { open: true, id: n.id, name: n.name, address: n.address })
+  Object.assign(form, { open: true, id: n.id, name: n.name, address: n.address, owner: n.owner_id ?? -1 })
+  loadUsers()
 }
 
 async function save() {
@@ -66,7 +78,11 @@ async function save() {
     if (form.id === null) {
       issued.value = await api.admin.createNode({ name: form.name.trim(), address: form.address.trim() })
     } else {
-      await api.admin.updateNode(form.id, { name: form.name.trim(), address: form.address.trim() })
+      await api.admin.updateNode(form.id, {
+        name: form.name.trim(),
+        address: form.address.trim(),
+        owner_id: form.owner === -1 ? null : form.owner,
+      })
       message.success(t('cluster.saved'))
     }
     form.open = false
@@ -159,7 +175,12 @@ async function scan(n: ClusterNode) {
                 </div>
               </td>
               <td class="small">
-                <div>{{ n.hostname ?? '—' }}</div>
+                <div>{{ n.hostname ?? '—' }}<span v-if="n.platform" class="faint"> · {{ n.platform }}</span></div>
+                <div v-if="n.owner_name" class="owner">
+                  <span class="badge brand">{{ t('sharing.owner') }}: {{ n.owner_name }}</span>
+                  <span v-if="n.sharing_paused" class="badge warn">{{ t('sharing.paused') }}</span>
+                  <span v-else-if="n.shared_now === false" class="badge">{{ t('sharing.notShared') }}</span>
+                </div>
                 <div class="faint">
                   <span v-if="n.cpu_cores">{{ t('cluster.cores', { n: n.cpu_cores }) }}</span>
                   <span v-if="n.cpu_percent != null"> · {{ n.cpu_percent.toFixed(0) }}%</span>
@@ -191,6 +212,7 @@ async function scan(n: ClusterNode) {
                 <NButton size="small" quaternary :disabled="n.status !== 'online'" @click="scan(n)">
                   {{ t('cluster.scan') }}
                 </NButton>
+                <NButton size="small" quaternary :data-sharing="n.name" @click="sharingNode = n">{{ t('sharing.manage') }}</NButton>
                 <NButton size="small" quaternary @click="openEdit(n)">{{ t('common.edit') }}</NButton>
                 <template v-if="!n.is_local">
                   <NButton size="small" quaternary @click="rotate(n)">{{ t('cluster.newToken') }}</NButton>
@@ -231,6 +253,11 @@ async function scan(n: ClusterNode) {
         <NInput v-model:value="form.address" maxlength="255" :placeholder="t('cluster.addressAuto')" />
         <p class="faint small hint">{{ t('cluster.addressHint') }}</p>
       </label>
+      <label v-if="form.id !== null">
+        <span class="field-label">{{ t('sharing.owner') }}</span>
+        <NSelect v-model:value="form.owner" :options="ownerOptions" filterable data-field="node-owner" />
+        <p class="faint small hint">{{ t('sharing.ownerHint') }}</p>
+      </label>
     </div>
     <template #footer>
       <div class="footer">
@@ -240,6 +267,17 @@ async function scan(n: ClusterNode) {
         </NButton>
       </div>
     </template>
+  </NModal>
+
+  <NModal
+    :show="sharingNode !== null"
+    preset="card"
+    :title="t('sharing.manageTitle', { name: sharingNode?.name ?? '' })"
+    :bordered="false"
+    style="width: 760px; max-width: calc(100vw - 32px)"
+    @update:show="(v: boolean) => !v && ((sharingNode = null), load())"
+  >
+    <SharingPanel v-if="sharingNode" :node-id="sharingNode.id" />
   </NModal>
 
   <NModal
@@ -253,6 +291,14 @@ async function scan(n: ClusterNode) {
     <template v-if="issued">
       <p class="small">{{ t('cluster.tokenOnce') }}</p>
       <CodeBlock :code="issued.token" inline />
+      <template v-if="issued.install_linux">
+        <h4 class="sub">{{ t('sharing.install') }}</h4>
+        <p class="faint small">{{ t('sharing.installHint') }}</p>
+        <p class="small label">{{ t('sharing.installLinux') }}</p>
+        <CodeBlock :code="issued.install_linux" />
+        <p class="small label">{{ t('sharing.installWindows') }}</p>
+        <CodeBlock :code="issued.install_windows ?? ''" />
+      </template>
       <h4 class="sub">{{ t('cluster.docker') }}</h4>
       <p class="faint small">{{ t('cluster.dockerHint') }}</p>
       <CodeBlock :code="issued.docker_command" />
@@ -282,6 +328,15 @@ async function scan(n: ClusterNode) {
 }
 .lane {
   margin: 0 4px 4px 0;
+}
+.owner {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin: 2px 0;
+}
+.label {
+  margin: 10px 0 4px;
 }
 .error-row td {
   color: var(--warning, #b45309);

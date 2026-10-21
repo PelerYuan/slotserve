@@ -28,6 +28,10 @@ flowchart LR
     agentC --- msC
 ```
 
+Personal computers (gaming laptops and desktops, Windows with Docker Desktop, Macs) can join too, with one-line
+installers, an owner who sets sharing hours and can pause sharing, and Wake-on-LAN: see
+[Personal computers](personal-computers.md).
+
 ## How it works
 
 - Each node agent connects **out** to the server over a WebSocket with its own token, so nodes need no open port for

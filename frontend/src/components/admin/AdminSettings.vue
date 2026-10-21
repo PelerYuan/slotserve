@@ -126,6 +126,7 @@ const GROUPS: { id: string; keys: string[] }[] = [
     ],
   },
   { id: 'monitor', keys: ['metrics_token', 'usage_busy_percent'] },
+  { id: 'machines', keys: ['sharing_grace_minutes', 'wol_lead_minutes'] },
   { id: 'maintenance', keys: ['usage_retention_days', 'usage_sample_days', 'audit_retention_days', 'backup_keep'] },
 ]
 const groups = computed(() => {

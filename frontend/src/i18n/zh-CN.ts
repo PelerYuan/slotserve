@@ -1,6 +1,7 @@
 import type en from './en'
 import { storageZh } from './storage' // storage hook
 import { machinesZh } from './machines' // machines
+import { sharingZh } from './sharing' // personal computers
 
 const zh: typeof en = {
   app: {
@@ -732,6 +733,7 @@ const zh: typeof en = {
         idle: '空闲',
         'idle-devenv': '共享开发环境',
         'idle-none': '空闲（设为不运行）',
+        unshared: '主人当前未共享',
       },
       stage: {
         weights: '加载权重',
@@ -1033,6 +1035,10 @@ const zh: typeof en = {
       audit_retention_days_desc: '0 表示永久保留。',
       backup_keep: '保留的每日备份数',
       backup_keep_desc: '每 24 小时自动备份一次数据库。0 表示关闭自动备份。',
+      sharing_grace_minutes: '主人暂停共享时的宽限期（分钟）',
+      sharing_grace_minutes_desc: '个人电脑的主人暂停共享后，他人正在运行的任务会先收到提醒，经过这段时间后再被停止。',
+      wol_lead_minutes: '预约前唤醒机器（分钟）',
+      wol_lead_minutes_desc: '支持网络唤醒的离线机器会在上面的预约开始前这么久被唤醒。0 表示从不自动唤醒。',
 
       devenv_enabled: '开发环境',
       devenv_enabled_desc: '允许把 GPU 时段预约成带 SSH 的 Docker 容器。需要把 Docker 套接字挂载进 SlotServe，这相当于给它宿主机的 root 权限。',
@@ -1101,6 +1107,7 @@ const zh: typeof en = {
         qq: 'QQ 机器人',
         webhooks: '群机器人 Webhook',
         monitor: '监控',
+        machines: '个人电脑',
       },
       unsaved: '有未保存的修改',
       notSet: '未设置',
@@ -1284,8 +1291,10 @@ const zh: typeof en = {
   },
   storage: storageZh.storage, // storage hook
   machines: machinesZh.machines, // machines
+  sharing: sharingZh.sharing, // personal computers
   errors: {
     ...machinesZh.errors, // machines
+    ...sharingZh.errors, // personal computers
     ...storageZh.errors, // storage hook
     hf_token_required: '{repo} 是受限仓库：请先在「管理 → 系统设置」中填写 Hugging Face Token。',
     insufficient_disk: '磁盘空间不足：剩余 {free_gb} GB，需要 {need_gb} GB。',

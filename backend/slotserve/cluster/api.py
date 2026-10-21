@@ -24,10 +24,10 @@ from ..services.audit import record
 from . import protocol as p
 from . import system
 from .hub import ClusterHub, hash_token, new_token
+from .install import AGENT_IMAGE, one_liners
 from .remote import RemoteExecutor
 
 router = APIRouter(tags=["nodes"])
-AGENT_IMAGE = "ghcr.io/peleryuan/slotserve:latest"
 _cpu = system.CpuMeter()
 
 
@@ -63,6 +63,23 @@ class NodeOut(BaseModel):
     model_count: int = 0
     gpus: list[GpuOut] = []
     lanes: list[NodeLaneOut] = []
+    # What kind of machine (services/sharing.py, cluster/system.py): e.g. "Windows · WSL2 (Docker Desktop)".
+    platform: str | None = None
+    host_os: str | None = None  # linux | windows | macos
+    # Personal computers: owner, sharing hours and pause (see services/sharing.summary).
+    owner_id: int | None = None
+    owner_name: str | None = None
+    sharing_schedule: list[dict] | None = None
+    shared_now: bool = True
+    sharing_paused: bool = False
+    sharing_paused_until: datetime | None = None
+    sharing_stops_at: datetime | None = None
+    sharing_next_change: datetime | None = None
+    # Wake-on-LAN
+    network: str | None = None
+    mac_addresses: str = ""  # entered by hand
+    wol_macs: list[str] = []  # every MAC a magic packet goes to
+    woken_at: datetime | None = None
 
 
 class NodeIn(BaseModel):
@@ -73,6 +90,7 @@ class NodeIn(BaseModel):
 class NodeUpdateIn(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
     address: str | None = Field(default=None, max_length=255)
+    owner_id: int | None = None  # a personal computer's owner (null: nobody)
 
 
 class NodeTokenOut(BaseModel):
@@ -81,6 +99,8 @@ class NodeTokenOut(BaseModel):
     server_url: str
     docker_command: str
     agent_command: str
+    install_linux: str = ""  # one-line installers (cluster/install.py)
+    install_windows: str = ""
 
 
 def get_cluster(request: Request) -> ClusterHub:
@@ -191,7 +211,30 @@ def _remote_out(node: Node, lanes: list[Lane], model_count: int, executor: Remot
     )
 
 
+def _machine_fields(node: Node, executor: RemoteExecutor | None, owner_name: str | None) -> dict:
+    """Platform, owner, sharing and Wake-on-LAN fields of a node."""
+    from ..services import sharing
+
+    info = sharing.local_info(get_settings()) if node.is_local else sharing._info(node, executor)
+    plat = info.get("platform") or {}
+    return {
+        **sharing.summary(node, get_settings(), utcnow(), owner_name),
+        "platform": plat.get("label"),
+        "host_os": plat.get("host_os"),
+        "wol_macs": sharing.macs_of(node, info),
+    }
+
+
 async def _out(db: AsyncSession, nodes: list[Node], cluster: ClusterHub) -> list[NodeOut]:
+    out = await _base_out(db, nodes, cluster)
+    names = dict((await db.execute(select(User.id, User.username))).all())
+    return [
+        o.model_copy(update=_machine_fields(n, cluster.executor(n.id), names.get(n.owner_id)))
+        for o, n in zip(out, nodes, strict=True)
+    ]
+
+
+async def _base_out(db: AsyncSession, nodes: list[Node], cluster: ClusterHub) -> list[NodeOut]:
     lanes = list((await db.execute(select(Lane).order_by(Lane.position, Lane.id))).scalars())
     counts = dict(
         (await db.execute(select(NodeModel.node_id, func.count(NodeModel.id)).group_by(NodeModel.node_id))).all()
@@ -243,12 +286,15 @@ async def _issue(request: Request, db: AsyncSession, node: Node, cluster: Cluste
     await db.commit()
     server = _server_url(request)
     docker, agent = _commands(server, token, node.name)
+    linux, windows = one_liners(server, token)
     return NodeTokenOut(
         node=(await _out(db, [node], cluster))[0],
         token=token,
         server_url=server,
         docker_command=docker,
         agent_command=agent,
+        install_linux=linux,
+        install_windows=windows,
     )
 
 
@@ -285,7 +331,11 @@ async def update_node(
         node.name = body.name
     if body.address is not None and not node.is_local:
         node.address = body.address.strip()
-    record(db, admin, "node.update", node.name, address=node.address)
+    if "owner_id" in body.model_fields_set:
+        if body.owner_id is not None and await db.get(User, body.owner_id) is None:
+            raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+        node.owner_id = body.owner_id
+    record(db, admin, "node.update", node.name, address=node.address, owner_id=node.owner_id)
     await db.commit()
     executor = cluster.executor(node.id)
     if executor is not None:

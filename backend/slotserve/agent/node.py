@@ -295,7 +295,12 @@ class NodeAgent:
             "protocol": self.protocol,
             "agent_version": __version__,
             "address": self.address,
-            "info": {**system.machine_info(), "hardware": await self.read_hardware()},
+            "info": {
+                **system.machine_info(
+                    self.settings.agent_wol_mac, self.settings.agent_network, self.settings.agent_host_os
+                ),
+                "hardware": await self.read_hardware(),
+            },
             "inventory": await self.inventory(),
             "runtimes": [runtime_report(rt) for rt in self.runtimes.values()],
         }
@@ -365,7 +370,17 @@ class NodeAgent:
             p.M_MODELS_DELETE: self._delete_model,
             p.M_DOWNLOAD_START: self.downloads.start,
             p.M_DOWNLOAD_CANCEL: self.downloads.cancel,
+            p.M_WOL_SEND: self._wol_send,
         }
+
+    async def _wol_send(self, params: dict) -> dict:
+        """Wakes another machine of this network: magic packets to its broadcast addresses."""
+        macs = [str(m) for m in params.get("macs") or []]
+        broadcasts = [str(b) for b in params.get("broadcasts") or []] or ["255.255.255.255"]
+        port = int(params.get("port") or 9)
+        sent = await asyncio.to_thread(system.send_magic, macs, broadcasts, port)
+        log.info("sent %s Wake-on-LAN packet(s) for %s", sent, ", ".join(macs))
+        return {"sent": sent}
 
     async def _ping(self, _params: dict) -> dict:
         return {"version": __version__, "protocol": p.PROTOCOL_VERSION}

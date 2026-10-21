@@ -32,6 +32,7 @@ class Target:
     est_load_seconds: float
     # reservation | exclusive | preload | preload-early | preload-exclusive | manual | fallback | default | idle
     # | idle-devenv (the lane's shared dev environment runs) | idle-none (the lane is set to run nothing)
+    # | unshared (the machine's owner does not share it now: outside sharing hours or sharing paused)
     reason: str
     reservation: Reservation | None = None
     fallback_from: str | None = None
@@ -100,9 +101,17 @@ async def compute_target(
     lane_id: int | None = None,
 ) -> Target:
     """Pure decision logic (see docs: "Scheduling and preloading")."""
+    from ..services import sharing
+
     buffer = settings.preload_buffer_seconds
+    lane = await db.get(Lane, lane_id) if lane_id is not None else await queries.primary_lane(db)
+    # A personal computer: outside its sharing hours only bookings run; while sharing is paused, nothing does
+    # (except the owner's own bookings).
+    gate, owner_id = await sharing.lane_gate(db, settings, lane, now)
 
     active = await queries.active_reservation(db, now, lane_id)
+    if gate == "stopped" and (active is None or active.user_id != owner_id):
+        return Target(None, None, 0.0, "unshared")
     if active is not None:
         if active.model_id is None:
             return Target(None, None, 0.0, "exclusive", active)
@@ -111,7 +120,6 @@ async def compute_target(
             est = await queries.estimate_load_seconds(db, model, settings)
             return Target(model, preset, est, "reservation", active)
 
-    lane = await db.get(Lane, lane_id) if lane_id is not None else await queries.primary_lane(db)
     mode = lane.mode if lane is not None else "model"
     default = await queries.default_model(db, lane_id) if mode == "model" else None
     default_spec = (default.id, None) if default else None
@@ -138,6 +146,9 @@ async def compute_target(
                     # Switching back to the default would leave it usable only briefly before the next switch.
                     if current != default_spec and gap <= est_default + lead + buffer:
                         return Target(model, preset, est_next, "preload-early", upcoming)
+
+    if gate == "closed":
+        return Target(None, None, 0.0, "unshared")
 
     if manual is not None and (manual.until is None or manual.until > now):
         model, preset = await _model_and_preset(db, manual.model_id, manual.preset_id)

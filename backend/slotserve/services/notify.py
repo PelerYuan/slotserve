@@ -53,6 +53,16 @@ EVENT_PREF = {
     "node_offline": "admin_alerts",
     "node_online": "admin_alerts",
     "booking_node_offline": "booking_changes",
+    # personal computers (services/sharing.py)
+    "sharing_paused_active": "booking_changes",
+    "sharing_paused_upcoming": "booking_changes",
+    "sharing_paused_upcoming_until": "booking_changes",
+    "booking_stopped_sharing": "booking_changes",
+    "booking_stopped_owner": "booking_changes",
+    "sharing_conflict": "booking_changes",
+    "sharing_conflict_owner": "booking_changes",
+    "booking_node_asleep": "booking_changes",
+    "booking_node_asleep_owner": "booking_changes",
     # storage hook (services/storage.py)
     "storage_quota": "downloads",
     "storage_quota_admin": "admin_alerts",
@@ -110,6 +120,23 @@ MESSAGES: dict[str, dict[str, str]] = {
         "node_online": "🔌 Machine {node} is back online.",
         "booking_node_offline": "🔌 The machine for your booking {when} ({what}) is offline. "
         "SlotServe reconnects automatically; an admin has been told.",
+        "sharing_paused_active": "⏸ The owner of {node} needs it back. Your booking {when} ({what}) on it "
+        "will be stopped at {at}; kept dev environments are paused, not deleted. Save your work.",
+        "sharing_paused_upcoming": "⏸ The owner of {node} paused sharing. Your booking {when} ({what}) "
+        "cannot run while it is paused; please move it to another time or machine.",
+        "sharing_paused_upcoming_until": "⏸ The owner of {node} paused sharing until {until}. Your booking {when} "
+        "({what}) cannot run while it is paused; please move it to another time or machine.",
+        "booking_stopped_sharing": "⏹ Your booking {when} on {node} was stopped: its owner is using the machine. "
+        "Kept dev environments are paused, not deleted.",
+        "booking_stopped_owner": "⏹ {by}, the owner of {node}, stopped your booking {when} ({what}).",
+        "sharing_conflict": "📅 {node} is no longer shared during your booking {when} ({what}). It stays booked, "
+        "but please move it if you can: its owner may need the machine.",
+        "sharing_conflict_owner": "📅 Your new sharing hours for {node} leave {count} booking(s) outside them. "
+        "They stay booked; the people affected have been told.",
+        "booking_node_asleep": "😴 {node} is still offline although your booking {when} ({what}) has started. "
+        "Its owner has been told.",
+        "booking_node_asleep_owner": "😴 Your machine {node} is offline, but {user}'s booking {when} on it has "
+        "started. Please switch it on.",
         "storage_quota": "💾 Your folder on {storage} uses {used}, more than the {quota} it should. Please tidy up.",
         "storage_quota_admin": "💾 {user} uses {used} on {storage} (soft limit {quota}).",
         "storage_down": "🔌 Storage {storage} cannot be used: {error}",
@@ -152,6 +179,21 @@ MESSAGES: dict[str, dict[str, str]] = {
         "node_offline": "🔌 机器 {node} 已离线：在其节点代理重新连接之前，它的 GPU 组不可用。",
         "node_online": "🔌 机器 {node} 已重新上线。",
         "booking_node_offline": "🔌 你的预约 {when}（{what}）所在的机器已离线。系统会自动重连，并已通知管理员。",
+        "sharing_paused_active": "⏸ {node} 的主人要用这台机器了。你在上面的预约 {when}（{what}）将在 {at} 停止；"
+        "保留的开发环境会被暂停而不是删除。请及时保存工作。",
+        "sharing_paused_upcoming": "⏸ {node} 的主人暂停了共享。暂停期间你的预约 {when}（{what}）无法运行，"
+        "请改到其他时间或机器。",
+        "sharing_paused_upcoming_until": "⏸ {node} 的主人暂停了共享，直到 {until}。暂停期间你的预约 {when}（{what}）"
+        "无法运行，请改到其他时间或机器。",
+        "booking_stopped_sharing": "⏹ 你在 {node} 上的预约 {when} 已停止：机器主人正在使用它。"
+        "保留的开发环境已暂停，没有删除。",
+        "booking_stopped_owner": "⏹ {node} 的主人 {by} 停止了你的预约 {when}（{what}）。",
+        "sharing_conflict": "📅 {node} 在你的预约 {when}（{what}）期间不再共享。预约仍然有效，但机器主人可能需要用它，"
+        "请尽量改期。",
+        "sharing_conflict_owner": "📅 {node} 的新共享时段之外还有 {count} 个预约。它们仍然有效，已通知相关的人。",
+        "booking_node_asleep": "😴 你的预约 {when}（{what}）已开始，但 {node} 仍然离线。已通知机器主人。",
+        "booking_node_asleep_owner": "😴 你的机器 {node} 处于离线状态，但 {user} 在上面的预约 {when} "
+        "已经开始，请开机。",
         "storage_quota": "💾 你在 {storage} 上的个人空间已用 {used}，超过了建议上限 {quota}，请清理。",
         "storage_quota_admin": "💾 {user} 在 {storage} 上已用 {used}（软上限 {quota}）。",
         "storage_down": "🔌 存储 {storage} 无法使用：{error}",
