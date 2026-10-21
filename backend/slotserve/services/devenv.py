@@ -523,6 +523,22 @@ class _NoCookies(CookiePolicy):
         return False
 
 
+def booking_ssh_files(bundle: "SshBundle", keys: list[str], secret: str | None) -> dict[str, tuple[bytes, int]]:
+    """Files that give a booking container its SSH server: root logs in with the person's keys, and with their
+    password (``secret``, a SHA-512 crypt hash) when one is set and password login is allowed."""
+    ssh = SSH_SCRIPT.format(setup=ROOT_SETUP, flags="" if secret else "-s", tries=MAX_AUTH_TRIES, key_dir="-D $S/ssh ")
+    return {
+        "opt/slotserve/dropbearmulti": (bundle.binary, 0o755),
+        "opt/slotserve/ssh_host_key": (bundle.host_key, 0o600),
+        "opt/slotserve/lib.sh": (LIB_SCRIPT.encode(), 0o644),
+        "opt/slotserve/ssh/authorized_keys": ("".join(k + "\n" for k in keys).encode(), 0o600),
+        "opt/slotserve/root.hash": ((secret or "*").encode(), 0o600),
+        "etc/profile.d/slotserve.sh": (PROFILE.encode(), 0o644),
+        "opt/slotserve/ssh.sh": (ssh.encode(), 0o755),
+        "opt/slotserve/start.sh": (START_SCRIPT.format(cd="cd /workspace 2>/dev/null || true").encode(), 0o755),
+    }
+
+
 @dataclass
 class SshBundle:
     binary: bytes
@@ -1006,6 +1022,8 @@ class DevEnvManager:
                 setup=SHARED_SETUP, flags="-w" if password_login else "-w -s", tries=MAX_AUTH_TRIES, key_dir=""
             )
             start = START_SCRIPT.format(cd="")
+            files["opt/slotserve/ssh.sh"] = (ssh.encode(), 0o755)
+            files["opt/slotserve/start.sh"] = (start.encode(), 0o755)
             self._volume(binds, mounts, f"slotserve-idle-home-l{s.lane_id}", f"lanes/l{s.lane_id}/home", "/home")
             name = f"slotserve-idle-{s.lane_id}"
             hostname = f"{re.sub(r'[^a-z0-9-]', '-', (lane.name if lane else 'lane').lower())[:40]}-idle"
@@ -1015,17 +1033,7 @@ class DevEnvManager:
             secret = user.devenv_password_hash if user is not None and password_login else None
             if not keys and not secret:
                 raise DevEnvError("ssh_login_required" if password_login else "ssh_key_required")
-            files.update(
-                {
-                    "opt/slotserve/ssh/authorized_keys": ("".join(k + "\n" for k in keys).encode(), 0o600),
-                    "opt/slotserve/root.hash": ((secret or "*").encode(), 0o600),
-                    "etc/profile.d/slotserve.sh": (PROFILE.encode(), 0o644),
-                }
-            )
-            ssh = SSH_SCRIPT.format(
-                setup=ROOT_SETUP, flags="" if secret else "-s", tries=MAX_AUTH_TRIES, key_dir="-D $S/ssh "
-            )
-            start = START_SCRIPT.format(cd="cd /workspace 2>/dev/null || true")
+            files.update(booking_ssh_files(bundle, keys, secret))
             uid = s.user_id
             self._volume(binds, mounts, f"slotserve-workspace-u{uid}", f"users/u{uid}/workspace", "/workspace")
             for path in self._project_paths(s, project, template):
@@ -1039,8 +1047,6 @@ class DevEnvManager:
             name = f"slotserve-proj-{project.id}" if project is not None else f"slotserve-dev-{s.id}"
             hostname = f"{(user.username if user else 'dev')[:40]}-dev"
             env = {"SLOTSERVE_USER": user.username if user else "", "SLOTSERVE_END": r.end_at.isoformat() if r else ""}
-        files["opt/slotserve/ssh.sh"] = (ssh.encode(), 0o755)
-        files["opt/slotserve/start.sh"] = (start.encode(), 0o755)
 
         if project is not None:
             network = project_network_name(project.id)

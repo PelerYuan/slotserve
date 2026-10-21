@@ -122,37 +122,49 @@ jobs:
           docker logs slotserve
           exit 1
       - name: SSH into a dev environment container (no GPU)
-        # Does what SlotServe does for a dev environment, with the bundled Dropbear and start script,
-        # in a stock Ubuntu image: create, copy the files in, start, log in with a key.
+        # Builds the files exactly as SlotServe does for a booking (booking_ssh_files) with the bundled
+        # Dropbear, then logs in to a stock Ubuntu container with a key and with a password.
         run: |
           set -eux
+          sudo apt-get install -y -qq sshpass >/dev/null
           cid=$(docker create slotserve:ci)
           docker cp "$cid:/opt/slotserve/bin/dropbearmulti" ./dropbearmulti
           docker rm "$cid"
-          mkdir -p ctx/opt/slotserve/ssh
-          cp dropbearmulti ctx/opt/slotserve/
-          ./dropbearmulti dropbearkey -t ed25519 -f ctx/opt/slotserve/ssh_host_key
+          ./dropbearmulti dropbearkey -t ed25519 -f hostkey
           ssh-keygen -q -t ed25519 -N "" -f client
-          cp client.pub ctx/opt/slotserve/ssh/authorized_keys
-          docker run --rm --entrypoint python slotserve:ci \
-            -c "from slotserve.services.devenv import START_SCRIPT; print(START_SCRIPT, end='')" > ctx/opt/slotserve/start.sh
-          docker run --rm --entrypoint python slotserve:ci \
-            -c "from slotserve.services.devenv import SSH_SCRIPT; print(SSH_SCRIPT, end='')" > ctx/opt/slotserve/ssh.sh
-          chmod 700 ctx/opt/slotserve/ssh
-          chmod 600 ctx/opt/slotserve/ssh/authorized_keys ctx/opt/slotserve/ssh_host_key
+          mkdir -p ctx
+          docker run --rm -v "$PWD:/w" -w /w --entrypoint python slotserve:ci -c '
+          import pathlib
+          from slotserve.services.devenv import SshBundle, booking_ssh_files
+          from slotserve.services.shacrypt import sha512_crypt
+          bundle = SshBundle(pathlib.Path("dropbearmulti").read_bytes(), pathlib.Path("hostkey").read_bytes(), "")
+          files = booking_ssh_files(bundle, [pathlib.Path("client.pub").read_text().strip()], sha512_crypt("ci-secret-pw"))
+          for rel, (data, mode) in files.items():
+              path = pathlib.Path("ctx", rel)
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(data)
+              path.chmod(mode)
+          '
+          sudo chmod 700 ctx/opt/slotserve/ssh
           sudo chown -R 0:0 ctx
           docker create --name devenv -p 2222:22 -e FROM_IMAGE=yes --init --user root -w /workspace \
             --mount type=volume,source=ci-workspace,target=/workspace \
             --entrypoint /bin/sh ubuntu:24.04 /opt/slotserve/start.sh
-          sudo tar -C ctx -cf - opt | docker cp - devenv:/
+          sudo tar -C ctx -cf - opt etc | docker cp - devenv:/
           docker start devenv
-          for i in $(seq 1 20); do nc -z 127.0.0.1 2222 && break; sleep 0.5; done
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i client -p 2222 \
-            root@127.0.0.1 'echo LOGIN_OK; echo "env=$FROM_IMAGE"; id -u; pwd' | tee out
+          sleep 2
+          opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5"
+          for i in $(seq 1 20); do
+            ssh $opts -o BatchMode=yes -i client -p 2222 root@127.0.0.1 true 2>/dev/null && break
+            sleep 0.5
+          done
+          ssh $opts -o BatchMode=yes -i client -p 2222 root@127.0.0.1 \
+            'echo LOGIN_OK; echo "env=$FROM_IMAGE"; id -u' | tee out
           grep -q LOGIN_OK out
           grep -q env=yes out
-          if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes \
-               -o PubkeyAuthentication=no -p 2222 root@127.0.0.1 true; then
-            echo "password-less login must be refused"; exit 1
+          sshpass -p ci-secret-pw ssh $opts -o PubkeyAuthentication=no -p 2222 root@127.0.0.1 'echo PASSWORD_OK' | tee out2
+          grep -q PASSWORD_OK out2
+          if sshpass -p wrong-password ssh $opts -o PubkeyAuthentication=no -p 2222 root@127.0.0.1 true; then
+            echo "a wrong password must be refused"; exit 1
           fi
           docker logs devenv
