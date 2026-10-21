@@ -32,7 +32,7 @@ import json
 import logging
 import secrets
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -409,26 +409,47 @@ async def pump(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, strea
             await writer.wait_closed()
 
 
-class RelayListener:
-    """A TCP port on the control plane whose connections are relayed to one target on a node."""
+Route = Callable[[], Awaitable[tuple["RemoteExecutor | None", dict]]]
 
-    def __init__(
-        self,
+
+def fixed_route(executor: Callable[[], RemoteExecutor | None], target: dict) -> Route:
+    """A route to one target on one node (looked up when a connection comes in: the node may reconnect)."""
+
+    async def route() -> tuple[RemoteExecutor | None, dict]:
+        return executor(), target
+
+    return route
+
+
+class RelayListener:
+    """A TCP port on the control plane whose connections are relayed to a node.
+
+    The listener only accepts and pumps bytes; *where* a connection goes is decided by ``route`` (called for each
+    connection), so a front that picks the target per connection (e.g. by name) needs no change here. ``key``
+    identifies what the listener serves, for reconciling (by default: the target of a fixed route)."""
+
+    def __init__(self, relay: Relay, route: Route, host: str, port: int, label: str = "", key: Any = None):
+        self.relay = relay
+        self.route = route
+        self.key = key
+        self.host = host
+        self.port = port
+        self.label = label or str(key)
+        self._server: asyncio.Server | None = None
+        self._tasks: set[asyncio.Task] = set()
+
+    @classmethod
+    def to(
+        cls,
         relay: Relay,
         executor: Callable[[], RemoteExecutor | None],
         target: dict,
         host: str,
         port: int,
         label: str = "",
-    ):
-        self.relay = relay
-        self.executor = executor
-        self.target = target
-        self.host = host
-        self.port = port
-        self.label = label or str(target)
-        self._server: asyncio.Server | None = None
-        self._tasks: set[asyncio.Task] = set()
+    ) -> RelayListener:
+        """A listener relaying every connection to one target."""
+        return cls(relay, fixed_route(executor, target), host, port, label or str(target), key=target)
 
     async def start(self) -> None:
         """Starts listening (raises ``OSError`` when the port is taken); port 0 picks a free one."""
@@ -442,10 +463,10 @@ class RelayListener:
         if task is not None:
             self._tasks.add(task)
         try:
-            executor = self.executor()
+            executor, target = await self.route()
             if executor is None:
                 raise RelayError("offline", "the node is gone")
-            stream = await self.relay.open(executor, self.target)
+            stream = await self.relay.open(executor, target)
         except (RelayError, OSError) as exc:
             log.info("relay %s: %s", self.label, exc)
             writer.close()

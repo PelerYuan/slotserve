@@ -50,7 +50,7 @@ async def _node(app, make_client, start_agent):
 
 
 async def _listener(app, executor, target: dict) -> RelayListener:
-    listener = RelayListener(app.state.cluster.relay, lambda: executor, target, "127.0.0.1", 0, "test")
+    listener = RelayListener.to(app.state.cluster.relay, lambda: executor, target, "127.0.0.1", 0, "test")
     await listener.start()
     return listener
 
