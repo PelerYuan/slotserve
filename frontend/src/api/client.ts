@@ -301,7 +301,7 @@ export const api = {
     nodes: () => request<ClusterNode[]>('GET', '/api/admin/nodes'),
     createNode: (body: { name: string; address?: string }) =>
       request<ClusterNodeToken>('POST', '/api/admin/nodes', body),
-    updateNode: (id: number, body: { name?: string; address?: string }) =>
+    updateNode: (id: number, body: { name?: string; address?: string; owner_id?: number | null }) =>
       request<ClusterNode>('PATCH', `/api/admin/nodes/${id}`, body),
     rotateNodeToken: (id: number) => request<ClusterNodeToken>('POST', `/api/admin/nodes/${id}/token`),
     revokeNode: (id: number) => request<ClusterNode>('POST', `/api/admin/nodes/${id}/revoke`),

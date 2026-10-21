@@ -1,4 +1,5 @@
 import { storageEn } from './storage' // storage hook
+import { sharingEn } from './sharing' // personal computers
 
 export default {
   app: {
@@ -731,6 +732,7 @@ export default {
         idle: 'idle',
         'idle-devenv': 'shared dev environment',
         'idle-none': 'idle (set to run nothing)',
+        unshared: 'not shared by its owner now',
       },
       stage: {
         weights: 'Loading weights',
@@ -1032,6 +1034,10 @@ export default {
       audit_retention_days_desc: '0 = keep forever.',
       backup_keep: 'Daily backups to keep',
       backup_keep_desc: 'A database copy is made every 24 hours. 0 turns automatic backups off.',
+      sharing_grace_minutes: 'Grace period when an owner pauses (minutes)',
+      sharing_grace_minutes_desc: 'When the owner of a personal computer pauses sharing, running work of others gets this long (with a warning) before it is stopped.',
+      wol_lead_minutes: 'Wake machines before bookings (minutes)',
+      wol_lead_minutes_desc: 'An offline machine with Wake-on-LAN is woken this long before a booking on it starts. 0 = never automatically.',
 
       devenv_enabled: 'Dev environments',
       devenv_enabled_desc: 'Let people book GPU time as a Docker container with SSH. Needs the Docker socket mounted into SlotServe, which gives it root access to the host.',
@@ -1100,6 +1106,7 @@ export default {
         qq: 'QQ bot',
         webhooks: 'Group webhooks',
         monitor: 'Monitoring',
+        machines: 'Personal computers',
       },
       unsaved: 'Unsaved changes',
       notSet: 'not set',
@@ -1282,8 +1289,10 @@ export default {
     done: 'Done',
   },
   storage: storageEn.storage, // storage hook
+  sharing: sharingEn.sharing, // personal computers
   errors: {
     ...storageEn.errors, // storage hook
+    ...sharingEn.errors, // personal computers
     hf_token_required: '{repo} is gated: add a Hugging Face token in Admin → System settings first.',
     insufficient_disk: 'Not enough disk space: {free_gb} GB free, {need_gb} GB needed.',
     catalog_engine_mismatch: 'This variant cannot run on {engine}.',

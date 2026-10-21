@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { NDrawer, NDropdown } from 'naive-ui'
@@ -9,6 +9,7 @@ import {
   CalendarDays,
   ChevronsUpDown,
   KeyRound,
+  LaptopMinimal,
   LayoutDashboard,
   Menu,
   Settings,
@@ -18,6 +19,7 @@ import {
 import BrandMark from '@/components/BrandMark.vue'
 import StatusDot from '@/components/StatusDot.vue'
 import { logout, session } from '@/composables/session'
+import { loadOwnedMachines, ownedMachines } from '@/composables/myMachines'
 import { useStatus } from '@/composables/useStatus'
 import { setLocale, type Locale } from '@/i18n'
 import { isDark, setThemeMode, themeMode, type ThemeMode } from '@/composables/theme'
@@ -35,11 +37,13 @@ const nav = computed(() => [
   { name: 'keys', label: t('nav.keys'), icon: KeyRound },
   ...(session.config?.devenv_enabled ? [{ name: 'devenv', label: t('nav.devenv'), icon: Terminal }] : []),
   { name: 'usage', label: t('nav.usage'), icon: BarChart3 },
+  ...(ownedMachines.value ? [{ name: 'my-machines', label: t('sharing.nav'), icon: LaptopMinimal }] : []),
   { name: 'settings', label: t('nav.settings'), icon: Settings },
   ...(session.user?.is_admin ? [{ name: 'admin', label: t('nav.admin'), icon: ShieldCheck }] : []),
 ])
 
 watch(() => route.fullPath, () => (drawer.value = false))
+onMounted(loadOwnedMachines)
 
 const userMenu = computed(() => [
   { key: 'zh-CN', label: '简体中文', disabled: locale.value === 'zh-CN' },

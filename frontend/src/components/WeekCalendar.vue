@@ -12,6 +12,9 @@ const props = defineProps<{
   reservations: Reservation[]
   currentUserId: number | null
   now: number
+  // Hours the lane's machine is not shared by its owner (personal computers); drawn hatched.
+  blocks?: { start: string; end: string; reason: string }[]
+  blockLabel?: string
 }>()
 
 const emit = defineEmits<{
@@ -84,6 +87,19 @@ const segmentsByDay = computed(() =>
       })
     }
     return out
+  }),
+)
+
+const blocksByDay = computed(() =>
+  dayList.value.map(({ date }) => {
+    const dayStart = date.getTime()
+    const dayEnd = addDays(date, 1).getTime()
+    return (props.blocks ?? []).flatMap((b) => {
+      const s = Math.max(new Date(b.start).getTime(), dayStart)
+      const e = Math.min(new Date(b.end).getTime(), dayEnd)
+      if (e <= s) return []
+      return [{ key: `${b.start}-${b.reason}`, top: ((s - dayStart) / 3_600_000) * HOUR_PX, height: ((e - s) / 3_600_000) * HOUR_PX, reason: b.reason }]
+    })
   }),
 )
 
@@ -199,6 +215,14 @@ onMounted(async () => {
           @pointercancel="drag = null"
         >
           <div class="past" :style="{ height: `${pastHeight(d.date)}px` }" />
+          <div
+            v-for="b in blocksByDay[i]"
+            :key="b.key"
+            class="blocked"
+            :class="b.reason"
+            :style="{ top: `${b.top}px`, height: `${b.height}px` }"
+            :title="blockLabel"
+          />
           <div v-for="h in hours" :key="h" class="hline" :style="{ top: `${h * HOUR_PX}px` }" />
 
           <button
@@ -307,6 +331,16 @@ onMounted(async () => {
   inset: 0 0 auto 0;
   background: repeating-linear-gradient(-45deg, var(--past-hatch) 0 6px, transparent 6px 12px);
   pointer-events: none;
+}
+.blocked {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: repeating-linear-gradient(45deg, var(--past-hatch) 0 3px, transparent 3px 9px), var(--blocked-bg, rgba(127, 127, 140, 0.1));
+  pointer-events: none;
+}
+.blocked.paused {
+  --blocked-bg: rgba(217, 119, 6, 0.12);
 }
 .hline {
   position: absolute;
