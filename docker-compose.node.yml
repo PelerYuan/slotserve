@@ -21,6 +21,10 @@ services:
       SLOTSERVE_AGENT_TOKEN: ${SLOTSERVE_AGENT_TOKEN:?Set SLOTSERVE_AGENT_TOKEN in .env}
       # Optional: the address the server should use to reach this machine (default: where it connects from).
       SLOTSERVE_AGENT_ADDRESS: ${SLOTSERVE_AGENT_ADDRESS:-}
+      # Optional, for an https:// server: a private CA to trust, or the server certificate's SHA-256 fingerprint
+      # (shown in Admin > Nodes) to pin a self-signed certificate.
+      SLOTSERVE_AGENT_CA_BUNDLE: ${SLOTSERVE_AGENT_CA_BUNDLE:-}
+      SLOTSERVE_AGENT_SERVER_FINGERPRINT: ${SLOTSERVE_AGENT_SERVER_FINGERPRINT:-}
       SLOTSERVE_DATA_DIR: /data
       SLOTSERVE_MODELS_DIR: /models
       SLOTSERVE_LLAMA_SERVER_CMD: /opt/llama.cpp/llama-server
@@ -31,8 +35,11 @@ services:
       - ${LLAMA_CPP_DIR:?Set LLAMA_CPP_DIR in .env}:/opt/llama.cpp:ro
       # This machine's models; with shared storage (NFS), mount the same share as on the server.
       - ${MODELS_DIR:?Set MODELS_DIR in .env}:/models
-      # Model server logs.
+      # Model server logs, and a token the server rotated in-band.
       - ${DATA_DIR:-./data}:/data
+      # Model libraries on NFS / SMB (Admin > Storage, "Also on nodes"): the agent mounts them through Docker volumes.
+      # - /var/run/docker.sock:/var/run/docker.sock
+      # - /var/lib/docker/volumes:/var/lib/docker/volumes:rslave
     # Remove this block on machines without NVIDIA GPUs.
     deploy:
       resources:

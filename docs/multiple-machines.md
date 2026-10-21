@@ -1,10 +1,10 @@
 # Multiple machines
 
 !!! note "Preview"
-    Multiple machines are new and still being completed: model servers, downloads and model scanning work on every
-    machine; **dev environments (with or without a GPU and their ports), one-click deploys from the
-    [model catalog](model-catalog.md) and downloads into [model libraries](storage.md) still run on the server's own
-    machine only**. Lanes of other machines reserve no CPU cores on the server.
+    Multiple machines are new and still being completed: model servers, downloads, model scanning, one-click deploys
+    from the [model catalog](model-catalog.md) and [model libraries](storage.md) work on every machine; **dev
+    environments (with or without a GPU and their ports) still run on the server's own machine only**. Lanes of other
+    machines reserve no CPU cores on the server.
 
 One SlotServe server can use the GPUs (or CPUs) of several machines. Everyone keeps using one web address, one API
 key and one booking calendar; each machine simply adds its own [lanes](gpus-and-engines.md#lanes).
@@ -96,6 +96,82 @@ The server and the agents speak a versioned protocol. An agent with an incompati
 message on both sides (shown on the node in Admin → Nodes as **Version mismatch**); run the same SlotServe version
 everywhere.
 
+## Securing the link
+
+The agent's connection carries the node token and every command, so outside a trusted network run it over TLS:
+
+- Serve SlotServe over **https** - behind a TLS reverse proxy (set `SLOTSERVE_PUBLIC_URL=https://...`), or directly
+  with `SLOTSERVE_SSL_CERTFILE` / `SLOTSERVE_SSL_KEYFILE` - and give the agents an `https://` server URL. They then
+  connect over `wss://` and verify the server certificate.
+- A certificate from a public CA needs nothing else. For a **private CA**, give the agent the CA certificate with
+  `--ca-bundle` (`SLOTSERVE_AGENT_CA_BUNDLE`). For a **self-signed** certificate, pin it: **Admin → Nodes** shows the
+  SHA-256 fingerprint of the server certificate (read from the certificate file, or from the certificate presented at
+  the public URL); pass it with `--fingerprint` (`SLOTSERVE_AGENT_SERVER_FINGERPRINT`). The agent checks the
+  fingerprint before it sends its token and refuses to connect to anything else. Remember to update the pin when the
+  certificate is renewed.
+- With an `http://` server URL the agent logs a warning and **Admin → Nodes** says the link is unencrypted.
+
+Tokens:
+
+- The server stores only the SHA-256 of each node token; the token itself is shown once.
+- **New token** rotates it. A connected agent receives the new token over its connection, stores it in its data
+  directory (`agent-token.json`, used instead of the configured token as long as that one is not changed) and keeps
+  running - nothing to change on the machine. An offline node gets the new token to put into its configuration.
+- Failed agent logins (unknown or rotated tokens) are limited per address: after `SLOTSERVE_NODE_LOGIN_ATTEMPTS` (20)
+  within 15 minutes the address is refused for a while, also with a valid token.
+- Adding, renaming, rotating, revoking and deleting nodes are recorded in **Admin → Audit log**.
+
+## Downloads on nodes
+
+- Every machine has its **own download queue**: one file at a time per machine, machines in parallel. An offline or
+  busy node never holds up downloads of other machines; **Admin → Nodes** shows each node's running and queued
+  downloads.
+- When a node goes offline during a download, the download goes back to its queue and **resumes** where it stopped
+  (the `.part` file stays on the node) once the node is back. A download that finished while the connection was down
+  is not downloaded again; one that was cancelled meanwhile is cancelled on the node when it reconnects.
+- **Model catalog**: deploying to a lane of another machine downloads the files into that node's models directory
+  and registers the model on that node. Whether a variant fits is judged with the GPUs of the lane's own machine (as
+  its agent reported them), and the free space the node reported is checked first. The node must have connected once.
+- **Model libraries** (Admin → Storage, purpose *model library*): **Also on nodes** makes a library usable on other
+  machines. A **host directory** must exist at the same path on those machines. An **NFS / SMB** share is mounted by
+  each node's agent the same way the server does it: the agent creates the Docker volume on its machine and keeps a
+  tiny holder container (`SLOTSERVE_STORAGE_HELPER_IMAGE`) running so the share stays mounted, then uses the volume's
+  directory for downloads and model servers. The agent needs the Docker socket for that, and when it runs in a
+  container it must see the volumes at the same path:
+  `-v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/docker/volumes:/var/lib/docker/volumes:rslave`.
+  The share's credentials are sent to the agent over its connection (another reason to use TLS). Libraries a node
+  cannot mount are shown with the error in Admin → Nodes. Downloads with `storage_id` to a node the library is not
+  available on are refused (`storage_remote_node`).
+
+## Clocks, versions and stopping the agent
+
+- **Clocks**: agents send their time with every heartbeat; **Admin → Nodes** shows each node's clock difference and
+  warns above `SLOTSERVE_NODE_CLOCK_SKEW_WARN_SECONDS` (10). Usage samples and load events are always recorded with the
+  server's clock (events at the time they arrive), and times a node reports are shifted by its difference, so a wrong
+  clock does not distort statistics. Keep NTP running on every machine all the same.
+- **Versions**: an agent older than the server is marked **Update the agent** in Admin → Nodes with the exact commands
+  (Compose, `docker run`, pip); the agent logs the same hint. Incompatible protocol versions are refused with the
+  command in the message.
+- **Reconnecting**: the agent reconnects by itself with exponential back-off (`SLOTSERVE_AGENT_RETRY_SECONDS` 1,
+  doubled up to `SLOTSERVE_AGENT_MAX_RETRY_SECONDS` 60) and random jitter, so many nodes do not all reconnect at the
+  same moment after a server restart.
+- **Stopping**: on `SIGTERM` / Ctrl+C the agent shuts down cleanly. With `SLOTSERVE_AGENT_ON_EXIT=stop` (default) it
+  stops its model servers. With `keep` (`--on-exit keep`) it leaves ready model servers running and the next agent
+  started on the machine takes them over without reloading the models - useful for updating an agent installed without
+  Docker. In a container the model servers always end with the container.
+
+## Monitoring
+
+- `GET /api/health` (the metrics token as `Authorization: Bearer`, or an admin session) returns one summary: `ok`,
+  `degraded` (a node with lanes offline, an outdated agent, a wrong clock, a failed lane, failed downloads) or `down`
+  (no lane can serve), with the problems, nodes, lanes and downloads. `?strict=true` answers `503` unless everything is
+  `ok`, for simple uptime checks.
+- Prometheus: GPU gauges and the sampled GPU counters carry a `node` label (GPU numbers are per machine);
+  `slotserve_node_up` and `slotserve_node_clock_skew_seconds` per node; `slotserve_lane_occupant` has the lane's node.
+- **Usage**: with several machines the Usage page adds a table per machine (booked and used GPU-hours, utilization,
+  share of time occupied, occupancy by kind); lanes and GPUs name their machine; CSV exports have a `node` column in
+  *compute* and a per-machine export (`kind=nodes`).
+
 ## Settings
 
 Server:
@@ -106,6 +182,9 @@ Server:
 | `SLOTSERVE_NODE_HEARTBEAT_SECONDS` | `5` | How often agents report metrics (sent to agents when they connect) |
 | `SLOTSERVE_NODE_OFFLINE_SECONDS` | `30` | Silence after which a node counts as offline |
 | `SLOTSERVE_NODE_RPC_TIMEOUT_SECONDS` | `30` | How long the server waits for an agent to answer a command |
+| `SLOTSERVE_NODE_LOGIN_ATTEMPTS` | `20` | Failed agent logins per address within 15 minutes before it is refused |
+| `SLOTSERVE_NODE_CLOCK_SKEW_WARN_SECONDS` | `10` | Clock difference above which Admin → Nodes warns |
+| `SLOTSERVE_SSL_CERTFILE`, `SLOTSERVE_SSL_KEYFILE` | *empty* | Serve HTTPS directly; the certificate's fingerprint is shown for pinning |
 
 Agent (besides the usual model server settings such as `SLOTSERVE_LLAMA_SERVER_CMD`, `SLOTSERVE_LLAMA_PORT`,
 `SLOTSERVE_MODELS_DIR`, `SLOTSERVE_DATA_DIR`, which apply to that machine):
@@ -116,6 +195,10 @@ Agent (besides the usual model server settings such as `SLOTSERVE_LLAMA_SERVER_C
 | `SLOTSERVE_AGENT_TOKEN` | *required* | The node's token from Admin → Nodes (`--token`) |
 | `SLOTSERVE_AGENT_ADDRESS` | *empty* | Address the server should use for this machine (`--address`); an address set in Admin → Nodes wins |
 | `SLOTSERVE_AGENT_MODEL_HOST` | `0.0.0.0` | Interface the node's model servers listen on |
+| `SLOTSERVE_AGENT_CA_BUNDLE` | *empty* | CA certificates to trust for an `https://` server (`--ca-bundle`) |
+| `SLOTSERVE_AGENT_SERVER_FINGERPRINT` | *empty* | Pinned SHA-256 fingerprint of the server certificate (`--fingerprint`) |
+| `SLOTSERVE_AGENT_ON_EXIT` | `stop` | `stop` the model servers when the agent stops, or `keep` them for the next agent (`--on-exit`) |
+| `SLOTSERVE_AGENT_RETRY_SECONDS`, `SLOTSERVE_AGENT_MAX_RETRY_SECONDS` | `1`, `60` | Reconnect back-off (doubling, with jitter) |
 
 Hugging Face downloads use the server's `SLOTSERVE_HF_TOKEN`; it is passed to the node only for downloads from
 `SLOTSERVE_HF_ENDPOINT`.
