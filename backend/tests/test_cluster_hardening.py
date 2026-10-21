@@ -731,7 +731,16 @@ async def test_agent_keeps_model_servers_and_takes_them_over(app, make_client, a
     await admin.post(f"/api/models/{model['id']}/default", params={"lane_id": lane["id"]})
     await _until(lambda: _lane_state(admin, "B", "ready"), what="ready")
     pid = agent.runtimes[lane["id"]].pid
+    try:
+        await _keep_and_take_over(app, admin, agents, created, agent, lane, node_id, pid)
+    finally:
+        from slotserve.runtime.adopted import AdoptedProcess
 
+        if pid_alive(pid):  # never leave the kept server behind, also when the test fails
+            AdoptedProcess(pid).kill()
+
+
+async def _keep_and_take_over(app, admin, agents, created, agent, lane, node_id, pid):
     await agent.close()  # keeps the model server running
     assert pid_alive(pid) and (agent.settings.data_dir / agent_node.STATE_FILE).is_file()
     executor = app.state.nodes.get(node_id)
