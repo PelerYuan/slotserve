@@ -142,7 +142,7 @@ async def runtime_logs(
     _: User = Depends(current_user),
     lanes: LaneManager = Depends(get_lanes),
 ):
-    return {"lines": lanes.get(lane_id).runtime.tail_log(lines)}
+    return {"lines": await lanes.get(lane_id).runtime.log_tail(lines)}
 
 
 @router.post("/runtime/restart", status_code=202)

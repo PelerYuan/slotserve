@@ -13,7 +13,8 @@ from ..config import Settings
 from ..db import SessionLocal, utcnow
 from ..orm import Lane, LlmModel, ModelPreset, Reservation
 from ..services import kv, queries
-from .manager import FAIL_BACKOFF_SECONDS, LlamaRuntime, RuntimeState
+from .executor import LaneRuntime
+from .manager import FAIL_BACKOFF_SECONDS, RuntimeState
 
 log = logging.getLogger(__name__)
 
@@ -150,7 +151,7 @@ async def compute_target(
 
 class Scheduler:
     def __init__(
-        self, runtime: LlamaRuntime, settings: Settings, events: EventSink | None = None, lane_id: int | None = None
+        self, runtime: LaneRuntime, settings: Settings, events: EventSink | None = None, lane_id: int | None = None
     ):
         self.lane_id = lane_id
         self.runtime = runtime

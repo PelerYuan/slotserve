@@ -198,6 +198,32 @@ class LlamaRuntime:
         tail = deque(data.decode("utf-8", errors="replace").splitlines(), maxlen=lines)
         return list(tail)
 
+    # ---- log access shared with remote runtimes (see runtime/executor.py LaneRuntime) ----
+
+    @property
+    def log_name(self) -> str:
+        return self.log_path.name
+
+    async def log_tail(self, lines: int = 200) -> list[str]:
+        return await asyncio.to_thread(self.tail_log, lines)
+
+    async def log_size(self) -> int:
+        try:
+            return self.log_path.stat().st_size
+        except OSError:
+            return 0
+
+    async def log_read(self, start: int, end: int) -> bytes:
+        def read() -> bytes:
+            try:
+                with self.log_path.open("rb") as f:
+                    f.seek(start)
+                    return f.read(max(0, end - start))
+            except OSError:
+                return b""
+
+        return await asyncio.to_thread(read)
+
     def launch_log(self, lines: int = 400) -> list[str]:
         """Log lines of the current (or last) launch only."""
         tail = self.tail_log(lines)

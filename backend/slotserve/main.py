@@ -31,6 +31,7 @@ from .api import (
 )
 from .config import Settings, get_settings
 from .gateway import devenv_web, proxy
+from .runtime.executor import LocalExecutor, NodeRegistry
 from .runtime.lanes import LaneManager, ensure_default_lane
 from .services import app_settings
 from .services.chat.hub import ChannelHub
@@ -71,7 +72,9 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         app.state.limiter = AttemptLimiter()
         app.state.notifier = Notifier(settings)
         await ensure_default_lane()
-        app.state.lanes = LaneManager(settings, app.state.notifier)
+        # Where lanes run: the built-in local node (this machine) and, with clustering, node agents.
+        app.state.nodes = NodeRegistry(LocalExecutor(settings))
+        app.state.lanes = LaneManager(settings, app.state.notifier, app.state.nodes)
         await app.state.lanes.start(run=start_background)
         # The first lane, for code paths that only ever deal with one GPU group.
         app.state.runtime = app.state.lanes.primary.runtime
@@ -85,6 +88,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
             await seed_templates(session)
         app.state.devenv = DevEnvManager(app.state, docker=getattr(app.state, "docker_client", None))
         app.state.lanes.gpu_holder = app.state.devenv.holds_gpu
+        app.state.nodes.local.docker_provider = lambda: app.state.devenv.docker
         transports = dict(getattr(app.state, "chat_transports", None) or {})
         transports.setdefault("telegram", getattr(app.state, "telegram_transport", None))
         app.state.channels = ChannelHub(app, transports)

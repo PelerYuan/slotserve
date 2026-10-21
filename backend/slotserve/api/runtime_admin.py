@@ -3,9 +3,10 @@
 import asyncio
 import json
 import re
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +23,7 @@ router = APIRouter(prefix="/api/admin/runtime", tags=["admin"])
 STREAM_SECONDS = 60  # the browser reconnects and resumes from the last byte it saw
 POLL_SECONDS = 0.5
 TAIL_BYTES = 256 * 1024
+DOWNLOAD_BYTES = 20 * 1024 * 1024  # a log kept on another machine is downloaded up to this size (its end)
 LINE_BREAK = re.compile(rb"\r\n|\r|\n")
 
 
@@ -43,7 +45,7 @@ async def runtime_overview(_: User = Depends(admin_user), lanes: LaneManager = D
                 lane_name=ctx.name,
                 devices=ctx.devices,
                 port=rt.port,
-                log_file=rt.log_path.name,
+                log_file=rt.log_name,
                 runtime=_runtime_out(rt.snapshot(), rt.log_progress()),
                 engine=rt.engine,
                 command=rt.command,
@@ -99,10 +101,21 @@ async def load_events(
 
 @router.get("/{lane_id}/log")
 async def download_log(lane_id: int, _: User = Depends(admin_user), lanes: LaneManager = Depends(get_lanes)):
-    path = _lane(lanes, lane_id).runtime.log_path
-    if not path.is_file():
+    rt = _lane(lanes, lane_id).runtime
+    path = getattr(rt, "log_path", None)
+    if isinstance(path, Path):
+        if not path.is_file():
+            raise ApiError(status.HTTP_404_NOT_FOUND, "log_not_found")
+        return FileResponse(path, media_type="text/plain; charset=utf-8", filename=path.name)
+    size = await rt.log_size()
+    if size <= 0:
         raise ApiError(status.HTTP_404_NOT_FOUND, "log_not_found")
-    return FileResponse(path, media_type="text/plain; charset=utf-8", filename=path.name)
+    data = await rt.log_read(max(0, size - DOWNLOAD_BYTES), size)
+    return Response(
+        data,
+        media_type="text/plain; charset=utf-8",
+        headers={"content-disposition": f'attachment; filename="{rt.log_name}"'},
+    )
 
 
 def _split(data: bytes) -> tuple[list[str], bytes]:
@@ -125,34 +138,21 @@ async def stream_log(
     lanes: LaneManager = Depends(get_lanes),
 ):
     """Server-sent events with new log lines. ``Last-Event-ID`` (a byte offset) resumes after a reconnect."""
-    path = _lane(lanes, lane_id).runtime.log_path
+    rt = _lane(lanes, lane_id).runtime
     resume = request.headers.get("last-event-id", "")
-
-    def size() -> int:
-        try:
-            return path.stat().st_size
-        except OSError:
-            return 0
-
-    def read(start: int, end: int) -> bytes:
-        try:
-            with path.open("rb") as f:
-                f.seek(start)
-                return f.read(end - start)
-        except OSError:
-            return b""
+    size, read = rt.log_size, rt.log_read  # the log may live on another machine (node agent)
 
     async def events():
         loop = asyncio.get_running_loop()
         deadline = loop.time() + STREAM_SECONDS
-        end = size()
+        end = await size()
         if resume.isdigit() and int(resume) <= end:
             pos, reset = int(resume), False
         else:
             # Fresh view: the last part of the file, starting at a line boundary.
             pos, reset = max(0, end - TAIL_BYTES), True
             if pos:
-                head = await asyncio.to_thread(read, pos, end)
+                head = await read(pos, end)
                 cut = head.find(b"\n")
                 pos += cut + 1 if cut >= 0 else 0
         buf = b""
@@ -164,12 +164,12 @@ async def stream_log(
         while loop.time() < deadline:
             if await request.is_disconnected():
                 return
-            end = size()
+            end = await size()
             if end < pos:  # the log was rotated or truncated
                 pos, buf, sent_partial = 0, b"", b""
                 yield _event(0, [], b"", reset=True)
             if end > pos:
-                chunk = await asyncio.to_thread(read, pos, min(end, pos + 1024 * 1024))
+                chunk = await read(pos, min(end, pos + 1024 * 1024))
                 pos += len(chunk)
                 lines, buf = _split(buf + chunk)
                 if lines or buf != sent_partial:

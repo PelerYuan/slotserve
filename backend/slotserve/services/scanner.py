@@ -1,6 +1,7 @@
 """Discovers GGUF files in the models directory and registers them as models."""
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 from sqlalchemy import select
@@ -8,6 +9,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings
 from ..orm import LlmModel
+
+
+@dataclass(frozen=True)
+class ModelFile:
+    """A model file found in a node's models directory."""
+
+    path: str  # absolute path on that node
+    name: str  # suggested model name
+    size_bytes: int
+
 
 SPLIT_RE = re.compile(r"-(\d{5})-of-(\d{5})\.gguf$", re.IGNORECASE)
 
@@ -39,6 +50,17 @@ def total_size(path: Path) -> int:
         if part.is_file():
             size += part.stat().st_size
     return size
+
+
+def find_files(root: Path) -> list[ModelFile]:
+    """Primary GGUF files under ``root`` (a node's models directory), without touching the database."""
+    if not root.is_dir():
+        return []
+    return [
+        ModelFile(path=str(path.resolve()), name=model_name_for(path), size_bytes=total_size(path))
+        for path in sorted(root.rglob("*.gguf"))
+        if path.is_file() and is_primary_gguf(path)
+    ]
 
 
 async def unique_name(db: AsyncSession, base: str) -> str:

@@ -11,8 +11,8 @@ from sqlalchemy import select, update
 from ..config import Settings
 from ..db import SessionLocal
 from ..orm import Lane, LlmModel, Reservation, WaitlistEntry
+from .executor import LaneRuntime, LocalExecutor, NodeExecutor, NodeRegistry
 from .gpu import gpu_stats
-from .manager import LlamaRuntime
 from .scheduler import EventSink, Scheduler
 
 log = logging.getLogger(__name__)
@@ -24,8 +24,9 @@ class LaneContext:
     name: str
     devices: list[int] | None
     position: int
-    runtime: LlamaRuntime
+    runtime: LaneRuntime
     scheduler: Scheduler
+    node_id: int | None = None  # None: the built-in local node
     task: asyncio.Task | None = field(default=None, repr=False)
 
 
@@ -51,9 +52,11 @@ async def ensure_default_lane() -> None:
 
 
 class LaneManager:
-    def __init__(self, settings: Settings, events: EventSink | None = None):
+    def __init__(self, settings: Settings, events: EventSink | None = None, nodes: NodeRegistry | None = None):
         self.settings = settings
         self.events = events
+        # Where each lane's model server runs; without a registry every lane runs on this machine.
+        self.nodes = nodes or NodeRegistry(LocalExecutor(settings))
         self.contexts: dict[int, LaneContext] = {}
         self._run = False
         self._sync_lock = asyncio.Lock()
@@ -81,6 +84,9 @@ class LaneManager:
         elif lane_id in self.contexts:
             self.contexts[lane_id].scheduler.poke()
 
+    def executor(self, ctx: LaneContext) -> NodeExecutor:
+        return self.nodes.get(ctx.node_id)
+
     def loaded_model_ids(self) -> set[int]:
         return {c.runtime.model_id for c in self.contexts.values() if c.runtime.model_id is not None}
 
@@ -100,6 +106,9 @@ class LaneManager:
                 await self._remove(lane_id)
             for lane in rows:
                 ctx = self.contexts.get(lane.id)
+                if ctx is not None and ctx.node_id != self._node_of(lane):
+                    await self._remove(lane.id)  # moved to another machine
+                    ctx = None
                 if ctx is None:
                     await self._add(lane)
                     continue
@@ -111,11 +120,12 @@ class LaneManager:
                 ctx.scheduler.poke()
 
     async def _add(self, lane: Lane) -> None:
-        runtime = LlamaRuntime(self.settings, lane_id=lane.id, devices=lane.devices)
+        node_id = self._node_of(lane)
+        runtime = self.nodes.get(node_id).create_runtime(lane.id, lane.devices)
         scheduler = Scheduler(runtime, self.settings, self.events, lane_id=lane.id)
         scheduler.hold = self._holds
         await scheduler.restore_manual()
-        ctx = LaneContext(lane.id, lane.name, lane.devices, lane.position, runtime, scheduler)
+        ctx = LaneContext(lane.id, lane.name, lane.devices, lane.position, runtime, scheduler, node_id=node_id)
         if self._run:
             ctx.task = asyncio.create_task(scheduler.run(), name=f"scheduler-lane{lane.id}")
         self.contexts[lane.id] = ctx
@@ -127,6 +137,11 @@ class LaneManager:
             with contextlib.suppress(asyncio.CancelledError):
                 await ctx.task
         await ctx.runtime.shutdown()
+
+    def _node_of(self, lane: Lane) -> int | None:
+        """The lane's node; ``None`` for the local node (also for lanes of a node that no longer exists)."""
+        node_id = getattr(lane, "node_id", None)
+        return None if self.nodes.find(node_id) is None or self.nodes.is_local(node_id) else node_id
 
     def _holds(self, lane_id: int | None) -> bool:
         return self.gpu_holder is not None and self.gpu_holder(lane_id)

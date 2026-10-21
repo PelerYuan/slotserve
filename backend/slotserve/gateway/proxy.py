@@ -14,7 +14,8 @@ from sqlalchemy import select
 
 from ..db import SessionLocal, utcnow
 from ..orm import ApiKey, LlmModel, UsageLog, User
-from ..runtime.manager import LlamaRuntime, RuntimeState
+from ..runtime.executor import LaneRuntime
+from ..runtime.manager import RuntimeState
 from ..security import hash_api_key
 from ..services import queries
 
@@ -57,7 +58,7 @@ class Admission:
     caller: Caller
     reservation_id: int | None
     model_name: str
-    runtime: LlamaRuntime
+    runtime: LaneRuntime
     lane_id: int | None = None
 
 
@@ -151,7 +152,7 @@ async def admit(request: Request, caller: Caller, requested_model: str | None) -
             chosen = candidates[0]
 
         ctx, active = chosen
-        runtime: LlamaRuntime = ctx.runtime
+        runtime: LaneRuntime = ctx.runtime
         target = ctx.scheduler.target
         if active is not None and active.model_id is None:
             raise GatewayError(
