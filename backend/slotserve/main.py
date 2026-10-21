@@ -34,7 +34,9 @@ from .api import (
     waitlist,
 )
 from .cluster import api as cluster_api
+from .cluster import machines_api
 from .cluster.hub import ClusterHub
+from .cluster.machines import MachineMonitor
 from .config import Settings, get_settings
 from .gateway import devenv_web, devenv_web_app, proxy
 from .gateway.devenv_web_auth import WebOriginGuard
@@ -85,6 +87,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         app.state.nodes = NodeRegistry(LocalExecutor(settings))
         app.state.cluster = ClusterHub(app.state, app.state.nodes)
         await app.state.cluster.start()
+        app.state.machines = MachineMonitor(app.state)  # the Machines page: local readings, load history
         app.state.lanes = LaneManager(settings, app.state.notifier, app.state.nodes)
         await app.state.lanes.start(run=start_background)
         # The first lane, for code paths that only ever deal with one GPU group.
@@ -126,6 +129,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
                 asyncio.create_task(app.state.devenv.run(), name="devenv"),
                 asyncio.create_task(app.state.usage_sampler.run(), name="usage-sampler"),
                 asyncio.create_task(app.state.cluster.run(), name="node-watchdog"),
+                asyncio.create_task(app.state.machines.run(), name="machines"),
                 asyncio.create_task(app.state.storage.run(), name="storage"),  # storage hook
             ]
         try:
@@ -184,6 +188,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         app.include_router(module.router)
     app.include_router(devenv.keys_router)
     app.include_router(cluster_api.router)
+    app.include_router(machines_api.router)  # the Machines page and machine selection
     app.include_router(storage.router)  # storage hook
     app.include_router(storage.user_router)
     app.include_router(devenv_cpu.router)  # devenv_cpu: environments without a GPU

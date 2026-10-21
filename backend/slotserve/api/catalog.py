@@ -92,6 +92,8 @@ class CatalogLaneOut(BaseModel):
     name: str
     gpus: list[int]
     memory_bytes: int | None
+    node_id: int | None = None  # the machine the lane's GPUs are in
+    node_name: str | None = None
 
 
 class CatalogOut(BaseModel):
@@ -136,10 +138,29 @@ class HiddenIn(BaseModel):
 # ---- helpers -----------------------------------------------------------------------
 
 
-async def _lane_memory(db: AsyncSession) -> tuple[list[Lane], dict[int, int | None]]:
+async def _lane_memory(db: AsyncSession, nodes=None) -> tuple[list[Lane], dict[int, int | None]]:
+    """Lanes and the memory of their GPUs; ``nodes`` (the node registry): each lane's GPUs are on its own machine."""
     lanes = list((await db.execute(select(Lane).order_by(Lane.position, Lane.id))).scalars())
-    gpus = await gpu.gpu_stats()
-    return lanes, {lane.id: catalog.lane_memory(lane.devices, gpus) for lane in lanes}
+    local = await gpu.gpu_stats()
+    by_node: dict[int | None, list] = {}
+    for lane in lanes:
+        if nodes is None or nodes.is_local(lane.node_id):
+            by_node[lane.node_id] = local
+        elif lane.node_id not in by_node:
+            executor = nodes.find(lane.node_id)
+            known = getattr(executor, "known_gpus", None)
+            by_node[lane.node_id] = known() if known is not None else []
+    return lanes, {lane.id: catalog.lane_memory(lane.devices, by_node[lane.node_id]) for lane in lanes}
+
+
+def _node_names(nodes, lanes: list[Lane]) -> dict[int, tuple[int | None, str | None]]:
+    if nodes is None:
+        return {}
+    out = {}
+    for lane in lanes:
+        executor = nodes.find(lane.node_id) or nodes.local
+        out[lane.id] = (executor.node_id, executor.name)
+    return out
 
 
 def _variant_out(
@@ -230,18 +251,28 @@ def _deployer(request: Request) -> cd.Deployer:
 
 @router.get("", response_model=CatalogOut)
 async def list_catalog(
+    request: Request,
     ctx: int | None = Query(default=None, ge=256, le=10_000_000),
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Every entry with memory estimates (``ctx`` overrides each entry's default context) and lane fit."""
-    lanes, memory = await _lane_memory(db)
+    nodes = getattr(request.app.state, "nodes", None)
+    lanes, memory = await _lane_memory(db, nodes)
+    where = _node_names(nodes, lanes)
     models = await cd.registered(db)
     items = await cd.all_entries(db, include_hidden=user.is_admin)
     return CatalogOut(
         updated=catalog.builtin().updated,
         lanes=[
-            CatalogLaneOut(id=lane.id, name=lane.name, gpus=lane.devices or [], memory_bytes=memory[lane.id])
+            CatalogLaneOut(
+                id=lane.id,
+                name=lane.name,
+                gpus=lane.devices or [],
+                memory_bytes=memory[lane.id],
+                node_id=where.get(lane.id, (None, None))[0],
+                node_name=where.get(lane.id, (None, None))[1],
+            )
             for lane in lanes
         ],
         entries=[_entry_out(item, ctx, memory, models) for item in items],
@@ -257,12 +288,13 @@ async def list_deploys(_: User = Depends(current_user), db: AsyncSession = Depen
 @router.get("/{entry_id}", response_model=EntryOut)
 async def get_entry(
     entry_id: str,
+    request: Request,
     ctx: int | None = Query(default=None, ge=256, le=10_000_000),
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
     item = await cd.find_entry(db, entry_id, include_hidden=user.is_admin)
-    _lanes, memory = await _lane_memory(db)
+    _lanes, memory = await _lane_memory(db, getattr(request.app.state, "nodes", None))
     return _entry_out(item, ctx, memory, await cd.registered(db))
 
 

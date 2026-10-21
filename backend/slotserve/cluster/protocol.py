@@ -59,7 +59,7 @@ M_DOWNLOAD_CANCEL = "download.cancel"  # {task_id} -> {}
 M_PING = "ping"  # {} -> {time}
 
 # Events the agent sends.
-E_METRICS = "metrics"  # {gpus: [...], cpu_percent, memory_used_mb, memory_total_mb, load}
+E_METRICS = "metrics"  # {gpus, cpu_percent, memory_used_mb, memory_total_mb, load, net_rx_bps, net_tx_bps, disks}
 E_RUNTIME = "runtime"  # one lane runtime's state (see RemoteRuntime.apply)
 E_LOAD_EVENT = "load_event"  # a finished load attempt (ModelLoadEvent fields)
 E_INVENTORY = "inventory"  # {gpus, cpu_cores, memory_total_mb, models: [...], ...}

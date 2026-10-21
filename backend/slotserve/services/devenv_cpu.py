@@ -249,6 +249,18 @@ class CpuEnvs:
     def enabled(self) -> bool:
         return bool(self.settings.devenv_enabled and self.settings.devenv_cpu_enabled)
 
+    def runs_on(self, node_id: int | None) -> bool:
+        """Whether CPU-only environments can start on a machine (``None``: the built-in local node).
+
+        For now they run where the control plane's Docker is, i.e. on the local node; starting them on node agents
+        (relayed through the control plane) extends this.
+        """
+        return self._is_local(node_id)
+
+    def _is_local(self, node_id: int | None) -> bool:
+        nodes = getattr(self.m.state, "nodes", None)
+        return node_id is None if nodes is None else nodes.is_local(node_id)
+
     async def active_count(self, db, user_id: int | None = None) -> int:
         stmt = select(func.count(DevSession.id)).where(DevSession.kind == KIND, DevSession.state.in_(ACTIVE_STATES))
         if user_id is not None:
@@ -295,11 +307,21 @@ class CpuEnvs:
         return (await db.execute(stmt.limit(1))).first() is not None
 
     async def start(
-        self, db, user: User, template: DevTemplate | None = None, project: DevProject | None = None
+        self,
+        db,
+        user: User,
+        template: DevTemplate | None = None,
+        project: DevProject | None = None,
+        node_id: int | None = None,
     ) -> DevSession:
-        """Starts a CPU-only environment from a template, or continues a kept environment without a GPU."""
+        """Starts a CPU-only environment from a template, or continues a kept environment without a GPU.
+
+        ``node_id``: the machine its owner picked (``None`` or the local node's id: the built-in local node).
+        """
         from .devenv import DevEnvError
 
+        if not self.runs_on(node_id):
+            raise DevEnvError("devenv_cpu_node_unsupported")
         await self.check_room(db, user.id)
         has_key = (await db.execute(select(SshKey.id).where(SshKey.user_id == user.id).limit(1))).first()
         password = self.settings.devenv_password_login and user.devenv_password_hash
@@ -322,6 +344,7 @@ class CpuEnvs:
             project_id=project.id if project else None,
             image=image,
             state="waiting",
+            node_id=None if self._is_local(node_id) else node_id,
         )
         db.add(s)
         await db.commit()

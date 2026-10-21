@@ -463,6 +463,8 @@ class DevSession(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     started_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     stopped_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    # kind "cpu": the machine its owner chose (NULL = the built-in local node); see CpuEnvs.runs_on.
+    node_id: Mapped[int | None] = mapped_column(ForeignKey("nodes.id", ondelete="SET NULL"), nullable=True)
 
 
 class DevPort(Base):

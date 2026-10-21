@@ -24,10 +24,37 @@ async def _detected_gpus(request: Request) -> int:
     return len(await sampler.stats()) if sampler is not None else 0
 
 
-async def _report(request: Request, db: AsyncSession, days: int, tz_offset: int, user_id: int | None):
+async def node_lanes(request: Request, db: AsyncSession, node_id: int | None) -> set[int] | None:
+    """The lanes of one machine (``None``: every machine)."""
+    if node_id is None:
+        return None
+    nodes = request.app.state.nodes
+    return {
+        lane_id
+        for lane_id, lane_node in (await db.execute(select(Lane.id, Lane.node_id))).all()
+        if (nodes.is_local(node_id) if lane_node is None else lane_node == node_id)
+    }
+
+
+def _cpu_on(request: Request, node_id: int | None) -> bool:
+    """CPU-only environments run on the local node (their usage rows do not name a machine)."""
+    return node_id is None or request.app.state.nodes.is_local(node_id)
+
+
+async def _report(
+    request: Request, db: AsyncSession, days: int, tz_offset: int, user_id: int | None, node_id: int | None = None
+):
     window = usage_report.Window(days, tz_offset, utcnow())
     names = dict((await db.execute(select(User.id, User.username))).all())
-    rep = await usage_report.build(db, window, names, await _detected_gpus(request), user_id)
+    rep = await usage_report.build(
+        db,
+        window,
+        names,
+        await _detected_gpus(request),
+        user_id,
+        lane_ids=await node_lanes(request, db, node_id),
+        include_cpu=_cpu_on(request, node_id),
+    )
     return window, names, rep
 
 
@@ -37,15 +64,19 @@ async def usage(
     days: int = Query(default=30, ge=1, le=365),
     tz_offset: int = TZ,
     scope: str = SCOPE,
+    node_id: int | None = Query(default=None, description="Only this machine's lanes (see /api/machines)"),
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
     only = user.id if scope == "mine" else None
-    window, names, rep = await _report(request, db, days, tz_offset, only)
+    window, names, rep = await _report(request, db, days, tz_offset, only, node_id)
     since = window.since
+    lane_ids = await node_lanes(request, db, node_id)
 
     def logs(stmt):
         stmt = stmt.where(UsageLog.created_at >= since)
+        if lane_ids is not None:
+            stmt = stmt.where(UsageLog.lane_id.in_(lane_ids))
         return stmt.where(UsageLog.user_id == only) if only is not None else stmt
 
     per_user = (
@@ -192,7 +223,7 @@ async def export_usage(
     only = user.id if scope == "mine" else None
     names = dict((await db.execute(select(User.id, User.username))).all())
     if kind == "people":
-        data = (await usage(request, days, tz_offset, scope, user, db)).users
+        data = (await usage(request, days, tz_offset, scope, None, user, db)).users
         rows: list[list] = [
             [
                 "user",

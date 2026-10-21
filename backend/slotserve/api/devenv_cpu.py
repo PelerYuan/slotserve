@@ -11,7 +11,7 @@ from ..config import get_settings
 from ..db import get_db
 from ..deps import current_user
 from ..errors import ApiError
-from ..orm import DevProject, DevSession, DevTemplate, Lane, User
+from ..orm import DevProject, DevSession, DevTemplate, Lane, Node, User
 from ..services.audit import record
 from ..services.devenv import DevEnvError, visible
 from ..services.devenv_cpu import ACTIVE_STATES, KIND, cpu_ranges
@@ -23,6 +23,7 @@ router = APIRouter(prefix="/api/devenv/cpu", tags=["devenv"])
 class StartIn(BaseModel):
     template_id: int | None = None
     project_id: int | None = None
+    node_id: int | None = None  # the machine to run on (see /api/machines); None = the built-in local node
 
 
 class AfterBookingIn(BaseModel):
@@ -45,6 +46,7 @@ class CpuSessionOut(BaseModel):
     state: str
     started_at: datetime | None
     live: LiveOut | None
+    node_id: int | None = None  # None: the built-in local node
 
 
 class LaneCores(BaseModel):
@@ -114,6 +116,7 @@ async def cpu_info(request: Request, user: User = Depends(current_user), db: Asy
                 state=r.state,
                 started_at=r.started_at,
                 live=LiveOut(**live) if live else None,
+                node_id=r.node_id,
             )
         )
     active_all = sum(1 for r in rows if r.state in ACTIVE_STATES) if user.is_admin else await cpu.active_count(db)
@@ -151,8 +154,12 @@ async def start_cpu(
 ):
     """Starts a dev environment without a GPU (no booking): from a template, or one of my kept environments."""
     template, project = await _start_target(db, body, user)
+    if body.node_id is not None:
+        node = await db.get(Node, body.node_id)
+        if node is None or node.revoked_at is not None:
+            raise ApiError(status.HTTP_400_BAD_REQUEST, "node_invalid")
     try:
-        s = await request.app.state.devenv.cpu.start(db, user, template=template, project=project)
+        s = await request.app.state.devenv.cpu.start(db, user, template=template, project=project, node_id=body.node_id)
     except DevEnvError as exc:
         raise _devenv_error(exc) from exc
     return (await _session_out(db, request, [s], user))[0]

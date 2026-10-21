@@ -210,10 +210,19 @@ class Report:
 
 
 async def build(
-    db: AsyncSession, window: Window, names: dict[int, str], detected_gpus: int, user_id: int | None = None
+    db: AsyncSession,
+    window: Window,
+    names: dict[int, str],
+    detected_gpus: int,
+    user_id: int | None = None,
+    lane_ids: set[int] | None = None,
+    include_cpu: bool = True,
 ) -> Report:
+    """``lane_ids``: only these lanes (one machine's); ``include_cpu``: count CPU-only environments."""
     rep = Report(window, names)
     lanes = list((await db.execute(select(Lane).order_by(Lane.position, Lane.id))).scalars())
+    if lane_ids is not None:
+        lanes = [lane for lane in lanes if lane.id in lane_ids]
     for lane in lanes:
         rep.lane_names[lane.id] = lane.name
         rep.lane_gpus[lane.id] = gpu_count(lane.devices, detected_gpus)
@@ -224,6 +233,8 @@ async def build(
     )
     if user_id is not None:
         stmt = stmt.where(Reservation.user_id == user_id)
+    if lane_ids is not None:
+        stmt = stmt.where(Reservation.lane_id.in_(lane_ids))
     for r in (await db.execute(stmt)).scalars():
         n = rep.lane_gpus.get(r.lane_id, 1)
         series = rep.person_series.setdefault(r.user_id, [0.0] * window.count)
@@ -257,6 +268,8 @@ async def build(
     )
     if user_id is not None:
         stmt = stmt.where(UsageSample.user_id == user_id)
+    if lane_ids is not None:
+        stmt = stmt.where(UsageSample.lane_id.in_(lane_ids))
     for pos, lane_id, gpu, kind, uid, sec, metered, util, busy, wh, peak, total in (await db.execute(stmt)).all():
         vals = (kind, sec or 0, metered or 0, util or 0.0, busy or 0, wh or 0.0, peak, total)
         rep.all.add(*vals)
@@ -281,6 +294,8 @@ async def build(
     )
     if user_id is not None:
         stmt = stmt.where(UsageSample.user_id == user_id)
+    if not include_cpu:
+        return rep
     for uid, cores in (await db.execute(stmt)).all():
         rep.cpu_core_seconds[uid] += float(cores or 0)
     return rep

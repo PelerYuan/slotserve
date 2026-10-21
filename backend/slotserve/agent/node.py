@@ -12,7 +12,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-import os
 import random
 import shutil
 from collections import deque
@@ -90,12 +89,15 @@ class NodeAgent:
         token: str | None = None,
         address: str | None = None,
         stats: StatsFn | None = None,
+        docker_info: system.DockerInfo | None = None,
     ):
         self.settings = agent_settings(settings)
         self.server = (server or settings.agent_server).rstrip("/")
         self.token = token or settings.agent_token
         self.address = address if address is not None else settings.agent_address
         self._stats = stats
+        self._docker_info = docker_info
+        self.hardware: dict = {}
         self.runtimes: dict[int, LlamaRuntime] = {}
         self.downloads = AgentDownloads(self.settings, self._emit_download)
         self.peer: Peer | None = None
@@ -110,7 +112,7 @@ class NodeAgent:
         self.retry_seconds = 1.0  # first reconnect delay; doubles up to MAX_BACKOFF
         self._pending: deque[tuple[str, dict]] = deque(maxlen=MAX_PENDING_EVENTS)
         self._sent: dict[int, dict] = {}
-        self._cpu = system.CpuMeter()
+        self._load = system.LoadProbe()
         self._stop = asyncio.Event()
 
     # ---- connection ---------------------------------------------------------
@@ -270,30 +272,37 @@ class NodeAgent:
             "llama_port": self.settings.llama_port,
         }
 
+    async def _docker(self) -> dict | None:
+        """Docker's ``/info`` on this machine, when the agent can reach the Docker socket."""
+        if self._docker_info is not None:
+            return await self._docker_info()
+        from ..services.docker_api import DockerClient
+
+        client = DockerClient(self.settings.docker_host)
+        try:
+            return await client.info()
+        finally:
+            await client.close()
+
+    async def read_hardware(self) -> dict:
+        """CPU, memory, disks, Docker and GPU driver of this machine (sent with the hello)."""
+        self.hardware = await system.hardware(self.settings.models_dir, self._docker)
+        return self.hardware
+
     async def _hello(self) -> dict:
         return {
             "type": "hello",
             "protocol": self.protocol,
             "agent_version": __version__,
             "address": self.address,
-            "info": system.machine_info(),
+            "info": {**system.machine_info(), "hardware": await self.read_hardware()},
             "inventory": await self.inventory(),
             "runtimes": [runtime_report(rt) for rt in self.runtimes.values()],
         }
 
     async def _metrics(self) -> dict:
-        used, total = system.memory_mb()
-        load = None
-        if hasattr(os, "getloadavg"):
-            with contextlib.suppress(OSError):
-                load = os.getloadavg()[0]
-        return {
-            "gpus": [g.model_dump() for g in await self.gpu_stats()],
-            "cpu_percent": self._cpu.percent(),
-            "memory_used_mb": used,
-            "memory_total_mb": total,
-            "load": load,
-        }
+        load = await asyncio.to_thread(self._load.read, self.hardware.get("disks"))
+        return {"gpus": [g.model_dump() for g in await self.gpu_stats()], **load}
 
     async def _metrics_loop(self) -> None:
         """Live metrics; they double as the heartbeat."""
