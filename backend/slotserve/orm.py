@@ -101,6 +101,8 @@ class DownloadTask(Base):
     model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    # storage hook: a model library (Storage with purpose "models") to download into; NULL = MODELS_DIR
+    storage_id: Mapped[int | None] = mapped_column(ForeignKey("storages.id", ondelete="SET NULL"), nullable=True)
 
 
 class Reservation(Base):
@@ -377,6 +379,8 @@ class DevProject(Base):
     container_port: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # JSON: the web interfaces the container was created with {token, ports, base_session} (kept across bookings)
     container_web: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # storage hook: signature of the managed storage mounts the container was created with (services/storage.py)
+    container_storage: Mapped[str | None] = mapped_column(String(64), nullable=True)
     size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
@@ -455,3 +459,33 @@ class UsageSample(Base):
     mem_peak_mb: Mapped[int | None] = mapped_column(Integer, nullable=True)
     mem_total_mb: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cpu_core_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)  # resource "cpu" only
+
+
+class Storage(Base):
+    """Storage admins manage in the panel (services/storage.py): a directory on the Docker host, an NFS export or
+    an SMB/CIFS share, used for one purpose: shared data, personal spaces, kept project data or a model library."""
+
+    __tablename__ = "storages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True)
+    kind: Mapped[str] = mapped_column(String(8))  # host | nfs | smb
+    purpose: Mapped[str] = mapped_column(String(16))  # shared | personal | projects | models
+    host_path: Mapped[str | None] = mapped_column(Text, nullable=True)  # host: directory on the Docker host
+    server: Mapped[str | None] = mapped_column(String(255), nullable=True)  # nfs / smb: host name or address
+    remote_path: Mapped[str | None] = mapped_column(Text, nullable=True)  # nfs: export path; smb: share[/dir]
+    options: Mapped[str | None] = mapped_column(Text, nullable=True)  # extra mount options (comma separated)
+    username: Mapped[str | None] = mapped_column(String(128), nullable=True)  # smb
+    password_enc: Mapped[str | None] = mapped_column(Text, nullable=True)  # smb, encrypted with SECRET_KEY
+    mount_path: Mapped[str | None] = mapped_column(String(255), nullable=True)  # in containers (shared, models)
+    read_only: Mapped[bool] = mapped_column(Boolean, default=False)
+    access: Mapped[str] = mapped_column(String(16), default="everyone")  # everyone | users | admins
+    user_ids: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list (access "users")
+    local_path: Mapped[str | None] = mapped_column(Text, nullable=True)  # models: where SlotServe sees it
+    quota_gb: Mapped[float | None] = mapped_column(Float, nullable=True)  # personal: soft limit per person
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    status: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON: the last check
+    usage: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON {user id: bytes} (personal)
+    warned: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON: user ids told they are over quota
+    checked_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

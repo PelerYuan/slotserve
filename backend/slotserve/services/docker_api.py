@@ -209,6 +209,25 @@ class DockerClient:
     async def remove_volume(self, name: str) -> None:
         await self._request("DELETE", f"/volumes/{quote(name, safe='')}", ok=(204, 404))
 
+    async def volume_create(
+        self, name: str, driver_opts: dict[str, str] | None = None, labels: dict[str, str] | None = None
+    ) -> dict:
+        """Creates a named volume with the local driver (``driver_opts`` e.g. type=nfs, o=addr=..., device=:/x)."""
+        body = {"Name": name, "Driver": "local", "DriverOpts": driver_opts or {}, "Labels": labels or {}}
+        return (await self._request("POST", "/volumes/create", json=body)).json()
+
+    async def volume_inspect(self, name: str) -> dict | None:
+        try:
+            return (await self._request("GET", f"/volumes/{quote(name, safe='')}")).json()
+        except DockerError as exc:
+            if exc.status == 404:
+                return None
+            raise
+
+    async def volumes(self, label: str) -> list[dict[str, Any]]:
+        filters = json.dumps({"label": [label]})
+        return (await self._request("GET", "/volumes", params={"filters": filters})).json().get("Volumes") or []
+
     async def list(self, label: str) -> list[dict[str, Any]]:
         filters = json.dumps({"label": [label]})
         return (await self._request("GET", "/containers/json", params={"all": "true", "filters": filters})).json()

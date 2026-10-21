@@ -13,12 +13,13 @@ import AdminRequests from '@/components/admin/AdminRequests.vue'
 import AdminLanes from '@/components/admin/AdminLanes.vue'
 import AdminRuntime from '@/components/admin/AdminRuntime.vue'
 import AdminChannels from '@/components/admin/AdminChannels.vue'
+import AdminStorage from '@/components/admin/AdminStorage.vue'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
-const TABS = ['overview', 'runtime', 'lanes', 'users', 'reservations', 'requests', 'keys', 'channels', 'settings', 'audit'] as const
+const TABS = ['overview', 'runtime', 'lanes', 'storage', 'users', 'reservations', 'requests', 'keys', 'channels', 'settings', 'audit'] as const
 type Tab = (typeof TABS)[number]
 
 const tab = computed<Tab>({
@@ -41,6 +42,7 @@ const tab = computed<Tab>({
         <AdminOverview v-if="name === 'overview'" @navigate="(v: Tab) => (tab = v)" />
         <AdminRuntime v-else-if="name === 'runtime'" />
         <AdminLanes v-else-if="name === 'lanes'" />
+        <AdminStorage v-else-if="name === 'storage'" />
         <AdminUsers v-else-if="name === 'users'" />
         <AdminReservations v-else-if="name === 'reservations'" />
         <AdminRequests v-else-if="name === 'requests'" />

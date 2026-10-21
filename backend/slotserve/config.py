@@ -141,6 +141,10 @@ class Settings(BaseSettings):
     devenv_storage_dir: str = ""
     devenv_projects: int = 3  # kept (paused) environments per person; 0 = none
     devenv_project_days: int = 0  # remove kept environments unused for this many days; 0 = never
+    # Storage managed in Admin -> Storage (services/storage.py): the small image that checks storages (df, du),
+    # and how often they are checked; 0 = only when an admin asks.
+    storage_helper_image: str = "busybox:1.37"
+    storage_check_minutes: int = 30
 
     @property
     def database_url(self) -> str:

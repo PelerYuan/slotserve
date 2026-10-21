@@ -53,8 +53,21 @@ class Downloader:
     def cancel(self, task_id: int) -> None:
         self._cancel.add(task_id)
 
-    def dest_path(self, filename: str) -> Path:
-        return self.settings.models_dir / filename
+    def dest_path(self, filename: str, base: Path | None = None) -> Path:
+        """``base``: a model library from Admin -> Storage (storage hook); default MODELS_DIR."""
+        return (base or self.settings.models_dir) / filename
+
+    async def task_dir(self, db, task: DownloadTask) -> Path | None:
+        """The model library a task downloads into (storage hook), None for MODELS_DIR."""
+        if task.storage_id is None:
+            return None
+        from ..orm import Storage
+        from .storage import library_path
+
+        st = await db.get(Storage, task.storage_id)
+        if st is None or st.purpose != "models" or (path := library_path(st)) is None:
+            raise RuntimeError("the model library is no longer available")
+        return path
 
     async def recover(self) -> None:
         """Tasks left running by a previous process go back to the queue."""
@@ -96,11 +109,16 @@ class Downloader:
             if task is None or task.status != "queued":
                 return
             url, filename, user_id = task.url, task.filename, task.user_id
+            try:
+                base = await self.task_dir(db, task)
+            except RuntimeError as exc:
+                await self._set(task_id, status="failed", error=str(exc), finished_at=utcnow())
+                return
         self._cancel.discard(task_id)
         self.current_id = task_id
         await self._set(task_id, status="running", error=None, speed_bps=0.0)
         try:
-            await self._download(task_id, url, filename)
+            await self._download(task_id, url, filename, base)
         except DownloadCancelled:
             await self._set(task_id, status="cancelled", speed_bps=0.0, finished_at=utcnow())
             return
@@ -112,7 +130,7 @@ class Downloader:
         finally:
             self.current_id = None
 
-        dest = self.dest_path(filename)
+        dest = self.dest_path(filename, base)
         model_id = None
         if scanner.is_primary_gguf(dest):
             async with SessionLocal() as db:
@@ -133,8 +151,8 @@ class Downloader:
             return {"Authorization": f"Bearer {self.settings.hf_token}"}
         return {}
 
-    async def _download(self, task_id: int, url: str, filename: str) -> None:
-        dest = self.dest_path(filename)
+    async def _download(self, task_id: int, url: str, filename: str, base: Path | None = None) -> None:
+        dest = self.dest_path(filename, base)
         part = dest.with_name(dest.name + ".part")
         dest.parent.mkdir(parents=True, exist_ok=True)
         if dest.exists():

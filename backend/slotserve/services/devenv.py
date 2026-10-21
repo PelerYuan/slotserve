@@ -41,6 +41,7 @@ from sqlalchemy import func, or_, select
 from ..db import SessionLocal, utcnow
 from ..orm import HOLDING_STATUSES, DevProject, DevSession, DevTemplate, Lane, Reservation, SshKey, User
 from ..runtime.manager import RuntimeState
+from . import storage
 from .docker_api import DockerClient, DockerError, registry_of, tar_files
 
 log = logging.getLogger(__name__)
@@ -543,6 +544,7 @@ class Plan:
     network_labels: dict = field(default_factory=dict)
     web: dict = field(default_factory=dict)  # declared ports and token (see DevEnvManager._web_spec)
     keep_entrypoint: bool = False
+    storage: "storage.StoragePlan | None" = None  # storage hook: managed storages (services/storage.py)
 
 
 class DevEnvManager:
@@ -998,6 +1000,8 @@ class DevEnvManager:
         binds: list[tuple[str, str]] = []
         mounts: list[dict] = []
         digest = None
+        # storage hook: storages from Admin -> Storage (personal /workspace, project data, shared data, libraries)
+        sp = await storage.plan_for(db, self.settings.secret_key, user, shared=s.kind == "shared")
         if s.kind == "shared":
             account_files, digest = await self._account_files(db)
             files.update(account_files)
@@ -1027,20 +1031,30 @@ class DevEnvManager:
             )
             start = START_SCRIPT.format(cd="cd /workspace 2>/dev/null || true")
             uid = s.user_id
-            self._volume(binds, mounts, f"slotserve-workspace-u{uid}", f"users/u{uid}/workspace", "/workspace")
+            if sp.personal is not None:  # storage hook
+                mounts.append(sp.sub(sp.personal, f"users/u{uid}", "/workspace", seed="/workspace"))
+            else:
+                self._volume(binds, mounts, f"slotserve-workspace-u{uid}", f"users/u{uid}/workspace", "/workspace")
             for path in self._project_paths(s, project, template):
                 slug = _slug(path)
                 if project is not None:
+                    if sp.projects is not None:  # storage hook
+                        mounts.append(sp.sub(sp.projects, f"projects/p{project.id}/{slug}", path, seed=path))
+                        continue
                     volume, rel = f"slotserve-project{project.id}-{slug}", f"projects/p{project.id}/{slug}"
                     self._volume(binds, mounts, volume, rel, path)
                 else:
                     tid = template.id if template else 0
+                    if sp.projects is not None:  # storage hook
+                        mounts.append(sp.sub(sp.projects, f"templates/u{uid}-t{tid}/{slug}", path, seed=path))
+                        continue
                     self._volume(binds, mounts, f"slotserve-u{uid}-t{tid}-{slug}", f"users/u{uid}/t{tid}/{slug}", path)
             name = f"slotserve-proj-{project.id}" if project is not None else f"slotserve-dev-{s.id}"
             hostname = f"{(user.username if user else 'dev')[:40]}-dev"
             env = {"SLOTSERVE_USER": user.username if user else "", "SLOTSERVE_END": r.end_at.isoformat() if r else ""}
         files["opt/slotserve/ssh.sh"] = (ssh.encode(), 0o755)
         files["opt/slotserve/start.sh"] = (start.encode(), 0o755)
+        mounts.extend(m for m in sp.mounts if not any(m is x for x in mounts))  # storage hook
 
         if project is not None:
             network = project_network_name(project.id)
@@ -1118,7 +1132,7 @@ class DevEnvManager:
                 User="root",
                 WorkingDir="/" if s.kind == "shared" else "/workspace",
             )
-        return Plan(name, files, config, binds, digest, network, network_labels, web, keep)
+        return Plan(name, files, config, binds, digest, network, network_labels, web, keep, sp)
 
     @staticmethod
     def _web_spec(s: DevSession, template: DevTemplate | None) -> dict:
@@ -1268,6 +1282,11 @@ class DevEnvManager:
         if project is not None and await self._resume(db, s, project, plan, used):
             return
         await self._prepare_storage(s, plan)
+        if plan.storage is not None:  # storage hook: volumes and folders of managed storages
+            try:
+                await storage.prepare(self.docker, s.image, plan.storage, f"slotserve-prep-{s.id}")
+            except storage.StorageError as exc:
+                raise DevEnvError(exc.code, **exc.params) from exc
         lo, hi = parse_port_range(self.settings.devenv_ssh_ports)
         free = [p for p in range(lo, hi + 1) if p not in used]
         candidates = [p for p in free if p not in kept] + [p for p in free if p in kept]
@@ -1296,6 +1315,7 @@ class DevEnvManager:
                 project.container_devices = lane.gpu_indices if lane else ""
                 project.container_paths = project.persist_paths or ""
                 project.container_web = json.dumps(plan.web)
+                project.container_storage = plan.storage.signature if plan.storage else ""  # storage hook
                 project.state, project.last_used_at = "running", utcnow()
             self._running(s, cid, plan.name, port, plan.accounts_digest)
             await db.commit()
@@ -1328,6 +1348,8 @@ class DevEnvManager:
         same = (
             (project.container_devices or "") == devices
             and (project.container_paths or "") == (project.persist_paths or "")
+            # storage hook: the managed storage mounts are the same
+            and (project.container_storage or "") == (plan.storage.signature if plan.storage else "")
             and project.container_port is not None
             and project.container_port not in used
         )
@@ -1581,14 +1603,28 @@ class DevEnvManager:
             with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
                 await self.docker.remove(project.container_id)
         if data:
-            storage = self.settings.devenv_storage_dir.rstrip("/")
-            if storage:
-                image = project.image
-                if not await self.docker.image_exists(image):
-                    template = await db.get(DevTemplate, project.template_id) if project.template_id else None
-                    image = template.image if template else image
+            storage_dir = self.settings.devenv_storage_dir.rstrip("/")
+            # storage hook: the project storage of Admin -> Storage keeps the data under projects/p<id>
+            st = await storage.projects_storage(db, await db.get(User, project.owner_id))
+            image = project.image
+            if (storage_dir or st is not None) and not await self.docker.image_exists(image):
+                template = await db.get(DevTemplate, project.template_id) if project.template_id else None
+                image = template.image if template else image
+            if st is not None:
+                try:
+                    await storage.remove_folder(
+                        self.docker,
+                        st,
+                        self.settings.secret_key,
+                        image,
+                        f"projects/p{project.id}",
+                        f"slotserve-clean-p{project.id}-st{st.id}",
+                    )
+                except storage.StorageError as exc:
+                    raise DevEnvError(exc.code, **exc.params) from exc
+            if storage_dir:
                 script = f"rm -rf /slotserve-storage/projects/p{project.id}"
-                await self._helper(f"slotserve-clean-p{project.id}", image, storage, script)
+                await self._helper(f"slotserve-clean-p{project.id}", image, storage_dir, script)
             else:
                 for path in {*load_paths(project.persist_paths), *load_paths(project.container_paths)}:
                     with contextlib.suppress(DockerError, httpx.HTTPError, OSError):

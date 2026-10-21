@@ -156,6 +156,7 @@ class ScanResultOut(BaseModel):
 class DownloadCreateIn(BaseModel):
     url: str = Field(min_length=8, max_length=4000)
     filename: str | None = Field(default=None, max_length=255)
+    storage_id: int | None = None  # storage hook: a model library; None = the models directory
 
 
 class HfFileOut(BaseModel):
@@ -176,6 +177,7 @@ class HfDownloadIn(BaseModel):
     repo: str = Field(min_length=3, max_length=200, pattern=r"^[\w.\-]+/[\w.\-]+$")
     revision: str = Field(default="main", min_length=1, max_length=100)
     files: list[str] = Field(min_length=1, max_length=50)
+    storage_id: int | None = None  # storage hook: a model library; None = the models directory
 
 
 class DownloadOut(ORMModel):
@@ -190,6 +192,7 @@ class DownloadOut(ORMModel):
     speed_bps: float
     error: str | None
     model_id: int | None
+    storage_id: int | None = None  # storage hook
     created_at: datetime
     finished_at: datetime | None
 

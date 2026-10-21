@@ -1,3 +1,5 @@
+import { storageEn } from './storage' // storage hook
+
 export default {
   app: {
     tagline: 'GPU time slots for your models',
@@ -646,6 +648,7 @@ export default {
     tabs: {
       runtime: 'Runtime monitor',
       lanes: 'GPUs & lanes',
+      storage: 'Storage',
       requests: 'Requests',
       overview: 'Overview',
       users: 'Users',
@@ -865,7 +868,7 @@ export default {
       devenv_password_login: 'Password logins',
       devenv_password_login_desc: 'Let people log into environments with their environment password as well as SSH keys.',
       devenv_storage_dir: 'Storage directory',
-      devenv_storage_dir_desc: 'Directory on the Docker host for persistent data (bind mounts). Empty: Docker named volumes.',
+      devenv_storage_dir_desc: 'Directory on the Docker host for persistent data (bind mounts). Empty: Docker named volumes. Storages in Admin → Storage (personal spaces, project data) take precedence.',
       devenv_projects: 'Kept environments per person',
       devenv_projects_desc: 'How many environments one person can keep (paused between bookings). 0 turns keeping off.',
       devenv_project_days: 'Remove unused kept environments after',
@@ -1022,7 +1025,9 @@ export default {
     expired: 'Expired',
     cancelled: 'Cancelled',
   },
+  storage: storageEn.storage, // storage hook
   errors: {
+    ...storageEn.errors, // storage hook
     devenv_disabled: 'Dev environments are switched off.',
     ssh_key_required: 'Add an SSH public key under Access credentials first.',
     ssh_login_required: 'Add an SSH public key or set an environment password under Access credentials first.',

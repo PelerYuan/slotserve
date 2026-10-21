@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { NButton, NCheckbox, NInput, NInputNumber, NModal, NSelect, NSwitch, useDialog, useMessage } from 'naive-ui'
 import { ExternalLink, KeyRound, Plus, Terminal, Users } from 'lucide-vue-next'
 import CodeBlock from '@/components/CodeBlock.vue'
+import StorageInfo from '@/components/StorageInfo.vue' // storage hook
 import { api } from '@/api/client'
 import type { DevInfo, DevProject, DevSession, DevTemplate, DevWebKind, Reservation } from '@/api/types'
 import { session } from '@/composables/session'
@@ -549,6 +550,9 @@ const stateTone: Record<string, string> = {
         </article>
       </div>
     </section>
+
+    <!-- storage hook: storages from Admin -> Storage -->
+    <StorageInfo v-if="info?.enabled" />
 
     <!-- dialogs -->
     <NModal v-model:show="saveForm.open" preset="card" :title="t('devenv.save')" style="max-width: 460px">

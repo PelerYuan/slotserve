@@ -70,18 +70,20 @@ async def register_file(db: AsyncSession, path: Path, settings: Settings, create
 
 
 async def scan(db: AsyncSession, settings: Settings, created_by: int | None) -> tuple[list[str], int]:
+    from .storage import model_library_dirs  # storage hook: model libraries from Admin -> Storage
+
     added: list[str] = []
     skipped = 0
-    root = settings.models_dir
-    if not root.is_dir():
-        return added, skipped
-    for path in sorted(root.rglob("*.gguf")):
-        if not path.is_file() or not is_primary_gguf(path):
+    for root in [settings.models_dir, *await model_library_dirs(db)]:
+        if not root.is_dir():
             continue
-        model = await register_file(db, path, settings, created_by)
-        if model is None:
-            skipped += 1
-        else:
-            added.append(model.name)
+        for path in sorted(root.rglob("*.gguf")):
+            if not path.is_file() or not is_primary_gguf(path):
+                continue
+            model = await register_file(db, path, settings, created_by)
+            if model is None:
+                skipped += 1
+            else:
+                added.append(model.name)
     await db.commit()
     return added, skipped

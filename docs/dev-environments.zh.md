@@ -145,6 +145,8 @@ ssh -p 2205 alice@服务器
 
 ## 存储
 
+管理员可以在**管理 → 存储**中添加主机目录、NFS 导出和 SMB 共享，用作共享数据、个人空间（`/workspace`）、项目数据和模型库，详见[存储](storage.md)。下面说明的是没有添加存储时的情况。
+
 默认情况下，持久数据保存在 Docker 命名卷中：`/workspace` 使用 `slotserve-workspace-u<用户 ID>`，保留环境的目录使用 `slotserve-project<ID>-<路径>`，模板的保留目录使用 `slotserve-u<用户>-t<模板>-<路径>`，通道共享环境的主目录使用 `slotserve-idle-home-l<通道>`。
 
 把**存储目录**设为 Docker 主机上的某个目录（例如 `/srv/slotserve`）后，改用绑定挂载：
