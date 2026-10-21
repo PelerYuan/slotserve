@@ -237,7 +237,9 @@ async def test_usage_numbers_csv_and_scope(app, make_client, sampler):
     assert any(line.startswith("bob,1,1.0,2.0,0.07,30.0,9000,") for line in lines)
     csv = (await admin.get("/api/usage/export", params={"days": 7, "kind": "compute"})).text
     header, *lines = csv.lstrip("﻿").strip().splitlines()
-    assert header == ("date,node,lane,gpu,kind,user,gpu_hours,used_gpu_hours,avg_utilization_pct,peak_memory_mb,energy_wh")
+    assert header == (
+        "date,node,lane,gpu,kind,user,gpu_hours,used_gpu_hours,avg_utilization_pct,peak_memory_mb,energy_wh"
+    )
     gpu0 = next(line for line in lines if ",0,gpu,bob," in line)
     assert gpu0.endswith(",0.067,0.067,60.0,9000,6.7")
     assert any(",1,free,," in line for line in lines)

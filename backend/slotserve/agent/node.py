@@ -250,7 +250,11 @@ class NodeAgent:
                     self.last_error = f"certificate_mismatch: {exc}"
                     log.error("refusing to connect: %s", exc)
                 except Exception as exc:  # noqa: BLE001 - every failure means "try again later"
-                    if self.fatal_code is None:
+                    code = getattr(getattr(exc, "rcvd", None), "code", None)
+                    if code in p.FATAL_CLOSE_CODES and self.fatal_code is None:
+                        # refused before the hello was answered (e.g. rate limited right away)
+                        self._rejected(self._close_reason(code), getattr(exc.rcvd, "reason", "") or "")
+                    elif self.fatal_code is None:
                         self.last_error = f"{exc.__class__.__name__}: {exc}"
                         log.warning("connection to %s failed: %s", self.server, self.last_error)
                 finally:
@@ -349,16 +353,17 @@ class NodeAgent:
                     await peer.close()
             code = ws.close_code
             if code in p.FATAL_CLOSE_CODES and self.fatal_code is None:
-                self._rejected(
-                    {
-                        p.CLOSE_REVOKED: "revoked",
-                        p.CLOSE_PROTOCOL: "protocol_mismatch",
-                        p.CLOSE_RATE_LIMITED: "rate_limited",
-                    }.get(code, "invalid_token"),
-                    ws.close_reason or "",
-                )
+                self._rejected(self._close_reason(code), ws.close_reason or "")
             log.info("disconnected from %s (code %s)", self.server, code)
             return True
+
+    @staticmethod
+    def _close_reason(code: int) -> str:
+        return {
+            p.CLOSE_REVOKED: "revoked",
+            p.CLOSE_PROTOCOL: "protocol_mismatch",
+            p.CLOSE_RATE_LIMITED: "rate_limited",
+        }.get(code, "invalid_token")
 
     def _rejected(self, code: str, message: str) -> None:
         self.fatal_code = {
@@ -389,7 +394,11 @@ class NodeAgent:
 
     async def close(self) -> None:
         """Agent shutdown: stops downloads, and stops the model servers or keeps them (``agent_on_exit``)."""
-        self.request_stop()
+        self._stop.set()
+        ws = self._ws
+        if ws is not None:
+            with contextlib.suppress(Exception):
+                await asyncio.wait_for(ws.close(), 5)
         for task in list(self._background):
             task.cancel()
         await self.downloads.close()

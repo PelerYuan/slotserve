@@ -318,7 +318,8 @@ class ClusterHub:
         with contextlib.suppress(Exception):
             await websocket.send_text(p.encode(p.error(code, message)))
         with contextlib.suppress(Exception):
-            await websocket.close(close_code)
+            # the reason too: an agent may see the close before it reads the error frame
+            await websocket.close(close_code, reason=message.encode()[:120].decode(errors="ignore"))
 
     # ---- events from agents ---------------------------------------------------
 
