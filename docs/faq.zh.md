@@ -36,6 +36,8 @@ location / {
 
 然后设置 `SLOTSERVE_COOKIE_SECURE=true`。
 
+开发环境的网页界面使用第二个端口（8001）。请给它一个单独的地址，例如在 8443 端口再加一个 `server` 块，`proxy_pass http://127.0.0.1:8001;`，使用相同的请求头并开启 WebSocket 升级（`proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade";`），然后把 `SLOTSERVE_DEVENV_WEB_URL` 设为这个地址、`SLOTSERVE_PUBLIC_URL` 设为 SlotServe 的地址。
+
 **如何备份？**
 复制 `DATA_DIR`（里面有 `slotserve.db`）。模型在 `MODELS_DIR` 中，除了下载和显式删除外不会被改动。
 

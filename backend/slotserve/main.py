@@ -17,6 +17,7 @@ from .api import (
     calendar,
     channels,
     devenv,
+    devenv_ports,
     downloads,
     keys,
     lanes,
@@ -30,7 +31,8 @@ from .api import (
     waitlist,
 )
 from .config import Settings, get_settings
-from .gateway import devenv_web, proxy
+from .gateway import devenv_web, devenv_web_app, proxy
+from .gateway.devenv_web_auth import WebOriginGuard
 from .runtime.lanes import LaneManager, ensure_default_lane
 from .services import app_settings
 from .services.chat.hub import ChannelHub
@@ -85,6 +87,11 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
             await seed_templates(session)
         app.state.devenv = DevEnvManager(app.state, docker=getattr(app.state, "docker_client", None))
         app.state.lanes.gpu_holder = app.state.devenv.holds_gpu
+        # [web origin] dev environment web interfaces on their own port (gateway/devenv_web_app.py)
+        app.state.web_app = devenv_web_app.create_web_app(app.state)
+        web_listener = None
+        if start_background and settings.devenv_web_port:
+            web_listener = await devenv_web_app.start(app.state.web_app, settings.host, settings.devenv_web_port)
         transports = dict(getattr(app.state, "chat_transports", None) or {})
         transports.setdefault("telegram", getattr(app.state, "telegram_transport", None))
         app.state.channels = ChannelHub(app, transports)
@@ -110,6 +117,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
             for t in tasks:
                 with contextlib.suppress(asyncio.CancelledError):
                     await t
+            await devenv_web_app.stop(web_listener)
             await app.state.notifier.save_pending()
             await app.state.lanes.shutdown()
             await app.state.channels.close()
@@ -133,6 +141,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         same_site="lax",
         https_only=settings.cookie_secure,
     )
+    app.add_middleware(WebOriginGuard, settings=settings)  # [web origin] pages there cannot change things here
     for module in (
         auth,
         notifications,
@@ -153,6 +162,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
     ):
         app.include_router(module.router)
     app.include_router(devenv.keys_router)
+    app.include_router(devenv_ports.router)
     app.include_router(proxy.router)
     app.include_router(devenv_web.router)
 

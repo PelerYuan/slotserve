@@ -65,7 +65,9 @@ async def test_web_templates_containers_and_networks(app, make_client):
     _admin, bob = await _setup(app, make_client)
     await bob.post("/api/ssh-keys", json={"public_key": ed25519_key()})
     templates = await _templates(bob)
-    assert templates["jupyter-pytorch"]["web_ports"] == [{"name": "JupyterLab", "port": 8888, "kind": "jupyter"}]
+    assert templates["jupyter-pytorch"]["web_ports"] == [
+        {"name": "JupyterLab", "port": 8888, "kind": "jupyter", "mode": "login"}
+    ]
     assert templates["desktop"]["keep_entrypoint"] and templates["desktop"]["web_ports"][0]["kind"] == "desktop"
     assert templates["vscode"]["web_ports"][0]["port"] == 8080 and templates["pytorch"]["web_ports"] == []
 
@@ -78,7 +80,10 @@ async def test_web_templates_containers_and_networks(app, make_client):
     r = await bob.post("/api/devenv/templates", json=body([{"port": 80}, {"port": 80, "name": "again"}]))
     assert r.status_code == 400 and r.json()["detail"]["code"] == "devenv_web_port_duplicate"
     mine = (await bob.post("/api/devenv/templates", json=body([{"port": 7860}]))).json()
-    assert mine["web_ports"] == [{"name": "7860", "port": 7860, "kind": "http"}] and not mine["keep_entrypoint"]
+    assert (
+        mine["web_ports"] == [{"name": "7860", "port": 7860, "kind": "http", "mode": "login"}]
+        and not mine["keep_entrypoint"]
+    )
     patched = (await bob.patch(f"/api/devenv/templates/{mine['id']}", json={"web_ports": []})).json()
     assert patched["web_ports"] == []
 

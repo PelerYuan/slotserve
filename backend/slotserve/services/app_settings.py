@@ -49,6 +49,12 @@ EDITABLE: dict[str, Editable] = {
     "devenv_storage_dir": Editable(str, max=500),
     "devenv_projects": Editable(int, min=0, max=100),
     "devenv_project_days": Editable(int, min=0, max=3650, unit="d"),
+    # direct ports and the web origin of environments (services/devenv_ports.py, gateway/devenv_web_auth.py)
+    "devenv_public_ports_enabled": Editable(bool),
+    "devenv_public_ports": Editable(str, min=1, max=32),
+    "devenv_public_port_limit": Editable(int, min=0, max=1000),
+    "devenv_forwarder_image": Editable(str, min=1, max=255),
+    "devenv_web_url": Editable(str, max=300),
     "invite_code": Editable(str, min=1, max=128, secret=True),
     "max_reservation_hours": Editable(int, min=1, max=24 * 7, unit="h"),
     "max_advance_days": Editable(int, min=1, max=365, unit="d"),
@@ -156,7 +162,7 @@ def validate(key: str, value: Any) -> Any:
             split_args(value)
         except ValueError as exc:
             raise InvalidSetting(key, str(exc)) from exc
-    if key == "devenv_ssh_ports":
+    if key in ("devenv_ssh_ports", "devenv_public_ports"):
         from .devenv import parse_port_range
 
         try:
@@ -190,7 +196,12 @@ def validate(key: str, value: Any) -> Any:
         value = value.rstrip("/")
     elif key == "wecom_aes_key" and value and len(value) != 43:
         raise InvalidSetting(key, "must be 43 characters")
-    elif key in ("public_url", "hf_endpoint", "telegram_proxy") and value:
+    elif key == "devenv_forwarder_image":
+        from .devenv import IMAGE_RE
+
+        if not IMAGE_RE.match(value):
+            raise InvalidSetting(key, "expected an image reference")
+    elif key in ("public_url", "hf_endpoint", "telegram_proxy", "devenv_web_url") and value:
         if not value.lower().startswith(("http://", "https://", "socks5://", "socks5h://")):
             raise InvalidSetting(key, "expected a URL")
         value = value.rstrip("/")

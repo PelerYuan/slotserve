@@ -38,8 +38,13 @@ async function submit() {
       mode.value === 'login'
         ? await api.login(form.username.trim(), form.password)
         : await api.register(form.username.trim(), form.password, form.invite.trim())
-    const next = typeof route.query.next === 'string' && route.query.next.startsWith('/') ? route.query.next : '/'
-    router.replace(next)
+    const next =
+      typeof route.query.next === 'string' && route.query.next.startsWith('/') && !route.query.next.startsWith('//')
+        ? route.query.next
+        : '/'
+    // a dev environment's web interface is served by the server (it hands over to the web port), not the app
+    if (/^\/devenv\/\d+\/port\//.test(next)) window.location.assign(next)
+    else router.replace(next)
   } catch (e) {
     error.value = describe(e)
     shake.value++

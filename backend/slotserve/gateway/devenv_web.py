@@ -5,7 +5,12 @@ Any port of a running environment can be opened; the ports a template declares c
 VS Code, http) that decides whether the app gets the full path and which token is added. Upstream addresses come
 from ``DevEnvManager.port_target(session, port)`` only.
 
-Only people signed in to SlotServe who may use the environment get through. SlotServe's own session cookie is
+These routes are served by the web listener on its own port (``devenv_web_port``, see ``devenv_web_auth.py`` and
+``devenv_web_app.py``), so pages in environments are a different origin than SlotServe; there people are recognized
+by a per-environment cookie handed over from SlotServe. On SlotServe's own port the same paths only sign people in
+and redirect there (or, with ``devenv_web_port`` 0, are served as before).
+
+Only people signed in to SlotServe who may use the environment get through. SlotServe's own cookies are
 never passed on, and where the app supports it the proxy adds the environment's random token
 (JupyterLab: ``Authorization: token ...``, the desktop: HTTP basic auth), so other containers or people on the host
 cannot use the app without going through SlotServe.
@@ -32,12 +37,13 @@ from ..db import SessionLocal
 from ..deps import SESSION_USER_KEY
 from ..orm import DevSession, User
 from ..services.devenv import can_access, port_entry, session_web, web_base
+from . import devenv_web_auth as web_auth
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["devenv"], include_in_schema=False)
 
 METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-SESSION_COOKIE = "slotserve_session"
+SESSION_COOKIE = web_auth.SESSION_COOKIE
 HOP_BY_HOP = {
     "connection",
     "keep-alive",
@@ -85,27 +91,56 @@ class Target:
         return urlsplit(self.base).netloc
 
 
-async def _target(app, scope_session: dict, session_id: int, port: int) -> Target:
-    """Where a request for one of a session's ports goes, after checking who is asking."""
-    uid = scope_session.get(SESSION_USER_KEY)
+def _listener(conn) -> bool:
+    """Whether this is the web listener (its own origin) rather than SlotServe's own app."""
+    return bool(getattr(conn.app.state, "web_listener", False))
+
+
+def _separate(conn) -> bool:
+    """SlotServe's own app, while web interfaces are served on the web listener: only sign in and redirect."""
+    return not _listener(conn) and bool(conn.app.state.settings.devenv_web_port)
+
+
+def _uid(conn, session_id: int) -> int | None:
+    if _listener(conn):
+        return web_auth.cookie_user(conn.app.state.settings, conn.cookies, session_id)
+    return conn.session.get(SESSION_USER_KEY)
+
+
+async def _session_for(db, session_id: int, uid: int | None) -> DevSession:
+    """The session a path names, if the person may use it (a kept environment's container keeps the paths of the
+    booking that created it, so they reach the running session)."""
     if uid is None:
         raise Denied(401, "not_authenticated")
+    user = await db.get(User, uid)
+    if user is None or user.disabled_at is not None:
+        raise Denied(401, "not_authenticated")
+    s = await db.get(DevSession, session_id)
+    if s is not None and s.state != "running" and s.project_id:
+        current = (
+            await db.execute(
+                select(DevSession).where(DevSession.project_id == s.project_id, DevSession.state == "running")
+            )
+        ).scalar()
+        if current is not None and (session_web(current) or {}).get("base_session") == s.id:
+            s = current
+    if s is None or not can_access(s, user):
+        raise Denied(404, "not_found")
+    return s
+
+
+def _other_environment(conn, session_id: int) -> bool:
+    """A page of one environment asking for another one's (they share the web listener's origin)."""
+    if conn.headers.get("sec-fetch-site") != "same-origin":
+        return False
+    m = re.match(r"^/devenv/(\d+)/", urlsplit(conn.headers.get("referer", "")).path)
+    return m is not None and int(m.group(1)) != session_id
+
+
+async def _target(app, uid: int | None, session_id: int, port: int) -> Target:
+    """Where a request for one of a session's ports goes, after checking who is asking."""
     async with SessionLocal() as db:
-        user = await db.get(User, uid)
-        if user is None or user.disabled_at is not None:
-            raise Denied(401, "not_authenticated")
-        s = await db.get(DevSession, session_id)
-        if s is not None and s.state != "running" and s.project_id:
-            # a kept environment's container keeps the paths of the booking that created it
-            current = (
-                await db.execute(
-                    select(DevSession).where(DevSession.project_id == s.project_id, DevSession.state == "running")
-                )
-            ).scalar()
-            if current is not None and (session_web(current) or {}).get("base_session") == s.id:
-                s = current
-        if s is None or not can_access(s, user):
-            raise Denied(404, "not_found")
+        s = await _session_for(db, session_id, uid)
     web = session_web(s)
     base = app.state.devenv.port_target(s, port) if s.state == "running" else None
     if not base:
@@ -135,7 +170,7 @@ def _auth_header(t: Target) -> str | None:
 def _cookies_without_ours(header: str | None) -> str | None:
     if not header:
         return None
-    kept = [c.strip() for c in header.split(";") if c.strip() and c.split("=", 1)[0].strip() != SESSION_COOKIE]
+    kept = [c.strip() for c in header.split(";") if c.strip() and not web_auth.is_ours(c.split("=", 1)[0])]
     return "; ".join(kept) or None
 
 
@@ -175,7 +210,7 @@ def _rewrite_location(value: str, t: Target) -> str:
 
 def _rewrite_cookie(value: str, t: Target) -> str | None:
     """Cookies stay inside the port's path; nobody gets to set SlotServe's own."""
-    if value.split("=", 1)[0].strip() == SESSION_COOKIE:
+    if web_auth.is_ours(value.split("=", 1)[0]):
         return None
     m = COOKIE_PATH.search(value)
     path = m.group(0).split("=", 1)[1].strip() if m else "/"
@@ -186,18 +221,30 @@ def _rewrite_cookie(value: str, t: Target) -> str | None:
 
 
 def _denied_http(request: Request, exc: Denied) -> Response:
-    if exc.status == 401 and request.method == "GET" and "text/html" in request.headers.get("accept", ""):
+    html = "text/html" in request.headers.get("accept", "")
+    if exc.status == 401 and request.method == "GET" and html:
+        if _listener(request):
+            # sign in on SlotServe, which hands the person back with a token
+            query = f"?{request.url.query}" if request.url.query else ""
+            back = web_auth.main_origin(request.app.state.settings, request.url) + quote(request.url.path, safe="/")
+            return RedirectResponse(back + query, status_code=302)
         return RedirectResponse(f"/login?next={quote(request.url.path, safe='/')}", status_code=302)
-    if exc.status == 503 and "text/html" in request.headers.get("accept", ""):
-        return HTMLResponse(_page("This environment is not running."), status_code=503)
+    if exc.status == 503 and html:
+        return HTMLResponse(_page("This environment is not running.", _home(request)), status_code=503)
     return JSONResponse({"detail": {"code": exc.code}}, status_code=exc.status)
 
 
-def _page(text: str) -> str:
+def _home(conn) -> str:
+    if _listener(conn):
+        return web_auth.main_origin(conn.app.state.settings, conn.url) + "/devenv"
+    return "/devenv"
+
+
+def _page(text: str, home: str = "/devenv") -> str:
     return (
         "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'>"
         "<title>SlotServe</title><body style='font-family:system-ui,sans-serif;padding:40px;color:#444'>"
-        f"<p>{escape(text)}</p><p><a href='/devenv'>Dev environments</a></p>"
+        f"<p>{escape(text)}</p><p><a href='{escape(home)}'>Dev environments</a></p>"
     )
 
 
@@ -211,10 +258,30 @@ async def port_root(session_id: int, port: int, request: Request):
     return RedirectResponse(web_base(session_id, port) + query, status_code=307)
 
 
+async def _handover(request: Request, session_id: int) -> Response:
+    """SlotServe's own app: checks the person and sends them to the web listener with a one-time token."""
+    settings = request.app.state.settings
+    if request.method not in ("GET", "HEAD"):
+        return JSONResponse({"detail": {"code": "devenv_web_moved"}}, status_code=404)
+    try:
+        async with SessionLocal() as db:
+            await _session_for(db, session_id, request.session.get(SESSION_USER_KEY))
+    except Denied as exc:
+        return _denied_http(request, exc)
+    target = _raw_path(request.scope, request.url.path) + (f"?{request.url.query}" if request.url.query else "")
+    token = web_auth.handovers.issue(settings, request.session[SESSION_USER_KEY], session_id, target)
+    url = web_auth.web_origin(settings, request.url) + web_auth.ENTER_PATH + "?token=" + quote(token, safe="")
+    return RedirectResponse(url, status_code=302, headers={"cache-control": "no-store"})
+
+
 @router.api_route("/devenv/{session_id:int}/port/{port:int}/{path:path}", methods=METHODS)
 async def port_http(session_id: int, port: int, path: str, request: Request):
+    if _separate(request):
+        return await _handover(request, session_id)
+    if _listener(request) and _other_environment(request, session_id):
+        return JSONResponse({"detail": {"code": "devenv_web_cross_environment"}}, status_code=403)
     try:
-        t = await _target(request.app, request.session, session_id, port)
+        t = await _target(request.app, _uid(request, session_id), session_id, port)
     except Denied as exc:
         return _denied_http(request, exc)
     url = t.base + _upstream_path(_raw_path(request.scope, request.url.path), t)
@@ -239,7 +306,9 @@ async def port_http(session_id: int, port: int, path: str, request: Request):
         log.info("dev environment %s port %s unreachable: %s", session_id, port, exc)
         if "text/html" in request.headers.get("accept", ""):
             return HTMLResponse(
-                _page(f"Nothing answers on port {port} yet. It may still be starting; reload in a moment."),
+                _page(
+                    f"Nothing answers on port {port} yet. It may still be starting; reload in a moment.", _home(request)
+                ),
                 status_code=502,
             )
         return JSONResponse({"detail": {"code": "devenv_web_unreachable"}}, status_code=502)
@@ -263,8 +332,11 @@ async def port_http(session_id: int, port: int, path: str, request: Request):
 
 @router.websocket("/devenv/{session_id:int}/port/{port:int}/{path:path}")
 async def port_socket(websocket: WebSocket, session_id: int, port: int, path: str):
+    if _separate(websocket) or (_listener(websocket) and _other_environment(websocket, session_id)):
+        await websocket.close(code=1008)
+        return
     try:
-        t = await _target(websocket.app, websocket.session, session_id, port)
+        t = await _target(websocket.app, _uid(websocket, session_id), session_id, port)
     except Denied:
         await websocket.close(code=1008)
         return
@@ -323,3 +395,36 @@ async def port_socket(websocket: WebSocket, session_id: int, port: int, path: st
         with contextlib.suppress(RuntimeError, WebSocketDisconnect):
             code = upstream.close_code if upstream.close_code and upstream.close_code < 5000 else 1000
             await websocket.close(code=code if code not in (1005, 1006) else 1000)
+
+
+# ---- the web listener's own routes (devenv_web_app.py) ---------------------------------------------------------
+
+enter_router = APIRouter(include_in_schema=False)
+
+
+@enter_router.get(web_auth.ENTER_PATH)
+async def enter(request: Request, token: str = ""):
+    """Turns a one-time token from SlotServe into the environment's cookie, then opens the page."""
+    settings = request.app.state.settings
+    data = web_auth.handovers.redeem(settings, token)
+    if data is None:
+        return HTMLResponse(
+            _page("This link has expired. Open the environment again.", _home(request)), status_code=400
+        )
+    sid = int(data["s"])
+    response = RedirectResponse(data["n"], status_code=302, headers={"cache-control": "no-store"})
+    response.set_cookie(
+        web_auth.cookie_name(sid),
+        web_auth.cookie_value(settings, int(data["u"]), sid),
+        max_age=web_auth.COOKIE_SECONDS,
+        path=web_auth.cookie_path(sid),
+        httponly=True,
+        samesite="lax",
+        secure=bool(settings.cookie_secure),
+    )
+    return response
+
+
+@enter_router.get("/")
+async def web_root(request: Request):
+    return RedirectResponse(_home(request), status_code=302)

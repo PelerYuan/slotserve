@@ -408,6 +408,8 @@ export interface DevWebPort {
   name: string
   port: number
   kind: DevWebKind
+  /** login: through SlotServe's proxy (default); direct: published on a host port (see ./devenvPorts.ts) */
+  mode?: 'login' | 'direct'
 }
 
 export interface DevTemplate {

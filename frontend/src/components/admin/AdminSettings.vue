@@ -67,6 +67,11 @@ const GROUPS: { id: string; keys: string[] }[] = [
       'devenv_storage_dir',
       'devenv_projects',
       'devenv_project_days',
+      'devenv_public_ports_enabled',
+      'devenv_public_ports',
+      'devenv_public_port_limit',
+      'devenv_forwarder_image',
+      'devenv_web_url',
     ],
   },
   {
