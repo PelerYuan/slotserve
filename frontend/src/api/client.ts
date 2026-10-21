@@ -29,6 +29,7 @@ import type {
   Status,
   TelegramInfo,
   Usage,
+  UsageExport,
   User,
   WaitlistEntry,
 } from './types'
@@ -179,10 +180,10 @@ export const api = {
   leaveWaitlist: (id: number) => request<void>('DELETE', `/api/waitlist/${id}`),
 
   // usage
-  usage: (days: number) =>
-    request<Usage>('GET', '/api/usage', undefined, { days, tz_offset: -new Date().getTimezoneOffset() }),
-  usageExportUrl: (days: number, kind: 'summary' | 'requests') =>
-    `/api/usage/export?days=${days}&kind=${kind}&tz_offset=${-new Date().getTimezoneOffset()}`,
+  usage: (days: number, scope: 'all' | 'mine' = 'all') =>
+    request<Usage>('GET', '/api/usage', undefined, { days, scope, tz_offset: -new Date().getTimezoneOffset() }),
+  usageExportUrl: (days: number, kind: UsageExport, scope: 'all' | 'mine' = 'all') =>
+    `/api/usage/export?days=${days}&kind=${kind}&scope=${scope}&tz_offset=${-new Date().getTimezoneOffset()}`,
 
   // dev environments
   devenv: {

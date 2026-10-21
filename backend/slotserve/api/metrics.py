@@ -6,11 +6,11 @@ from sqlalchemy import func, select
 
 from ..config import get_settings
 from ..db import SessionLocal, utcnow
-from ..orm import DownloadTask, LlmModel, ModelLoadEvent, Reservation, UsageDaily, UsageLog, User
+from ..orm import DownloadTask, Lane, LlmModel, ModelLoadEvent, Reservation, UsageDaily, UsageLog, UsageSample, User
 from ..runtime.gpu import gpu_stats
 from ..runtime.manager import RuntimeState
 from ..security import constant_time_equals
-from ..services import queries
+from ..services import queries, usage_sampler
 
 router = APIRouter(tags=["metrics"])
 
@@ -143,7 +143,14 @@ async def metrics(request: Request):
         ).scalar_one()
         w.metric("slotserve_downloads_pending", "gauge", "Downloads queued or running.", [({}, queued)])
 
-    gpus = await gpu_stats()
+        sampler = getattr(request.app.state, "usage_sampler", None)
+        gpus = await sampler.stats() if sampler is not None else await gpu_stats()
+        await _compute_metrics(w, db, lanes, users, gpus, sampler, now)
+
+    lane_of: dict[int, str] = {}
+    for ctx in lanes:
+        for g in usage_sampler.lane_gpus(ctx.devices, gpus):
+            lane_of.setdefault(g.index, ctx.name)
     for name, help_text, attr, scale in (
         ("slotserve_gpu_memory_used_bytes", "GPU memory in use.", "memory_used_mb", 1024 * 1024),
         ("slotserve_gpu_memory_total_bytes", "GPU memory size.", "memory_total_mb", 1024 * 1024),
@@ -152,9 +159,85 @@ async def metrics(request: Request):
         ("slotserve_gpu_power_watts", "GPU power draw.", "power_w", 1),
     ):
         samples = [
-            ({"gpu": g.index, "name": g.name}, round(getattr(g, attr) * scale, 3))
+            ({"gpu": g.index, "name": g.name, "lane": lane_of.get(g.index, "")}, round(getattr(g, attr) * scale, 3))
             for g in gpus
             if getattr(g, attr) is not None
         ]
         w.metric(name, "gauge", help_text, samples)
     return PlainTextResponse(w.text(), media_type="text/plain; version=0.0.4; charset=utf-8")
+
+
+async def _compute_metrics(w: _Writer, db, lanes, users: dict[int, str], gpus, sampler, now) -> None:
+    """Who holds each lane now, booked GPU-hours, and the sampled GPU time, busy time and energy."""
+    occupants = []
+    for ctx in lanes:
+        occ = await usage_sampler.attribute(db, ctx, now, sampler.probes if sampler is not None else ())
+        user = users.get(occ.user_id, "?") if occ.user_id is not None else ""
+        occupants.append(({"lane": ctx.name, "kind": occ.kind, "user": user}, 1))
+    w.metric(
+        "slotserve_lane_occupant",
+        "gauge",
+        "What each lane is doing now (kind: model, gpu, devenv, idle_model, idle_devenv, free); value is always 1.",
+        occupants,
+    )
+
+    lane_rows = list((await db.execute(select(Lane))).scalars())
+    names = {lane.id: lane.name for lane in lane_rows}
+    sizes = {lane.id: usage_sampler.gpu_count(lane.devices, len(gpus)) for lane in lane_rows}
+    booked: dict[tuple[str, str, str], float] = {}
+    rows = await db.execute(select(Reservation).where(Reservation.status == "booked", Reservation.start_at < now))
+    for r in rows.scalars():
+        key = (users.get(r.user_id, "?"), names.get(r.lane_id, "?"), usage_sampler.booking_kind(r))
+        hours = (min(r.end_at, now) - r.start_at).total_seconds() / 3600 * sizes.get(r.lane_id, 1)
+        booked[key] = booked.get(key, 0.0) + hours
+    w.metric(
+        "slotserve_booked_gpu_hours_total",
+        "counter",
+        "Booked GPU-hours that have elapsed (booked time x GPUs of the lane).",
+        [({"user": u, "lane": lane, "kind": k}, round(v, 4)) for (u, lane, k), v in sorted(booked.items())],
+    )
+
+    sampled = (
+        await db.execute(
+            select(
+                UsageSample.lane_id,
+                UsageSample.gpu_index,
+                UsageSample.kind,
+                func.sum(UsageSample.seconds),
+                func.sum(UsageSample.busy_seconds),
+                func.sum(UsageSample.energy_wh),
+            )
+            .where(UsageSample.resource == "gpu")
+            .group_by(UsageSample.lane_id, UsageSample.gpu_index, UsageSample.kind)
+        )
+    ).all()
+    seconds, busy, energy = [], [], {}
+    for lane_id, gpu, kind, sec, busy_sec, wh in sampled:
+        labels = {"lane": names.get(lane_id, "?"), "gpu": "" if gpu < 0 else gpu, "kind": kind}
+        seconds.append((labels, int(sec or 0)))
+        busy.append((labels, int(busy_sec or 0)))
+        key = (labels["lane"], labels["gpu"])
+        energy[key] = energy.get(key, 0.0) + float(wh or 0)
+    w.metric("slotserve_gpu_seconds_total", "counter", "Sampled GPU time by what the GPU was doing.", seconds)
+    w.metric("slotserve_gpu_busy_seconds_total", "counter", "Sampled GPU time at or above the busy threshold.", busy)
+    w.metric(
+        "slotserve_gpu_energy_joules_total",
+        "counter",
+        "Energy drawn by the GPU, from sampled power.",
+        [({"lane": lane, "gpu": g}, round(wh * 3600, 1)) for (lane, g), wh in sorted(energy.items(), key=str)],
+    )
+    per_user = (
+        await db.execute(
+            select(
+                UsageSample.user_id, UsageSample.kind, func.sum(UsageSample.seconds), func.sum(UsageSample.busy_seconds)
+            )
+            .where(UsageSample.user_id.is_not(None), UsageSample.resource == "gpu")
+            .group_by(UsageSample.user_id, UsageSample.kind)
+        )
+    ).all()
+    w.metric(
+        "slotserve_user_gpu_busy_seconds_total",
+        "counter",
+        "Sampled GPU time at or above the busy threshold during each person's bookings.",
+        [({"user": users.get(uid, "?"), "kind": k}, int(b or 0)) for uid, k, _s, b in per_user],
+    )

@@ -75,6 +75,8 @@ EDITABLE: dict[str, Editable] = {
     "metrics_token": Editable(str, max=200, secret=True),
     "drain_seconds": Editable(int, min=0, max=600, unit="s"),
     "usage_retention_days": Editable(int, min=0, max=3650, unit="d"),
+    "usage_sample_days": Editable(int, min=0, max=3650, unit="d"),
+    "usage_busy_percent": Editable(int, min=1, max=100, unit="%"),
     "audit_retention_days": Editable(int, min=0, max=3650, unit="d"),
     "backup_keep": Editable(int, min=0, max=100),
 }

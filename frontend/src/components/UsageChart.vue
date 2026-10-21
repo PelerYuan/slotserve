@@ -2,11 +2,17 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { formatCompact, formatNumber } from '@/utils/format'
 
-/** Stacked daily columns: one segment per series (person). */
-const props = defineProps<{
-  days: string[] // YYYY-MM-DD, oldest first
-  series: { name: string; color: string; values: number[] }[]
-}>()
+/** Stacked columns over time buckets: one segment per series (a person, a kind, ...). */
+const props = withDefaults(
+  defineProps<{
+    labels: string[] // local bucket starts, YYYY-MM-DD or YYYY-MM-DDTHH:MM, oldest first
+    series: { name: string; color: string; values: number[] }[]
+    format?: (v: number) => string
+    axisFormat?: (v: number) => string
+    label?: string
+  }>(),
+  { format: formatNumber, axisFormat: formatCompact, label: 'Usage over time' },
+)
 
 const wrap = ref<HTMLElement | null>(null)
 const width = ref(720)
@@ -20,7 +26,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => ro?.disconnect())
 
-const totals = computed(() => props.days.map((_, i) => props.series.reduce((s, x) => s + (x.values[i] ?? 0), 0)))
+const totals = computed(() => props.labels.map((_, i) => props.series.reduce((s, x) => s + (x.values[i] ?? 0), 0)))
 
 function niceMax(v: number) {
   if (v <= 0) return 10
@@ -33,13 +39,13 @@ const yMax = computed(() => niceMax(Math.max(...totals.value, 0)))
 const ticks = computed(() => [0, 0.25, 0.5, 0.75, 1].map((f) => f * yMax.value))
 const plotW = computed(() => width.value - PAD.left - PAD.right)
 const plotH = HEIGHT - PAD.top - PAD.bottom
-const band = computed(() => plotW.value / Math.max(1, props.days.length))
+const band = computed(() => plotW.value / Math.max(1, props.labels.length))
 const barW = computed(() => Math.min(24, Math.max(3, band.value * 0.62)))
 const y = (v: number) => PAD.top + plotH - (v / yMax.value) * plotH
 
 const GAP = 2
 const columns = computed(() =>
-  props.days.map((day, i) => {
+  props.labels.map((day, i) => {
     const x = PAD.left + i * band.value + (band.value - barW.value) / 2
     let acc = 0
     const segs: { color: string; y: number; h: number; top: boolean }[] = []
@@ -55,10 +61,15 @@ const columns = computed(() =>
   }),
 )
 
-const labelEvery = computed(() => Math.max(1, Math.ceil(props.days.length / Math.floor(plotW.value / 64))))
+const labelEvery = computed(() => Math.max(1, Math.ceil(props.labels.length / Math.floor(plotW.value / 64))))
 function dayLabel(d: string) {
-  const [, m, dd] = d.split('-')
-  return `${Number(m)}/${Number(dd)}`
+  const [date, time] = d.split('T')
+  const [, m, dd] = date.split('-')
+  const day = `${Number(m)}/${Number(dd)}`
+  return time && time !== '00:00' ? time.slice(0, 2) + 'h' : day
+}
+function fullLabel(d: string) {
+  return d.replace('T00:00', '').replace('T', ' ')
 }
 
 function segPath(x: number, w: number, top: number, h: number, round: boolean) {
@@ -74,7 +85,7 @@ const tip = computed(() => {
   const left = Math.min(Math.max(col.x + barW.value / 2, 90), width.value - 90)
   return {
     left,
-    day: props.days[i],
+    day: fullLabel(props.labels[i]),
     total: totals.value[i],
     rows: props.series.map((s) => ({ name: s.name, color: s.color, v: s.values[i] ?? 0 })).filter((r) => r.v > 0),
   }
@@ -83,11 +94,11 @@ const tip = computed(() => {
 
 <template>
   <div ref="wrap" class="chart" @mouseleave="hover = null">
-    <svg :width="width" :height="HEIGHT" role="img" aria-label="Tokens per day">
+    <svg :width="width" :height="HEIGHT" role="img" :aria-label="label">
       <g class="gridlines">
         <g v-for="tk in ticks" :key="tk">
           <line :x1="PAD.left" :x2="width - PAD.right" :y1="y(tk)" :y2="y(tk)" />
-          <text :x="PAD.left - 8" :y="y(tk) + 4" text-anchor="end">{{ formatCompact(tk) }}</text>
+          <text :x="PAD.left - 8" :y="y(tk) + 4" text-anchor="end">{{ axisFormat(tk) }}</text>
         </g>
       </g>
       <g v-for="c in columns" :key="c.day">
@@ -117,12 +128,12 @@ const tip = computed(() => {
         <span class="sw" :style="{ background: r.color }" />
         <span>{{ r.name }}</span>
         <span class="spacer" />
-        <span class="num">{{ formatNumber(r.v) }}</span>
+        <span class="num">{{ format(r.v) }}</span>
       </div>
       <div class="tip-row total">
         <span>Σ</span>
         <span class="spacer" />
-        <span class="num">{{ formatNumber(tip.total) }}</span>
+        <span class="num">{{ format(tip.total) }}</span>
       </div>
     </div>
   </div>

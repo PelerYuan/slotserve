@@ -76,6 +76,10 @@ class Settings(BaseSettings):
 
     # Housekeeping: 0 keeps forever / disables.
     usage_retention_days: int = 365
+    # GPU samples (one per GPU and minute) are folded into hourly totals after this many days.
+    usage_sample_days: int = 30
+    # A GPU counts as "in use" in a minute when its utilization is at least this high.
+    usage_busy_percent: int = 10
     audit_retention_days: int = 730
     backup_keep: int = 7
 

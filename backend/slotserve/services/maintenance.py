@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings
 from ..orm import AuditLog, DownloadTask, ModelLoadEvent, UsageDaily, UsageLog, WaitlistEntry
+from . import usage_sampler
 
 log = logging.getLogger(__name__)
 
@@ -119,6 +120,7 @@ async def apply_retention(db: AsyncSession, settings: Settings, now: datetime) -
             existing.duration_ms += ms
         result = await db.execute(delete(UsageLog).where(UsageLog.created_at < cutoff))
         stats["usage_rows"] = result.rowcount or 0
+    stats["usage_samples"] = await usage_sampler.roll_up(db, settings.usage_sample_days, now)
     if settings.audit_retention_days > 0:
         cutoff = now - timedelta(days=settings.audit_retention_days)
         result = await db.execute(delete(AuditLog).where(AuditLog.created_at < cutoff))

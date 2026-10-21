@@ -513,7 +513,64 @@ class UsageUserRow(BaseModel):
     requests: int
     prompt_tokens: int
     completion_tokens: int
-    reserved_hours: float
+    reserved_hours: float  # calendar hours booked
+    bookings: int = 0
+    booked_gpu_hours: float = 0.0  # booked hours x GPUs of the lane
+    used_gpu_hours: float = 0.0  # sampled GPU time at or above the busy threshold
+    avg_utilization: float | None = None  # % during their bookings; None without GPU metrics
+    peak_memory_mb: int | None = None
+    energy_wh: float = 0.0
+    cpu_core_hours: float = 0.0  # CPU-only environments (resource "cpu")
+
+
+class UsageTotals(BaseModel):
+    booked_gpu_hours: float
+    used_gpu_hours: float
+    sampled_gpu_hours: float
+    avg_utilization: float | None
+    energy_wh: float
+    peak_memory_mb: int | None
+    requests: int
+    tokens: int
+    cpu_core_hours: float = 0.0
+
+
+class UsageLaneRow(BaseModel):
+    lane_id: int | None
+    lane_name: str
+    gpus: int
+    booked_gpu_hours: float
+    used_gpu_hours: float
+    avg_utilization: float | None
+    energy_wh: float
+    peak_memory_mb: int | None
+    occupancy: dict[str, float]  # kind -> sampled GPU-hours
+
+
+class UsageGpuRow(BaseModel):
+    lane_id: int | None
+    lane_name: str
+    gpu_index: int  # -1: the lane has no GPU metrics
+    gpu_hours: float
+    used_gpu_hours: float
+    avg_utilization: float | None
+    energy_wh: float
+    peak_memory_mb: int | None
+    memory_total_mb: int | None
+
+
+class UsageKindRow(BaseModel):
+    kind: str
+    gpu_hours: float
+    used_gpu_hours: float
+    avg_utilization: float | None
+    energy_wh: float
+
+
+class UsageSeries(BaseModel):
+    key: str
+    name: str
+    values: list[float | None]
 
 
 class UsageModelRow(BaseModel):
@@ -535,6 +592,19 @@ class UsageOut(BaseModel):
     users: list[UsageUserRow]
     models: list[UsageModelRow]
     daily: list[UsageDayRow]
+    scope: str = "all"  # all | mine
+    busy_percent: int = 0
+    metered: bool = False  # whether any GPU metrics were recorded in the period
+    totals: UsageTotals | None = None
+    lanes: list[UsageLaneRow] = []
+    gpus: list[UsageGpuRow] = []
+    kinds: list[UsageKindRow] = []
+    # Time series over ``buckets`` (local start times, YYYY-MM-DDTHH:MM, each ``bucket_hours`` long).
+    bucket_hours: int = 24
+    buckets: list[str] = []
+    hours_by_person: list[UsageSeries] = []  # booked GPU-hours
+    hours_by_kind: list[UsageSeries] = []  # sampled GPU-hours, including idle and free time
+    utilization_by_lane: list[UsageSeries] = []  # average utilization %, None without metrics
 
 
 class BackupOut(BaseModel):

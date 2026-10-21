@@ -61,6 +61,8 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_METRICS_TOKEN` | *空* | `/metrics` 的 Bearer Token，留空则关闭 |
 | `SLOTSERVE_DRAIN_SECONDS` | `30` | 切换模型前等待进行中请求完成的最长时间 |
 | `SLOTSERVE_USAGE_RETENTION_DAYS` | `365` | 逐条请求记录保留天数，之后合并为按天汇总（0 表示永久；否则至少 90） |
+| `SLOTSERVE_USAGE_SAMPLE_DAYS` | `30` | 按分钟的 GPU 使用采样保留天数，之后合并为按小时汇总（0 表示不合并） |
+| `SLOTSERVE_USAGE_BUSY_PERCENT` | `10` | 某一分钟内 GPU 利用率不低于此值时计为“使用中”（对新采样生效） |
 | `SLOTSERVE_AUDIT_RETENTION_DAYS` | `730` | 审计日志保留天数（0 表示永久） |
 | `SLOTSERVE_BACKUP_KEEP` | `7` | 保留的每日数据库备份份数（0 表示关闭自动备份） |
 | `SLOTSERVE_DEVENV_ENABLED` | `false` | 开发环境：把 GPU 时段预约成带 SSH 的 Docker 容器 |
