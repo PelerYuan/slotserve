@@ -12,6 +12,7 @@ export interface ApiKey {
   prefix: string
   created_at: string
   last_used_at: string | null
+  revealable: boolean
 }
 
 export interface ApiKeyCreated extends ApiKey {

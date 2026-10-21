@@ -3,13 +3,14 @@ import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { NButton, NForm, NFormItem, NInput } from 'naive-ui'
-import { CalendarClock, Plug, RefreshCw } from 'lucide-vue-next'
+import { CalendarClock, Moon, Plug, RefreshCw, Sun } from 'lucide-vue-next'
 import BrandMark from '@/components/BrandMark.vue'
 import AuthShowcase from '@/components/AuthShowcase.vue'
 import { api } from '@/api/client'
 import { session } from '@/composables/session'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { setLocale } from '@/i18n'
+import { isDark, setThemeMode } from '@/composables/theme'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -86,6 +87,15 @@ function setMode(m: 'login' | 'register') {
         <button :class="{ on: locale === 'zh-CN' }" @click="setLocale('zh-CN')">中文</button>
         <span>/</span>
         <button :class="{ on: locale === 'en' }" @click="setLocale('en')">EN</button>
+        <button
+          class="theme-toggle"
+          :aria-label="t(`settings.themes.${isDark ? 'light' : 'dark'}`)"
+          :title="t(`settings.themes.${isDark ? 'light' : 'dark'}`)"
+          @click="setThemeMode(isDark ? 'light' : 'dark')"
+        >
+          <Sun v-if="isDark" :size="15" />
+          <Moon v-else :size="15" />
+        </button>
       </div>
       <div class="form-wrap">
         <BrandMark class="mobile-brand rise" />
@@ -304,6 +314,11 @@ function setMode(m: 'login' | 'register') {
 .lang button:hover,
 .lang button.on {
   color: var(--text);
+}
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 10px;
 }
 .lang button.on {
   font-weight: 600;

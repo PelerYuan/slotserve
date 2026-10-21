@@ -49,7 +49,7 @@ async function save(payload: Record<string, SettingValue | null>) {
 }
 
 const GROUPS: { id: string; keys: string[] }[] = [
-  { id: 'access', keys: ['registration_open', 'invite_code', 'approval_mode', 'approval_hours'] },
+  { id: 'access', keys: ['registration_open', 'invite_code', 'approval_mode', 'approval_hours', 'api_key_reveal'] },
   {
     id: 'booking',
     keys: [

@@ -8,6 +8,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - **Admin → Runtime monitor**: per-lane live server output (server-sent events), loading stage and progress read from llama.cpp / vLLM / SGLang output, failure details (error, exit code, last output lines, retry countdown), the exact launch command and a load history with command and output excerpt for every load.
 - The overview's loading bar uses the progress the model server reports when available.
+- Admin switch **Let people view their API keys again**: new keys keep an encrypted copy (Fernet, keyed from `SECRET_KEY`) and owners can **View** them; switching it off deletes every copy. Off by default.
+- Light/dark switch in the user menu, the mobile menu and on the sign-in page.
 
 ## [0.7.1] - 2026-10-21
 

@@ -76,6 +76,11 @@ class ApiKeyOut(ORMModel):
     prefix: str
     created_at: datetime
     last_used_at: datetime | None
+    revealable: bool = False  # the owner can view the full key again
+
+
+class ApiKeyRevealOut(BaseModel):
+    key: str
 
 
 class ApiKeyCreatedOut(ApiKeyOut):

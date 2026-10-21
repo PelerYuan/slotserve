@@ -20,6 +20,7 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | --- | --- | --- |
 | `SLOTSERVE_INVITE_CODE` | `change-me` | 注册所需邀请码 |
 | `SLOTSERVE_REGISTRATION_OPEN` | `true` | 是否允许凭邀请码注册 |
+| `SLOTSERVE_API_KEY_REVEAL` | `false` | 为新建的 API 密钥保存加密副本，所有者之后可以再次查看 |
 | `SLOTSERVE_SECRET_KEY` | `change-me` | 会话 Cookie 签名密钥 |
 | `SLOTSERVE_HOST` | `0.0.0.0` | 监听地址 |
 | `SLOTSERVE_PORT` | `8000` | 监听端口 |

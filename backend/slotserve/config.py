@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     secret_key: str = "change-me"
     invite_code: str = "change-me"
     registration_open: bool = True
+    # Keep an encrypted copy of new API keys so their owners can view them again.
+    api_key_reveal: bool = False
     cookie_secure: bool = False
     static_dir: Path | None = None
     # Base URL people use to open SlotServe (e.g. http://gpu-box:8000); used in links sent by the bot.

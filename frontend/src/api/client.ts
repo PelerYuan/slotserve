@@ -114,6 +114,7 @@ export const api = {
   keys: () => request<ApiKey[]>('GET', '/api/keys'),
   createKey: (name: string) => request<ApiKeyCreated>('POST', '/api/keys', { name }),
   revokeKey: (id: number) => request<void>('DELETE', `/api/keys/${id}`),
+  revealKey: (id: number) => request<{ key: string }>('GET', `/api/keys/${id}/reveal`),
 
   // models
   models: () => request<Model[]>('GET', '/api/models'),

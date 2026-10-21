@@ -34,6 +34,7 @@ class Editable:
 
 EDITABLE: dict[str, Editable] = {
     "registration_open": Editable(bool),
+    "api_key_reveal": Editable(bool),
     "invite_code": Editable(str, min=1, max=128, secret=True),
     "max_reservation_hours": Editable(int, min=1, max=24 * 7, unit="h"),
     "max_advance_days": Editable(int, min=1, max=365, unit="d"),

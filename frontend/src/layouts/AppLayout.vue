@@ -19,6 +19,7 @@ import StatusDot from '@/components/StatusDot.vue'
 import { logout, session } from '@/composables/session'
 import { useStatus } from '@/composables/useStatus'
 import { setLocale, type Locale } from '@/i18n'
+import { isDark, setThemeMode, themeMode, type ThemeMode } from '@/composables/theme'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -41,6 +42,12 @@ watch(() => route.fullPath, () => (drawer.value = false))
 const userMenu = computed(() => [
   { key: 'zh-CN', label: '简体中文', disabled: locale.value === 'zh-CN' },
   { key: 'en', label: 'English', disabled: locale.value === 'en' },
+  { type: 'divider', key: 'd0' },
+  ...(['light', 'dark', 'system'] as const).map((mode) => ({
+    key: `theme:${mode}`,
+    label: t(`settings.themes.${mode}`),
+    disabled: themeMode.value === mode,
+  })),
   { type: 'divider', key: 'd1' },
   { key: 'logout', label: t('auth.logout') },
 ])
@@ -49,6 +56,8 @@ async function onUserMenu(key: string) {
   if (key === 'logout') {
     await logout()
     router.push({ name: 'login' })
+  } else if (key.startsWith('theme:')) {
+    setThemeMode(key.slice(6) as ThemeMode)
   } else {
     setLocale(key as Locale)
   }
@@ -116,6 +125,9 @@ const runtime = computed(() => status.value?.runtime)
         </nav>
         <button class="nav-item" @click="onUserMenu(locale === 'zh-CN' ? 'en' : 'zh-CN')">
           {{ locale === 'zh-CN' ? 'English' : '简体中文' }}
+        </button>
+        <button class="nav-item" @click="setThemeMode(isDark ? 'light' : 'dark')">
+          {{ t(`settings.themes.${isDark ? 'light' : 'dark'}`) }}
         </button>
         <button class="nav-item" @click="onUserMenu('logout')">{{ t('auth.logout') }}</button>
       </div>

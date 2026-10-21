@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import FileResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
@@ -389,6 +389,9 @@ async def put_settings(
         raise ApiError(status.HTTP_400_BAD_REQUEST, "invalid_setting", key=exc.key, reason=exc.reason) from exc
     if applied:
         record(db, admin, "settings.update", ", ".join(applied), **applied)
+    if "api_key_reveal" in applied and not get_settings().api_key_reveal:
+        # Off means off: no copy of any key stays readable.
+        await db.execute(update(ApiKey).values(key_encrypted=None))
     await db.commit()
     if app_settings.TELEGRAM_KEYS & applied.keys():
         request.app.state.telegram.reload()

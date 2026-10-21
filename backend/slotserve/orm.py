@@ -31,6 +31,8 @@ class ApiKey(Base):
     name: Mapped[str] = mapped_column(String(64))
     prefix: Mapped[str] = mapped_column(String(16))
     key_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    # Encrypted with SECRET_KEY, only while admins allow viewing keys again (setting api_key_reveal).
+    key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)

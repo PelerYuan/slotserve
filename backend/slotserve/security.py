@@ -1,6 +1,9 @@
+import base64
 import hashlib
 import hmac
 import secrets
+
+from cryptography.fernet import Fernet, InvalidToken
 
 API_KEY_PREFIX = "sk-ss-"
 
@@ -32,6 +35,23 @@ def generate_api_key() -> str:
 
 def hash_api_key(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
+
+
+def _fernet(secret_key: str) -> Fernet:
+    digest = hashlib.sha256(b"slotserve api key v1:" + secret_key.encode()).digest()
+    return Fernet(base64.urlsafe_b64encode(digest))
+
+
+def encrypt_api_key(key: str, secret_key: str) -> str:
+    return _fernet(secret_key).encrypt(key.encode()).decode()
+
+
+def decrypt_api_key(token: str, secret_key: str) -> str | None:
+    """None when the copy cannot be read, e.g. after SECRET_KEY changed."""
+    try:
+        return _fernet(secret_key).decrypt(token.encode()).decode()
+    except (InvalidToken, ValueError):
+        return None
 
 
 def key_display_prefix(key: str) -> str:

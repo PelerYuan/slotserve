@@ -25,6 +25,16 @@ async function load() {
 }
 onMounted(load)
 
+// Shown again on request, when admins allow keeping a copy (Admin > System settings).
+const revealed = ref<{ name: string; key: string } | null>(null)
+async function reveal(k: ApiKey) {
+  try {
+    revealed.value = { name: k.name, key: (await api.revealKey(k.id)).key }
+  } catch (e) {
+    showError(e)
+  }
+}
+
 async function create() {
   if (!newName.value.trim()) return
   busy.value = true
@@ -98,7 +108,8 @@ function revoke(k: ApiKey) {
               <td><code class="prefix">{{ k.prefix }}••••••••</code></td>
               <td class="muted num">{{ formatDateTime(k.created_at) }}</td>
               <td class="muted">{{ k.last_used_at ? relativeFromNow(k.last_used_at) : t('keys.never') }}</td>
-              <td class="right">
+              <td class="right nowrap">
+                <NButton v-if="k.revealable" size="small" quaternary @click="reveal(k)">{{ t('keys.reveal') }}</NButton>
                 <NButton size="small" quaternary type="error" @click="revoke(k)">{{ t('keys.revoke') }}</NButton>
               </td>
             </tr>
@@ -126,7 +137,7 @@ function revoke(k: ApiKey) {
       :mask-closable="false"
       @update:show="(v: boolean) => !v && (created = null)"
     >
-      <p class="muted hint">{{ t('keys.createdHint') }}</p>
+      <p class="muted hint">{{ created?.revealable ? t('keys.createdHintRevealable') : t('keys.createdHint') }}</p>
       <CodeBlock v-if="created" :code="created.key" inline />
       <template #footer>
         <div class="footer">
@@ -134,10 +145,29 @@ function revoke(k: ApiKey) {
         </div>
       </template>
     </NModal>
+
+    <NModal
+      :show="!!revealed"
+      preset="card"
+      :title="revealed?.name"
+      style="width: 560px; max-width: calc(100vw - 32px)"
+      :bordered="false"
+      @update:show="(v: boolean) => !v && (revealed = null)"
+    >
+      <CodeBlock v-if="revealed" :code="revealed.key" inline />
+      <template #footer>
+        <div class="footer">
+          <NButton type="primary" @click="revealed = null">{{ t('common.close') }}</NButton>
+        </div>
+      </template>
+    </NModal>
   </div>
 </template>
 
 <style scoped>
+.nowrap {
+  white-space: nowrap;
+}
 .endpoint {
   margin-bottom: 16px;
   display: grid;

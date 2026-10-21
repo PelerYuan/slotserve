@@ -20,6 +20,7 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | --- | --- | --- |
 | `SLOTSERVE_INVITE_CODE` | `change-me` | Code required to sign up |
 | `SLOTSERVE_REGISTRATION_OPEN` | `true` | Allow sign-up with the invite code |
+| `SLOTSERVE_API_KEY_REVEAL` | `false` | Keep an encrypted copy of new API keys so owners can view them again |
 | `SLOTSERVE_SECRET_KEY` | `change-me` | Session cookie signing key |
 | `SLOTSERVE_HOST` | `0.0.0.0` | Listen address |
 | `SLOTSERVE_PORT` | `8000` | Listen port |
