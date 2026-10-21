@@ -41,6 +41,7 @@ from sqlalchemy import func, or_, select
 from ..db import SessionLocal, utcnow
 from ..orm import HOLDING_STATUSES, DevProject, DevSession, DevTemplate, Lane, Reservation, SshKey, User
 from ..runtime.manager import RuntimeState
+from .devenv_cpu import CpuEnvs
 from .docker_api import DockerClient, DockerError, registry_of, tar_files
 
 log = logging.getLogger(__name__)
@@ -571,6 +572,7 @@ class DevEnvManager:
         self.in_container = Path("/.dockerenv").exists()
         self._web_http: httpx.AsyncClient | None = None
         self.self_container = socket.gethostname()
+        self.cpu = CpuEnvs(self)  # devenv_cpu: environments without a GPU
 
     # ---- plumbing ---------------------------------------------------------------
 
@@ -608,10 +610,12 @@ class DevEnvManager:
             await self._web_http.aclose()
         for task in [*self._pulls.values(), *self._saves.values()]:
             task.cancel()
+        await self.cpu.close()  # devenv_cpu
         if self._docker is not None:
             await self._docker.close()
 
     async def run(self) -> None:
+        self.cpu.start_monitor()  # devenv_cpu: live use and usage of CPU-only environments
         while True:
             try:
                 await self.tick()
@@ -821,14 +825,19 @@ class DevEnvManager:
         r: Reservation | None = None
         if s.kind == "shared":
             over = self._shared_wanted.get(s.lane_id) != s.template_id
+        elif s.kind == "cpu":
+            over = await self.cpu.should_stop(db, s)  # devenv_cpu: owner gone, or its project's booking started
         else:
             r = await db.get(Reservation, s.reservation_id) if s.reservation_id else None
             over = r is None or r.status != "booked" or r.end_at <= now
         if over:
             await self._stop(db, s, "stopped")
+            await self.cpu.after_booking(db, s)  # devenv_cpu: maybe continue the project without a GPU
             return
         if s.state == "failed":
             return  # waits for a restart from the person or an admin
+        if s.project_id and s.state in ("waiting", "pulling", "ready"):
+            await self.cpu.follow_project_image(db, s)  # devenv_cpu: the project may have been snapshotted meanwhile
         if s.state in ("waiting", "pulling"):
             if await self.docker.image_exists(s.image):
                 s.state, s.detail, s.progress = "ready", None, None
@@ -865,6 +874,10 @@ class DevEnvManager:
 
     async def _gpu_free(self, db, s: DevSession) -> bool:
         """The lane's model server has stopped and no other container of the lane still holds the GPUs."""
+        if s.kind == "cpu":
+            return True  # devenv_cpu: no GPUs
+        if await self.cpu.project_busy(db, s):
+            return False  # devenv_cpu: the project still runs without a GPU; it is stopped first
         lanes = getattr(self.state, "lanes", None)
         if lanes is not None and lanes.get(s.lane_id).runtime.state != RuntimeState.STOPPED:
             return False
@@ -1094,6 +1107,7 @@ class DevEnvManager:
             host_config["NanoCpus"] = int(self.settings.devenv_cpus * 1e9)
         if self.settings.devenv_memory_gb > 0:
             host_config["Memory"] = int(self.settings.devenv_memory_gb * 1024**3)
+        await self.cpu.apply_resources(db, s, lane, host_config, env)  # devenv_cpu: cpuset, CPU-only limits
         labels = {LABEL: "1", "slotserve.session": str(s.id), "slotserve.kind": s.kind or "booking"}
         if user is not None:
             labels["slotserve.user"] = user.username
@@ -1293,7 +1307,7 @@ class DevEnvManager:
             if project is not None:
                 lane = await db.get(Lane, s.lane_id) if s.lane_id else None
                 project.container_id, project.container_port = cid, port
-                project.container_devices = lane.gpu_indices if lane else ""
+                project.container_devices = self._devices_key(s, lane)
                 project.container_paths = project.persist_paths or ""
                 project.container_web = json.dumps(plan.web)
                 project.state, project.last_used_at = "running", utcnow()
@@ -1301,10 +1315,17 @@ class DevEnvManager:
             await db.commit()
             await self._after_start(s, cid, plan.name, plan.web, plan)
             await db.commit()
-            if s.kind != "shared":
+            if s.kind not in ("shared", "cpu"):
                 self.state.notifier.emit("devenv_ready", user_id=s.user_id, reservation_id=s.reservation_id, port=port)
             return
         raise DevEnvError("devenv_no_ports", detail=last_error)
+
+    @staticmethod
+    def _devices_key(s: DevSession, lane: Lane | None) -> str:
+        """What a kept container's GPUs are recorded as: the lane's, or "cpu" for one without a GPU (devenv_cpu)."""
+        if s.kind == "cpu":
+            return "cpu"
+        return lane.gpu_indices if lane else ""
 
     def _running(self, s: DevSession, cid: str, name: str, port: int, digest: str | None) -> None:
         s.container_id, s.container_name, s.ssh_port = cid, name, port
@@ -1324,7 +1345,7 @@ class DevEnvManager:
                 project.state, project.container_id = "missing", None
             return False
         lane = await db.get(Lane, s.lane_id) if s.lane_id else None
-        devices = lane.gpu_indices if lane else ""
+        devices = self._devices_key(s, lane)
         same = (
             (project.container_devices or "") == devices
             and (project.container_paths or "") == (project.persist_paths or "")
@@ -1337,6 +1358,7 @@ class DevEnvManager:
                     await self.docker.stop(project.container_id, timeout=10)
             # the container's network stays while the project exists, but it may have been removed by hand
             await self._ensure_network(plan, fresh=False)
+            await self.cpu.refresh_limits(project.container_id, plan.config["HostConfig"])  # devenv_cpu
             try:
                 await self.docker.put_archive(project.container_id, "/", tar_files(plan.files))
                 await self.docker.start(project.container_id)
@@ -1352,9 +1374,10 @@ class DevEnvManager:
                 spec.setdefault("base_session", s.id)
                 await self._after_start(s, project.container_id, plan.name, spec, plan)
                 await db.commit()
-                self.state.notifier.emit(
-                    "devenv_ready", user_id=s.user_id, reservation_id=s.reservation_id, port=project.container_port
-                )
+                if s.kind != "cpu":
+                    self.state.notifier.emit(
+                        "devenv_ready", user_id=s.user_id, reservation_id=s.reservation_id, port=project.container_port
+                    )
                 return True
         # Different GPUs, paths or port: keep what was installed by snapshotting the container into an image.
         s.detail = "snapshot"
@@ -1367,7 +1390,7 @@ class DevEnvManager:
         project.container_web = None
         s.image, s.detail = ref, None
         plan.config["Image"] = ref
-        if old.startswith(f"slotserve/project-{project.id}:"):
+        if old != ref and old.startswith(f"slotserve/project-{project.id}:"):
             with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
                 await self.docker.remove_image(old)
         await db.commit()
@@ -1419,7 +1442,7 @@ class DevEnvManager:
         await self._discard(db, s, stop_first=False)
         s.container_id = None
         s.state, s.error, s.detail, s.progress = "failed", message[:4000], None, None
-        if notify and s.kind != "shared":
+        if notify and s.kind not in ("shared", "cpu"):
             self.state.notifier.emit(
                 "devenv_failed", user_id=s.user_id, reservation_id=s.reservation_id, error=message.splitlines()[0][:300]
             )

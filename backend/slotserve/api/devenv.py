@@ -105,7 +105,7 @@ class WebOut(BaseModel):
 
 class SessionOut(BaseModel):
     id: int
-    kind: str  # booking | shared (the environment of an idle lane, open to everyone)
+    kind: str  # booking | shared (the environment of an idle lane, open to everyone) | cpu (without a GPU)
     reservation_id: int | None
     username: str | None
     mine: bool
@@ -446,6 +446,11 @@ async def restart_session(
     session_id: int, request: Request, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
 ):
     s = await _session(db, session_id, user, manage=True)
+    if s.kind == "cpu" and s.state == "failed" and s.user_id is not None:
+        try:  # devenv_cpu: a failed CPU-only environment holds no place; retrying it takes one
+            await request.app.state.devenv.cpu.check_room(db, s.user_id)
+        except DevEnvError as exc:
+            raise _devenv_error(exc) from exc
     if s.user_id != user.id:
         record(db, user, "devenv.restart", f"#{s.id}")
         await db.commit()

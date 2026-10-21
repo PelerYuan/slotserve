@@ -380,6 +380,8 @@ class DevProject(Base):
     size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    # devenv_cpu: when a booking of it ends, keep it running without a GPU instead of pausing it
+    cpu_after_booking: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False)
 
 
 class DevSession(Base):
@@ -389,6 +391,7 @@ class DevSession(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     # booking | shared (an idle lane's environment: no booking, no owner, everyone has an account)
+    # | cpu (started by its owner without a GPU and without a booking; see services/devenv_cpu.py)
     kind: Mapped[str | None] = mapped_column(String(16), default="booking", nullable=True)
     reservation_id: Mapped[int | None] = mapped_column(
         ForeignKey("reservations.id", ondelete="CASCADE"), unique=True, nullable=True
@@ -428,8 +431,8 @@ class UsageSample(Base):
 
     ``resource`` "gpu": one row per GPU of a lane; ``gpu_index`` -1 stands for a lane without GPU
     metrics (no nvidia-smi), where occupancy is still recorded. ``resource`` "cpu" (CPU-only
-    environments, not sampled yet) uses ``gpu_index`` -1, ``util_seconds`` for CPU %, ``cpu_core_seconds``
-    for cores in use and ``mem_peak_mb`` for RAM.
+    environments, sampled by services/devenv_cpu.py) uses ``gpu_index`` -1, ``util_seconds`` for CPU % (of the
+    environment's core limit), ``cpu_core_seconds`` for cores in use and ``mem_peak_mb`` for RAM.
     """
 
     __tablename__ = "usage_samples"

@@ -49,6 +49,13 @@ EDITABLE: dict[str, Editable] = {
     "devenv_storage_dir": Editable(str, max=500),
     "devenv_projects": Editable(int, min=0, max=100),
     "devenv_project_days": Editable(int, min=0, max=3650, unit="d"),
+    # devenv_cpu: environments without a GPU
+    "devenv_cpu_enabled": Editable(bool),
+    "devenv_cpu_per_user": Editable(int, min=1, max=100),
+    "devenv_cpu_cores_per_gpu": Editable(int, min=0, max=1024, unit="CPU"),
+    "devenv_cpu_cores": Editable(float, min=0, max=1024, unit="CPU"),
+    "devenv_cpu_memory_gb": Editable(float, min=0, max=8192, unit="GB"),
+    "devenv_cpu_memory_pool_gb": Editable(float, min=0, max=65536, unit="GB"),
     "invite_code": Editable(str, min=1, max=128, secret=True),
     "max_reservation_hours": Editable(int, min=1, max=24 * 7, unit="h"),
     "max_advance_days": Editable(int, min=1, max=365, unit="d"),
