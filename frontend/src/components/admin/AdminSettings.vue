@@ -63,6 +63,10 @@ const GROUPS: { id: string; keys: string[] }[] = [
       'devenv_allowed_registries',
       'devenv_saved_images',
       'devenv_pull_minutes',
+      'devenv_password_login',
+      'devenv_storage_dir',
+      'devenv_projects',
+      'devenv_project_days',
     ],
   },
   {

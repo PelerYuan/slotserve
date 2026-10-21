@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings
@@ -193,9 +193,21 @@ async def free_windows(db: AsyncSession, lane_id: int, start: datetime, end: dat
     return gaps
 
 
+async def check_devenv_login(db: AsyncSession, settings: Settings, owner: User) -> None:
+    """A dev environment needs a way in: an SSH key, or an environment password when password login is on."""
+    from ..orm import SshKey
+
+    if settings.devenv_password_login and owner.devenv_password_hash:
+        return
+    if (await db.execute(select(SshKey.id).where(SshKey.user_id == owner.id).limit(1))).first() is None:
+        raise ApiError(
+            status.HTTP_400_BAD_REQUEST, "ssh_login_required" if settings.devenv_password_login else "ssh_key_required"
+        )
+
+
 async def resolve_devenv(db: AsyncSession, settings: Settings, template_id: int | None, owner: User):
     """The template of a dev environment booking, checked for the person it is for."""
-    from ..orm import DevTemplate, SshKey
+    from ..orm import DevTemplate
     from .devenv import visible
 
     if template_id is None:
@@ -205,6 +217,61 @@ async def resolve_devenv(db: AsyncSession, settings: Settings, template_id: int 
     template = await db.get(DevTemplate, template_id)
     if not visible(template, owner):
         raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
-    if (await db.execute(select(SshKey.id).where(SshKey.user_id == owner.id).limit(1))).first() is None:
-        raise ApiError(status.HTTP_400_BAD_REQUEST, "ssh_key_required")
+    await check_devenv_login(db, settings, owner)
     return template
+
+
+async def resolve_project(
+    db: AsyncSession, settings: Settings, owner: User, project_id: int | None, new_name: str | None, template
+):
+    """The kept environment a dev environment booking continues, or a new one started from ``template``.
+
+    A new project is added to the session (not committed): it is saved together with the booking.
+    """
+    from ..orm import DevProject
+
+    if project_id is not None:
+        if not settings.devenv_enabled:
+            raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_disabled")
+        project = await db.get(DevProject, project_id)
+        if project is None or project.owner_id != owner.id:
+            raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+        await check_devenv_login(db, settings, owner)
+        return project
+    if not new_name or not new_name.strip():
+        return None
+    if template is None:
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_project_template")
+    count = (await db.execute(select(func.count(DevProject.id)).where(DevProject.owner_id == owner.id))).scalar_one()
+    if count >= settings.devenv_projects:
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_project_limit", limit=settings.devenv_projects)
+    project = DevProject(
+        owner_id=owner.id,
+        name=new_name.strip()[:64],
+        template_id=template.id,
+        image=template.image,
+        persist_paths=template.persist_paths,
+        state="new",
+    )
+    db.add(project)
+    await db.flush()
+    return project
+
+
+async def raise_if_project_busy(
+    db: AsyncSession, project_id: int | None, windows: list[Window], exclude: set[int] = frozenset()
+) -> None:
+    """One kept environment cannot run twice at the same time (e.g. booked on two lanes)."""
+    if project_id is None:
+        return
+    for start, end in windows:
+        stmt = select(Reservation.id).where(
+            Reservation.devenv_project_id == project_id,
+            Reservation.status.in_(HOLDING_STATUSES),
+            Reservation.start_at < end,
+            Reservation.end_at > start,
+        )
+        if exclude:
+            stmt = stmt.where(Reservation.id.not_in(exclude))
+        if (await db.execute(stmt.limit(1))).first() is not None:
+            raise ApiError(status.HTTP_409_CONFLICT, "devenv_project_busy")

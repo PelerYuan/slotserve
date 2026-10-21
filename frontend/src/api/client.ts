@@ -11,12 +11,14 @@ import type {
   BookingInput,
   CalendarLinks,
   DevInfo,
+  DevProject,
   DevSession,
   DevTemplate,
   DevTemplateInput,
   DownloadTask,
   HfFile,
   Lane,
+  LaneInput,
   LaneRuntime,
   LoadEvent,
   Model,
@@ -197,6 +199,17 @@ export const api = {
     restart: (id: number) => request<{ ok: boolean }>('POST', `/api/devenv/sessions/${id}/restart`),
     save: (id: number, name: string) => request<{ ok: boolean }>('POST', `/api/devenv/sessions/${id}/save`, { name }),
     logs: (id: number) => request<{ text: string }>('GET', `/api/devenv/sessions/${id}/logs`),
+    projects: (everyone = false) =>
+      request<DevProject[]>('GET', '/api/devenv/projects', undefined, { everyone: everyone || undefined }),
+    createProject: (body: { name: string; template_id: number; persist_paths?: string[] }) =>
+      request<DevProject>('POST', '/api/devenv/projects', body),
+    updateProject: (id: number, body: { name?: string; persist_paths?: string[] }) =>
+      request<DevProject>('PATCH', `/api/devenv/projects/${id}`, body),
+    deleteProject: (id: number, deleteData = false) =>
+      request<void>('DELETE', `/api/devenv/projects/${id}`, undefined, { delete_data: deleteData || undefined }),
+    password: () => request<{ set: boolean; login_enabled: boolean }>('GET', '/api/devenv/password'),
+    setPassword: (password: string) => request<void>('PUT', '/api/devenv/password', { password }),
+    clearPassword: () => request<void>('DELETE', '/api/devenv/password'),
   },
   sshKeys: () => request<SshKey[]>('GET', '/api/ssh-keys'),
   addSshKey: (name: string, public_key: string) => request<SshKey>('POST', '/api/ssh-keys', { name, public_key }),
@@ -244,10 +257,8 @@ export const api = {
     backups: () => request<Backup[]>('GET', '/api/admin/backups'),
     createBackup: () => request<Backup>('POST', '/api/admin/backups'),
     backupUrl: (name: string) => `/api/admin/backups/${encodeURIComponent(name)}`,
-    createLane: (body: { name: string; gpus: number[]; default_model_id: number | null }) =>
-      request<Lane>('POST', '/api/admin/lanes', body),
-    updateLane: (id: number, body: { name: string; gpus: number[]; default_model_id: number | null }) =>
-      request<Lane>('PATCH', `/api/admin/lanes/${id}`, body),
+    createLane: (body: LaneInput) => request<Lane>('POST', '/api/admin/lanes', body),
+    updateLane: (id: number, body: LaneInput) => request<Lane>('PATCH', `/api/admin/lanes/${id}`, body),
     deleteLane: (id: number) => request<void>('DELETE', `/api/admin/lanes/${id}`),
     manual: (body: {
       action: 'load' | 'unload' | 'auto'

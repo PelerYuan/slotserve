@@ -178,13 +178,36 @@ class DockerClient:
     async def remove(self, container: str) -> None:
         await self._request("DELETE", f"/containers/{container}", params={"force": "true"}, ok=(204, 404))
 
-    async def inspect(self, container: str) -> dict | None:
+    async def inspect(self, container: str, size: bool = False) -> dict | None:
+        params = {"size": "true"} if size else None
         try:
-            return (await self._request("GET", f"/containers/{container}/json")).json()
+            return (await self._request("GET", f"/containers/{container}/json", params=params)).json()
         except DockerError as exc:
             if exc.status == 404:
                 return None
             raise
+
+    async def wait(self, container: str, timeout: float = 600) -> int:
+        """Waits for a container to exit; returns its exit code."""
+        resp = await self._request("POST", f"/containers/{container}/wait", timeout=timeout)
+        return int(resp.json().get("StatusCode", 0))
+
+    async def exec(self, container: str, cmd: list[str], timeout: float = 120) -> tuple[int, str]:
+        """Runs a command as root in a running container; returns (exit code, output)."""
+        created = await self._request(
+            "POST",
+            f"/containers/{container}/exec",
+            json={"Cmd": cmd, "AttachStdout": True, "AttachStderr": True, "User": "root"},
+        )
+        exec_id = created.json()["Id"]
+        start = {"Detach": False, "Tty": False}
+        out = await self._request("POST", f"/exec/{exec_id}/start", json=start, timeout=timeout)
+        info = (await self._request("GET", f"/exec/{exec_id}/json")).json()
+        code = info.get("ExitCode")
+        return (int(code) if code is not None else -1), _demux(out.content)
+
+    async def remove_volume(self, name: str) -> None:
+        await self._request("DELETE", f"/volumes/{quote(name, safe='')}", ok=(204, 404))
 
     async def list(self, label: str) -> list[dict[str, Any]]:
         filters = json.dumps({"label": [label]})

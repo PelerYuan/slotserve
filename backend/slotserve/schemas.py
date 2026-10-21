@@ -207,6 +207,8 @@ class ReservationCreateIn(BaseModel):
     user_id: int | None = None  # admins may book for someone else
     lane_id: int | None = None  # None = the first lane
     devenv_template_id: int | None = None  # a dev environment booking (model_id stays None)
+    devenv_project_id: int | None = None  # ... continuing a kept environment
+    devenv_project_name: str | None = Field(default=None, max_length=64)  # ... keeping it as a new project
 
 
 class ReservationUpdateIn(BaseModel):
@@ -219,6 +221,7 @@ class ReservationUpdateIn(BaseModel):
     note: str | None = Field(default=None, max_length=500)
     lane_id: int | None = None
     devenv_template_id: int | None = None
+    devenv_project_id: int | None = None
 
 
 class ReviewIn(BaseModel):
@@ -241,6 +244,8 @@ class ReservationOut(BaseModel):
     exclusive: bool = False
     devenv_template_id: int | None = None
     devenv_template_name: str | None = None
+    devenv_project_id: int | None = None
+    devenv_project_name: str | None = None
     series_id: str | None = None
     lane_id: int | None = None
     lane_name: str | None = None
@@ -302,6 +307,9 @@ class LaneStatusOut(BaseModel):
     active_reservation: ReservationOut | None = None
     next_reservation: ReservationOut | None = None
     default_model: str | None = None
+    idle_mode: str = "model"  # model | devenv | none: what runs while nobody has the lane booked
+    idle_template_name: str | None = None
+    shared_state: str | None = None  # state of the lane's shared dev environment, when there is one
 
 
 class LaneOut(BaseModel):
@@ -311,6 +319,9 @@ class LaneOut(BaseModel):
     default_model_id: int | None
     default_model_name: str | None
     position: int
+    idle_mode: str = "model"
+    idle_template_id: int | None = None
+    idle_template_name: str | None = None
 
 
 class LaneIn(BaseModel):
@@ -318,6 +329,10 @@ class LaneIn(BaseModel):
     gpus: list[int] = Field(default_factory=list, max_length=64)
     default_model_id: int | None = None
     position: int | None = None
+    # What runs while the lane is not booked: model (its default model), devenv (a shared environment), none.
+    # Left out on an update: unchanged.
+    idle_mode: str | None = Field(default=None, pattern=r"^(model|devenv|none)$")
+    idle_template_id: int | None = None
 
 
 class StatusOut(BaseModel):

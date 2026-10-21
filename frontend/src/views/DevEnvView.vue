@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { NButton, NInput, NModal, NSwitch, useDialog, useMessage } from 'naive-ui'
-import { KeyRound, Plus, Terminal } from 'lucide-vue-next'
+import { NButton, NCheckbox, NInput, NModal, NSwitch, useDialog, useMessage } from 'naive-ui'
+import { KeyRound, Plus, Terminal, Users } from 'lucide-vue-next'
 import CodeBlock from '@/components/CodeBlock.vue'
 import { api } from '@/api/client'
-import type { DevInfo, DevSession, DevTemplate, Reservation, SshKey } from '@/api/types'
+import type { DevInfo, DevProject, DevSession, DevTemplate, Reservation } from '@/api/types'
 import { session } from '@/composables/session'
 import { useErrorMessage } from '@/composables/useErrorMessage'
-import { formatDateTime, formatRange } from '@/utils/format'
+import { formatBytes, formatDateTime, formatRange, relativeFromNow } from '@/utils/format'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -21,31 +21,42 @@ const isAdmin = computed(() => !!session.user?.is_admin)
 const info = ref<DevInfo | null>(null)
 const sessions = ref<DevSession[]>([])
 const templates = ref<DevTemplate[]>([])
-const keys = ref<SshKey[]>([])
+const hasKeys = ref(true)
+const projects = ref<DevProject[]>([])
 const upcoming = ref<Reservation[]>([])
 const everyone = ref(false)
 
-const open = computed(() => sessions.value.filter((s) => s.state !== 'stopped'))
-const history = computed(() => sessions.value.filter((s) => s.state === 'stopped').slice(0, 8))
+const sharedSessions = computed(() => sessions.value.filter((s) => s.kind === 'shared'))
+const own = computed(() => sessions.value.filter((s) => s.kind !== 'shared'))
+const open = computed(() => own.value.filter((s) => s.state !== 'stopped'))
+const history = computed(() => own.value.filter((s) => s.state === 'stopped').slice(0, 8))
+// A way in: an SSH key, or the environment password while password logins are allowed.
+const canLogIn = computed(() => hasKeys.value || (!!info.value?.password_login && !!info.value?.password_set))
 const prepared = computed(() => new Set(sessions.value.map((s) => s.reservation_id)))
 const notPrepared = computed(() => upcoming.value.filter((r) => !prepared.value.has(r.id)))
 const shared = computed(() => templates.value.filter((x) => x.kind === 'builtin'))
-const own = computed(() => templates.value.filter((x) => x.kind !== 'builtin'))
+const ownTemplates = computed(() => templates.value.filter((x) => x.kind !== 'builtin'))
 
 async function load() {
   try {
-    const [i, s, tpl, k, mine] = await Promise.all([
+    const [i, s, tpl, k, p, mine] = await Promise.all([
       api.devenv.info(),
       api.devenv.sessions(everyone.value),
       api.devenv.templates(),
       api.sshKeys(),
+      api.devenv.projects(everyone.value),
       api.reservations(new Date(Date.now() - 3_600_000), new Date(Date.now() + 60 * 86_400_000), true),
     ])
     info.value = i
     sessions.value = s
     templates.value = tpl
-    keys.value = k
-    upcoming.value = mine.filter((r) => r.devenv_template_id && (r.phase === 'upcoming' || r.phase === 'pending' || r.phase === 'active'))
+    hasKeys.value = k.length > 0
+    projects.value = p
+    upcoming.value = mine.filter(
+      (r) =>
+        (r.devenv_template_id || r.devenv_project_id) &&
+        (r.phase === 'upcoming' || r.phase === 'pending' || r.phase === 'active'),
+    )
   } catch (e) {
     showError(e)
   }
@@ -67,10 +78,10 @@ function describeTemplate(x: DevTemplate) {
 }
 
 function vscodeConfig(s: DevSession) {
-  return `Host slotserve-dev
+  return `Host ${s.kind === 'shared' ? `slotserve-${s.lane_name ?? 'shared'}`.replace(/[^\w.-]/g, '-') : 'slotserve-dev'}
   HostName ${info.value?.ssh_host ?? 'server'}
   Port ${s.ssh_port}
-  User root`
+  User ${s.ssh_user ?? 'root'}`
 }
 
 // ---- session actions --------------------------------------------------------
@@ -124,6 +135,7 @@ const tplForm = reactive({
   description: '',
   command: '',
   env: '',
+  paths: '',
   shared: false,
 })
 function openTemplate(x?: DevTemplate) {
@@ -136,6 +148,7 @@ function openTemplate(x?: DevTemplate) {
     description: x ? (x.builtin_key ? '' : x.description) : '',
     command: x?.command ?? '',
     env: x ? Object.entries(x.env).map(([k, v]) => `${k}=${v}`).join('\n') : '',
+    paths: x ? x.persist_paths.join('\n') : '',
     shared: false,
   })
 }
@@ -147,6 +160,12 @@ function parseEnv(text: string): Record<string, string> {
   }
   return out
 }
+function parseLines(text: string): string[] {
+  return text
+    .split('\n')
+    .map((x) => x.trim())
+    .filter(Boolean)
+}
 async function saveTemplate() {
   busy.value = true
   const body = {
@@ -155,6 +174,7 @@ async function saveTemplate() {
     description: tplForm.description.trim(),
     command: tplForm.command.trim() || null,
     env: parseEnv(tplForm.env),
+    persist_paths: parseLines(tplForm.paths),
   }
   try {
     if (tplForm.id) {
@@ -198,13 +218,19 @@ function removeTemplate(x: DevTemplate) {
   })
 }
 
-// ---- SSH keys ------------------------------------------------------------------
-const keyForm = reactive({ open: false, name: '', key: '' })
-async function addKey() {
+// ---- kept environments (projects) -----------------------------------------------
+const projectForm = reactive({ open: false, id: 0, name: '', paths: '' })
+function openProject(p: DevProject) {
+  Object.assign(projectForm, { open: true, id: p.id, name: p.name, paths: p.persist_paths.join('\n') })
+}
+async function saveProject() {
   busy.value = true
   try {
-    await api.addSshKey(keyForm.name.trim(), keyForm.key.trim())
-    Object.assign(keyForm, { open: false, name: '', key: '' })
+    await api.devenv.updateProject(projectForm.id, {
+      name: projectForm.name.trim(),
+      persist_paths: parseLines(projectForm.paths),
+    })
+    projectForm.open = false
     load()
   } catch (e) {
     showError(e)
@@ -212,18 +238,34 @@ async function addKey() {
     busy.value = false
   }
 }
-function removeKey(k: SshKey) {
+const deleteData = ref(false)
+function removeProject(p: DevProject) {
+  deleteData.value = false
   dialog.warning({
     title: t('common.delete'),
-    content: t('devenv.keyDeleteConfirm', { name: k.name }),
+    content: () =>
+      h('div', { class: 'confirm' }, [
+        h('p', t('devenv.deleteProjectConfirm', { name: p.name })),
+        h(NCheckbox, {
+          checked: deleteData.value,
+          'onUpdate:checked': (v: boolean) => (deleteData.value = v),
+          label: t('devenv.deleteData'),
+        }),
+      ]),
     positiveText: t('common.delete'),
     negativeText: t('common.cancel'),
     onPositiveClick: async () => {
-      await api.deleteSshKey(k.id).catch(showError)
-      load()
+      try {
+        await api.devenv.deleteProject(p.id, deleteData.value)
+        load()
+      } catch (e) {
+        showError(e)
+      }
     },
   })
 }
+
+const projectTone: Record<string, string> = { running: 'ok', paused: 'brand', missing: 'danger', new: '' }
 
 const stateTone: Record<string, string> = {
   running: 'ok',
@@ -256,11 +298,55 @@ const stateTone: Record<string, string> = {
       <span v-if="isAdmin && info.docker.error" class="mono small"> {{ info.docker.error }}</span>
     </div>
 
-    <div v-if="info?.enabled && !keys.length" class="card card-pad notice warn">
+    <div v-if="info?.enabled && !canLogIn" class="card card-pad notice warn">
       <KeyRound :size="16" />
-      <span>{{ t('devenv.needKey') }}</span>
-      <NButton size="small" type="primary" secondary @click="keyForm.open = true">{{ t('devenv.addKey') }}</NButton>
+      <span>{{ info.password_login ? t('devenv.needKey') : t('devenv.needKeyOnly') }}</span>
+      <NButton size="small" type="primary" secondary @click="router.push({ name: 'keys' })">{{ t('devenv.credentials') }}</NButton>
     </div>
+    <p v-else-if="info?.enabled" class="faint small cred-hint">
+      <KeyRound :size="13" />
+      {{ t('devenv.credentialsHint') }}
+      <RouterLink :to="{ name: 'keys' }">{{ t('devenv.credentials') }}</RouterLink>
+    </p>
+
+    <!-- shared environments of idle lanes -->
+    <section v-if="sharedSessions.length" class="block">
+      <div class="block-head">
+        <h2 class="block-title">{{ t('devenv.sharedTitle') }}</h2>
+      </div>
+      <article v-for="s in sharedSessions" :key="`shared${s.id}`" class="card card-pad env" data-kind="shared">
+        <div class="row env-head">
+          <Users :size="15" class="faint" />
+          <span class="strong">{{ s.lane_name }}</span>
+          <span class="badge brand">{{ t('devenv.sharedBadge') }}</span>
+          <span class="badge" :class="stateTone[s.state]">{{ t(`devenv.state.${s.state}`) }}</span>
+          <span class="spacer" />
+          <span class="faint small">{{ s.template_name ?? s.image }}</span>
+        </div>
+        <p class="muted small">{{ t('devenv.sharedHint', { user: s.ssh_user ?? '?' }) }}</p>
+        <div v-if="s.state === 'pulling'" class="progress">
+          <div class="bar"><span :style="{ width: `${s.progress ?? 3}%` }" /></div>
+          <div class="faint small">{{ t('devenv.pulling', { pct: s.progress !== null ? Math.round(s.progress) : '…' }) }}</div>
+        </div>
+        <template v-if="s.state === 'running' && s.ssh_command">
+          <div class="ssh">
+            <div class="faint small">{{ t('devenv.connect') }}</div>
+            <CodeBlock :code="s.ssh_command" inline />
+          </div>
+          <details class="vscode">
+            <summary class="small">{{ t('devenv.vscode') }}</summary>
+            <CodeBlock :code="vscodeConfig(s)" />
+          </details>
+        </template>
+        <div v-if="isAdmin && s.error" class="failure"><pre class="mono small">{{ s.error }}</pre></div>
+        <div v-if="isAdmin" class="row wrap actions">
+          <NButton v-if="s.state === 'running' || s.state === 'failed'" size="small" secondary @click="restart(s)">
+            {{ s.state === 'failed' ? t('devenv.retry') : t('devenv.restart') }}
+          </NButton>
+          <NButton size="small" quaternary @click="showLogs(s)">{{ t('devenv.logs') }}</NButton>
+        </div>
+      </article>
+    </section>
 
     <!-- environments -->
     <section class="block">
@@ -274,8 +360,9 @@ const stateTone: Record<string, string> = {
 
       <article v-for="s in open" :key="s.id" class="card card-pad env">
         <div class="row env-head">
-          <span class="strong">{{ s.template_name ?? s.image }}</span>
+          <span class="strong">{{ s.project_name ?? s.template_name ?? s.image }}</span>
           <span class="badge" :class="stateTone[s.state]">{{ t(`devenv.state.${s.state}`) }}</span>
+          <span v-if="s.project_name && s.template_name" class="faint small">{{ s.template_name }}</span>
           <span v-if="everyone" class="faint small">{{ s.username }}</span>
           <span class="spacer" />
           <span class="faint small num">
@@ -293,7 +380,9 @@ const stateTone: Record<string, string> = {
           </div>
         </div>
         <p v-else-if="s.state === 'ready' || s.state === 'waiting'" class="muted small">{{ t('devenv.waitingStart') }}</p>
-        <p v-else-if="s.state === 'starting'" class="muted small">{{ t('devenv.starting') }}</p>
+        <p v-else-if="s.state === 'starting'" class="muted small">
+          {{ s.detail === 'snapshot' ? t('devenv.snapshot') : t('devenv.starting') }}
+        </p>
 
         <template v-if="s.state === 'running' && s.ssh_command">
           <div class="ssh">
@@ -329,7 +418,7 @@ const stateTone: Record<string, string> = {
 
       <article v-for="r in notPrepared" :key="`r${r.id}`" class="card card-pad env">
         <div class="row env-head">
-          <span class="strong">{{ r.devenv_template_name }}</span>
+          <span class="strong">{{ r.devenv_project_name ?? r.devenv_template_name }}</span>
           <span class="badge">{{ r.status === 'pending' ? t('phase.pending') : t('phase.upcoming') }}</span>
           <span class="spacer" />
           <span class="faint small num">{{ formatRange(r.start_at, r.end_at) }}</span>
@@ -347,6 +436,38 @@ const stateTone: Record<string, string> = {
           </li>
         </ul>
       </details>
+    </section>
+
+    <!-- kept environments -->
+    <section class="block">
+      <div class="block-head">
+        <h2 class="block-title">{{ t('devenv.projects') }}</h2>
+      </div>
+      <p class="muted small">{{ t('devenv.projectsHint') }}</p>
+      <div v-if="!projects.length" class="faint small">{{ t('devenv.projectsEmpty', { n: info?.projects_limit ?? 3 }) }}</div>
+      <div class="grid">
+        <article v-for="p in projects" :key="p.id" class="card card-pad tpl" data-kind="project">
+          <div class="row">
+            <span class="strong">{{ p.name }}</span>
+            <span class="badge" :class="projectTone[p.state]">{{ t(`devenv.projectState.${p.state}`) }}</span>
+            <span v-if="everyone && p.owner" class="faint small">{{ p.owner }}</span>
+          </div>
+          <div class="mono small faint image">{{ p.template_name ?? p.image }}</div>
+          <p class="small muted">
+            <template v-if="p.last_used_at">{{ t('devenv.lastUsed', { time: relativeFromNow(p.last_used_at) }) }}</template>
+            <template v-if="p.size_bytes !== null"> · {{ formatBytes(p.size_bytes) }}</template>
+            <template v-if="p.upcoming"> · {{ t('devenv.upcomingBookings', { n: p.upcoming }) }}</template>
+          </p>
+          <p v-if="p.persist_paths.length" class="mono small faint">{{ p.persist_paths.join('  ') }}</p>
+          <div class="row actions">
+            <NButton size="tiny" quaternary @click="openProject(p)">{{ t('common.edit') }}</NButton>
+            <NButton size="tiny" quaternary type="error" :disabled="p.state === 'running'" @click="removeProject(p)">
+              {{ t('common.delete') }}
+            </NButton>
+          </div>
+        </article>
+      </div>
+      <p v-if="info?.project_days" class="faint small">{{ t('devenv.projectDays', { n: info.project_days }) }}</p>
     </section>
 
     <!-- templates -->
@@ -377,9 +498,9 @@ const stateTone: Record<string, string> = {
         </article>
       </div>
       <h3 class="sub">{{ t('devenv.mine') }}</h3>
-      <div v-if="!own.length" class="faint small">{{ t('devenv.mineEmpty', { n: info?.saved_limit ?? 3 }) }}</div>
+      <div v-if="!ownTemplates.length" class="faint small">{{ t('devenv.mineEmpty', { n: info?.saved_limit ?? 3 }) }}</div>
       <div class="grid">
-        <article v-for="x in own" :key="x.id" class="card card-pad tpl">
+        <article v-for="x in ownTemplates" :key="x.id" class="card card-pad tpl">
           <div class="row">
             <span class="strong">{{ x.name }}</span>
             <span class="badge" :class="{ brand: x.kind === 'saved' }">{{ t(`devenv.kind.${x.kind}`) }}</span>
@@ -391,28 +512,6 @@ const stateTone: Record<string, string> = {
             <NButton size="tiny" quaternary type="error" @click="removeTemplate(x)">{{ t('common.delete') }}</NButton>
           </div>
         </article>
-      </div>
-    </section>
-
-    <!-- SSH keys -->
-    <section class="block">
-      <div class="block-head">
-        <h2 class="block-title">{{ t('devenv.keys') }}</h2>
-        <NButton size="small" secondary @click="keyForm.open = true">
-          <template #icon><Plus :size="14" /></template>
-          {{ t('devenv.addKey') }}
-        </NButton>
-      </div>
-      <div v-if="!keys.length" class="faint small">{{ t('devenv.noKeys') }}</div>
-      <div v-else class="card">
-        <div v-for="k in keys" :key="k.id" class="key-row">
-          <KeyRound :size="15" class="faint" />
-          <span class="strong">{{ k.name }}</span>
-          <span class="faint small">{{ k.key_type }}</span>
-          <span class="mono small faint fp">{{ k.fingerprint }}</span>
-          <span class="spacer" />
-          <NButton size="tiny" quaternary type="error" @click="removeKey(k)">{{ t('common.delete') }}</NButton>
-        </div>
       </div>
     </section>
 
@@ -461,6 +560,11 @@ const stateTone: Record<string, string> = {
           <span class="field-label">{{ t('devenv.env') }}</span>
           <NInput v-model:value="tplForm.env" type="textarea" class="mono" placeholder="HF_HOME=/workspace/.cache/huggingface" :autosize="{ minRows: 2, maxRows: 6 }" />
         </label>
+        <label>
+          <span class="field-label">{{ t('devenv.persistPaths') }}</span>
+          <NInput v-model:value="tplForm.paths" type="textarea" class="mono" placeholder="/root" :autosize="{ minRows: 1, maxRows: 6 }" />
+          <span class="faint small">{{ t('devenv.persistPathsHint') }}</span>
+        </label>
         <label v-if="isAdmin && !tplForm.id" class="row small toggle">
           <NSwitch v-model:value="tplForm.shared" size="small" />{{ t('devenv.shared') }}
         </label>
@@ -475,22 +579,22 @@ const stateTone: Record<string, string> = {
       </template>
     </NModal>
 
-    <NModal v-model:show="keyForm.open" preset="card" :title="t('devenv.addKey')" style="max-width: 560px">
+    <NModal v-model:show="projectForm.open" preset="card" :title="t('devenv.editProject')" style="max-width: 520px">
       <div class="form">
         <label>
-          <span class="field-label">{{ t('devenv.keyName') }}</span>
-          <NInput v-model:value="keyForm.name" maxlength="64" :placeholder="t('devenv.keyNamePlaceholder')" />
+          <span class="field-label">{{ t('devenv.templateName') }}</span>
+          <NInput v-model:value="projectForm.name" maxlength="64" />
         </label>
         <label>
-          <span class="field-label">{{ t('devenv.publicKey') }}</span>
-          <NInput v-model:value="keyForm.key" type="textarea" class="mono" placeholder="ssh-ed25519 AAAA… you@laptop" :autosize="{ minRows: 3, maxRows: 6 }" />
-          <span class="faint small">{{ t('devenv.publicKeyHint') }}</span>
+          <span class="field-label">{{ t('devenv.persistPaths') }}</span>
+          <NInput v-model:value="projectForm.paths" type="textarea" class="mono" placeholder="/root" :autosize="{ minRows: 2, maxRows: 6 }" />
+          <span class="faint small">{{ t('devenv.persistPathsHint') }}</span>
         </label>
       </div>
       <template #footer>
         <div class="footer">
-          <NButton @click="keyForm.open = false">{{ t('common.cancel') }}</NButton>
-          <NButton type="primary" :loading="busy" :disabled="!keyForm.key.trim()" @click="addKey">{{ t('common.save') }}</NButton>
+          <NButton @click="projectForm.open = false">{{ t('common.cancel') }}</NButton>
+          <NButton type="primary" :loading="busy" :disabled="!projectForm.name.trim()" @click="saveProject">{{ t('common.save') }}</NButton>
         </div>
       </template>
     </NModal>
@@ -511,6 +615,13 @@ const stateTone: Record<string, string> = {
 }
 .notice.warn {
   background: var(--brand-softer);
+}
+.cred-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: -4px 0 16px;
 }
 .block {
   margin-bottom: 28px;
@@ -607,23 +718,6 @@ const stateTone: Record<string, string> = {
 .tpl.off {
   opacity: 0.6;
 }
-.key-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
-  min-width: 0;
-}
-.key-row:last-child {
-  border-bottom: 0;
-}
-.fp {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
 .history ul {
   margin: 8px 0 0;
   padding-left: 18px;
@@ -657,10 +751,5 @@ const stateTone: Record<string, string> = {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-}
-@media (max-width: 640px) {
-  .fp {
-    display: none;
-  }
 }
 </style>

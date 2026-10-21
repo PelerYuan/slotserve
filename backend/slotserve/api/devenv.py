@@ -1,20 +1,32 @@
-"""Dev environments: templates, sessions (the containers behind bookings) and SSH keys."""
+"""Dev environments: templates, sessions (the containers behind bookings), kept projects, SSH keys, passwords."""
 
 import json
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
-from ..db import get_db
+from ..db import get_db, utcnow
 from ..deps import current_user
 from ..errors import ApiError
-from ..orm import DevSession, DevTemplate, Lane, Reservation, SshKey, User
+from ..orm import DevProject, DevSession, DevTemplate, Lane, Reservation, SshKey, User
 from ..services.audit import record
-from ..services.devenv import DevEnvError, check_image, parse_public_key
+from ..services.devenv import (
+    OPEN_STATES,
+    DevEnvError,
+    can_access,
+    check_image,
+    check_persist_paths,
+    dump_paths,
+    load_paths,
+    parse_public_key,
+    unix_names,
+    visible,
+)
+from ..services.shacrypt import sha512_crypt
 
 router = APIRouter(prefix="/api/devenv", tags=["devenv"])
 keys_router = APIRouter(prefix="/api/ssh-keys", tags=["devenv"])
@@ -26,6 +38,7 @@ class TemplateIn(BaseModel):
     description: str = Field(default="", max_length=2000)
     command: str | None = Field(default=None, max_length=4000)
     env: dict[str, str] = Field(default_factory=dict)
+    persist_paths: list[str] = Field(default_factory=list, max_length=20)  # kept besides /workspace
     shared: bool = False  # admins: offer it to everyone
 
 
@@ -35,6 +48,7 @@ class TemplatePatch(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
     command: str | None = Field(default=None, max_length=4000)
     env: dict[str, str] | None = None
+    persist_paths: list[str] | None = Field(default=None, max_length=20)
     enabled: bool | None = None
 
 
@@ -45,6 +59,7 @@ class TemplateOut(BaseModel):
     description: str
     command: str | None
     env: dict[str, str]
+    persist_paths: list[str]
     kind: str  # builtin | custom | saved
     builtin_key: str | None
     owner: str | None
@@ -55,8 +70,13 @@ class TemplateOut(BaseModel):
 
 class SessionOut(BaseModel):
     id: int
-    reservation_id: int
-    username: str
+    kind: str  # booking | shared (the environment of an idle lane, open to everyone)
+    reservation_id: int | None
+    username: str | None
+    mine: bool
+    project_id: int | None
+    project_name: str | None
+    lane_id: int | None
     template_name: str | None
     image: str
     lane_name: str | None
@@ -65,6 +85,7 @@ class SessionOut(BaseModel):
     progress: float | None
     error: str | None
     ssh_port: int | None
+    ssh_user: str | None
     ssh_command: str | None
     start_at: datetime | None
     end_at: datetime | None
@@ -74,6 +95,37 @@ class SessionOut(BaseModel):
 
 class SaveIn(BaseModel):
     name: str = Field(min_length=1, max_length=64)
+
+
+class ProjectIn(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    template_id: int
+    persist_paths: list[str] | None = Field(default=None, max_length=20)  # None: the template's
+
+
+class ProjectPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    persist_paths: list[str] | None = Field(default=None, max_length=20)
+
+
+class ProjectOut(BaseModel):
+    id: int
+    name: str
+    owner: str | None
+    mine: bool
+    template_id: int | None
+    template_name: str | None
+    image: str
+    persist_paths: list[str]
+    state: str  # new | running | paused | missing
+    size_bytes: int | None
+    last_used_at: datetime | None
+    created_at: datetime
+    upcoming: int  # bookings that will continue it
+
+
+class PasswordIn(BaseModel):
+    password: str = Field(min_length=8, max_length=128)
 
 
 class KeyIn(BaseModel):
@@ -87,6 +139,13 @@ class KeyOut(BaseModel):
     fingerprint: str
     key_type: str
     created_at: datetime
+
+
+def _paths(paths: list[str]) -> list[str]:
+    try:
+        return check_persist_paths(paths)
+    except DevEnvError as exc:
+        raise _devenv_error(exc) from exc
 
 
 def _devenv_error(exc: DevEnvError) -> ApiError:
@@ -114,6 +173,7 @@ async def _template_out(db: AsyncSession, rows: list[DevTemplate], user: User) -
                 description=t.description or "",
                 command=t.command,
                 env=env,
+                persist_paths=load_paths(t.persist_paths),
                 kind=t.kind,
                 builtin_key=t.builtin_key,
                 owner=names.get(t.owner_id),
@@ -144,6 +204,10 @@ async def devenv_info(request: Request, user: User = Depends(current_user)):
         "custom_images": s.devenv_custom_images,
         "saved_limit": s.devenv_saved_images,
         "pull_minutes": s.devenv_pull_minutes,
+        "password_login": s.devenv_password_login,
+        "password_set": bool(user.devenv_password_hash),
+        "projects_limit": s.devenv_projects,
+        "project_days": s.devenv_project_days,
     }
 
 
@@ -180,6 +244,7 @@ async def create_template(body: TemplateIn, user: User = Depends(current_user), 
         description=body.description.strip(),
         command=(body.command or "").strip() or None,
         env=json.dumps(body.env) if body.env else None,
+        persist_paths=dump_paths(_paths(body.persist_paths)),
         kind="builtin" if body.shared else "custom",
         owner_id=None if body.shared else user.id,
     )
@@ -222,6 +287,8 @@ async def update_template(
         t.command = (body.command or "").strip() or None
     if body.env is not None:
         t.env = json.dumps(body.env) if body.env else None
+    if body.persist_paths is not None:
+        t.persist_paths = dump_paths(_paths(body.persist_paths))
     if body.enabled is not None:
         t.enabled = body.enabled
     if t.kind == "builtin":
@@ -247,28 +314,41 @@ async def delete_template(
 # ---- sessions -----------------------------------------------------------------
 
 
-async def _session_out(db: AsyncSession, request: Request, rows: list[DevSession]) -> list[SessionOut]:
+async def _session_out(db: AsyncSession, request: Request, rows: list[DevSession], user: User) -> list[SessionOut]:
     host = ssh_host(request)
+    names: dict[int, str] = {}
+    if any(s.kind == "shared" for s in rows):
+        users = list((await db.execute(select(User).where(User.disabled_at.is_(None)))).scalars())
+        names = unix_names(users)
     out = []
     for s in rows:
-        r = await db.get(Reservation, s.reservation_id)
-        owner = await db.get(User, s.user_id)
+        r = await db.get(Reservation, s.reservation_id) if s.reservation_id else None
+        owner = await db.get(User, s.user_id) if s.user_id else None
         template = await db.get(DevTemplate, s.template_id) if s.template_id else None
+        project = await db.get(DevProject, s.project_id) if s.project_id else None
         lane = await db.get(Lane, s.lane_id) if s.lane_id else None
+        running = s.state == "running" and s.ssh_port is not None
+        login = names.get(user.id) if s.kind == "shared" else "root"
         out.append(
             SessionOut(
                 id=s.id,
+                kind=s.kind or "booking",
                 reservation_id=s.reservation_id,
-                username=owner.username if owner else "?",
+                username=owner.username if owner else None,
+                mine=s.user_id == user.id,
+                project_id=s.project_id,
+                project_name=project.name if project else None,
+                lane_id=s.lane_id,
                 template_name=template.name if template else None,
                 image=s.image,
                 lane_name=lane.name if lane else None,
                 state=s.state,
                 detail=s.detail,
                 progress=s.progress,
-                error=s.error,
-                ssh_port=s.ssh_port if s.state == "running" else None,
-                ssh_command=f"ssh -p {s.ssh_port} root@{host}" if s.state == "running" and s.ssh_port else None,
+                error=s.error if s.kind != "shared" or user.is_admin else None,
+                ssh_port=s.ssh_port if running else None,
+                ssh_user=login,
+                ssh_command=f"ssh -p {s.ssh_port} {login}@{host}" if running and login else None,
                 start_at=r.start_at if r else None,
                 end_at=r.end_at if r else None,
                 started_at=s.started_at,
@@ -286,17 +366,28 @@ async def list_sessions(
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(DevSession).order_by(DevSession.id.desc()).limit(limit)
+    """Your environments (everyone's for admins with ``everyone``) and the shared environments of idle lanes."""
+    stmt = select(DevSession).where(DevSession.kind.is_not("shared")).order_by(DevSession.id.desc()).limit(limit)
     if not (everyone and user.is_admin):
         stmt = stmt.where(DevSession.user_id == user.id)
-    rows = (await db.execute(stmt)).scalars().all()
-    return await _session_out(db, request, list(rows))
+    rows = list((await db.execute(stmt)).scalars())
+    shared = (
+        await db.execute(
+            select(DevSession)
+            .where(DevSession.kind == "shared", DevSession.state.in_(OPEN_STATES))
+            .order_by(DevSession.lane_id, DevSession.id)
+        )
+    ).scalars()
+    return await _session_out(db, request, [*shared, *rows], user)
 
 
-async def _own_session(db: AsyncSession, session_id: int, user: User) -> DevSession:
+async def _session(db: AsyncSession, session_id: int, user: User, manage: bool = False) -> DevSession:
+    """A session the person may see (``can_access``); ``manage``: restart, save, logs (admins for shared ones)."""
     s = await db.get(DevSession, session_id)
-    if s is None or (s.user_id != user.id and not user.is_admin):
+    if s is None or not can_access(s, user):
         raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    if manage and s.kind == "shared" and not user.is_admin:
+        raise ApiError(status.HTTP_403_FORBIDDEN, "admin_required")
     return s
 
 
@@ -304,7 +395,7 @@ async def _own_session(db: AsyncSession, session_id: int, user: User) -> DevSess
 async def restart_session(
     session_id: int, request: Request, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
 ):
-    s = await _own_session(db, session_id, user)
+    s = await _session(db, session_id, user, manage=True)
     if s.user_id != user.id:
         record(db, user, "devenv.restart", f"#{s.id}")
         await db.commit()
@@ -323,7 +414,10 @@ async def save_session(
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    s = await _own_session(db, session_id, user)
+    s = await _session(db, session_id, user, manage=True)
+    if s.kind == "shared":
+        # Its /etc/shadow holds everyone's password hashes; it must not end up in an image.
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_shared_save")
     try:
         await request.app.state.devenv.save(s.id, body.name, user)
     except DevEnvError as exc:
@@ -339,7 +433,7 @@ async def session_logs(
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    s = await _own_session(db, session_id, user)
+    s = await _session(db, session_id, user, manage=True)
     return {"text": await request.app.state.devenv.logs(s, tail)}
 
 
@@ -359,7 +453,9 @@ async def list_keys(user: User = Depends(current_user), db: AsyncSession = Depen
 
 
 @keys_router.post("", response_model=KeyOut, status_code=201)
-async def add_key(body: KeyIn, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
+async def add_key(
+    body: KeyIn, request: Request, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
+):
     try:
         key, fingerprint = parse_public_key(body.public_key)
     except ValueError as exc:
@@ -374,13 +470,155 @@ async def add_key(body: KeyIn, user: User = Depends(current_user), db: AsyncSess
     k = SshKey(user_id=user.id, name=name[:64], public_key=key, fingerprint=fingerprint)
     db.add(k)
     await db.commit()
+    request.app.state.devenv.accounts_changed()
     return _key_out(k)
 
 
 @keys_router.delete("/{key_id}", status_code=204)
-async def delete_key(key_id: int, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
+async def delete_key(
+    key_id: int, request: Request, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
+):
     k = await db.get(SshKey, key_id)
     if k is None or k.user_id != user.id:
         raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
     await db.delete(k)
+    await db.commit()
+    request.app.state.devenv.accounts_changed()
+
+
+# ---- environment password ----------------------------------------------------------
+
+
+@router.get("/password")
+async def password_status(user: User = Depends(current_user)):
+    return {"set": bool(user.devenv_password_hash), "login_enabled": get_settings().devenv_password_login}
+
+
+@router.put("/password", status_code=204)
+async def set_password(
+    body: PasswordIn, request: Request, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
+):
+    """Sets the SSH password for dev environments; only its SHA-512-crypt hash is stored."""
+    if not body.password.strip() or any(ch in body.password for ch in "\n\r\0"):
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_password_invalid")
+    user.devenv_password_hash = sha512_crypt(body.password)
+    await db.commit()
+    request.app.state.devenv.accounts_changed()
+
+
+@router.delete("/password", status_code=204)
+async def clear_password(request: Request, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
+    user.devenv_password_hash = None
+    await db.commit()
+    request.app.state.devenv.accounts_changed()
+
+
+# ---- kept environments (projects) -----------------------------------------------------
+
+
+async def _project_out(db: AsyncSession, rows: list[DevProject], user: User) -> list[ProjectOut]:
+    out = []
+    now = utcnow()
+    for p in rows:
+        owner = await db.get(User, p.owner_id)
+        template = await db.get(DevTemplate, p.template_id) if p.template_id else None
+        upcoming = (
+            await db.execute(
+                select(func.count(Reservation.id)).where(
+                    Reservation.devenv_project_id == p.id,
+                    Reservation.status.in_(("booked", "pending")),
+                    Reservation.end_at > now,
+                )
+            )
+        ).scalar_one()
+        out.append(
+            ProjectOut(
+                id=p.id,
+                name=p.name,
+                owner=owner.username if owner else None,
+                mine=p.owner_id == user.id,
+                template_id=p.template_id,
+                template_name=template.name if template else None,
+                image=p.image,
+                persist_paths=load_paths(p.persist_paths),
+                state=p.state,
+                size_bytes=p.size_bytes,
+                last_used_at=p.last_used_at,
+                created_at=p.created_at,
+                upcoming=upcoming,
+            )
+        )
+    return out
+
+
+async def _project(db: AsyncSession, project_id: int, user: User) -> DevProject:
+    p = await db.get(DevProject, project_id)
+    if p is None or (p.owner_id != user.id and not user.is_admin):
+        raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    return p
+
+
+@router.get("/projects", response_model=list[ProjectOut])
+async def list_projects(everyone: bool = False, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
+    stmt = select(DevProject).order_by(DevProject.id)
+    if not (everyone and user.is_admin):
+        stmt = stmt.where(DevProject.owner_id == user.id)
+    return await _project_out(db, list((await db.execute(stmt)).scalars()), user)
+
+
+@router.post("/projects", response_model=ProjectOut, status_code=201)
+async def create_project(body: ProjectIn, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
+    s = get_settings()
+    if not s.devenv_enabled:
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_disabled")
+    template = await db.get(DevTemplate, body.template_id)
+    if not visible(template, user):
+        raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    count = (await db.execute(select(func.count(DevProject.id)).where(DevProject.owner_id == user.id))).scalar_one()
+    if count >= s.devenv_projects:
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_project_limit", limit=s.devenv_projects)
+    paths = _paths(body.persist_paths) if body.persist_paths is not None else load_paths(template.persist_paths)
+    p = DevProject(
+        owner_id=user.id,
+        name=body.name.strip(),
+        template_id=template.id,
+        image=template.image,
+        persist_paths=dump_paths(paths),
+        state="new",
+    )
+    db.add(p)
+    await db.commit()
+    return (await _project_out(db, [p], user))[0]
+
+
+@router.patch("/projects/{project_id}", response_model=ProjectOut)
+async def update_project(
+    project_id: int, body: ProjectPatch, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
+):
+    """Renames a project or changes its kept paths (they apply the next time its container starts)."""
+    p = await _project(db, project_id, user)
+    if body.name is not None:
+        p.name = body.name.strip()
+    if body.persist_paths is not None:
+        p.persist_paths = dump_paths(_paths(body.persist_paths))
+    await db.commit()
+    return (await _project_out(db, [p], user))[0]
+
+
+@router.delete("/projects/{project_id}", status_code=204)
+async def delete_project(
+    project_id: int,
+    request: Request,
+    delete_data: bool = False,
+    user: User = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Removes a project's container (and with ``delete_data`` its kept directories); /workspace stays."""
+    p = await _project(db, project_id, user)
+    if p.owner_id != user.id:
+        record(db, user, "devenv.project_delete", f"#{p.id} {p.name}", data=delete_data)
+    try:
+        await request.app.state.devenv.delete_project(db, p, data=delete_data)
+    except DevEnvError as exc:
+        raise _devenv_error(exc) from exc
     await db.commit()

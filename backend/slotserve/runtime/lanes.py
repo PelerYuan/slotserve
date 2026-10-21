@@ -3,6 +3,7 @@
 import asyncio
 import contextlib
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from sqlalchemy import select, update
@@ -56,6 +57,8 @@ class LaneManager:
         self.contexts: dict[int, LaneContext] = {}
         self._run = False
         self._sync_lock = asyncio.Lock()
+        # Set by the dev environment manager: whether a lane's shared environment still uses its GPUs.
+        self.gpu_holder: Callable[[int | None], bool] | None = None
 
     # ---- lookup -------------------------------------------------------------
 
@@ -110,6 +113,7 @@ class LaneManager:
     async def _add(self, lane: Lane) -> None:
         runtime = LlamaRuntime(self.settings, lane_id=lane.id, devices=lane.devices)
         scheduler = Scheduler(runtime, self.settings, self.events, lane_id=lane.id)
+        scheduler.hold = self._holds
         await scheduler.restore_manual()
         ctx = LaneContext(lane.id, lane.name, lane.devices, lane.position, runtime, scheduler)
         if self._run:
@@ -123,6 +127,9 @@ class LaneManager:
             with contextlib.suppress(asyncio.CancelledError):
                 await ctx.task
         await ctx.runtime.shutdown()
+
+    def _holds(self, lane_id: int | None) -> bool:
+        return self.gpu_holder is not None and self.gpu_holder(lane_id)
 
     async def shutdown(self) -> None:
         for lane_id in list(self.contexts):

@@ -141,9 +141,38 @@ async def create_all() -> None:
 
     assert _engine is not None
     async with _engine.begin() as conn:
+        rebuilt = await conn.run_sync(_detach_strict_devenv_sessions)
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(_add_missing_columns)
+        if rebuilt:
+            await conn.run_sync(_refill_devenv_sessions, rebuilt)
         await conn.exec_driver_sql(f"PRAGMA user_version={SCHEMA_VERSION}")
+
+
+def _detach_strict_devenv_sessions(conn) -> list[str]:
+    """Pre-release 0.9 databases: ``devenv_sessions`` had NOT NULL booking columns (shared sessions have none).
+
+    The old table is renamed so ``create_all`` makes the new one; returns the columns to copy over.
+    """
+    info = list(conn.exec_driver_sql('PRAGMA table_info("devenv_sessions")'))
+    if not any(row[1] == "reservation_id" and row[3] for row in info):
+        return []
+    for (name,) in conn.exec_driver_sql(
+        "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='devenv_sessions' AND sql IS NOT NULL"
+    ).all():
+        conn.exec_driver_sql(f'DROP INDEX "{name}"')
+    conn.exec_driver_sql("ALTER TABLE devenv_sessions RENAME TO devenv_sessions_old")
+    return [row[1] for row in info]
+
+
+def _refill_devenv_sessions(conn, columns: list[str]) -> None:
+    keep = {row[1] for row in conn.exec_driver_sql('PRAGMA table_info("devenv_sessions")')}
+    cols = ", ".join(f'"{c}"' for c in columns if c in keep)
+    conn.exec_driver_sql(
+        f"INSERT INTO devenv_sessions ({cols}) SELECT {cols} FROM devenv_sessions_old"
+        " WHERE reservation_id IN (SELECT id FROM reservations) AND user_id IN (SELECT id FROM users)"
+    )
+    conn.exec_driver_sql("DROP TABLE devenv_sessions_old")
 
 
 def _add_missing_columns(conn) -> None:

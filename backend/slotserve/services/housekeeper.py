@@ -133,7 +133,8 @@ class Housekeeper:
         if target is None or target.reservation is None:
             return
         r = target.reservation
-        if target.reason == "exclusive" and r.devenv_template_id is None and runtime.state == RuntimeState.STOPPED:
+        devenv = r.devenv_template_id is not None or r.devenv_project_id is not None
+        if target.reason == "exclusive" and not devenv and runtime.state == RuntimeState.STOPPED:
             if await once(db, f"res:{r.id}:exclusive"):
                 self.notifier.emit("exclusive_ready", user_id=r.user_id, reservation_id=r.id)
         elif (
