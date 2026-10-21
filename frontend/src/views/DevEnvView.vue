@@ -399,6 +399,7 @@ const stateTone: Record<string, string> = {
           <span class="faint small num">
             <template v-if="s.start_at && s.end_at">{{ formatRange(s.start_at, s.end_at) }}</template>
             <template v-if="s.lane_name"> · {{ s.lane_name }}</template>
+            <template v-if="s.node_name"> · {{ s.node_name }}</template>
           </span>
         </div>
         <div class="mono small faint image">{{ s.image }}</div>
@@ -411,6 +412,10 @@ const stateTone: Record<string, string> = {
             <span v-if="s.detail" class="mono"> · {{ s.detail }}</span>
           </div>
         </div>
+        <p v-else-if="s.detail === 'devenv_project_node_offline'" class="muted small">
+          {{ t('devenv.projectNodeOffline') }}
+        </p>
+        <p v-else-if="s.state === 'waiting' && s.detail === 'snapshot'" class="muted small">{{ t('devenv.snapshot') }}</p>
         <p v-else-if="(s.state === 'ready' || s.state === 'waiting') && s.kind !== 'cpu'" class="muted small">
           {{ t('devenv.waitingStart') }}
         </p>

@@ -585,7 +585,8 @@ const zh: typeof en = {
     projectName: '保留环境的名称',
     projectPick: '保留的环境',
     noProjects: '你还没有保留的环境。',
-    snapshot: 'GPU 变了：正在把环境迁移到新的 GPU 上…',
+    snapshot: 'GPU 或机器变了：正在把环境迁移过去…',
+    projectNodeOffline: '正在等待这个保留环境所在的机器重新上线。',
     kind: { builtin: '共享', custom: '自定义', saved: '已保存' },
     state: {
       waiting: '等待中',
@@ -707,6 +708,10 @@ const zh: typeof en = {
     pickHint: '保留的环境会保留你安装的东西；模板每次都是全新的（/workspace 始终都在）。',
     keptGroup: '保留的环境',
     templateGroup: '模板',
+    nodeHint: '运行在哪台机器上',
+    nodeDefault: '服务器本机（或保留环境所在的机器）',
+    nodeOption: '{name} · {n} 核',
+    nodeOffline: '离线',
   },
   admin: {
     runtimeView: {
@@ -1296,7 +1301,7 @@ const zh: typeof en = {
     node_has_lanes: '该节点仍有通道，请先移走或删除。',
     node_has_downloads: '该节点仍有排队或进行中的下载。',
     node_offline: '节点 {node} 已离线。',
-    devenv_remote_lane: '开发环境目前只能运行在服务器本机上（暂不支持其他节点）。',
+    devenv_node_missing: '这台机器没有连接到本服务器。',
     catalog_remote_lane: '模型目录中的模型目前只能下载到服务器本机；请选择服务器本机上的通道（暂不支持其他节点）。',
     storage_remote_node: '「管理 → 存储」中的模型库位于服务器本机；其他节点会下载到各自的模型目录。',
     devenv_disabled: '开发环境功能已关闭。',

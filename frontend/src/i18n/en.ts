@@ -584,7 +584,8 @@ export default {
     projectName: 'Name of the kept environment',
     projectPick: 'Kept environment',
     noProjects: 'You have no kept environments yet.',
-    snapshot: 'The GPUs changed: copying the environment to the new ones…',
+    snapshot: 'The GPUs or the machine changed: copying the environment over…',
+    projectNodeOffline: 'Waiting for the machine this kept environment is on to come back online.',
     kind: { builtin: 'shared', custom: 'custom', saved: 'saved' },
     state: {
       waiting: 'Waiting',
@@ -708,6 +709,10 @@ export default {
     pickHint: 'A kept environment keeps what you install; a template starts fresh (your /workspace is always there).',
     keptGroup: 'Kept environments',
     templateGroup: 'Templates',
+    nodeHint: 'Machine to run it on',
+    nodeDefault: 'The server’s own machine (or where the kept environment is)',
+    nodeOption: '{name} · {n} cores',
+    nodeOffline: 'offline',
   },
   admin: {
     runtimeView: {
@@ -1297,7 +1302,7 @@ export default {
     node_has_lanes: 'The node still has lanes. Move or delete them first.',
     node_has_downloads: 'The node still has downloads queued or running.',
     node_offline: 'Node {node} is offline.',
-    devenv_remote_lane: 'Dev environments run on the server’s own machine only (not yet on other nodes).',
+    devenv_node_missing: 'That machine is not connected to this server.',
     catalog_remote_lane: 'Catalog models download to this server only; choose a lane on the server’s own machine (not yet on other nodes).',
     storage_remote_node: 'Model libraries from Admin → Storage are on this server; other nodes download into their own models directory.',
     devenv_disabled: 'Dev environments are switched off.',

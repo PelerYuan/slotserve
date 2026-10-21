@@ -594,6 +594,9 @@ export interface DevSession {
   template_name: string | null
   image: string
   lane_name: string | null
+  /** the machine it runs on; null: the server's own */
+  node_id?: number | null
+  node_name?: string | null
   state: DevState
   detail: string | null
   progress: number | null

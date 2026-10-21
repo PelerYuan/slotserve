@@ -26,6 +26,7 @@ const { showError } = useErrorMessage()
 
 const rows = ref<Storage[]>([])
 const users = ref<AdminUser[]>([])
+const nodes = ref<{ id: number; name: string }[]>([]) // other machines (a host directory may exist there too)
 const loading = ref(false)
 const checking = ref<Set<number>>(new Set())
 
@@ -42,7 +43,9 @@ async function load() {
 onMounted(async () => {
   await load()
   users.value = await api.admin.users().catch(() => [])
+  nodes.value = (await api.admin.nodes().catch(() => [])).filter((n) => !n.is_local)
 })
+const nodeOptions = computed(() => nodes.value.map((n) => ({ label: n.name, value: n.id })))
 
 const KINDS: StorageKind[] = ['host', 'nfs', 'smb']
 const PURPOSES: StoragePurpose[] = ['shared', 'personal', 'projects', 'models']
@@ -75,6 +78,7 @@ const form = reactive({
   local_path: '',
   quota_gb: null as number | null,
   enabled: true,
+  node_ids: [] as number[],
 })
 const busy = ref(false)
 
@@ -106,6 +110,7 @@ function openNew() {
     local_path: '',
     quota_gb: null,
     enabled: true,
+    node_ids: [],
   })
 }
 
@@ -131,6 +136,7 @@ function openEdit(s: Storage) {
     local_path: s.local_path ?? '',
     quota_gb: s.quota_gb,
     enabled: s.enabled,
+    node_ids: [...(s.node_ids ?? [])],
   })
 }
 
@@ -159,7 +165,10 @@ function body(): StorageInput {
     user_ids: form.access === 'users' ? form.user_ids : [],
     enabled: form.enabled,
   }
-  if (form.kind === 'host') b.host_path = form.host_path.trim()
+  if (form.kind === 'host') {
+    b.host_path = form.host_path.trim()
+    b.node_ids = form.node_ids
+  }
   else {
     b.server = form.server.trim() || null
     b.remote_path = form.remote_path.trim()
@@ -359,6 +368,18 @@ function pct(s: Storage) {
         <span class="field-label">{{ t('storage.hostPath') }}</span>
         <NInput v-model:value="form.host_path" placeholder="/srv/slotserve/data" class="mono" data-field="storage-host-path" />
         <p class="faint small hint">{{ t('storage.hostPathHint') }}</p>
+      </label>
+      <label v-if="form.kind === 'host' && nodeOptions.length">
+        <span class="field-label">{{ t('storage.nodes') }}</span>
+        <NSelect
+          v-model:value="form.node_ids"
+          :options="nodeOptions"
+          multiple
+          clearable
+          :placeholder="t('storage.nodesNone')"
+          data-field="storage-nodes"
+        />
+        <p class="faint small hint">{{ t('storage.nodesHint') }}</p>
       </label>
       <template v-else>
         <div class="two">

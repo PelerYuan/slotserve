@@ -35,6 +35,8 @@ export interface Storage {
   local_path: string | null
   quota_gb: number | null
   enabled: boolean
+  /** host: other machines where the same directory exists */
+  node_ids: number[]
   status: StorageCheck | null
   checked_at: string | null
   usage_total: number | null
@@ -60,6 +62,7 @@ export interface StorageInput {
   local_path?: string | null
   quota_gb?: number | null
   enabled: boolean
+  node_ids?: number[]
 }
 
 export interface StorageUsage {
