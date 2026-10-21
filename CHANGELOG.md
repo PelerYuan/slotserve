@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-21
+
 ### Added
 
 - **Admin → Runtime monitor**: per-lane live server output (server-sent events), loading stage and progress read from llama.cpp / vLLM / SGLang output, failure details (error, exit code, last output lines, retry countdown), the exact launch command and a load history with command and output excerpt for every load.
@@ -137,7 +139,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - Admin CLI: `slotserve reset-password`, `slotserve set-admin`.
 - Bilingual documentation site (MkDocs Material).
 
-[Unreleased]: https://github.com/PelerYuan/slotserve/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/PelerYuan/slotserve/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/PelerYuan/slotserve/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/PelerYuan/slotserve/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/PelerYuan/slotserve/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/PelerYuan/slotserve/compare/v0.5.0...v0.6.0
