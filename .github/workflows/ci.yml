@@ -136,6 +136,8 @@ jobs:
           cp client.pub ctx/opt/slotserve/ssh/authorized_keys
           docker run --rm --entrypoint python slotserve:ci \
             -c "from slotserve.services.devenv import START_SCRIPT; print(START_SCRIPT, end='')" > ctx/opt/slotserve/start.sh
+          docker run --rm --entrypoint python slotserve:ci \
+            -c "from slotserve.services.devenv import SSH_SCRIPT; print(SSH_SCRIPT, end='')" > ctx/opt/slotserve/ssh.sh
           chmod 700 ctx/opt/slotserve/ssh
           chmod 600 ctx/opt/slotserve/ssh/authorized_keys ctx/opt/slotserve/ssh_host_key
           sudo chown -R 0:0 ctx
