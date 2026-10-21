@@ -73,7 +73,12 @@ def server(tmp_path_factory):
                 raise RuntimeError((tmp / "server.log").read_text(errors="replace")[-4000:]) from None
             time.sleep(0.3)
     yield base
-    proc.terminate()
+    if os.name == "nt":
+        # Windows ends the server without running its shutdown, so its model servers would be left
+        # behind; end the whole process tree instead.
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True, check=False)
+    else:
+        proc.terminate()
     try:
         proc.wait(timeout=20)
     except subprocess.TimeoutExpired:
