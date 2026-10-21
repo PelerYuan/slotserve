@@ -16,6 +16,7 @@ Rules:
 
 - A GPU belongs to at most one lane. Changing a lane's GPUs restarts its process.
 - Each lane has its own **default model**, served to everyone while the lane is not booked.
+- **Arguments** edits the launch arguments of the model a lane is running and reloads every lane running it; **Reload** restarts a lane's model server. Arguments belong to the model, so they apply on every lane.
 - Bookings, waitlist entries, manual load/unload and the "fall back to the default model" behaviour are per lane. Quotas count bookings across all lanes.
 - A lane with bookings that have not ended cannot be deleted, and the last lane cannot be deleted.
 - Each lane's process gets `CUDA_VISIBLE_DEVICES` set to its GPUs and listens on `SLOTSERVE_LLAMA_PORT + lane id - 1`. Logs are per lane (`llama-server-lane<N>.log`).

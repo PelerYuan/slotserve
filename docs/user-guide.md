@@ -89,7 +89,7 @@ The first account is the admin. Admins see an **Admin** entry in the sidebar.
 | Tab | What you can do |
 | --- | --- |
 | Overview | Counts of users, keys, open and pending bookings, requests and tokens in the last 24 h; recent model loads with failures; restart a lane's model server and read its log; **load a model now** or **unload** while nobody has the GPU booked, for a set time or until the next booking |
-| GPUs & lanes | Detected GPUs; create, edit and delete lanes and choose each lane's default model |
+| GPUs & lanes | Detected GPUs; create, edit and delete lanes and choose each lane's default model; edit the launch arguments of the model a lane is running and reload it |
 | Users | Create users (no invite code needed), reset passwords, grant or remove admin, disable, enable or delete accounts |
 | Bookings | Every booking, filtered by status or person; approve or reject requests; edit, cancel or end any booking; book for someone else |
 | Requests | Every API request with person, key, model, status, duration and tokens; filter to errors |

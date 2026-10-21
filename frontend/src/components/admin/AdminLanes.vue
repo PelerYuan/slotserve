@@ -86,6 +86,50 @@ function remove(l: Lane) {
 }
 
 const laneState = (id: number) => status.value?.lanes.find((l) => l.id === id)
+const loadedModel = (id: number) => laneState(id)?.runtime.model_id ?? null
+
+function reload(l: Lane) {
+  dialog.warning({
+    title: t('admin.lanes.reload'),
+    content: t('admin.lanes.reloadConfirm', { name: l.name }),
+    positiveText: t('admin.lanes.reload'),
+    negativeText: t('common.cancel'),
+    onPositiveClick: async () => {
+      try {
+        await api.restart(l.id)
+        message.success(t('admin.lanes.reloading', { name: l.name }))
+        setTimeout(refresh, 800)
+      } catch (e) {
+        showError(e)
+      }
+    },
+  })
+}
+
+// Edit the launch arguments of the model a lane is running, then reload every lane running it.
+const argsForm = reactive({ open: false, modelId: 0, name: '', args: '' })
+function openArgs(l: Lane) {
+  const id = loadedModel(l.id)
+  const m = models.value.find((x) => x.id === id)
+  if (!m) return
+  Object.assign(argsForm, { open: true, modelId: m.id, name: m.name, args: m.args })
+}
+async function saveArgs() {
+  busy.value = true
+  try {
+    await api.updateModel(argsForm.modelId, { args: argsForm.args.trim() })
+    const affected = lanes.value.filter((x) => loadedModel(x.id) === argsForm.modelId)
+    for (const x of affected) await api.restart(x.id)
+    models.value = await api.models().catch(() => models.value)
+    argsForm.open = false
+    message.success(t('admin.lanes.argsSaved', { n: affected.length }))
+    setTimeout(refresh, 800)
+  } catch (e) {
+    showError(e)
+  } finally {
+    busy.value = false
+  }
+}
 </script>
 
 <template>
@@ -144,6 +188,10 @@ const laneState = (id: number) => status.value?.lanes.find((l) => l.id === id)
               </template>
             </td>
             <td class="right nowrap">
+              <NButton size="small" quaternary :disabled="!loadedModel(l.id)" @click="openArgs(l)">
+                {{ t('admin.lanes.args') }}
+              </NButton>
+              <NButton size="small" quaternary @click="reload(l)">{{ t('admin.lanes.reload') }}</NButton>
               <NButton size="small" quaternary @click="openEdit(l)">{{ t('common.edit') }}</NButton>
               <NButton size="small" quaternary type="error" :disabled="lanes.length <= 1" @click="remove(l)">
                 {{ t('common.delete') }}
@@ -196,6 +244,22 @@ const laneState = (id: number) => status.value?.lanes.find((l) => l.id === id)
       </div>
     </template>
   </NModal>
+  <NModal v-model:show="argsForm.open" preset="card" :title="t('admin.lanes.argsTitle', { model: argsForm.name })" style="max-width: 560px">
+    <NInput
+      v-model:value="argsForm.args"
+      type="textarea"
+      class="mono"
+      :autosize="{ minRows: 3, maxRows: 8 }"
+      placeholder="-ngl 99 -c 8192 --flash-attn on"
+    />
+    <p class="faint small args-hint">{{ t('admin.lanes.argsHint') }}</p>
+    <template #footer>
+      <div class="footer">
+        <NButton @click="argsForm.open = false">{{ t('common.cancel') }}</NButton>
+        <NButton type="primary" :loading="busy" @click="saveArgs">{{ t('admin.lanes.argsSave') }}</NButton>
+      </div>
+    </template>
+  </NModal>
 </template>
 
 <style scoped>
@@ -238,5 +302,8 @@ const laneState = (id: number) => status.value?.lanes.find((l) => l.id === id)
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+.args-hint {
+  margin-top: 8px;
 }
 </style>
