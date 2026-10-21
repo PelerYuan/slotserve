@@ -72,6 +72,13 @@ export const storageEn = {
     mountPath: 'Mount path in environments',
     mountOptional: 'Optional for a model library: leave it empty to only use it in SlotServe.',
     readOnly: 'Read-only',
+    nodes: 'Also on nodes',
+    nodesNone: 'Only this server',
+    nodesHostHint:
+      'Other machines (node agents) that have this directory at the same path. Their lanes can use the models in it, and downloads to those machines can go into it.',
+    nodesShareHint:
+      'Other machines (node agents) that mount this share themselves: their agent creates the same Docker volume there and keeps it mounted, so their lanes can use the models and downloads to them can go into it.',
+    onNodes: 'also on {nodes}',
     localPath: 'Path SlotServe reads it at',
     localPathHint:
       'Where SlotServe itself sees the library, to scan and download into it. For NFS or SMB, mount it there on the SlotServe machine (or into the SlotServe container). For a host directory it defaults to that directory.',
@@ -94,6 +101,7 @@ export const storageEn = {
     storage_password_invalid: 'The password cannot contain commas or line breaks.',
     storage_local_invalid: 'Enter an absolute path for the library.',
     storage_local_required: 'A model library on NFS or SMB needs the path SlotServe reads it at.',
+    storage_nodes_invalid: 'Choose nodes that exist (not the built-in node).',
     storage_users_invalid: 'Choose the people who get this storage.',
     storage_library_invalid: 'That model library cannot be used.',
   },
@@ -169,6 +177,12 @@ export const storageZh = {
     mountPath: '环境中的挂载路径',
     mountOptional: '模型库可以不填：留空则只在 SlotServe 中使用。',
     readOnly: '只读',
+    nodes: '同时用于节点',
+    nodesNone: '仅本服务器',
+    nodesHostHint: '在相同路径下也有这个目录的其他机器（节点代理）。这些机器上的通道可以使用其中的模型，下载到这些机器时也可以下载到这里。',
+    nodesShareHint:
+      '自行挂载这个共享的其他机器（节点代理）：节点代理会在该机器上创建同样的 Docker 卷并保持挂载，这些机器上的通道可以使用其中的模型，下载到这些机器时也可以下载到这里。',
+    onNodes: '也用于 {nodes}',
     localPath: 'SlotServe 读取它的路径',
     localPathHint: 'SlotServe 自己看到这个模型库的位置，用于扫描和下载。NFS 或 SMB 需要先挂载到 SlotServe 所在机器（或 SlotServe 容器）的这个位置。主机目录默认就是该目录。',
     quota: '每人软上限',
@@ -190,6 +204,7 @@ export const storageZh = {
     storage_password_invalid: '密码不能包含逗号或换行。',
     storage_local_invalid: '请为模型库填写绝对路径。',
     storage_local_required: 'NFS 或 SMB 上的模型库需要填写 SlotServe 读取它的路径。',
+    storage_nodes_invalid: '请选择存在的节点（不能是内置节点）。',
     storage_users_invalid: '请选择可以使用这个存储的人。',
     storage_library_invalid: '不能使用这个模型库。',
   },

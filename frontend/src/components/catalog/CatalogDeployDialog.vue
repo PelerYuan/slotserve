@@ -51,7 +51,14 @@ const variantOptions = computed(() =>
     label: `${v.quant} · ${v.engines.map(engineLabel).join('/')} · ${formatBytes(v.download_bytes)}`,
   })),
 )
-const laneOptions = computed(() => props.lanes.map((l) => ({ value: l.id, label: l.name })))
+const laneOptions = computed(() =>
+  props.lanes.map((l) => ({
+    value: l.id,
+    label: l.node_name
+      ? `${l.name} · ${l.node_name}${l.node_online === false ? ` (${t('cluster.statuses.offline')})` : ''}`
+      : l.name,
+  })),
+)
 const lane = computed(() => props.lanes.find((l) => l.id === laneId.value) ?? null)
 const fit = computed(() => (laneId.value != null ? fitOn(variant.value, laneId.value) : 'unknown'))
 

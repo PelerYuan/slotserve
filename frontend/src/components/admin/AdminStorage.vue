@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { NButton, NCheckbox, NInput, NInputNumber, NModal, NSelect, NSwitch, useDialog, useMessage } from 'naive-ui'
 import { HardDrive, Plus, RefreshCw } from 'lucide-vue-next'
 import { api } from '@/api/client'
-import type { AdminUser } from '@/api/types'
+import type { AdminUser, ClusterNode } from '@/api/types'
 import {
   storageApi,
   type Storage,
@@ -26,6 +26,7 @@ const { showError } = useErrorMessage()
 
 const rows = ref<Storage[]>([])
 const users = ref<AdminUser[]>([])
+const nodes = ref<ClusterNode[]>([]) // other machines a model library can be used on
 const loading = ref(false)
 const checking = ref<Set<number>>(new Set())
 
@@ -42,7 +43,12 @@ async function load() {
 onMounted(async () => {
   await load()
   users.value = await api.admin.users().catch(() => [])
+  nodes.value = (await api.admin.nodes().catch(() => [] as ClusterNode[])).filter((n) => !n.is_local)
 })
+const nodeOptions = computed(() =>
+  nodes.value.filter((n) => n.status !== 'revoked').map((n) => ({ label: n.name, value: n.id })),
+)
+const nodeName = (id: number) => nodes.value.find((n) => n.id === id)?.name ?? `#${id}`
 
 const KINDS: StorageKind[] = ['host', 'nfs', 'smb']
 const PURPOSES: StoragePurpose[] = ['shared', 'personal', 'projects', 'models']
@@ -73,6 +79,7 @@ const form = reactive({
   access: 'everyone' as StorageAccess,
   user_ids: [] as number[],
   local_path: '',
+  node_ids: [] as number[],
   quota_gb: null as number | null,
   enabled: true,
 })
@@ -104,6 +111,7 @@ function openNew() {
     access: 'everyone',
     user_ids: [],
     local_path: '',
+    node_ids: [],
     quota_gb: null,
     enabled: true,
   })
@@ -129,6 +137,7 @@ function openEdit(s: Storage) {
     access: s.access,
     user_ids: [...s.user_ids],
     local_path: s.local_path ?? '',
+    node_ids: [...(s.node_ids ?? [])],
     quota_gb: s.quota_gb,
     enabled: s.enabled,
   })
@@ -171,7 +180,10 @@ function body(): StorageInput {
     else if (form.clearPassword) b.password = ''
   }
   if (needsMount.value) b.mount_path = form.mount_path.trim() || null
-  if (form.purpose === 'models') b.local_path = form.local_path.trim() || null
+  if (form.purpose === 'models') {
+    b.local_path = form.local_path.trim() || null
+    b.node_ids = form.node_ids
+  }
   if (form.purpose === 'personal') b.quota_gb = form.quota_gb || null
   return b
 }
@@ -293,6 +305,9 @@ function pct(s: Storage) {
               <span v-else class="muted">—</span>
               <span v-if="s.read_only" class="badge"> {{ t('storage.ro') }}</span>
               <div v-if="s.purpose === 'models' && s.local_path" class="faint mono">{{ t('storage.localShort') }} {{ s.local_path }}</div>
+              <div v-if="s.purpose === 'models' && s.node_ids?.length" class="faint">
+                {{ t('storage.onNodes', { nodes: s.node_ids.map(nodeName).join(', ') }) }}
+              </div>
             </td>
             <td class="small">{{ accessText(s) }}</td>
             <td class="small state">
@@ -419,6 +434,11 @@ function pct(s: Storage) {
         <span class="field-label">{{ t('storage.localPath') }}</span>
         <NInput v-model:value="form.local_path" :placeholder="form.kind === 'host' ? form.host_path : '/mnt/nas-models'" class="mono" />
         <p class="faint small hint">{{ t('storage.localPathHint') }}</p>
+      </label>
+      <label v-if="form.purpose === 'models' && nodeOptions.length">
+        <span class="field-label">{{ t('storage.nodes') }}</span>
+        <NSelect v-model:value="form.node_ids" multiple :options="nodeOptions" :placeholder="t('storage.nodesNone')" data-field="storage-nodes" />
+        <p class="faint small hint">{{ form.kind === 'host' ? t('storage.nodesHostHint') : t('storage.nodesShareHint') }}</p>
       </label>
       <label v-if="form.purpose === 'personal'">
         <span class="field-label">{{ t('storage.quota') }}</span>
