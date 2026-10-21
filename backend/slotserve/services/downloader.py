@@ -48,6 +48,7 @@ class Downloader:
         self.events = None  # Notifier, set by the app
         self.cluster = None  # ClusterHub, set by the app: downloads that run on other machines
         self._remote_calls: set[asyncio.Task] = set()
+        self.deployer = None  # services.catalog_deploy.Deployer, set by the app
 
     def poke(self) -> None:
         self._wake.set()
@@ -69,8 +70,21 @@ class Downloader:
         executor = self.cluster.executor(node_id)
         return executor is not None and executor.online
 
-    def dest_path(self, filename: str) -> Path:
-        return self.settings.models_dir / filename
+    def dest_path(self, filename: str, base: Path | None = None) -> Path:
+        """``base``: a model library from Admin -> Storage (storage hook); default MODELS_DIR."""
+        return (base or self.settings.models_dir) / filename
+
+    async def task_dir(self, db, task: DownloadTask) -> Path | None:
+        """The model library a task downloads into (storage hook), None for MODELS_DIR."""
+        if task.storage_id is None:
+            return None
+        from ..orm import Storage
+        from .storage import library_path
+
+        st = await db.get(Storage, task.storage_id)
+        if st is None or st.purpose != "models" or (path := library_path(st)) is None:
+            raise RuntimeError("the model library is no longer available")
+        return path
 
     async def recover(self) -> None:
         """Tasks left running by a previous process go back to the queue."""
@@ -115,6 +129,11 @@ class Downloader:
             if task is None or task.status != "queued":
                 return
             url, filename, user_id, node_id = task.url, task.filename, task.user_id, task.node_id
+            try:
+                base = await self.task_dir(db, task)
+            except RuntimeError as exc:
+                await self._set(task_id, status="failed", error=str(exc), finished_at=utcnow())
+                return
         self._cancel.discard(task_id)
         self.current_id = task_id
         await self._set(task_id, status="running", error=None, speed_bps=0.0)
@@ -124,7 +143,7 @@ class Downloader:
             if remote:
                 remote_path = await self.cluster.run_download(node_id, task_id, url, filename, self.auth_headers(url))
             else:
-                await self._download(task_id, url, filename)
+                await self._download(task_id, url, filename, base)
         except DownloadCancelled:
             await self._set(task_id, status="cancelled", speed_bps=0.0, finished_at=utcnow())
             return
@@ -145,8 +164,14 @@ class Downloader:
             await self._set(task_id, status="done", speed_bps=0.0, finished_at=utcnow(), model_id=model_id)
             self._emit("download_done", user_id=user_id, filename=filename)
             return
-        dest = self.dest_path(filename)
+        dest = self.dest_path(filename, base)
         model_id = None
+        if self.deployer is not None and await self.deployer.owns(task_id):
+            # Part of a catalog deployment: it registers the model itself once every file is here.
+            await self._set(task_id, status="done", speed_bps=0.0, finished_at=utcnow())
+            self._emit("download_done", user_id=user_id, filename=filename)
+            await self.deployer.task_done(task_id)
+            return
         if scanner.is_primary_gguf(dest):
             async with SessionLocal() as db:
                 model = await scanner.register_file(db, dest, self.settings, user_id)
@@ -185,8 +210,8 @@ class Downloader:
             return {"Authorization": f"Bearer {self.settings.hf_token}"}
         return {}
 
-    async def _download(self, task_id: int, url: str, filename: str) -> None:
-        dest = self.dest_path(filename)
+    async def _download(self, task_id: int, url: str, filename: str, base: Path | None = None) -> None:
+        dest = self.dest_path(filename, base)
         part = dest.with_name(dest.name + ".part")
         dest.parent.mkdir(parents=True, exist_ok=True)
         if dest.exists():

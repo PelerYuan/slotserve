@@ -41,6 +41,8 @@ from sqlalchemy import func, or_, select
 from ..db import SessionLocal, utcnow
 from ..orm import HOLDING_STATUSES, DevProject, DevSession, DevTemplate, Lane, Reservation, SshKey, User
 from ..runtime.manager import RuntimeState
+from . import storage
+from .devenv_cpu import CpuEnvs
 from .docker_api import DockerClient, DockerError, registry_of, tar_files
 
 log = logging.getLogger(__name__)
@@ -433,7 +435,7 @@ def web_base(session_id: int, port: int) -> str:
 
 
 def load_web_ports(raw: str | None) -> list[dict]:
-    """A template's declared web interfaces: [{name, port, kind}] (invalid entries are skipped)."""
+    """A template's declared web interfaces: [{name, port, kind, mode?}] (invalid entries are skipped)."""
     try:
         items = json.loads(raw) if raw else []
     except ValueError:
@@ -448,7 +450,10 @@ def load_web_ports(raw: str | None) -> list[dict]:
             continue
         seen.add(port)
         kind = item.get("kind") if item.get("kind") in WEB_KINDS else "http"
-        out.append({"name": str(item.get("name") or port)[:32], "port": port, "kind": kind})
+        entry = {"name": str(item.get("name") or port)[:32], "port": port, "kind": kind}
+        if item.get("mode") == "direct":  # direct ports: published on the host (services/devenv_ports.py)
+            entry["mode"] = "direct"
+        out.append(entry)
     return out
 
 
@@ -523,6 +528,22 @@ class _NoCookies(CookiePolicy):
         return False
 
 
+def booking_ssh_files(bundle: "SshBundle", keys: list[str], secret: str | None) -> dict[str, tuple[bytes, int]]:
+    """Files that give a booking container its SSH server: root logs in with the person's keys, and with their
+    password (``secret``, a SHA-512 crypt hash) when one is set and password login is allowed."""
+    ssh = SSH_SCRIPT.format(setup=ROOT_SETUP, flags="" if secret else "-s", tries=MAX_AUTH_TRIES, key_dir="-D $S/ssh ")
+    return {
+        "opt/slotserve/dropbearmulti": (bundle.binary, 0o755),
+        "opt/slotserve/ssh_host_key": (bundle.host_key, 0o600),
+        "opt/slotserve/lib.sh": (LIB_SCRIPT.encode(), 0o644),
+        "opt/slotserve/ssh/authorized_keys": ("".join(k + "\n" for k in keys).encode(), 0o600),
+        "opt/slotserve/root.hash": ((secret or "*").encode(), 0o600),
+        "etc/profile.d/slotserve.sh": (PROFILE.encode(), 0o644),
+        "opt/slotserve/ssh.sh": (ssh.encode(), 0o755),
+        "opt/slotserve/start.sh": (START_SCRIPT.format(cd="cd /workspace 2>/dev/null || true").encode(), 0o755),
+    }
+
+
 @dataclass
 class SshBundle:
     binary: bytes
@@ -543,6 +564,7 @@ class Plan:
     network_labels: dict = field(default_factory=dict)
     web: dict = field(default_factory=dict)  # declared ports and token (see DevEnvManager._web_spec)
     keep_entrypoint: bool = False
+    storage: "storage.StoragePlan | None" = None  # storage hook: managed storages (services/storage.py)
 
 
 class DevEnvManager:
@@ -571,6 +593,11 @@ class DevEnvManager:
         self.in_container = Path("/.dockerenv").exists()
         self._web_http: httpx.AsyncClient | None = None
         self.self_container = socket.gethostname()
+        self.cpu = CpuEnvs(self)  # devenv_cpu: environments without a GPU
+        # [ports hook] direct ports and their forwarder containers (services/devenv_ports.py)
+        from .devenv_ports import PortManager
+
+        self.ports = PortManager(self)
 
     # ---- plumbing ---------------------------------------------------------------
 
@@ -608,10 +635,12 @@ class DevEnvManager:
             await self._web_http.aclose()
         for task in [*self._pulls.values(), *self._saves.values()]:
             task.cancel()
+        await self.cpu.close()  # devenv_cpu
         if self._docker is not None:
             await self._docker.close()
 
     async def run(self) -> None:
+        self.cpu.start_monitor()  # devenv_cpu: live use and usage of CPU-only environments
         while True:
             try:
                 await self.tick()
@@ -711,6 +740,7 @@ class DevEnvManager:
                         log.warning("dev environment %s: docker unreachable: %s", s.id, exc)
                     await db.commit()
                 self._accounts_dirty = False
+                await self.ports.reconcile(db)  # [ports hook] forwarders of direct ports
                 self._holding = set(
                     (
                         await db.execute(
@@ -821,14 +851,19 @@ class DevEnvManager:
         r: Reservation | None = None
         if s.kind == "shared":
             over = self._shared_wanted.get(s.lane_id) != s.template_id
+        elif s.kind == "cpu":
+            over = await self.cpu.should_stop(db, s)  # devenv_cpu: owner gone, or its project's booking started
         else:
             r = await db.get(Reservation, s.reservation_id) if s.reservation_id else None
             over = r is None or r.status != "booked" or r.end_at <= now
         if over:
             await self._stop(db, s, "stopped")
+            await self.cpu.after_booking(db, s)  # devenv_cpu: maybe continue the project without a GPU
             return
         if s.state == "failed":
             return  # waits for a restart from the person or an admin
+        if s.project_id and s.state in ("waiting", "pulling", "ready"):
+            await self.cpu.follow_project_image(db, s)  # devenv_cpu: the project may have been snapshotted meanwhile
         if s.state in ("waiting", "pulling"):
             if await self.docker.image_exists(s.image):
                 s.state, s.detail, s.progress = "ready", None, None
@@ -865,6 +900,10 @@ class DevEnvManager:
 
     async def _gpu_free(self, db, s: DevSession) -> bool:
         """The lane's model server has stopped and no other container of the lane still holds the GPUs."""
+        if s.kind == "cpu":
+            return True  # devenv_cpu: no GPUs
+        if await self.cpu.project_busy(db, s):
+            return False  # devenv_cpu: the project still runs without a GPU; it is stopped first
         lanes = getattr(self.state, "lanes", None)
         if lanes is not None and lanes.get(s.lane_id).runtime.state != RuntimeState.STOPPED:
             return False
@@ -998,6 +1037,8 @@ class DevEnvManager:
         binds: list[tuple[str, str]] = []
         mounts: list[dict] = []
         digest = None
+        # storage hook: storages from Admin -> Storage (personal /workspace, project data, shared data, libraries)
+        sp = await storage.plan_for(db, self.settings.secret_key, user, shared=s.kind == "shared")
         if s.kind == "shared":
             account_files, digest = await self._account_files(db)
             files.update(account_files)
@@ -1006,6 +1047,8 @@ class DevEnvManager:
                 setup=SHARED_SETUP, flags="-w" if password_login else "-w -s", tries=MAX_AUTH_TRIES, key_dir=""
             )
             start = START_SCRIPT.format(cd="")
+            files["opt/slotserve/ssh.sh"] = (ssh.encode(), 0o755)
+            files["opt/slotserve/start.sh"] = (start.encode(), 0o755)
             self._volume(binds, mounts, f"slotserve-idle-home-l{s.lane_id}", f"lanes/l{s.lane_id}/home", "/home")
             name = f"slotserve-idle-{s.lane_id}"
             hostname = f"{re.sub(r'[^a-z0-9-]', '-', (lane.name if lane else 'lane').lower())[:40]}-idle"
@@ -1015,32 +1058,30 @@ class DevEnvManager:
             secret = user.devenv_password_hash if user is not None and password_login else None
             if not keys and not secret:
                 raise DevEnvError("ssh_login_required" if password_login else "ssh_key_required")
-            files.update(
-                {
-                    "opt/slotserve/ssh/authorized_keys": ("".join(k + "\n" for k in keys).encode(), 0o600),
-                    "opt/slotserve/root.hash": ((secret or "*").encode(), 0o600),
-                    "etc/profile.d/slotserve.sh": (PROFILE.encode(), 0o644),
-                }
-            )
-            ssh = SSH_SCRIPT.format(
-                setup=ROOT_SETUP, flags="" if secret else "-s", tries=MAX_AUTH_TRIES, key_dir="-D $S/ssh "
-            )
-            start = START_SCRIPT.format(cd="cd /workspace 2>/dev/null || true")
+            files.update(booking_ssh_files(bundle, keys, secret))
             uid = s.user_id
-            self._volume(binds, mounts, f"slotserve-workspace-u{uid}", f"users/u{uid}/workspace", "/workspace")
+            if sp.personal is not None:  # storage hook
+                mounts.append(sp.sub(sp.personal, f"users/u{uid}", "/workspace", seed="/workspace"))
+            else:
+                self._volume(binds, mounts, f"slotserve-workspace-u{uid}", f"users/u{uid}/workspace", "/workspace")
             for path in self._project_paths(s, project, template):
                 slug = _slug(path)
                 if project is not None:
+                    if sp.projects is not None:  # storage hook
+                        mounts.append(sp.sub(sp.projects, f"projects/p{project.id}/{slug}", path, seed=path))
+                        continue
                     volume, rel = f"slotserve-project{project.id}-{slug}", f"projects/p{project.id}/{slug}"
                     self._volume(binds, mounts, volume, rel, path)
                 else:
                     tid = template.id if template else 0
+                    if sp.projects is not None:  # storage hook
+                        mounts.append(sp.sub(sp.projects, f"templates/u{uid}-t{tid}/{slug}", path, seed=path))
+                        continue
                     self._volume(binds, mounts, f"slotserve-u{uid}-t{tid}-{slug}", f"users/u{uid}/t{tid}/{slug}", path)
             name = f"slotserve-proj-{project.id}" if project is not None else f"slotserve-dev-{s.id}"
             hostname = f"{(user.username if user else 'dev')[:40]}-dev"
             env = {"SLOTSERVE_USER": user.username if user else "", "SLOTSERVE_END": r.end_at.isoformat() if r else ""}
-        files["opt/slotserve/ssh.sh"] = (ssh.encode(), 0o755)
-        files["opt/slotserve/start.sh"] = (start.encode(), 0o755)
+        mounts.extend(m for m in sp.mounts if not any(m is x for x in mounts))  # storage hook
 
         if project is not None:
             network = project_network_name(project.id)
@@ -1094,6 +1135,7 @@ class DevEnvManager:
             host_config["NanoCpus"] = int(self.settings.devenv_cpus * 1e9)
         if self.settings.devenv_memory_gb > 0:
             host_config["Memory"] = int(self.settings.devenv_memory_gb * 1024**3)
+        await self.cpu.apply_resources(db, s, lane, host_config, env)  # devenv_cpu: cpuset, CPU-only limits
         labels = {LABEL: "1", "slotserve.session": str(s.id), "slotserve.kind": s.kind or "booking"}
         if user is not None:
             labels["slotserve.user"] = user.username
@@ -1118,7 +1160,7 @@ class DevEnvManager:
                 User="root",
                 WorkingDir="/" if s.kind == "shared" else "/workspace",
             )
-        return Plan(name, files, config, binds, digest, network, network_labels, web, keep)
+        return Plan(name, files, config, binds, digest, network, network_labels, web, keep, sp)
 
     @staticmethod
     def _web_spec(s: DevSession, template: DevTemplate | None) -> dict:
@@ -1268,6 +1310,11 @@ class DevEnvManager:
         if project is not None and await self._resume(db, s, project, plan, used):
             return
         await self._prepare_storage(s, plan)
+        if plan.storage is not None:  # storage hook: volumes and folders of managed storages
+            try:
+                await storage.prepare(self.docker, s.image, plan.storage, f"slotserve-prep-{s.id}")
+            except storage.StorageError as exc:
+                raise DevEnvError(exc.code, **exc.params) from exc
         lo, hi = parse_port_range(self.settings.devenv_ssh_ports)
         free = [p for p in range(lo, hi + 1) if p not in used]
         candidates = [p for p in free if p not in kept] + [p for p in free if p in kept]
@@ -1293,18 +1340,26 @@ class DevEnvManager:
             if project is not None:
                 lane = await db.get(Lane, s.lane_id) if s.lane_id else None
                 project.container_id, project.container_port = cid, port
-                project.container_devices = lane.gpu_indices if lane else ""
+                project.container_devices = self._devices_key(s, lane)
                 project.container_paths = project.persist_paths or ""
                 project.container_web = json.dumps(plan.web)
+                project.container_storage = plan.storage.signature if plan.storage else ""  # storage hook
                 project.state, project.last_used_at = "running", utcnow()
             self._running(s, cid, plan.name, port, plan.accounts_digest)
             await db.commit()
             await self._after_start(s, cid, plan.name, plan.web, plan)
             await db.commit()
-            if s.kind != "shared":
+            if s.kind not in ("shared", "cpu"):
                 self.state.notifier.emit("devenv_ready", user_id=s.user_id, reservation_id=s.reservation_id, port=port)
             return
         raise DevEnvError("devenv_no_ports", detail=last_error)
+
+    @staticmethod
+    def _devices_key(s: DevSession, lane: Lane | None) -> str:
+        """What a kept container's GPUs are recorded as: the lane's, or "cpu" for one without a GPU (devenv_cpu)."""
+        if s.kind == "cpu":
+            return "cpu"
+        return lane.gpu_indices if lane else ""
 
     def _running(self, s: DevSession, cid: str, name: str, port: int, digest: str | None) -> None:
         s.container_id, s.container_name, s.ssh_port = cid, name, port
@@ -1324,10 +1379,12 @@ class DevEnvManager:
                 project.state, project.container_id = "missing", None
             return False
         lane = await db.get(Lane, s.lane_id) if s.lane_id else None
-        devices = lane.gpu_indices if lane else ""
+        devices = self._devices_key(s, lane)
         same = (
             (project.container_devices or "") == devices
             and (project.container_paths or "") == (project.persist_paths or "")
+            # storage hook: the managed storage mounts are the same
+            and (project.container_storage or "") == (plan.storage.signature if plan.storage else "")
             and project.container_port is not None
             and project.container_port not in used
         )
@@ -1337,6 +1394,7 @@ class DevEnvManager:
                     await self.docker.stop(project.container_id, timeout=10)
             # the container's network stays while the project exists, but it may have been removed by hand
             await self._ensure_network(plan, fresh=False)
+            await self.cpu.refresh_limits(project.container_id, plan.config["HostConfig"])  # devenv_cpu
             try:
                 await self.docker.put_archive(project.container_id, "/", tar_files(plan.files))
                 await self.docker.start(project.container_id)
@@ -1352,9 +1410,10 @@ class DevEnvManager:
                 spec.setdefault("base_session", s.id)
                 await self._after_start(s, project.container_id, plan.name, spec, plan)
                 await db.commit()
-                self.state.notifier.emit(
-                    "devenv_ready", user_id=s.user_id, reservation_id=s.reservation_id, port=project.container_port
-                )
+                if s.kind != "cpu":
+                    self.state.notifier.emit(
+                        "devenv_ready", user_id=s.user_id, reservation_id=s.reservation_id, port=project.container_port
+                    )
                 return True
         # Different GPUs, paths or port: keep what was installed by snapshotting the container into an image.
         s.detail = "snapshot"
@@ -1367,7 +1426,7 @@ class DevEnvManager:
         project.container_web = None
         s.image, s.detail = ref, None
         plan.config["Image"] = ref
-        if old.startswith(f"slotserve/project-{project.id}:"):
+        if old != ref and old.startswith(f"slotserve/project-{project.id}:"):
             with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
                 await self.docker.remove_image(old)
         await db.commit()
@@ -1389,6 +1448,7 @@ class DevEnvManager:
     async def _discard(self, db, s: DevSession, stop_first: bool) -> None:
         """Ends a session's container: a kept environment's is paused, any other removed with its network."""
         project = await db.get(DevProject, s.project_id) if s.project_id else None
+        await self.ports.drop_forwarders(s)  # [ports hook] before the network goes or the container pauses
         if s.container_id:
             if project is not None and project.container_id == s.container_id:
                 await self._pause(db, project, s.container_id)  # keep what is installed in it
@@ -1419,7 +1479,7 @@ class DevEnvManager:
         await self._discard(db, s, stop_first=False)
         s.container_id = None
         s.state, s.error, s.detail, s.progress = "failed", message[:4000], None, None
-        if notify and s.kind != "shared":
+        if notify and s.kind not in ("shared", "cpu"):
             self.state.notifier.emit(
                 "devenv_failed", user_id=s.user_id, reservation_id=s.reservation_id, error=message.splitlines()[0][:300]
             )
@@ -1427,6 +1487,7 @@ class DevEnvManager:
     async def _cleanup(self, db) -> None:
         """After a restart: keep containers whose session is still running (and their networks), pause kept ones,
         remove the rest and leftover networks."""
+        await self.ports.remove_all()  # [ports hook] the next tick starts the forwarders that are still wanted
         running = {
             s.container_id: s
             for s in (await db.execute(select(DevSession).where(DevSession.state == "running"))).scalars()
@@ -1539,7 +1600,8 @@ class DevEnvManager:
                         command=source.command if source else None,
                         env=source.env if source else None,
                         persist_paths=source.persist_paths if source else None,
-                        web_ports=source.web_ports if source else None,
+                        # [ports hook] the declared ports plus the ones added at runtime, with their modes
+                        web_ports=await self.ports.saved_web_ports(db, s, source),
                         keep_entrypoint=source.keep_entrypoint if source else False,
                         kind="saved",
                         owner_id=owner_id,
@@ -1581,18 +1643,33 @@ class DevEnvManager:
             with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
                 await self.docker.remove(project.container_id)
         if data:
-            storage = self.settings.devenv_storage_dir.rstrip("/")
-            if storage:
-                image = project.image
-                if not await self.docker.image_exists(image):
-                    template = await db.get(DevTemplate, project.template_id) if project.template_id else None
-                    image = template.image if template else image
+            storage_dir = self.settings.devenv_storage_dir.rstrip("/")
+            # storage hook: the project storage of Admin -> Storage keeps the data under projects/p<id>
+            st = await storage.projects_storage(db, await db.get(User, project.owner_id))
+            image = project.image
+            if (storage_dir or st is not None) and not await self.docker.image_exists(image):
+                template = await db.get(DevTemplate, project.template_id) if project.template_id else None
+                image = template.image if template else image
+            if st is not None:
+                try:
+                    await storage.remove_folder(
+                        self.docker,
+                        st,
+                        self.settings.secret_key,
+                        image,
+                        f"projects/p{project.id}",
+                        f"slotserve-clean-p{project.id}-st{st.id}",
+                    )
+                except storage.StorageError as exc:
+                    raise DevEnvError(exc.code, **exc.params) from exc
+            if storage_dir:
                 script = f"rm -rf /slotserve-storage/projects/p{project.id}"
-                await self._helper(f"slotserve-clean-p{project.id}", image, storage, script)
+                await self._helper(f"slotserve-clean-p{project.id}", image, storage_dir, script)
             else:
                 for path in {*load_paths(project.persist_paths), *load_paths(project.container_paths)}:
                     with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
                         await self.docker.remove_volume(f"slotserve-project{project.id}-{_slug(path)}")
+        await self.ports.release_project(db, project)  # [ports hook] its fixed host ports go back to the pool
         await self._drop_network(project_network_name(project.id))
         if project.image.startswith(f"slotserve/project-{project.id}:"):
             with contextlib.suppress(DockerError, httpx.HTTPError, OSError):

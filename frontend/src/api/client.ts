@@ -14,6 +14,11 @@ import type {
   ChannelLink,
   ChatChannel,
   ChatChannels,
+  Catalog,
+  CatalogDeploy,
+  CatalogDeployInput,
+  CatalogEntry,
+  CatalogEntryInput,
   ClusterNode,
   ClusterNodeToken,
   DevInfo,
@@ -57,7 +62,8 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn
 }
 
-async function request<T>(method: string, path: string, body?: unknown, query?: Record<string, unknown>): Promise<T> {
+// exported for api modules of their own (e.g. ./devenvPorts.ts)
+export async function request<T>(method: string, path: string, body?: unknown, query?: Record<string, unknown>): Promise<T> {
   let url = path
   if (query) {
     const qs = new URLSearchParams()
@@ -168,6 +174,22 @@ export const api = {
     }),
   hfDownload: (repo: string, files: string[], revision = 'main', nodeId?: number | null) =>
     request<DownloadTask[]>('POST', '/api/downloads/hf', { repo, revision, files, node_id: nodeId ?? null }),
+
+  // model catalog
+  catalog: {
+    list: (ctx?: number) => request<Catalog>('GET', '/api/catalog', undefined, { ctx }),
+    entry: (id: string, ctx?: number) =>
+      request<CatalogEntry>('GET', `/api/catalog/${encodeURIComponent(id)}`, undefined, { ctx }),
+    deploys: () => request<CatalogDeploy[]>('GET', '/api/catalog/deploys'),
+    deploy: (body: CatalogDeployInput) => request<CatalogDeploy>('POST', '/api/catalog/deploy', body),
+    dismiss: (id: number) => request<void>('DELETE', `/api/catalog/deploys/${id}`),
+    setHidden: (id: string, hidden: boolean) =>
+      request<void>('PUT', `/api/catalog/${encodeURIComponent(id)}/hidden`, { hidden }),
+    createEntry: (body: CatalogEntryInput) => request<CatalogEntry>('POST', '/api/catalog/entries', body),
+    updateEntry: (id: string, body: CatalogEntryInput) =>
+      request<CatalogEntry>('PUT', `/api/catalog/entries/${encodeURIComponent(id)}`, body),
+    deleteEntry: (id: string) => request<void>('DELETE', `/api/catalog/entries/${encodeURIComponent(id)}`),
+  },
 
   // reservations
   reservations: (start: Date, end: Date, mine = false, laneId?: number | null) =>

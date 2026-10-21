@@ -86,10 +86,23 @@ These only exist in `docker-compose.yml` and describe the **host**.
 | `SLOTSERVE_DEVENV_PULL_MINUTES` | `60` | Download the image this long before a booking |
 | `SLOTSERVE_DEVENV_PASSWORD_LOGIN` | `true` | Allow SSH logins with the environment password as well as keys |
 | `SLOTSERVE_DEVENV_STORAGE_DIR` | *empty* | Directory on the Docker host for persistent data (bind mounts); empty = Docker named volumes |
+| `SLOTSERVE_STORAGE_HELPER_IMAGE` | `busybox:1.37` | Image of the short-lived containers that check storages from **Admin → Storage** (pulled when missing) |
+| `SLOTSERVE_STORAGE_CHECK_MINUTES` | `30` | How often storages are checked (free space, per-person usage); 0 = only on demand |
 | `SLOTSERVE_DEVENV_PROJECTS` | `3` | Kept (paused) environments per person; 0 = none |
 | `SLOTSERVE_DEVENV_PROJECT_DAYS` | `0` | Remove kept environments unused this many days (0 = never) |
+| `SLOTSERVE_DEVENV_CPU_ENABLED` | `true` | Let people start dev environments without a GPU (no booking) |
+| `SLOTSERVE_DEVENV_CPU_PER_USER` | `2` | Environments without a GPU one person can run at once |
+| `SLOTSERVE_DEVENV_CPU_CORES_PER_GPU` | `8` | CPU cores each lane reserves per GPU for its bookings (cpuset); 0 = none |
+| `SLOTSERVE_DEVENV_CPU_CORES` / `_MEMORY_GB` | `4` / `16` | Limits of one environment without a GPU (0 = the whole pool / no limit) |
+| `SLOTSERVE_DEVENV_CPU_MEMORY_POOL_GB` | `0` | Memory all environments without a GPU may claim together (0 = no limit) |
+| `SLOTSERVE_DEVENV_PUBLIC_PORTS_ENABLED` | `true` | Let people publish container ports directly on host ports (no SlotServe login) |
+| `SLOTSERVE_DEVENV_PUBLIC_PORTS` | `2300-2399` | Host ports for direct ports (keep apart from the SSH ports) |
+| `SLOTSERVE_DEVENV_PUBLIC_PORT_LIMIT` | `5` | Direct ports per person; admins have no limit; 0 = only admins |
+| `SLOTSERVE_DEVENV_FORWARDER_IMAGE` | `alpine/socat:1.8.1.1` | Image of the per-port forwarder containers (needs `socat` on its PATH) |
+| `SLOTSERVE_DEVENV_WEB_PORT` | `8001` | Port of the dev environment web interfaces, a separate origin (0 = serve them on `PORT`, not recommended) |
+| `SLOTSERVE_DEVENV_WEB_URL` | *empty* | How browsers reach that port, e.g. behind a reverse proxy; empty = the same host on `DEVENV_WEB_PORT` |
 
-Admins can change every setting in **Admin → System settings** without a restart, except the deployment ones (`HOST`, `PORT`, `SECRET_KEY`, `COOKIE_SECURE`, `STATIC_DIR`, `DATA_DIR`, `MODELS_DIR`, `LLAMA_SERVER_CMD`, `LLAMA_HOST`, `LLAMA_PORT`, `TELEGRAM_API_BASE`, the `…_API_BASE` and `QQ_TOKEN_URL` addresses, `DOCKER_HOST`, `DROPBEAR_PATH`), which need a restart and therefore stay in `.env`. Overrides live in the database and win over `.env`; **Use default** removes an override.
+Admins can change every setting in **Admin → System settings** without a restart, except the deployment ones (`HOST`, `PORT`, `SECRET_KEY`, `COOKIE_SECURE`, `STATIC_DIR`, `DATA_DIR`, `MODELS_DIR`, `LLAMA_SERVER_CMD`, `LLAMA_HOST`, `LLAMA_PORT`, `TELEGRAM_API_BASE`, the `…_API_BASE` and `QQ_TOKEN_URL` addresses, `DOCKER_HOST`, `DROPBEAR_PATH`, `DEVENV_WEB_PORT`), which need a restart and therefore stay in `.env`. Overrides live in the database and win over `.env`; **Use default** removes an override.
 
 Settings for several machines (the server's node settings and the node agent's `SLOTSERVE_AGENT_*`) are listed in [Multiple machines](multiple-machines.md#settings); they are read at startup.
 

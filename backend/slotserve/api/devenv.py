@@ -45,12 +45,19 @@ class WebPort(BaseModel):
     name: str = Field(default="", max_length=32)
     port: int = Field(ge=1, le=65535)
     kind: WebKind = "http"
+    # [ports hook] login: through SlotServe's proxy; direct: published on a host port (services/devenv_ports.py)
+    mode: Literal["login", "direct"] = "login"
 
 
 def _web_ports(ports: list[WebPort]) -> str | None:
     if len({p.port for p in ports}) != len(ports):
         raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_web_port_duplicate")
-    items = [{"name": p.name.strip() or str(p.port), "port": p.port, "kind": p.kind} for p in ports]
+    items = []
+    for p in ports:
+        item = {"name": p.name.strip() or str(p.port), "port": p.port, "kind": p.kind}
+        if p.mode == "direct":
+            item["mode"] = "direct"
+        items.append(item)
     return json.dumps(items) if items else None
 
 
@@ -105,7 +112,7 @@ class WebOut(BaseModel):
 
 class SessionOut(BaseModel):
     id: int
-    kind: str  # booking | shared (the environment of an idle lane, open to everyone)
+    kind: str  # booking | shared (the environment of an idle lane, open to everyone) | cpu (without a GPU)
     reservation_id: int | None
     username: str | None
     mine: bool
@@ -446,6 +453,11 @@ async def restart_session(
     session_id: int, request: Request, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
 ):
     s = await _session(db, session_id, user, manage=True)
+    if s.kind == "cpu" and s.state == "failed" and s.user_id is not None:
+        try:  # devenv_cpu: a failed CPU-only environment holds no place; retrying it takes one
+            await request.app.state.devenv.cpu.check_room(db, s.user_id)
+        except DevEnvError as exc:
+            raise _devenv_error(exc) from exc
     if s.user_id != user.id:
         record(db, user, "devenv.restart", f"#{s.id}")
         await db.commit()

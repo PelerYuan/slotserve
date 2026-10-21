@@ -21,11 +21,21 @@ class FakeDocker:
         self.execs: dict[str, dict] = {}  # exec id -> {Container, Config, Started}
         self.exec_calls: list[tuple[str, list[str]]] = []  # (container id, command) of every exec
         self.exec_result: tuple[int, bytes] = (0, b"")
+        self.listening: bytes | None = None  # /proc/net/tcp contents the port probe sees (None: exec_result)
         self.wait_code: int | None = None  # exit code reported for helper containers (default: their own)
         self.removed_volumes: list[str] = []
         self.commits: list[tuple[str, str]] = []
         self.created: list[tuple[str, dict]] = []  # (name, config) of every container ever created
+        # Storage (services/storage.py): named volumes, what helper containers print, mounts that fail
+        self.volumes: dict[str, dict] = {}  # name -> {Name, Driver, Options, Labels}
+        self.helper_output: dict[str, str] = {}  # text in a helper's script -> its output (logs)
+        self.mount_errors: dict[str, str] = {}  # mount source (prefix) -> error when a container starts
         self._exec_ids: dict[str, int] = {}
+        self.ncpu = 32  # what /info reports
+        self.mem_total = 128 * 2**30
+        self.cpu_ns: dict[str, int] = {}  # container id -> CPU time reported by /stats
+        self.mem_used: dict[str, int] = {}
+        self.updates: list[tuple[str, dict]] = []  # (container id, body) of every docker update
         self._next = 1
 
         def ref(name: str, tag: str) -> str:
@@ -34,6 +44,35 @@ class FakeDocker:
         @self.app.get("/v1.41/version")
         async def version():
             return {"Version": "27.0-fake", "ApiVersion": "1.41"}
+
+        @self.app.get("/v1.41/info")
+        async def info():
+            return {"NCPU": self.ncpu, "MemTotal": self.mem_total, "ServerVersion": "27.0-fake"}
+
+        @self.app.get("/v1.41/containers/{cid}/stats")
+        async def stats(cid: str):
+            c = find(cid)
+            if c is None:
+                return JSONResponse({"message": "no such container"}, status_code=404)
+            host = c["Config"].get("HostConfig", {})
+            return {
+                "cpu_stats": {"cpu_usage": {"total_usage": self.cpu_ns.get(c["Id"], 0)}, "online_cpus": self.ncpu},
+                "memory_stats": {
+                    "usage": self.mem_used.get(c["Id"], 0) + 4096,
+                    "limit": host.get("Memory") or self.mem_total,
+                    "stats": {"inactive_file": 4096},
+                },
+            }
+
+        @self.app.post("/v1.41/containers/{cid}/update")
+        async def update(cid: str, request: Request):
+            c = find(cid)
+            if c is None:
+                return JSONResponse({"message": "no such container"}, status_code=404)
+            body = await request.json()
+            self.updates.append((c["Id"], body))
+            c["Config"].setdefault("HostConfig", {}).update(body)
+            return {"Warnings": []}
 
         @self.app.get("/v1.41/images/{name:path}/json")
         async def image(name: str):
@@ -160,6 +199,8 @@ class FakeDocker:
             if detach:
                 return Response(status_code=200)
             code, text = self.exec_result
+            if self.listening is not None and "proc/net/tcp" in " ".join(self.execs[eid]["Config"]["Cmd"]):
+                code, text = 0, self.listening  # what the port probe reads (services/devenv_ports.py)
             self._exec_ids[eid] = code
             return Response(content=b"\x01\x00\x00\x00" + len(text).to_bytes(4, "big") + text if text else b"")
 
@@ -187,10 +228,18 @@ class FakeDocker:
             c = find(cid)
             if c is None:
                 return JSONResponse({"message": "no such container"}, status_code=404)
-            port = c["Config"]["HostConfig"].get("PortBindings", {}).get("22/tcp", [{}])[0].get("HostPort")
-            if port in self.busy_ports:
-                message = f"Bind for 0.0.0.0:{port} failed: port is already allocated"
-                return JSONResponse({"message": message}, status_code=500)
+            for m in c["Config"].get("HostConfig", {}).get("Mounts") or []:
+                for prefix, error in self.mount_errors.items():
+                    if str(m.get("Source", "")).startswith(prefix):
+                        return JSONResponse({"message": error}, status_code=500)
+                if m.get("Type") == "volume" and m["Source"] not in self.volumes:
+                    self.volumes[m["Source"]] = {"Name": m["Source"], "Driver": "local", "Options": {}, "Labels": {}}
+            # any published host port (SSH, forwarders of direct ports) can be taken by something else
+            for bindings in c["Config"]["HostConfig"].get("PortBindings", {}).values():
+                port = (bindings or [{}])[0].get("HostPort")
+                if port and port in self.busy_ports:
+                    message = f"Bind for 0.0.0.0:{port} failed: port is already allocated"
+                    return JSONResponse({"message": message}, status_code=500)
             c["Running"] = True
             return Response(status_code=204)
 
@@ -251,8 +300,46 @@ class FakeDocker:
 
         @self.app.delete("/v1.41/volumes/{name}")
         async def remove_volume(name: str):
-            self.removed_volumes.append(unquote(name))
+            name = unquote(name)
+            in_use = any(
+                m.get("Source") == name
+                for c in self.containers.values()
+                for m in c["Config"].get("HostConfig", {}).get("Mounts") or []
+            )
+            if in_use:
+                return JSONResponse({"message": f"remove {name}: volume is in use"}, status_code=409)
+            self.removed_volumes.append(name)
+            self.volumes.pop(name, None)
             return Response(status_code=204)
+
+        @self.app.post("/v1.41/volumes/create")
+        async def volume_create(request: Request):
+            body = await request.json()
+            name = body["Name"]
+            if name not in self.volumes:
+                self.volumes[name] = {
+                    "Name": name,
+                    "Driver": body.get("Driver") or "local",
+                    "Options": body.get("DriverOpts") or {},
+                    "Labels": body.get("Labels") or {},
+                }
+            return JSONResponse(self.volumes[name], status_code=201)
+
+        @self.app.get("/v1.41/volumes/{name}")
+        async def volume_inspect(name: str):
+            v = self.volumes.get(unquote(name))
+            if v is None:
+                return JSONResponse({"message": "no such volume"}, status_code=404)
+            return v
+
+        @self.app.get("/v1.41/volumes")
+        async def volume_list(filters: str = "{}"):
+            wanted = [w.partition("=") for w in json.loads(filters).get("label", [])]
+
+            def match(labels: dict) -> bool:
+                return all((labels.get(k) == v) if sep else (k in labels) for k, sep, v in wanted)
+
+            return {"Volumes": [v for v in self.volumes.values() if match(v["Labels"])], "Warnings": []}
 
         @self.app.get("/v1.41/containers/json")
         async def listing(filters: str = "{}"):
@@ -268,6 +355,11 @@ class FakeDocker:
         async def logs(cid: str):
             c = find(cid)
             text = b"dropbear: Not backgrounding\n" + (b"Killed\n" if c and c["ExitCode"] else b"")
+            script = " ".join((c or {}).get("Config", {}).get("Entrypoint") or [])
+            for needle, output in self.helper_output.items():
+                if needle in script:
+                    text = output.encode()
+                    break
             return Response(content=b"\x01\x00\x00\x00" + len(text).to_bytes(4, "big") + text)
 
         @self.app.post("/v1.41/commit")
@@ -289,3 +381,11 @@ class FakeDocker:
             "ExitCode": 0,
         }
         return cid
+
+    def forwarders(self) -> dict[str, dict]:
+        """Forwarder containers of direct ports, by name."""
+        return {
+            c["Name"]: c
+            for c in self.containers.values()
+            if c["Config"].get("Labels", {}).get("slotserve.devenv") == "forwarder"
+        }

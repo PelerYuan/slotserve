@@ -47,6 +47,9 @@ FREE = Occupant("free")
 # Extra ways to recognise shared use of an otherwise unbooked lane (e.g. a lane's idle mode):
 # ``async probe(db, lane_context, now) -> Occupant | None``; the first non-None answer wins.
 IdleProbe = Callable[[AsyncSession, object, datetime], Awaitable[Occupant | None]]
+# Rows for other resources, written with each minute: ``async writer(db, minute, seconds) -> rows added``
+# (CPU-only dev environments: services/devenv_cpu.py).
+UsageWriter = Callable[[AsyncSession, datetime, int], Awaitable[int]]
 
 
 def booking_kind(r: Reservation) -> str:
@@ -97,6 +100,7 @@ class UsageSampler:
         self.state = app_state
         self._stats = stats
         self.probes: list[IdleProbe] = []
+        self.writers: list[UsageWriter] = []
         self._last: datetime | None = None
         self.current: dict[int, Occupant] = {}  # lane id -> occupant at the last sample
 
@@ -153,6 +157,11 @@ class UsageSampler:
                 for g in own or [None]:
                     db.add(_row(minute, seconds, ctx.id, occ, g, busy_pct))
                     written += 1
+            for writer in self.writers:
+                try:
+                    written += await writer(db, minute, seconds)
+                except Exception:
+                    log.exception("usage writer failed")
             await db.commit()
         self._last = minute
         return written

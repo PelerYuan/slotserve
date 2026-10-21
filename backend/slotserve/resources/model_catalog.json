@@ -1,0 +1,2320 @@
+{
+  "version": 1,
+  "updated": "2026-10-22",
+  "entries": [
+    {
+      "id": "qwen3-4b-instruct-2507",
+      "name": "Qwen3 4B Instruct 2507",
+      "family": "Qwen3",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "chat"
+      ],
+      "params_b": 4.0,
+      "context_length": 262144,
+      "tags": [
+        "small",
+        "multilingual",
+        "tools"
+      ],
+      "description": {
+        "en": "Small, fast instruction model with a very long native context. A good default for light chat, extraction and tool calling.",
+        "zh": "小巧快速的指令模型，原生支持超长上下文。适合轻量对话、信息抽取和工具调用。"
+      },
+      "source_repo": "Qwen/Qwen3-4B-Instruct-2507",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "unsloth/Qwen3-4B-Instruct-2507-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 2497281120
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "unsloth/Qwen3-4B-Instruct-2507-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Qwen3-4B-Instruct-2507-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 4280405600
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-4B-Instruct-2507",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 8060896487,
+          "file_count": 10
+        }
+      ],
+      "arch": {
+        "layers": 36,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "qwen3-8b",
+      "name": "Qwen3 8B",
+      "family": "Qwen3",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "chat",
+        "reasoning"
+      ],
+      "params_b": 8.2,
+      "context_length": 32768,
+      "tags": [
+        "thinking",
+        "multilingual",
+        "tools"
+      ],
+      "description": {
+        "en": "General-purpose model that can switch between step-by-step thinking and quick answers. Strong all-rounder for a single GPU.",
+        "zh": "可在“思考”与快速回答之间切换的通用模型，单卡上的全能选手。"
+      },
+      "source_repo": "Qwen/Qwen3-8B",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-8B-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Qwen3-8B-Q4_K_M.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 5027783488
+        },
+        {
+          "id": "q5_k_m",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-8B-GGUF",
+          "quant": "Q5_K_M",
+          "files": [
+            "Qwen3-8B-Q5_K_M.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 5851112224
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-8B-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Qwen3-8B-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 8709518112
+        },
+        {
+          "id": "fp8",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-8B-FP8",
+          "quant": "FP8",
+          "gated": false,
+          "size_bytes": 9452566812,
+          "file_count": 9
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-8B",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 16397431693,
+          "file_count": 12
+        }
+      ],
+      "arch": {
+        "layers": 36,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "qwen3-14b",
+      "name": "Qwen3 14B",
+      "family": "Qwen3",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "chat",
+        "reasoning"
+      ],
+      "params_b": 14.8,
+      "context_length": 32768,
+      "tags": [
+        "thinking",
+        "multilingual",
+        "tools"
+      ],
+      "description": {
+        "en": "Larger Qwen3 with thinking and non-thinking modes; noticeably better at reasoning and writing than the 8B.",
+        "zh": "更大的 Qwen3，支持思考与非思考模式，推理和写作明显优于 8B。"
+      },
+      "source_repo": "Qwen/Qwen3-14B",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-14B-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Qwen3-14B-Q4_K_M.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 9001752960
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-14B-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Qwen3-14B-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 15698533728
+        },
+        {
+          "id": "awq",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-14B-AWQ",
+          "quant": "AWQ",
+          "gated": false,
+          "size_bytes": 9992654711,
+          "file_count": 9
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-14B",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 29552584193,
+          "file_count": 15
+        }
+      ],
+      "arch": {
+        "layers": 40,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "qwen3-32b",
+      "name": "Qwen3 32B",
+      "family": "Qwen3",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "chat",
+        "reasoning"
+      ],
+      "params_b": 32.8,
+      "context_length": 32768,
+      "tags": [
+        "thinking",
+        "multilingual",
+        "tools"
+      ],
+      "description": {
+        "en": "The largest dense Qwen3. High-quality answers and reasoning when you have the memory for it.",
+        "zh": "最大的稠密 Qwen3，显存充足时回答与推理质量很高。"
+      },
+      "source_repo": "Qwen/Qwen3-32B",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-32B-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Qwen3-32B-Q4_K_M.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 19762149024
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-32B-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Qwen3-32B-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 34817718912
+        },
+        {
+          "id": "awq",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-32B-AWQ",
+          "quant": "AWQ",
+          "gated": false,
+          "size_bytes": 19341495560,
+          "file_count": 11
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-32B",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 65540268929,
+          "file_count": 24
+        }
+      ],
+      "arch": {
+        "layers": 64,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "qwen3-30b-a3b-instruct-2507",
+      "name": "Qwen3 30B-A3B Instruct 2507",
+      "family": "Qwen3",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "chat"
+      ],
+      "params_b": 30.5,
+      "context_length": 262144,
+      "tags": [
+        "moe",
+        "fast",
+        "multilingual",
+        "tools"
+      ],
+      "description": {
+        "en": "Mixture-of-experts model: 30B parameters but only about 3B active per token, so it answers quickly while knowing a lot.",
+        "zh": "混合专家模型：总参数 30B，每个 token 仅激活约 3B，知识面广且生成速度快。"
+      },
+      "source_repo": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+      "active_params_b": 3.3,
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Qwen3-30B-A3B-Instruct-2507-Q4_K_M.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 18556686752
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Qwen3-30B-A3B-Instruct-2507-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 32483932576
+        },
+        {
+          "id": "bf16",
+          "format": "gguf",
+          "repo": "unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF",
+          "quant": "BF16",
+          "files": [
+            "BF16/Qwen3-30B-A3B-Instruct-2507-BF16-00001-of-00002.gguf",
+            "BF16/Qwen3-30B-A3B-Instruct-2507-BF16-00002-of-00002.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 61095803232
+        },
+        {
+          "id": "fp8",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8",
+          "quant": "FP8",
+          "gated": false,
+          "size_bytes": 31195072366,
+          "file_count": 11
+        },
+        {
+          "id": "bf16-st",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 61084234632,
+          "file_count": 24
+        }
+      ],
+      "arch": {
+        "layers": 48,
+        "kv_heads": 4,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "llama-3.1-8b-instruct",
+      "name": "Llama 3.1 8B Instruct",
+      "family": "Llama 3",
+      "publisher": "Meta",
+      "license": "Llama 3.1 Community",
+      "tasks": [
+        "chat"
+      ],
+      "params_b": 8.0,
+      "context_length": 131072,
+      "tags": [
+        "multilingual",
+        "tools"
+      ],
+      "description": {
+        "en": "Meta's widely used 8B instruction model with a 128K context. The original weights need an accepted licence on Hugging Face.",
+        "zh": "Meta 广泛使用的 8B 指令模型，128K 上下文。原始权重需在 Hugging Face 上同意许可后下载。"
+      },
+      "source_repo": "meta-llama/Llama-3.1-8B-Instruct",
+      "config_repo": "unsloth/Llama-3.1-8B-Instruct",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 4920739232
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Meta-Llama-3.1-8B-Instruct-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 8540775840
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "meta-llama/Llama-3.1-8B-Instruct",
+          "quant": "BF16",
+          "gated": true,
+          "size_bytes": 16069722669,
+          "file_count": 10
+        }
+      ],
+      "arch": {
+        "layers": 32,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "llama-3.2-3b-instruct",
+      "name": "Llama 3.2 3B Instruct",
+      "family": "Llama 3",
+      "publisher": "Meta",
+      "license": "Llama 3.2 Community",
+      "tasks": [
+        "chat"
+      ],
+      "params_b": 3.2,
+      "context_length": 131072,
+      "tags": [
+        "small",
+        "multilingual"
+      ],
+      "description": {
+        "en": "Compact Llama for summarisation and simple assistants; runs comfortably next to other workloads.",
+        "zh": "紧凑的 Llama，适合摘要和简单助手，可与其他任务同时运行。"
+      },
+      "source_repo": "meta-llama/Llama-3.2-3B-Instruct",
+      "config_repo": "unsloth/Llama-3.2-3B-Instruct",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "bartowski/Llama-3.2-3B-Instruct-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 2019377696
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "bartowski/Llama-3.2-3B-Instruct-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Llama-3.2-3B-Instruct-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 3421899296
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "meta-llama/Llama-3.2-3B-Instruct",
+          "quant": "BF16",
+          "gated": true,
+          "size_bytes": 6434699227,
+          "file_count": 9
+        }
+      ],
+      "arch": {
+        "layers": 28,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "gemma-3-4b-it",
+      "name": "Gemma 3 4B",
+      "family": "Gemma 3",
+      "publisher": "Google",
+      "license": "Gemma",
+      "tasks": [
+        "chat",
+        "vision"
+      ],
+      "params_b": 4.3,
+      "context_length": 131072,
+      "tags": [
+        "multilingual",
+        "images"
+      ],
+      "description": {
+        "en": "Google's open model that understands text and images, in the 4B size. The GGUF variants include the vision projector; the original weights need an accepted licence.",
+        "zh": "Google 的开放模型，可理解文字和图片（4B 规格）。GGUF 版本自带视觉投影文件；原始权重需同意许可后下载。"
+      },
+      "source_repo": "google/gemma-3-4b-it",
+      "config_repo": "unsloth/gemma-3-4b-it",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "ggml-org/gemma-3-4b-it-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "gemma-3-4b-it-Q4_K_M.gguf"
+          ],
+          "mmproj": "mmproj-model-f16.gguf",
+          "gated": false,
+          "size_bytes": 2489757856,
+          "mmproj_size_bytes": 851251104
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "ggml-org/gemma-3-4b-it-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "gemma-3-4b-it-Q8_0.gguf"
+          ],
+          "mmproj": "mmproj-model-f16.gguf",
+          "gated": false,
+          "size_bytes": 4130226336,
+          "mmproj_size_bytes": 851251104
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "google/gemma-3-4b-it",
+          "quant": "BF16",
+          "gated": true,
+          "size_bytes": 8639603101,
+          "file_count": 13
+        }
+      ],
+      "arch": {
+        "layers": 34,
+        "kv_heads": 4,
+        "head_dim": 256
+      }
+    },
+    {
+      "id": "gemma-3-12b-it",
+      "name": "Gemma 3 12B",
+      "family": "Gemma 3",
+      "publisher": "Google",
+      "license": "Gemma",
+      "tasks": [
+        "chat",
+        "vision"
+      ],
+      "params_b": 12.2,
+      "context_length": 131072,
+      "tags": [
+        "multilingual",
+        "images"
+      ],
+      "description": {
+        "en": "Google's open model that understands text and images, in the 12B size. The GGUF variants include the vision projector; the original weights need an accepted licence.",
+        "zh": "Google 的开放模型，可理解文字和图片（12B 规格）。GGUF 版本自带视觉投影文件；原始权重需同意许可后下载。"
+      },
+      "source_repo": "google/gemma-3-12b-it",
+      "config_repo": "unsloth/gemma-3-12b-it",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "ggml-org/gemma-3-12b-it-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "gemma-3-12b-it-Q4_K_M.gguf"
+          ],
+          "mmproj": "mmproj-model-f16.gguf",
+          "gated": false,
+          "size_bytes": 7300574976,
+          "mmproj_size_bytes": 854200224
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "ggml-org/gemma-3-12b-it-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "gemma-3-12b-it-Q8_0.gguf"
+          ],
+          "mmproj": "mmproj-model-f16.gguf",
+          "gated": false,
+          "size_bytes": 12509949696,
+          "mmproj_size_bytes": 854200224
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "google/gemma-3-12b-it",
+          "quant": "BF16",
+          "gated": true,
+          "size_bytes": 24414136353,
+          "file_count": 16
+        }
+      ],
+      "arch": {
+        "layers": 48,
+        "kv_heads": 8,
+        "head_dim": 256
+      }
+    },
+    {
+      "id": "gemma-3-27b-it",
+      "name": "Gemma 3 27B",
+      "family": "Gemma 3",
+      "publisher": "Google",
+      "license": "Gemma",
+      "tasks": [
+        "chat",
+        "vision"
+      ],
+      "params_b": 27.4,
+      "context_length": 131072,
+      "tags": [
+        "multilingual",
+        "images"
+      ],
+      "description": {
+        "en": "Google's open model that understands text and images, in the 27B size. The GGUF variants include the vision projector; the original weights need an accepted licence.",
+        "zh": "Google 的开放模型，可理解文字和图片（27B 规格）。GGUF 版本自带视觉投影文件；原始权重需同意许可后下载。"
+      },
+      "source_repo": "google/gemma-3-27b-it",
+      "config_repo": "unsloth/gemma-3-27b-it",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "ggml-org/gemma-3-27b-it-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "gemma-3-27b-it-Q4_K_M.gguf"
+          ],
+          "mmproj": "mmproj-model-f16.gguf",
+          "gated": false,
+          "size_bytes": 16546404736,
+          "mmproj_size_bytes": 857739168
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "ggml-org/gemma-3-27b-it-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "gemma-3-27b-it-Q8_0.gguf"
+          ],
+          "mmproj": "mmproj-model-f16.gguf",
+          "gated": false,
+          "size_bytes": 28707604864,
+          "mmproj_size_bytes": 857739168
+        },
+        {
+          "id": "f16",
+          "format": "gguf",
+          "repo": "ggml-org/gemma-3-27b-it-GGUF",
+          "quant": "F16",
+          "files": [
+            "gemma-3-27b-it-f16-00001-of-00002.gguf",
+            "gemma-3-27b-it-f16-00002-of-00002.gguf"
+          ],
+          "mmproj": "mmproj-model-f16.gguf",
+          "gated": false,
+          "size_bytes": 54027274816,
+          "mmproj_size_bytes": 857739168
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "google/gemma-3-27b-it",
+          "quant": "BF16",
+          "gated": true,
+          "size_bytes": 54904341871,
+          "file_count": 23
+        }
+      ],
+      "arch": {
+        "layers": 62,
+        "kv_heads": 16,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "mistral-small-3.2-24b-instruct-2506",
+      "name": "Mistral Small 3.2 24B Instruct",
+      "family": "Mistral Small",
+      "publisher": "Mistral AI",
+      "license": "Apache-2.0",
+      "tasks": [
+        "chat",
+        "vision"
+      ],
+      "params_b": 24.0,
+      "context_length": 131072,
+      "tags": [
+        "multilingual",
+        "tools",
+        "images"
+      ],
+      "description": {
+        "en": "Capable mid-size model with image input and reliable function calling.",
+        "zh": "能力均衡的中等规模模型，支持图片输入，函数调用可靠。"
+      },
+      "source_repo": "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+      "extra_args": {
+        "vllm": "--tokenizer-mode mistral --config-format mistral --load-format mistral",
+        "sglang": ""
+      },
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Mistral-Small-3.2-24B-Instruct-2506-Q4_K_M.gguf"
+          ],
+          "mmproj": "mmproj-F16.gguf",
+          "gated": false,
+          "size_bytes": 14333922848,
+          "mmproj_size_bytes": 878053568
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Mistral-Small-3.2-24B-Instruct-2506-Q8_0.gguf"
+          ],
+          "mmproj": "mmproj-F16.gguf",
+          "gated": false,
+          "size_bytes": 25054793248,
+          "mmproj_size_bytes": 878053568
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+          "quant": "BF16",
+          "include": [
+            "consolidated.safetensors",
+            "params.json",
+            "tekken.json"
+          ],
+          "exclude": [
+            "model-*.safetensors",
+            "model.safetensors.index.json"
+          ],
+          "gated": false,
+          "size_bytes": 48042196643,
+          "file_count": 6
+        }
+      ],
+      "arch": {
+        "layers": 40,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "phi-4",
+      "name": "Phi-4",
+      "family": "Phi",
+      "publisher": "Microsoft",
+      "license": "MIT",
+      "tasks": [
+        "chat",
+        "reasoning"
+      ],
+      "params_b": 14.7,
+      "context_length": 16384,
+      "tags": [
+        "math",
+        "english"
+      ],
+      "description": {
+        "en": "14B model trained heavily on synthetic data; strong at maths and logic for its size, mainly English.",
+        "zh": "大量使用合成数据训练的 14B 模型，数学与逻辑能力出色，以英文为主。"
+      },
+      "source_repo": "microsoft/phi-4",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "bartowski/phi-4-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "phi-4-Q4_K_M.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 9053114816
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "microsoft/phi-4-gguf",
+          "quant": "Q8_0",
+          "files": [
+            "phi-4-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 15580500160
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "microsoft/phi-4",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 29325867007,
+          "file_count": 15
+        }
+      ],
+      "arch": {
+        "layers": 40,
+        "kv_heads": 10,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "gpt-oss-20b",
+      "name": "gpt-oss 20B",
+      "family": "gpt-oss",
+      "publisher": "OpenAI",
+      "license": "Apache-2.0",
+      "tasks": [
+        "chat",
+        "reasoning"
+      ],
+      "params_b": 21.0,
+      "context_length": 131072,
+      "tags": [
+        "moe",
+        "tools",
+        "fast"
+      ],
+      "description": {
+        "en": "OpenAI's open-weight reasoning model (mixture of experts, about 3.6B active) with adjustable reasoning effort.",
+        "zh": "OpenAI 的开放权重推理模型（混合专家，约 3.6B 激活参数），可调节推理强度。"
+      },
+      "source_repo": "openai/gpt-oss-20b",
+      "active_params_b": 3.6,
+      "extra_args": {
+        "llama.cpp": "--jinja"
+      },
+      "variants": [
+        {
+          "id": "mxfp4",
+          "format": "gguf",
+          "repo": "ggml-org/gpt-oss-20b-GGUF",
+          "quant": "MXFP4",
+          "files": [
+            "gpt-oss-20b-MXFP4.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 12109566624
+        },
+        {
+          "id": "mxfp4-st",
+          "format": "safetensors",
+          "repo": "openai/gpt-oss-20b",
+          "quant": "MXFP4",
+          "gated": false,
+          "size_bytes": 13789244452,
+          "file_count": 10
+        }
+      ],
+      "arch": {
+        "layers": 24,
+        "kv_heads": 8,
+        "head_dim": 64
+      }
+    },
+    {
+      "id": "gpt-oss-120b",
+      "name": "gpt-oss 120B",
+      "family": "gpt-oss",
+      "publisher": "OpenAI",
+      "license": "Apache-2.0",
+      "tasks": [
+        "chat",
+        "reasoning"
+      ],
+      "params_b": 117.0,
+      "context_length": 131072,
+      "tags": [
+        "moe",
+        "tools",
+        "large"
+      ],
+      "description": {
+        "en": "The large gpt-oss: frontier-style reasoning with about 5.1B active parameters per token. Needs a lot of GPU memory.",
+        "zh": "大型 gpt-oss：每个 token 约 5.1B 激活参数，推理能力强，需要大量显存。"
+      },
+      "source_repo": "openai/gpt-oss-120b",
+      "active_params_b": 5.1,
+      "extra_args": {
+        "llama.cpp": "--jinja"
+      },
+      "variants": [
+        {
+          "id": "mxfp4",
+          "format": "gguf",
+          "repo": "ggml-org/gpt-oss-120b-GGUF",
+          "quant": "MXFP4",
+          "files": [
+            "gpt-oss-120b-MXFP4.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 63387346208
+        },
+        {
+          "id": "mxfp4-st",
+          "format": "safetensors",
+          "repo": "openai/gpt-oss-120b",
+          "quant": "MXFP4",
+          "gated": false,
+          "size_bytes": 65276839171,
+          "file_count": 22
+        }
+      ],
+      "arch": {
+        "layers": 36,
+        "kv_heads": 8,
+        "head_dim": 64
+      }
+    },
+    {
+      "id": "qwen2.5-coder-7b-instruct",
+      "name": "Qwen2.5 Coder 7B Instruct",
+      "family": "Qwen2.5 Coder",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "code",
+        "chat"
+      ],
+      "params_b": 7.6,
+      "context_length": 32768,
+      "tags": [
+        "code-completion",
+        "fill-in-the-middle"
+      ],
+      "description": {
+        "en": "Code-specialised Qwen2.5 (7B) for writing, explaining and completing code in many languages.",
+        "zh": "专注代码的 Qwen2.5（7B），擅长多语言代码编写、解释与补全。"
+      },
+      "source_repo": "Qwen/Qwen2.5-Coder-7B-Instruct",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "qwen2.5-coder-7b-instruct-q4_k_m.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 4683073536
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "qwen2.5-coder-7b-instruct-q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 8098525184
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen2.5-Coder-7B-Instruct",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 15242788143,
+          "file_count": 11
+        }
+      ],
+      "arch": {
+        "layers": 28,
+        "kv_heads": 4,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "qwen2.5-coder-14b-instruct",
+      "name": "Qwen2.5 Coder 14B Instruct",
+      "family": "Qwen2.5 Coder",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "code",
+        "chat"
+      ],
+      "params_b": 14.8,
+      "context_length": 32768,
+      "tags": [
+        "code-completion",
+        "fill-in-the-middle"
+      ],
+      "description": {
+        "en": "Code-specialised Qwen2.5 (14B) for writing, explaining and completing code in many languages.",
+        "zh": "专注代码的 Qwen2.5（14B），擅长多语言代码编写、解释与补全。"
+      },
+      "source_repo": "Qwen/Qwen2.5-Coder-14B-Instruct",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "qwen2.5-coder-14b-instruct-q4_k_m.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 8988110272
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "qwen2.5-coder-14b-instruct-q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 15701597632
+        },
+        {
+          "id": "awq",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen2.5-Coder-14B-Instruct-AWQ",
+          "quant": "AWQ",
+          "gated": false,
+          "size_bytes": 9991766692,
+          "file_count": 10
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen2.5-Coder-14B-Instruct",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 29551669960,
+          "file_count": 13
+        }
+      ],
+      "arch": {
+        "layers": 48,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "qwen2.5-coder-32b-instruct",
+      "name": "Qwen2.5 Coder 32B Instruct",
+      "family": "Qwen2.5 Coder",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "code",
+        "chat"
+      ],
+      "params_b": 32.8,
+      "context_length": 32768,
+      "tags": [
+        "code-completion",
+        "fill-in-the-middle"
+      ],
+      "description": {
+        "en": "Code-specialised Qwen2.5 (32B) for writing, explaining and completing code in many languages.",
+        "zh": "专注代码的 Qwen2.5（32B），擅长多语言代码编写、解释与补全。"
+      },
+      "source_repo": "Qwen/Qwen2.5-Coder-32B-Instruct",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "Qwen/Qwen2.5-Coder-32B-Instruct-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "qwen2.5-coder-32b-instruct-q4_k_m-00001-of-00003.gguf",
+            "qwen2.5-coder-32b-instruct-q4_k_m-00002-of-00003.gguf",
+            "qwen2.5-coder-32b-instruct-q4_k_m-00003-of-00003.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 19851336128
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "Qwen/Qwen2.5-Coder-32B-Instruct-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "qwen2.5-coder-32b-instruct-q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 34820884672
+        },
+        {
+          "id": "awq",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen2.5-Coder-32B-Instruct-AWQ",
+          "quant": "AWQ",
+          "gated": false,
+          "size_bytes": 19340625805,
+          "file_count": 12
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen2.5-Coder-32B-Instruct",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 65539393464,
+          "file_count": 21
+        }
+      ],
+      "arch": {
+        "layers": 64,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "qwen3-coder-30b-a3b-instruct",
+      "name": "Qwen3 Coder 30B-A3B Instruct",
+      "family": "Qwen3 Coder",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "code",
+        "chat"
+      ],
+      "params_b": 30.5,
+      "context_length": 262144,
+      "tags": [
+        "moe",
+        "agentic",
+        "tools",
+        "fast"
+      ],
+      "description": {
+        "en": "Fast mixture-of-experts coding model built for agentic coding tools and long repositories.",
+        "zh": "面向智能体编程工具和大型代码库的快速混合专家代码模型。"
+      },
+      "source_repo": "Qwen/Qwen3-Coder-30B-A3B-Instruct",
+      "active_params_b": 3.3,
+      "extra_args": {
+        "llama.cpp": "--jinja"
+      },
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 18556689568
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Qwen3-Coder-30B-A3B-Instruct-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 32483935392
+        },
+        {
+          "id": "fp8",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8",
+          "quant": "FP8",
+          "gated": false,
+          "size_bytes": 31195113809,
+          "file_count": 13
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-Coder-30B-A3B-Instruct",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 61079808507,
+          "file_count": 25
+        }
+      ],
+      "arch": {
+        "layers": 48,
+        "kv_heads": 4,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "devstral-small-2507",
+      "name": "Devstral Small 2507",
+      "family": "Devstral",
+      "publisher": "Mistral AI",
+      "license": "Apache-2.0",
+      "tasks": [
+        "code"
+      ],
+      "params_b": 23.6,
+      "context_length": 131072,
+      "tags": [
+        "agentic",
+        "tools"
+      ],
+      "description": {
+        "en": "Agentic coding model tuned for software-engineering agents that edit files and run tools.",
+        "zh": "为能编辑文件、调用工具的软件工程智能体调优的代码模型。"
+      },
+      "source_repo": "mistralai/Devstral-Small-2507",
+      "extra_args": {
+        "vllm": "--tokenizer-mode mistral --config-format mistral --load-format mistral",
+        "sglang": "",
+        "llama.cpp": "--jinja"
+      },
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "unsloth/Devstral-Small-2507-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Devstral-Small-2507-Q4_K_M.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 14333918432
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "unsloth/Devstral-Small-2507-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Devstral-Small-2507-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 25054788576
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "mistralai/Devstral-Small-2507",
+          "quant": "BF16",
+          "include": [
+            "consolidated.safetensors",
+            "params.json",
+            "tekken.json"
+          ],
+          "exclude": [
+            "model-*.safetensors",
+            "model.safetensors.index.json"
+          ],
+          "gated": false,
+          "size_bytes": 47164252323,
+          "file_count": 6
+        }
+      ],
+      "arch": {
+        "layers": 40,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "deepseek-r1-distill-qwen-7b",
+      "name": "DeepSeek R1 Distill Qwen 7B",
+      "family": "DeepSeek R1",
+      "publisher": "DeepSeek",
+      "license": "MIT",
+      "tasks": [
+        "reasoning",
+        "chat"
+      ],
+      "params_b": 7.6,
+      "context_length": 131072,
+      "tags": [
+        "thinking",
+        "math"
+      ],
+      "description": {
+        "en": "Qwen2.5 7B distilled from DeepSeek-R1: thinks out loud before answering, good at maths and logic puzzles.",
+        "zh": "由 DeepSeek-R1 蒸馏的 Qwen2.5 7B：先思考再作答，擅长数学和逻辑题。"
+      },
+      "source_repo": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+      "default_ctx": 16384,
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "unsloth/DeepSeek-R1-Distill-Qwen-7B-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 4683073248
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "unsloth/DeepSeek-R1-Distill-Qwen-7B-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "DeepSeek-R1-Distill-Qwen-7B-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 8098524896
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 15238335532,
+          "file_count": 7
+        }
+      ],
+      "arch": {
+        "layers": 28,
+        "kv_heads": 4,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "deepseek-r1-distill-qwen-14b",
+      "name": "DeepSeek R1 Distill Qwen 14B",
+      "family": "DeepSeek R1",
+      "publisher": "DeepSeek",
+      "license": "MIT",
+      "tasks": [
+        "reasoning",
+        "chat"
+      ],
+      "params_b": 14.8,
+      "context_length": 131072,
+      "tags": [
+        "thinking",
+        "math"
+      ],
+      "description": {
+        "en": "Qwen2.5 14B distilled from DeepSeek-R1: thinks out loud before answering, good at maths and logic puzzles.",
+        "zh": "由 DeepSeek-R1 蒸馏的 Qwen2.5 14B：先思考再作答，擅长数学和逻辑题。"
+      },
+      "source_repo": "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+      "default_ctx": 16384,
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "unsloth/DeepSeek-R1-Distill-Qwen-14B-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 8988109984
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "unsloth/DeepSeek-R1-Distill-Qwen-14B-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "DeepSeek-R1-Distill-Qwen-14B-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 15701597344
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 29547217498,
+          "file_count": 9
+        }
+      ],
+      "arch": {
+        "layers": 48,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "deepseek-r1-distill-qwen-32b",
+      "name": "DeepSeek R1 Distill Qwen 32B",
+      "family": "DeepSeek R1",
+      "publisher": "DeepSeek",
+      "license": "MIT",
+      "tasks": [
+        "reasoning",
+        "chat"
+      ],
+      "params_b": 32.8,
+      "context_length": 131072,
+      "tags": [
+        "thinking",
+        "math"
+      ],
+      "description": {
+        "en": "Qwen2.5 32B distilled from DeepSeek-R1: thinks out loud before answering, good at maths and logic puzzles.",
+        "zh": "由 DeepSeek-R1 蒸馏的 Qwen2.5 32B：先思考再作答，擅长数学和逻辑题。"
+      },
+      "source_repo": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+      "default_ctx": 16384,
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "unsloth/DeepSeek-R1-Distill-Qwen-32B-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "DeepSeek-R1-Distill-Qwen-32B-Q4_K_M.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 19851335584
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "unsloth/DeepSeek-R1-Distill-Qwen-32B-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "DeepSeek-R1-Distill-Qwen-32B-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 34820884384
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 65534941126,
+          "file_count": 13
+        }
+      ],
+      "arch": {
+        "layers": 64,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "deepseek-r1-0528-qwen3-8b",
+      "name": "DeepSeek R1 0528 Qwen3 8B",
+      "family": "DeepSeek R1",
+      "publisher": "DeepSeek",
+      "license": "MIT",
+      "tasks": [
+        "reasoning",
+        "chat"
+      ],
+      "params_b": 8.2,
+      "context_length": 131072,
+      "tags": [
+        "thinking",
+        "math"
+      ],
+      "description": {
+        "en": "Qwen3 8B distilled from the May 2025 DeepSeek-R1; one of the strongest small reasoning models.",
+        "zh": "由 2025 年 5 月版 DeepSeek-R1 蒸馏的 Qwen3 8B，是最强的小型推理模型之一。"
+      },
+      "source_repo": "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B",
+      "default_ctx": 16384,
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "DeepSeek-R1-0528-Qwen3-8B-Q4_K_M.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 5027785216
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "DeepSeek-R1-0528-Qwen3-8B-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 8709519872
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 16388587711,
+          "file_count": 6
+        }
+      ],
+      "arch": {
+        "layers": 36,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "qwq-32b",
+      "name": "QwQ 32B",
+      "family": "QwQ",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "reasoning",
+        "chat"
+      ],
+      "params_b": 32.8,
+      "context_length": 131072,
+      "tags": [
+        "thinking",
+        "math"
+      ],
+      "description": {
+        "en": "Qwen's dedicated reasoning model; long chains of thought for hard maths, science and coding questions.",
+        "zh": "Qwen 的专用推理模型，用较长的思维链解决数学、科学和编程难题。"
+      },
+      "source_repo": "Qwen/QwQ-32B",
+      "default_ctx": 16384,
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "Qwen/QwQ-32B-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "qwq-32b-q4_k_m.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 19851335840
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "Qwen/QwQ-32B-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "qwq-32b-q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 34820884640
+        },
+        {
+          "id": "awq",
+          "format": "safetensors",
+          "repo": "Qwen/QwQ-32B-AWQ",
+          "quant": "AWQ",
+          "gated": false,
+          "size_bytes": 19340622221,
+          "file_count": 14
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "Qwen/QwQ-32B",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 65539396537,
+          "file_count": 23
+        }
+      ],
+      "arch": {
+        "layers": 64,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "qwen3-embedding-0.6b",
+      "name": "Qwen3 Embedding 0.6B",
+      "family": "Qwen3 Embedding",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "embedding"
+      ],
+      "params_b": 0.6,
+      "context_length": 32768,
+      "tags": [
+        "retrieval",
+        "multilingual",
+        "rag"
+      ],
+      "description": {
+        "en": "Multilingual text embeddings (0.6B) for search and retrieval-augmented generation; served on /v1/embeddings.",
+        "zh": "多语言文本向量模型（0.6B），用于检索和 RAG，通过 /v1/embeddings 提供服务。"
+      },
+      "source_repo": "Qwen/Qwen3-Embedding-0.6B",
+      "extra_args": {
+        "llama.cpp": "--embedding --pooling last",
+        "vllm": "--runner pooling",
+        "sglang": "--is-embedding"
+      },
+      "variants": [
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-Embedding-0.6B-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Qwen3-Embedding-0.6B-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 639150592
+        },
+        {
+          "id": "f16",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-Embedding-0.6B-GGUF",
+          "quant": "F16",
+          "files": [
+            "Qwen3-Embedding-0.6B-f16.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 1197629632
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-Embedding-0.6B",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 1207469921,
+          "file_count": 9
+        }
+      ],
+      "arch": {
+        "layers": 28,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "qwen3-embedding-4b",
+      "name": "Qwen3 Embedding 4B",
+      "family": "Qwen3 Embedding",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "embedding"
+      ],
+      "params_b": 4.0,
+      "context_length": 32768,
+      "tags": [
+        "retrieval",
+        "multilingual",
+        "rag"
+      ],
+      "description": {
+        "en": "Multilingual text embeddings (4B) for search and retrieval-augmented generation; served on /v1/embeddings.",
+        "zh": "多语言文本向量模型（4B），用于检索和 RAG，通过 /v1/embeddings 提供服务。"
+      },
+      "source_repo": "Qwen/Qwen3-Embedding-4B",
+      "extra_args": {
+        "llama.cpp": "--embedding --pooling last",
+        "vllm": "--runner pooling",
+        "sglang": "--is-embedding"
+      },
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-Embedding-4B-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Qwen3-Embedding-4B-Q4_K_M.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 2496703776
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-Embedding-4B-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Qwen3-Embedding-4B-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 4279660224
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-Embedding-4B",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 8059502816,
+          "file_count": 11
+        }
+      ],
+      "arch": {
+        "layers": 36,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "qwen3-embedding-8b",
+      "name": "Qwen3 Embedding 8B",
+      "family": "Qwen3 Embedding",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "embedding"
+      ],
+      "params_b": 7.6,
+      "context_length": 32768,
+      "tags": [
+        "retrieval",
+        "multilingual",
+        "rag"
+      ],
+      "description": {
+        "en": "Multilingual text embeddings (8B) for search and retrieval-augmented generation; served on /v1/embeddings.",
+        "zh": "多语言文本向量模型（8B），用于检索和 RAG，通过 /v1/embeddings 提供服务。"
+      },
+      "source_repo": "Qwen/Qwen3-Embedding-8B",
+      "extra_args": {
+        "llama.cpp": "--embedding --pooling last",
+        "vllm": "--runner pooling",
+        "sglang": "--is-embedding"
+      },
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-Embedding-8B-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Qwen3-Embedding-8B-Q4_K_M.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 4676804928
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-Embedding-8B-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Qwen3-Embedding-8B-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 8047105824
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-Embedding-8B",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 15150545299,
+          "file_count": 13
+        }
+      ],
+      "arch": {
+        "layers": 36,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "nomic-embed-text-v1.5",
+      "name": "Nomic Embed Text v1.5",
+      "family": "Nomic Embed",
+      "publisher": "Nomic AI",
+      "license": "Apache-2.0",
+      "tasks": [
+        "embedding"
+      ],
+      "params_b": 0.14,
+      "context_length": 8192,
+      "tags": [
+        "retrieval",
+        "english",
+        "tiny"
+      ],
+      "description": {
+        "en": "Tiny, popular English embedding model; fast enough to share a GPU with anything.",
+        "zh": "小巧且流行的英文向量模型，速度快，可与任何任务共用显卡。"
+      },
+      "source_repo": "nomic-ai/nomic-embed-text-v1.5",
+      "arch": null,
+      "extra_args": {
+        "llama.cpp": "--embedding --pooling mean"
+      },
+      "variants": [
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "nomic-ai/nomic-embed-text-v1.5-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "nomic-embed-text-v1.5.Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 146146432
+        },
+        {
+          "id": "f16",
+          "format": "gguf",
+          "repo": "nomic-ai/nomic-embed-text-v1.5-GGUF",
+          "quant": "F16",
+          "files": [
+            "nomic-embed-text-v1.5.f16.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 274290560
+        }
+      ]
+    },
+    {
+      "id": "bge-m3",
+      "name": "BGE-M3",
+      "family": "BGE",
+      "publisher": "BAAI",
+      "license": "MIT",
+      "tasks": [
+        "embedding"
+      ],
+      "params_b": 0.57,
+      "context_length": 8192,
+      "tags": [
+        "retrieval",
+        "multilingual"
+      ],
+      "description": {
+        "en": "Multilingual embedding model from BAAI with long inputs; a common choice for Chinese and mixed-language search.",
+        "zh": "BAAI 的多语言向量模型，支持长文本输入，中文及多语言检索的常用选择。"
+      },
+      "source_repo": "BAAI/bge-m3",
+      "arch": null,
+      "extra_args": {
+        "llama.cpp": "--embedding --pooling cls"
+      },
+      "variants": [
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "gpustack/bge-m3-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "bge-m3-Q8_0.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 634553760
+        },
+        {
+          "id": "f16",
+          "format": "gguf",
+          "repo": "gpustack/bge-m3-GGUF",
+          "quant": "F16",
+          "files": [
+            "bge-m3-FP16.gguf"
+          ],
+          "gated": false,
+          "size_bytes": 1157671200
+        }
+      ]
+    },
+    {
+      "id": "qwen2.5-vl-3b-instruct",
+      "name": "Qwen2.5 VL 3B Instruct",
+      "family": "Qwen2.5 VL",
+      "publisher": "Qwen",
+      "license": "Qwen Research",
+      "tasks": [
+        "vision",
+        "chat"
+      ],
+      "params_b": 3.8,
+      "context_length": 32768,
+      "tags": [
+        "images",
+        "ocr",
+        "documents"
+      ],
+      "description": {
+        "en": "Vision-language model (3B) for screenshots, documents, charts and photos, including OCR.",
+        "zh": "视觉语言模型（3B），可理解截图、文档、图表和照片，支持 OCR。"
+      },
+      "source_repo": "Qwen/Qwen2.5-VL-3B-Instruct",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "ggml-org/Qwen2.5-VL-3B-Instruct-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf"
+          ],
+          "mmproj": "mmproj-Qwen2.5-VL-3B-Instruct-f16.gguf",
+          "gated": false,
+          "size_bytes": 1929901056,
+          "mmproj_size_bytes": 1338428128
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "ggml-org/Qwen2.5-VL-3B-Instruct-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Qwen2.5-VL-3B-Instruct-Q8_0.gguf"
+          ],
+          "mmproj": "mmproj-Qwen2.5-VL-3B-Instruct-f16.gguf",
+          "gated": false,
+          "size_bytes": 3285474304,
+          "mmproj_size_bytes": 1338428128
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen2.5-VL-3B-Instruct",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 7520892432,
+          "file_count": 11
+        }
+      ],
+      "arch": {
+        "layers": 36,
+        "kv_heads": 2,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "qwen2.5-vl-7b-instruct",
+      "name": "Qwen2.5 VL 7B Instruct",
+      "family": "Qwen2.5 VL",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "vision",
+        "chat"
+      ],
+      "params_b": 8.3,
+      "context_length": 32768,
+      "tags": [
+        "images",
+        "ocr",
+        "documents"
+      ],
+      "description": {
+        "en": "Vision-language model (7B) for screenshots, documents, charts and photos, including OCR.",
+        "zh": "视觉语言模型（7B），可理解截图、文档、图表和照片，支持 OCR。"
+      },
+      "source_repo": "Qwen/Qwen2.5-VL-7B-Instruct",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "ggml-org/Qwen2.5-VL-7B-Instruct-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf"
+          ],
+          "mmproj": "mmproj-Qwen2.5-VL-7B-Instruct-f16.gguf",
+          "gated": false,
+          "size_bytes": 4683072032,
+          "mmproj_size_bytes": 1354162912
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "ggml-org/Qwen2.5-VL-7B-Instruct-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
+          ],
+          "mmproj": "mmproj-Qwen2.5-VL-7B-Instruct-f16.gguf",
+          "gated": false,
+          "size_bytes": 8098523680,
+          "mmproj_size_bytes": 1354162912
+        },
+        {
+          "id": "awq",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen2.5-VL-7B-Instruct-AWQ",
+          "quant": "AWQ",
+          "gated": false,
+          "size_bytes": 6939943008,
+          "file_count": 13
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen2.5-VL-7B-Instruct",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 16595961188,
+          "file_count": 14
+        }
+      ],
+      "arch": {
+        "layers": 28,
+        "kv_heads": 4,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "qwen2.5-vl-32b-instruct",
+      "name": "Qwen2.5 VL 32B Instruct",
+      "family": "Qwen2.5 VL",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "vision",
+        "chat"
+      ],
+      "params_b": 33.5,
+      "context_length": 128000,
+      "tags": [
+        "images",
+        "ocr",
+        "documents"
+      ],
+      "description": {
+        "en": "Vision-language model (32B) for screenshots, documents, charts and photos, including OCR.",
+        "zh": "视觉语言模型（32B），可理解截图、文档、图表和照片，支持 OCR。"
+      },
+      "source_repo": "Qwen/Qwen2.5-VL-32B-Instruct",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "ggml-org/Qwen2.5-VL-32B-Instruct-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Qwen2.5-VL-32B-Instruct-Q4_K_M.gguf"
+          ],
+          "mmproj": "mmproj-Qwen2.5-VL-32B-Instruct-f16.gguf",
+          "gated": false,
+          "size_bytes": 19851334528,
+          "mmproj_size_bytes": 1378753408
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "ggml-org/Qwen2.5-VL-32B-Instruct-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Qwen2.5-VL-32B-Instruct-Q8_0.gguf"
+          ],
+          "mmproj": "mmproj-Qwen2.5-VL-32B-Instruct-f16.gguf",
+          "gated": false,
+          "size_bytes": 34820883328,
+          "mmproj_size_bytes": 1378753408
+        },
+        {
+          "id": "awq",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen2.5-VL-32B-Instruct-AWQ",
+          "quant": "AWQ",
+          "gated": false,
+          "size_bytes": 20722767492,
+          "file_count": 17
+        }
+      ],
+      "arch": {
+        "layers": 64,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "qwen3-vl-4b-instruct",
+      "name": "Qwen3 VL 4B Instruct",
+      "family": "Qwen3 VL",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "vision",
+        "chat"
+      ],
+      "params_b": 4.4,
+      "context_length": 262144,
+      "tags": [
+        "images",
+        "ocr",
+        "documents"
+      ],
+      "description": {
+        "en": "Newest Qwen vision-language model (4B): image and document understanding, OCR and visual agents. Needs a recent llama.cpp / vLLM.",
+        "zh": "最新的 Qwen 视觉语言模型（4B）：图像与文档理解、OCR 和视觉智能体。需要较新的 llama.cpp / vLLM。"
+      },
+      "source_repo": "Qwen/Qwen3-VL-4B-Instruct",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-VL-4B-Instruct-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Qwen3VL-4B-Instruct-Q4_K_M.gguf"
+          ],
+          "mmproj": "mmproj-Qwen3VL-4B-Instruct-F16.gguf",
+          "gated": false,
+          "size_bytes": 2497281664,
+          "mmproj_size_bytes": 836180256
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-VL-4B-Instruct-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Qwen3VL-4B-Instruct-Q8_0.gguf"
+          ],
+          "mmproj": "mmproj-Qwen3VL-4B-Instruct-F16.gguf",
+          "gated": false,
+          "size_bytes": 4280406144,
+          "mmproj_size_bytes": 836180256
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-VL-4B-Instruct",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 8887284080,
+          "file_count": 12
+        }
+      ],
+      "arch": {
+        "layers": 36,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "qwen3-vl-8b-instruct",
+      "name": "Qwen3 VL 8B Instruct",
+      "family": "Qwen3 VL",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "vision",
+        "chat"
+      ],
+      "params_b": 8.8,
+      "context_length": 262144,
+      "tags": [
+        "images",
+        "ocr",
+        "documents"
+      ],
+      "description": {
+        "en": "Newest Qwen vision-language model (8B): image and document understanding, OCR and visual agents. Needs a recent llama.cpp / vLLM.",
+        "zh": "最新的 Qwen 视觉语言模型（8B）：图像与文档理解、OCR 和视觉智能体。需要较新的 llama.cpp / vLLM。"
+      },
+      "source_repo": "Qwen/Qwen3-VL-8B-Instruct",
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-VL-8B-Instruct-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Qwen3VL-8B-Instruct-Q4_K_M.gguf"
+          ],
+          "mmproj": "mmproj-Qwen3VL-8B-Instruct-F16.gguf",
+          "gated": false,
+          "size_bytes": 5027784800,
+          "mmproj_size_bytes": 1159029824
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-VL-8B-Instruct-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Qwen3VL-8B-Instruct-Q8_0.gguf"
+          ],
+          "mmproj": "mmproj-Qwen3VL-8B-Instruct-F16.gguf",
+          "gated": false,
+          "size_bytes": 8709519456,
+          "mmproj_size_bytes": 1159029824
+        },
+        {
+          "id": "fp8",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-VL-8B-Instruct-FP8",
+          "quant": "FP8",
+          "gated": false,
+          "size_bytes": 10605560594,
+          "file_count": 11
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-VL-8B-Instruct",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 17545907231,
+          "file_count": 14
+        }
+      ],
+      "arch": {
+        "layers": 36,
+        "kv_heads": 8,
+        "head_dim": 128
+      }
+    },
+    {
+      "id": "qwen3-vl-30b-a3b-instruct",
+      "name": "Qwen3 VL 30B-A3B Instruct",
+      "family": "Qwen3 VL",
+      "publisher": "Qwen",
+      "license": "Apache-2.0",
+      "tasks": [
+        "vision",
+        "chat"
+      ],
+      "params_b": 31.1,
+      "context_length": 262144,
+      "tags": [
+        "images",
+        "ocr",
+        "documents",
+        "moe"
+      ],
+      "description": {
+        "en": "Newest Qwen vision-language model (30B-A3B): image and document understanding, OCR and visual agents. Needs a recent llama.cpp / vLLM.",
+        "zh": "最新的 Qwen 视觉语言模型（30B-A3B）：图像与文档理解、OCR 和视觉智能体。需要较新的 llama.cpp / vLLM。"
+      },
+      "source_repo": "Qwen/Qwen3-VL-30B-A3B-Instruct",
+      "active_params_b": 3.3,
+      "variants": [
+        {
+          "id": "q4_k_m",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-VL-30B-A3B-Instruct-GGUF",
+          "quant": "Q4_K_M",
+          "files": [
+            "Qwen3VL-30B-A3B-Instruct-Q4_K_M.gguf"
+          ],
+          "mmproj": "mmproj-Qwen3VL-30B-A3B-Instruct-F16.gguf",
+          "gated": false,
+          "size_bytes": 18556687168,
+          "mmproj_size_bytes": 1083499584
+        },
+        {
+          "id": "q8_0",
+          "format": "gguf",
+          "repo": "Qwen/Qwen3-VL-30B-A3B-Instruct-GGUF",
+          "quant": "Q8_0",
+          "files": [
+            "Qwen3VL-30B-A3B-Instruct-Q8_0.gguf"
+          ],
+          "mmproj": "mmproj-Qwen3VL-30B-A3B-Instruct-F16.gguf",
+          "gated": false,
+          "size_bytes": 32483932992,
+          "mmproj_size_bytes": 1083499584
+        },
+        {
+          "id": "fp8",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-VL-30B-A3B-Instruct-FP8",
+          "quant": "FP8",
+          "gated": false,
+          "size_bytes": 32268907538,
+          "file_count": 14
+        },
+        {
+          "id": "bf16",
+          "format": "safetensors",
+          "repo": "Qwen/Qwen3-VL-30B-A3B-Instruct",
+          "quant": "BF16",
+          "gated": false,
+          "size_bytes": 62153198906,
+          "file_count": 23
+        }
+      ],
+      "arch": {
+        "layers": 48,
+        "kv_heads": 4,
+        "head_dim": 128
+      }
+    }
+  ]
+}

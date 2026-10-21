@@ -15,8 +15,11 @@ from .api import (
     admin,
     auth,
     calendar,
+    catalog,
     channels,
     devenv,
+    devenv_cpu,
+    devenv_ports,
     downloads,
     keys,
     lanes,
@@ -26,22 +29,26 @@ from .api import (
     reservations,
     runtime_admin,
     status,
+    storage,
     usage,
     waitlist,
 )
 from .cluster import api as cluster_api
 from .cluster.hub import ClusterHub
 from .config import Settings, get_settings
-from .gateway import devenv_web, proxy
+from .gateway import devenv_web, devenv_web_app, proxy
+from .gateway.devenv_web_auth import WebOriginGuard
 from .runtime.executor import LocalExecutor, NodeRegistry
 from .runtime.lanes import LaneManager, ensure_default_lane
 from .services import app_settings
+from .services.catalog_deploy import Deployer
 from .services.chat.hub import ChannelHub
 from .services.devenv import DevEnvManager, seed_templates
 from .services.downloader import Downloader
 from .services.housekeeper import Housekeeper
 from .services.notify import Notifier
 from .services.ratelimit import AttemptLimiter
+from .services.storage import StorageService
 from .services.usage_sampler import UsageSampler
 
 log = logging.getLogger("slotserve")
@@ -86,6 +93,8 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         app.state.downloader = Downloader(settings)
         app.state.downloader.events = app.state.notifier
         app.state.downloader.cluster = app.state.cluster
+        app.state.deployer = Deployer(settings, app.state.lanes)
+        app.state.downloader.deployer = app.state.deployer
         app.state.housekeeper = Housekeeper(app.state)
         # GPU metrics come from nvidia-smi unless a reader was injected (tests, other hardware).
         app.state.usage_sampler = UsageSampler(app.state, stats=getattr(app.state, "gpu_stats_fn", None))
@@ -94,6 +103,12 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         app.state.devenv = DevEnvManager(app.state, docker=getattr(app.state, "docker_client", None))
         app.state.lanes.gpu_holder = app.state.devenv.holds_gpu
         app.state.nodes.local.docker_provider = lambda: app.state.devenv.docker
+        app.state.storage = StorageService(app.state)  # storage hook: Admin -> Storage checks
+        # [web origin] dev environment web interfaces on their own port (gateway/devenv_web_app.py)
+        app.state.web_app = devenv_web_app.create_web_app(app.state)
+        web_listener = None
+        if start_background and settings.devenv_web_port:
+            web_listener = await devenv_web_app.start(app.state.web_app, settings.host, settings.devenv_web_port)
         transports = dict(getattr(app.state, "chat_transports", None) or {})
         transports.setdefault("telegram", getattr(app.state, "telegram_transport", None))
         app.state.channels = ChannelHub(app, transports)
@@ -111,6 +126,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
                 asyncio.create_task(app.state.devenv.run(), name="devenv"),
                 asyncio.create_task(app.state.usage_sampler.run(), name="usage-sampler"),
                 asyncio.create_task(app.state.cluster.run(), name="node-watchdog"),
+                asyncio.create_task(app.state.storage.run(), name="storage"),  # storage hook
             ]
         try:
             yield
@@ -120,6 +136,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
             for t in tasks:
                 with contextlib.suppress(asyncio.CancelledError):
                     await t
+            await devenv_web_app.stop(web_listener)
             await app.state.notifier.save_pending()
             await app.state.cluster.close()  # before the lanes: model servers on nodes keep running
             await app.state.lanes.shutdown()
@@ -144,6 +161,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         same_site="lax",
         https_only=settings.cookie_secure,
     )
+    app.add_middleware(WebOriginGuard, settings=settings)  # [web origin] pages there cannot change things here
     for module in (
         auth,
         notifications,
@@ -161,10 +179,15 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         lanes,
         runtime_admin,
         devenv,
+        catalog,
     ):
         app.include_router(module.router)
     app.include_router(devenv.keys_router)
     app.include_router(cluster_api.router)
+    app.include_router(storage.router)  # storage hook
+    app.include_router(storage.user_router)
+    app.include_router(devenv_cpu.router)  # devenv_cpu: environments without a GPU
+    app.include_router(devenv_ports.router)
     app.include_router(proxy.router)
     app.include_router(devenv_web.router)
 

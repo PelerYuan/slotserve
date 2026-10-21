@@ -141,6 +141,29 @@ class Settings(BaseSettings):
     devenv_storage_dir: str = ""
     devenv_projects: int = 3  # kept (paused) environments per person; 0 = none
     devenv_project_days: int = 0  # remove kept environments unused for this many days; 0 = never
+    # Storage managed in Admin -> Storage (services/storage.py): the small image that checks storages (df, du),
+    # and how often they are checked; 0 = only when an admin asks.
+    storage_helper_image: str = "busybox:1.37"
+    storage_check_minutes: int = 30
+    # -- devenv_cpu: environments without a GPU (no booking), on the CPU cores no lane reserves --
+    devenv_cpu_enabled: bool = True
+    devenv_cpu_per_user: int = 2  # CPU-only environments one person can run at the same time
+    devenv_cpu_cores_per_gpu: int = 8  # CPU cores each GPU lane reserves for whoever uses it; 0 = none
+    devenv_cpu_cores: float = 4.0  # cores one CPU-only environment may use at most; 0 = the whole shared pool
+    devenv_cpu_memory_gb: float = 16.0  # RAM one CPU-only environment may use at most; 0 = no limit
+    devenv_cpu_memory_pool_gb: float = 0.0  # RAM all CPU-only environments together may claim; 0 = no limit
+    # Direct ports: container ports published on the host as http://server:<port> (no SlotServe login), through a
+    # small forwarder container per port (services/devenv_ports.py).
+    devenv_public_ports_enabled: bool = True
+    devenv_public_ports: str = "2300-2399"  # host ports for them; keep it apart from devenv_ssh_ports
+    devenv_public_port_limit: int = 5  # direct ports per person (admins: no limit); 0 = only admins
+    devenv_forwarder_image: str = "alpine/socat:1.8.1.1"  # any image with socat on its PATH
+    # Web interfaces behind the SlotServe login are served on their own port, so the browser keeps them apart from
+    # SlotServe itself (a separate origin). 0 = serve them on SlotServe's own port (not recommended).
+    devenv_web_port: int = 8001
+    # How browsers reach that port, e.g. https://gpu-box:8443 behind a reverse proxy; empty = the host name the
+    # browser uses for SlotServe with devenv_web_port.
+    devenv_web_url: str = ""
 
     # Multiple machines (see docs "Multiple machines"): node agents connect to the control plane.
     local_node_name: str = "local"  # name of the built-in node (this machine)

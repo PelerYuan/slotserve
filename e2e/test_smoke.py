@@ -6,6 +6,7 @@ import socket
 import subprocess
 import sys
 import urllib.request
+from pathlib import Path
 
 from playwright.sync_api import Page, expect
 
@@ -87,6 +88,7 @@ def test_admin_pages_render(page: Page, server: str):
         "requests",
         "keys",
         "channels",
+        "storage",
         "settings",
         "audit",
     ):
@@ -252,4 +254,76 @@ def test_nodes_page_and_agent(page: Page, server: str, tmp_path):
         else:
             agent.terminate()
         agent.wait(timeout=20)
+    assert not page.errors  # type: ignore[attr-defined]
+
+
+def test_storage_tab(page: Page, server: str):
+    """Admin -> Storage: add a host directory, see its check result, remove it."""
+    sign_in(page, server, "admin")
+    page.goto(f"{server}/admin?tab=storage")
+    expect(page.get_by_text("No storage yet", exact=False)).to_be_visible()
+    page.locator("[data-test=storage-add]").click()
+    dialog = page.get_by_role("dialog")
+    dialog.locator("[data-field=storage-name] input").fill("E2E data")
+    dialog.locator("[data-field=storage-host-path] input").fill("/srv/e2e-data")
+    dialog.locator("[data-field=storage-mount] input").fill("/data/e2e")
+    dialog.locator("[data-test=storage-save]").click()
+    expect(dialog).to_be_hidden()
+    row = page.locator(".storages tr", has_text="E2E data")
+    expect(row).to_contain_text("/srv/e2e-data")
+    expect(row).to_contain_text("/data/e2e")
+    # no Docker here: the check that runs after saving reports the storage as not reachable
+    expect(row.locator("[data-test=storage-state]")).to_have_text("Not reachable", timeout=30_000)
+    [storage] = _api(page, server, "GET", "/api/admin/storage")
+    assert storage["name"] == "E2E data" and storage["status"]["ok"] is False
+
+    row.get_by_role("button", name="Delete").click()
+    page.get_by_role("dialog").get_by_role("button", name="Delete").click()
+    expect(page.get_by_text("No storage yet", exact=False)).to_be_visible()
+
+
+def test_devenv_without_gpu_ui(page: Page, server: str):
+    """Dev environments without a GPU: the section on the dev environments page and the admin settings."""
+    sign_in(page, server, "admin")
+    _api(page, server, "PUT", "/api/admin/settings", {"devenv_enabled": True})
+    try:
+        info = _api(page, server, "GET", "/api/devenv/cpu")
+        assert info["enabled"] is True and info["per_user"] == 2 and info["sessions"] == []
+        page.goto(f"{server}/devenv")
+        panel = page.locator("[data-test=cpu-panel]")
+        expect(panel.get_by_role("heading", name="Without a GPU")).to_be_visible()
+        expect(panel.get_by_text("0 of 2 running for you")).to_be_visible()
+        expect(panel.get_by_role("button", name="Start without GPU")).to_be_visible()
+        expect(page.locator("[data-test=cpu-start]").first).to_be_visible()
+
+        page.goto(f"{server}/admin?tab=settings")
+        expect(page.get_by_text("CPU cores reserved per GPU")).to_be_visible()
+        expect(page.get_by_text("Without-GPU environments per person")).to_be_visible()
+    finally:
+        _api(page, server, "PUT", "/api/admin/settings", {"devenv_enabled": None})
+
+
+def test_model_catalog_deploy(page: Page, server: str):
+    sign_in(page, server, "admin")
+    # Put a catalog file into the models folder so deploying needs no download.
+    small = next(m for m in _api(page, server, "GET", "/api/models") if m["name"] == "chat-small")
+    (Path(small["file_path"]).parent / "nomic-embed-text-v1.5.Q8_0.gguf").write_bytes(b"GGUF" + b"\0" * 1024)
+
+    page.goto(f"{server}/models")
+    page.locator(".view-tabs .n-tabs-tab", has_text="Catalog").click()
+    expect(page.locator(".cat-card").first).to_be_visible()
+    page.get_by_role("tab", name="Embeddings").click()
+    page.get_by_placeholder("Search models").fill("nomic")
+    card = page.locator(".cat-card", has_text="Nomic Embed Text v1.5")
+    expect(page.locator(".cat-card")).to_have_count(1)
+    card.get_by_role("button", name="Details").click()
+    drawer = page.locator(".n-drawer")
+    expect(drawer.get_by_text("Downloaded").first).to_be_visible()
+    drawer.get_by_role("button", name="Deploy").first.click()
+    dialog = page.get_by_role("dialog").last
+    expect(dialog.get_by_text("Estimated GPU memory")).to_be_visible()
+    dialog.get_by_role("button", name="Deploy").click()
+    expect(page.get_by_text("nomic-embed-text-v1.5-q8_0 is ready")).to_be_visible()
+    model = next(m for m in _api(page, server, "GET", "/api/models") if m["name"] == "nomic-embed-text-v1.5-q8_0")
+    assert model["args"] == "-ngl 99 -c 8192 --embedding --pooling mean"
     assert not page.errors  # type: ignore[attr-defined]

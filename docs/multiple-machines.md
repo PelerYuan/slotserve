@@ -2,7 +2,9 @@
 
 !!! note "Preview"
     Multiple machines are new and still being completed: model servers, downloads and model scanning work on every
-    machine; **dev environments still run on the server's own machine only**.
+    machine; **dev environments (with or without a GPU and their ports), one-click deploys from the
+    [model catalog](model-catalog.md) and downloads into [model libraries](storage.md) still run on the server's own
+    machine only**. Lanes of other machines reserve no CPU cores on the server.
 
 One SlotServe server can use the GPUs (or CPUs) of several machines. Everyone keeps using one web address, one API
 key and one booking calendar; each machine simply adds its own [lanes](gpus-and-engines.md#lanes).

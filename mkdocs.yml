@@ -41,10 +41,12 @@ plugins:
             Getting started: 快速开始
             Configuration: 配置参考
             User guide: 使用指南
+            Model catalog: 模型目录
             Notifications & integrations: 通知与集成
             GPUs, lanes & engines: 多 GPU 与推理后端
             Multiple machines: 多台机器
             Dev environments: 开发环境
+            Storage: 存储
             API: 接口
             How scheduling works: 调度原理
             Development: 开发
@@ -73,10 +75,12 @@ nav:
   - Getting started: getting-started.md
   - Configuration: configuration.md
   - User guide: user-guide.md
+  - Model catalog: model-catalog.md
   - Notifications & integrations: integrations.md
   - GPUs, lanes & engines: gpus-and-engines.md
   - Multiple machines: multiple-machines.md
   - Dev environments: dev-environments.md
+  - Storage: storage.md
   - API: api.md
   - How scheduling works: scheduling.md
   - Development: development.md

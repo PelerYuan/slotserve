@@ -36,6 +36,8 @@ location / {
 
 Then set `SLOTSERVE_COOKIE_SECURE=true`.
 
+Dev environment web interfaces use a second port (8001). Give them an address of their own, e.g. a second `server` block on port 8443 with `proxy_pass http://127.0.0.1:8001;`, the same headers and WebSocket upgrades (`proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade";`), and set `SLOTSERVE_DEVENV_WEB_URL` to it and `SLOTSERVE_PUBLIC_URL` to SlotServe's address.
+
 **How do I back up?**
 Copy `DATA_DIR` (it contains `slotserve.db`). Models live in `MODELS_DIR` and are not touched except by downloads and explicit deletes.
 

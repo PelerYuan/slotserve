@@ -103,6 +103,47 @@ class DownloadTask(Base):
     finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     # The node that downloads into its models directory; NULL = the local node.
     node_id: Mapped[int | None] = mapped_column(ForeignKey("nodes.id", ondelete="CASCADE"), nullable=True)
+    # storage hook: a model library (Storage with purpose "models") to download into; NULL = MODELS_DIR
+    storage_id: Mapped[int | None] = mapped_column(ForeignKey("storages.id", ondelete="SET NULL"), nullable=True)
+
+
+class CatalogEntryRow(Base):
+    """A model catalog entry an admin added (same shape as the built-in catalog file)."""
+
+    __tablename__ = "catalog_entries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    entry_id: Mapped[str] = mapped_column(String(64), unique=True)
+    data: Mapped[str] = mapped_column(Text)  # JSON, services.catalog.Entry
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class CatalogDeploy(Base):
+    """A one-click deployment from the catalog: downloads, then a model registered with launch arguments."""
+
+    __tablename__ = "catalog_deploys"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    entry_id: Mapped[str] = mapped_column(String(64))
+    variant_id: Mapped[str] = mapped_column(String(64))
+    engine: Mapped[str] = mapped_column(String(16))
+    model_name: Mapped[str] = mapped_column(String(128))
+    args: Mapped[str] = mapped_column(Text, default="")
+    description: Mapped[str] = mapped_column(Text, default="")
+    # The GGUF file (first part) or the directory the model is registered with.
+    target_path: Mapped[str] = mapped_column(Text)
+    lane_id: Mapped[int | None] = mapped_column(ForeignKey("lanes.id", ondelete="SET NULL"), nullable=True)
+    set_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    task_ids: Mapped[str] = mapped_column(Text, default="[]")  # JSON list of download_tasks ids
+    # downloading | done | failed | cancelled
+    status: Mapped[str] = mapped_column(String(16), default="downloading", index=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
 class Reservation(Base):
@@ -381,9 +422,13 @@ class DevProject(Base):
     container_port: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # JSON: the web interfaces the container was created with {token, ports, base_session} (kept across bookings)
     container_web: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # storage hook: signature of the managed storage mounts the container was created with (services/storage.py)
+    container_storage: Mapped[str | None] = mapped_column(String(64), nullable=True)
     size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    # devenv_cpu: when a booking of it ends, keep it running without a GPU instead of pausing it
+    cpu_after_booking: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False)
 
 
 class DevSession(Base):
@@ -393,6 +438,7 @@ class DevSession(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     # booking | shared (an idle lane's environment: no booking, no owner, everyone has an account)
+    # | cpu (started by its owner without a GPU and without a booking; see services/devenv_cpu.py)
     kind: Mapped[str | None] = mapped_column(String(16), default="booking", nullable=True)
     reservation_id: Mapped[int | None] = mapped_column(
         ForeignKey("reservations.id", ondelete="CASCADE"), unique=True, nullable=True
@@ -419,6 +465,34 @@ class DevSession(Base):
     stopped_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
+class DevPort(Base):
+    """A container port of a dev environment: one someone added, or a declared one whose setting was changed.
+
+    ``mode`` direct: published on ``host_port`` of the host through a forwarder container (no SlotServe login);
+    login: opened through SlotServe's web proxy. A kept environment's ports belong to its project (the host port
+    stays while it is paused); any other environment's to its session, until the booking ends.
+    """
+
+    __tablename__ = "devenv_ports"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    project_id: Mapped[int | None] = mapped_column(
+        ForeignKey("devenv_projects.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    session_id: Mapped[int | None] = mapped_column(
+        ForeignKey("devenv_sessions.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    container_port: Mapped[int] = mapped_column(Integer)
+    name: Mapped[str] = mapped_column(String(32), default="")
+    mode: Mapped[str] = mapped_column(String(8), default="login")  # direct | login
+    declared: Mapped[bool] = mapped_column(Boolean, default=False)  # the template declares this port
+    host_port: Mapped[int | None] = mapped_column(Integer, nullable=True, unique=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    active_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)  # forwarder first ran
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
 # What a resource was doing: bookings, shared use while nobody books, or nothing.
 # ``cpu_devenv`` is reserved for CPU-only dev environments (resource "cpu").
 BOOKING_KINDS = ("model", "gpu", "devenv", "cpu_devenv")
@@ -432,8 +506,8 @@ class UsageSample(Base):
 
     ``resource`` "gpu": one row per GPU of a lane; ``gpu_index`` -1 stands for a lane without GPU
     metrics (no nvidia-smi), where occupancy is still recorded. ``resource`` "cpu" (CPU-only
-    environments, not sampled yet) uses ``gpu_index`` -1, ``util_seconds`` for CPU %, ``cpu_core_seconds``
-    for cores in use and ``mem_peak_mb`` for RAM.
+    environments, sampled by services/devenv_cpu.py) uses ``gpu_index`` -1, ``util_seconds`` for CPU % (of the
+    environment's core limit), ``cpu_core_seconds`` for cores in use and ``mem_peak_mb`` for RAM.
     """
 
     __tablename__ = "usage_samples"
@@ -503,3 +577,33 @@ class NodeModel(Base):
     size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
     source: Mapped[str] = mapped_column(String(16), default="scan")  # scan | download | manual
     seen_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class Storage(Base):
+    """Storage admins manage in the panel (services/storage.py): a directory on the Docker host, an NFS export or
+    an SMB/CIFS share, used for one purpose: shared data, personal spaces, kept project data or a model library."""
+
+    __tablename__ = "storages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True)
+    kind: Mapped[str] = mapped_column(String(8))  # host | nfs | smb
+    purpose: Mapped[str] = mapped_column(String(16))  # shared | personal | projects | models
+    host_path: Mapped[str | None] = mapped_column(Text, nullable=True)  # host: directory on the Docker host
+    server: Mapped[str | None] = mapped_column(String(255), nullable=True)  # nfs / smb: host name or address
+    remote_path: Mapped[str | None] = mapped_column(Text, nullable=True)  # nfs: export path; smb: share[/dir]
+    options: Mapped[str | None] = mapped_column(Text, nullable=True)  # extra mount options (comma separated)
+    username: Mapped[str | None] = mapped_column(String(128), nullable=True)  # smb
+    password_enc: Mapped[str | None] = mapped_column(Text, nullable=True)  # smb, encrypted with SECRET_KEY
+    mount_path: Mapped[str | None] = mapped_column(String(255), nullable=True)  # in containers (shared, models)
+    read_only: Mapped[bool] = mapped_column(Boolean, default=False)
+    access: Mapped[str] = mapped_column(String(16), default="everyone")  # everyone | users | admins
+    user_ids: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list (access "users")
+    local_path: Mapped[str | None] = mapped_column(Text, nullable=True)  # models: where SlotServe sees it
+    quota_gb: Mapped[float | None] = mapped_column(Float, nullable=True)  # personal: soft limit per person
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    status: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON: the last check
+    usage: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON {user id: bytes} (personal)
+    warned: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON: user ids told they are over quota
+    checked_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

@@ -16,12 +16,17 @@ services:
       # Container-side paths; the host paths are mapped in `volumes` below.
       SLOTSERVE_HOST: 0.0.0.0
       SLOTSERVE_PORT: 8000
+      SLOTSERVE_DEVENV_WEB_PORT: 8001
       SLOTSERVE_DATA_DIR: /data
       SLOTSERVE_MODELS_DIR: /models
       SLOTSERVE_LLAMA_SERVER_CMD: /opt/llama.cpp/llama-server
     ports:
       # Also the address node agents of other machines connect to (docs: Multiple machines, docker-compose.node.yml).
       - "${PORT:-8000}:8000"
+      # Web interfaces of dev environments (desktop, JupyterLab, VS Code, ...) are served on their own port so the
+      # browser keeps them apart from SlotServe. Publishing it on another host port? Set SLOTSERVE_DEVENV_WEB_URL.
+      # Direct ports (2300-2399 by default) and SSH ports are published by Docker itself, not here.
+      - "${DEVENV_WEB_PORT:-8001}:8001"
     volumes:
       # Directory that contains your compiled `llama-server` and its .so files.
       - ${LLAMA_CPP_DIR:?Set LLAMA_CPP_DIR in .env}:/opt/llama.cpp:ro

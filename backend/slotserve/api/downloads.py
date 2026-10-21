@@ -1,3 +1,4 @@
+import contextlib
 import re
 from urllib.parse import quote
 
@@ -14,6 +15,7 @@ from ..orm import DownloadTask, Node, User
 from ..schemas import DownloadCreateIn, DownloadOut, HfDownloadIn, HfFileOut, HfFilesOut
 from ..services.downloader import Downloader, filename_from_url, safe_filename
 from ..services.scanner import SPLIT_RE
+from ..services.storage import StorageError, library_dir
 
 router = APIRouter(prefix="/api/downloads", tags=["downloads"])
 
@@ -39,6 +41,7 @@ async def _queue(
     url: str,
     filename: str | None,
     node_id: int | None = None,
+    storage_id: int | None = None,
 ) -> DownloadTask:
     if not url.lower().startswith(("http://", "https://")):
         raise ApiError(status.HTTP_400_BAD_REQUEST, "invalid_url")
@@ -46,7 +49,15 @@ async def _queue(
     if name is None:
         raise ApiError(status.HTTP_400_BAD_REQUEST, "invalid_filename")
     node_id = await _node(db, downloader, node_id)
-    if node_id is None and downloader.dest_path(name).exists():
+    base = None
+    if storage_id is not None:  # storage hook: download into a model library from Admin -> Storage
+        if node_id is not None:  # libraries are mounted on this machine; other machines use their models directory
+            raise ApiError(status.HTTP_400_BAD_REQUEST, "storage_remote_node")
+        try:
+            base = await library_dir(db, storage_id, user)
+        except StorageError as exc:
+            raise ApiError(status.HTTP_400_BAD_REQUEST, exc.code, **exc.params) from exc
+    if node_id is None and downloader.dest_path(name, base).exists():
         raise ApiError(status.HTTP_409_CONFLICT, "file_exists", filename=name)
     busy = await db.execute(
         select(DownloadTask.id).where(
@@ -57,7 +68,7 @@ async def _queue(
     )
     if busy.first() is not None:
         raise ApiError(status.HTTP_409_CONFLICT, "download_in_progress", filename=name)
-    task = DownloadTask(user_id=user.id, url=url, filename=name, node_id=node_id)
+    task = DownloadTask(user_id=user.id, url=url, filename=name, node_id=node_id, storage_id=storage_id)
     db.add(task)
     return task
 
@@ -79,7 +90,7 @@ async def create_download(
     db: AsyncSession = Depends(get_db),
     downloader: Downloader = Depends(get_downloader),
 ):
-    task = await _queue(db, user, downloader, body.url.strip(), body.filename, body.node_id)
+    task = await _queue(db, user, downloader, body.url.strip(), body.filename, body.node_id, body.storage_id)
     await db.commit()
     downloader.poke()
     return (await _out(db, [task]))[0]
@@ -152,7 +163,8 @@ async def hf_download(
         if ".." in path.split("/") or not re.fullmatch(r"[\w.\-/ ]+\.gguf", path, re.IGNORECASE):
             raise ApiError(status.HTTP_400_BAD_REQUEST, "invalid_filename")
         url = f"{endpoint}/{body.repo}/resolve/{quote(body.revision, safe='')}/{quote(path)}"
-        tasks.append(await _queue(db, user, downloader, url, path.rsplit("/", 1)[-1], body.node_id))
+        name = path.rsplit("/", 1)[-1]
+        tasks.append(await _queue(db, user, downloader, url, name, body.node_id, body.storage_id))
     await db.commit()
     downloader.poke()
     return await _out(db, tasks)
@@ -201,7 +213,10 @@ async def cancel_download(
         await db.commit()
     elif task.status in ("failed", "cancelled", "done"):
         # Remove finished entries from the list (keeps the downloaded file).
-        part = downloader.dest_path(task.filename + ".part")
+        base = None
+        with contextlib.suppress(RuntimeError):
+            base = await downloader.task_dir(db, task)
+        part = downloader.dest_path(task.filename + ".part", base)
         if task.status != "done" and task.node_id is None and part.exists():
             part.unlink()
         await db.delete(task)

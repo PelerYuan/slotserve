@@ -187,6 +187,22 @@ class DockerClient:
                 return None
             raise
 
+    async def stats(self, container: str) -> dict | None:
+        """One reading of a container's resource use (CPU time in ns, memory); None when it is gone."""
+        try:
+            resp = await self._request(
+                "GET", f"/containers/{container}/stats", params={"stream": "false", "one-shot": "true"}
+            )
+        except DockerError as exc:
+            if exc.status == 404:
+                return None
+            raise
+        return resp.json()
+
+    async def update(self, container: str, resources: dict) -> None:
+        """Changes a container's CPU and memory limits (``docker update``)."""
+        await self._request("POST", f"/containers/{container}/update", json=resources)
+
     async def wait(self, container: str, timeout: float = 600) -> int:
         """Waits for a container to exit; returns its exit code."""
         resp = await self._request("POST", f"/containers/{container}/wait", timeout=timeout)
@@ -208,6 +224,25 @@ class DockerClient:
 
     async def remove_volume(self, name: str) -> None:
         await self._request("DELETE", f"/volumes/{quote(name, safe='')}", ok=(204, 404))
+
+    async def volume_create(
+        self, name: str, driver_opts: dict[str, str] | None = None, labels: dict[str, str] | None = None
+    ) -> dict:
+        """Creates a named volume with the local driver (``driver_opts`` e.g. type=nfs, o=addr=..., device=:/x)."""
+        body = {"Name": name, "Driver": "local", "DriverOpts": driver_opts or {}, "Labels": labels or {}}
+        return (await self._request("POST", "/volumes/create", json=body)).json()
+
+    async def volume_inspect(self, name: str) -> dict | None:
+        try:
+            return (await self._request("GET", f"/volumes/{quote(name, safe='')}")).json()
+        except DockerError as exc:
+            if exc.status == 404:
+                return None
+            raise
+
+    async def volumes(self, label: str) -> list[dict[str, Any]]:
+        filters = json.dumps({"label": [label]})
+        return (await self._request("GET", "/volumes", params={"filters": filters})).json().get("Volumes") or []
 
     async def list(self, label: str) -> list[dict[str, Any]]:
         filters = json.dumps({"label": [label]})

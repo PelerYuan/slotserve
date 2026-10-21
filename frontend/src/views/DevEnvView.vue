@@ -5,6 +5,14 @@ import { useRouter } from 'vue-router'
 import { NButton, NCheckbox, NInput, NInputNumber, NModal, NSelect, NSwitch, useDialog, useMessage } from 'naive-ui'
 import { ExternalLink, KeyRound, Plus, Terminal, Users } from 'lucide-vue-next'
 import CodeBlock from '@/components/CodeBlock.vue'
+import StorageInfo from '@/components/StorageInfo.vue' // storage hook
+// devenv_cpu: environments without a GPU
+import CpuPanel from '@/components/devenv/CpuPanel.vue'
+import CpuProjectControls from '@/components/devenv/CpuProjectControls.vue'
+import CpuSessionInfo from '@/components/devenv/CpuSessionInfo.vue'
+import CpuStartButton from '@/components/devenv/CpuStartButton.vue'
+import DevEnvPorts from '@/components/devenv/DevEnvPorts.vue'
+import PublicPorts from '@/components/devenv/PublicPorts.vue'
 import { api } from '@/api/client'
 import type { DevInfo, DevProject, DevSession, DevTemplate, DevWebKind, Reservation } from '@/api/types'
 import { session } from '@/composables/session'
@@ -135,15 +143,18 @@ const tplForm = reactive({
   description: '',
   command: '',
   env: '',
-  ports: [] as { name: string; port: number | null; kind: DevWebKind }[],
+  ports: [] as { name: string; port: number | null; kind: DevWebKind; mode: 'login' | 'direct' }[],
   keepEntrypoint: false,
   paths: '',
   shared: false,
 })
 const webKinds: DevWebKind[] = ['desktop', 'jupyter', 'vscode', 'http']
 const webKindOptions = computed(() => webKinds.map((k) => ({ value: k, label: t(`devenv.web.kind.${k}`) })))
+const portModeOptions = computed(() =>
+  (['login', 'direct'] as const).map((m) => ({ value: m, label: t(`devenv.ports.mode.${m}`) })),
+)
 function addPort() {
-  tplForm.ports.push({ name: '', port: null, kind: 'http' })
+  tplForm.ports.push({ name: '', port: null, kind: 'http', mode: 'login' })
 }
 function openLabel(p: { name: string; kind: DevWebKind }) {
   return p.kind === 'http' ? t('devenv.web.openNamed', { name: p.name }) : t(`devenv.web.open.${p.kind}`)
@@ -158,7 +169,7 @@ function openTemplate(x?: DevTemplate) {
     description: x ? (x.builtin_key ? '' : x.description) : '',
     command: x?.command ?? '',
     env: x ? Object.entries(x.env).map(([k, v]) => `${k}=${v}`).join('\n') : '',
-    ports: (x?.web_ports ?? []).map((p) => ({ ...p })),
+    ports: (x?.web_ports ?? []).map((p) => ({ ...p, mode: p.mode ?? 'login' })),
     keepEntrypoint: x?.keep_entrypoint ?? false,
     paths: x ? x.persist_paths.join('\n') : '',
     shared: false,
@@ -188,7 +199,7 @@ async function saveTemplate() {
     env: parseEnv(tplForm.env),
     web_ports: tplForm.ports
       .filter((p) => p.port)
-      .map((p) => ({ name: p.name.trim(), port: p.port as number, kind: p.kind })),
+      .map((p) => ({ name: p.name.trim(), port: p.port as number, kind: p.kind, mode: p.mode })),
     keep_entrypoint: tplForm.keepEntrypoint,
     persist_paths: parseLines(tplForm.paths),
   }
@@ -354,6 +365,7 @@ const stateTone: Record<string, string> = {
             <CodeBlock :code="vscodeConfig(s)" />
           </details>
         </template>
+        <DevEnvPorts v-if="s.state === 'running'" :session="s" :can-manage="false" />
         <div v-if="isAdmin && s.error" class="failure"><pre class="mono small">{{ s.error }}</pre></div>
         <div v-if="isAdmin" class="row wrap actions">
           <NButton v-if="s.state === 'running' || s.state === 'failed'" size="small" secondary @click="restart(s)">
@@ -363,6 +375,9 @@ const stateTone: Record<string, string> = {
         </div>
       </article>
     </section>
+
+    <!-- devenv_cpu: environments without a GPU -->
+    <CpuPanel v-if="info?.enabled" :templates="templates" :projects="projects" :can-log-in="canLogIn" @changed="load" />
 
     <!-- environments -->
     <section class="block">
@@ -387,6 +402,7 @@ const stateTone: Record<string, string> = {
           </span>
         </div>
         <div class="mono small faint image">{{ s.image }}</div>
+        <CpuSessionInfo v-if="s.kind === 'cpu'" :session="s" :projects="projects" @changed="load" />
 
         <div v-if="s.state === 'pulling'" class="progress">
           <div class="bar"><span :style="{ width: `${s.progress ?? 3}%` }" /></div>
@@ -395,7 +411,9 @@ const stateTone: Record<string, string> = {
             <span v-if="s.detail" class="mono"> · {{ s.detail }}</span>
           </div>
         </div>
-        <p v-else-if="s.state === 'ready' || s.state === 'waiting'" class="muted small">{{ t('devenv.waitingStart') }}</p>
+        <p v-else-if="(s.state === 'ready' || s.state === 'waiting') && s.kind !== 'cpu'" class="muted small">
+          {{ t('devenv.waitingStart') }}
+        </p>
         <p v-else-if="s.state === 'starting'" class="muted small">
           {{ s.detail === 'snapshot' ? t('devenv.snapshot') : t('devenv.starting') }}
         </p>
@@ -416,6 +434,7 @@ const stateTone: Record<string, string> = {
           </NButton>
           <span class="faint small">{{ t('devenv.web.newTab') }}</span>
         </div>
+        <DevEnvPorts v-if="s.state === 'running'" :session="s" :can-manage="s.mine || isAdmin" />
 
         <template v-if="s.state === 'running' && s.ssh_command">
           <div class="ssh">
@@ -492,6 +511,7 @@ const stateTone: Record<string, string> = {
             <template v-if="p.upcoming"> · {{ t('devenv.upcomingBookings', { n: p.upcoming }) }}</template>
           </p>
           <p v-if="p.persist_paths.length" class="mono small faint">{{ p.persist_paths.join('  ') }}</p>
+          <CpuProjectControls :project="p" @changed="load" />
           <div class="row actions">
             <NButton size="tiny" quaternary @click="openProject(p)">{{ t('common.edit') }}</NButton>
             <NButton size="tiny" quaternary type="error" :disabled="p.state === 'running'" @click="removeProject(p)">
@@ -502,6 +522,9 @@ const stateTone: Record<string, string> = {
       </div>
       <p v-if="info?.project_days" class="faint small">{{ t('devenv.projectDays', { n: info.project_days }) }}</p>
     </section>
+
+    <!-- direct ports (host ports) -->
+    <PublicPorts v-if="info?.enabled" :is-admin="isAdmin" />
 
     <!-- templates -->
     <section class="block">
@@ -525,6 +548,7 @@ const stateTone: Record<string, string> = {
           </div>
           <div class="mono small faint image">{{ x.image }}</div>
           <p class="small muted">{{ describeTemplate(x) }}</p>
+          <div v-if="x.enabled" class="row actions"><CpuStartButton :template-id="x.id" @started="load" /></div>
           <div v-if="isAdmin" class="row actions">
             <NButton size="tiny" quaternary @click="openTemplate(x)">{{ t('common.edit') }}</NButton>
             <NButton size="tiny" quaternary type="error" @click="removeTemplate(x)">{{ t('common.delete') }}</NButton>
@@ -543,12 +567,16 @@ const stateTone: Record<string, string> = {
           <div class="mono small faint image">{{ x.image }}</div>
           <p v-if="x.description" class="small muted">{{ x.description }}</p>
           <div class="row actions">
+            <CpuStartButton :template-id="x.id" @started="load" />
             <NButton size="tiny" quaternary @click="openTemplate(x)">{{ t('common.edit') }}</NButton>
             <NButton size="tiny" quaternary type="error" @click="removeTemplate(x)">{{ t('common.delete') }}</NButton>
           </div>
         </article>
       </div>
     </section>
+
+    <!-- storage hook: storages from Admin -> Storage -->
+    <StorageInfo v-if="info?.enabled" />
 
     <!-- dialogs -->
     <NModal v-model:show="saveForm.open" preset="card" :title="t('devenv.save')" style="max-width: 460px">
@@ -608,6 +636,7 @@ const stateTone: Record<string, string> = {
               style="width: 120px"
             />
             <NSelect v-model:value="p.kind" :options="webKindOptions" style="width: 150px" />
+            <NSelect v-model:value="p.mode" :options="portModeOptions" style="width: 160px" />
             <NButton size="small" quaternary type="error" @click="tplForm.ports.splice(i, 1)">{{ t('common.delete') }}</NButton>
           </div>
           <div>
