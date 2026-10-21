@@ -12,7 +12,7 @@ sequenceDiagram
     S->>D: pull the image
     Note over S,D: at the start
     S->>S: stop the lane's model server
-    S->>D: create the container (lane GPUs, /workspace, /models read-only)
+    S->>D: create a network and the container (lane GPUs, /workspace, /models read-only)
     S->>D: copy in the SSH server and your public keys, start
     S-->>U: ssh -p 2201 root@server (web page and Telegram)
     U->>D: ssh, VS Code Remote-SSH, port forwarding
@@ -55,22 +55,51 @@ sequenceDiagram
     You are `root` inside the container. Your files belong in `/workspace`; the shared models are at `/models` (read-only).
 
 4. **VS Code**: add the snippet from the page to `~/.ssh/config` and connect with Remote-SSH. The port can change between bookings.
-5. **Jupyter or other web tools**: start them yourself and forward the port, e.g. `ssh -p 2201 -L 8888:localhost:8888 root@server`.
+5. **Desktop, JupyterLab, VS Code in the browser**: templates with a web interface show an **Open desktop / Open JupyterLab / Open VS Code** button while they run (see [Web interfaces](#web-interfaces)). Other web tools you start yourself can be reached with port forwarding, e.g. `ssh -p 2201 -L 8888:localhost:8888 root@server`.
 
 When the booking ends the container is removed. Extend the booking in time (the reminder 10 minutes before the end has buttons for that) if you need longer.
 
 ### Templates
 
-| Template | Image |
-| --- | --- |
-| PyTorch | `pytorch/pytorch:2.14.1-cuda12.6-cudnn9-devel` |
-| Jupyter + PyTorch | `quay.io/jupyter/pytorch-notebook:cuda12-pytorch-2.11.0` |
-| TensorFlow | `tensorflow/tensorflow:2.21.0-gpu-jupyter` |
-| CUDA | `nvidia/cuda:12.9.2-cudnn-devel-ubuntu24.04` |
+| Template | Image | Web interface |
+| --- | --- | --- |
+| PyTorch | `pytorch/pytorch:2.14.1-cuda12.6-cudnn9-devel` | |
+| JupyterLab + PyTorch | `quay.io/jupyter/pytorch-notebook:cuda12-pytorch-2.11.0` | JupyterLab |
+| TensorFlow | `tensorflow/tensorflow:2.21.0-gpu-jupyter` | |
+| CUDA | `nvidia/cuda:12.9.2-cudnn-devel-ubuntu24.04` | |
+| Ubuntu desktop | `linuxserver/webtop:ubuntu-xfce-388f14a2-ls7` | Desktop (XFCE) |
+| VS Code | `codercom/code-server:4.141.0` | VS Code (code-server) |
 
 The built-in templates use CUDA 12 builds, which run on a wide range of GPUs and drivers. Admins can change their images, switch them off or add shared templates.
 
 Anyone can add **their own template** from any image (unless an admin turned custom images off or limited the registries), with an optional main process and environment variables. The image needs `/bin/sh`; SSH works in any image because SlotServe brings its own small static SSH server.
+
+### Web interfaces
+
+SlotServe opens any port of a running environment in the browser at `/devenv/<session>/port/<port>/` on the SlotServe address. A template **declares its web interfaces** as a list of ports, each with a name and a kind (desktop, JupyterLab, VS Code or any other web app); while the environment runs, its card has an **Open …** button for each of them (new tab). Other ports, e.g. a TensorBoard you start yourself on port 6006, can be opened by typing `/devenv/<session>/port/6006/`. Only the person who booked the environment and admins can open its ports (environments that belong to no booking are open to everyone signed in); you need to be signed in to SlotServe.
+
+```mermaid
+flowchart LR
+    B[Browser] -- "/devenv/7/port/8888/ (session cookie)" --> S[SlotServe]
+    S -- "HTTP + WebSocket, token added" --> C["container slotserve-dev-7:8888"]
+    subgraph N["network slotserve-devenv-7"]
+        C
+    end
+```
+
+- **Isolation**: every environment runs on its own Docker network. Web ports are never published: when SlotServe runs in a container it joins the environment's network and reaches any port by container name; when it runs directly on the host, Docker binds each declared port to a random port on `127.0.0.1`, and other ports are reached on the container's address in its network (on Linux hosts). The network is removed when the environment stops, and leftovers are cleaned up after a restart.
+- **Proxy**: SlotServe forwards HTTP (streamed) and WebSockets (Jupyter kernels, VS Code, desktop streaming), keeps redirects and cookies under the environment's path and never passes its own session cookie on.
+- **Token**: each start gets a random token. JupyterLab is started with it (`--IdentityProvider.token`) and the desktop uses it as its password; SlotServe adds it to every request, so nobody can use these apps without going through SlotServe.
+- **Base path**: the main process and environment variables can use the placeholders `{base_path}` and `{port}` (the first declared port, e.g. `/devenv/7/port/8888/` and `8888`), `{base_path_<port>}` (any declared port, e.g. `{base_path_6006}`), `{token}` and `{session}`. Ports whose app is given its base path (Jupyter `--ServerApp.base_url`, the desktop's `SUBFOLDER`) receive the full path; for all other ports (code-server, most simple apps, ports that are not declared) SlotServe strips the prefix, so those apps should use relative links. The variables `SLOTSERVE_WEB_BASE`, `SLOTSERVE_WEB_PORT` and `SLOTSERVE_WEB_TOKEN` (first declared port) are set as well.
+- **Keep the image's entrypoint**: images such as the linuxserver desktop run their own init system. With this option SlotServe keeps the image's entrypoint and command and starts the SSH server next to it with `docker exec`, instead of using its own start script.
+
+The built-ins: **JupyterLab + PyTorch** (JupyterLab on port 8888, files in `/workspace`), **Ubuntu desktop** (an XFCE desktop streamed to the browser, port 3000) and **VS Code** (code-server on port 8080, opened on `/workspace`; extensions come from Open VSX). SSH works in all of them as before.
+
+!!! note
+    The desktop streams video with modern browser APIs that need a secure context: open SlotServe over HTTPS (or on `localhost`). Hardware-accelerated graphics in the desktop may need `NVIDIA_DRIVER_CAPABILITIES=all` in the template's environment variables, depending on the host's driver setup.
+
+!!! warning "Same origin"
+    Web interfaces are served from the same address as SlotServe. A page in someone's environment runs with the rights of whoever opens it, so admins should only open environments of people they trust. code-server has no token of its own; it relies on the per-environment network (and the port bound to `127.0.0.1` when SlotServe runs on the host).
 
 ### Saving an environment
 
@@ -80,4 +109,4 @@ Anyone can add **their own template** from any image (unless an admin turned cus
 
 - **Dev environments** with **Everyone** switched on lists every environment with its state, image, port and errors; **Logs** shows the container output.
 - A failed environment (image not found, container exited, no free port) shows the reason and can be started again with **Try again**. The person is notified.
-- On restart SlotServe keeps environments that are still running and removes leftover containers.
+- On restart SlotServe keeps environments that are still running and removes leftover containers and networks.

@@ -4,7 +4,7 @@ import io
 import json
 import logging
 import tarfile
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 from urllib.parse import quote
 
@@ -189,6 +189,42 @@ class DockerClient:
     async def list(self, label: str) -> list[dict[str, Any]]:
         filters = json.dumps({"label": [label]})
         return (await self._request("GET", "/containers/json", params={"all": "true", "filters": filters})).json()
+
+    async def exec_detached(self, container: str, cmd: Sequence[str], user: str = "root") -> str:
+        """Runs a command inside a running container in the background (``docker exec -d``)."""
+        body = {"Cmd": [*cmd], "User": user, "AttachStdin": False, "AttachStdout": False, "AttachStderr": False}
+        resp = await self._request("POST", f"/containers/{container}/exec", json=body)
+        exec_id = resp.json()["Id"]
+        await self._request("POST", f"/exec/{exec_id}/start", json={"Detach": True, "Tty": False}, ok=(200, 204))
+        return exec_id
+
+    # ---- networks -------------------------------------------------------------
+
+    async def network_create(self, name: str, labels: dict[str, str]) -> str:
+        body = {"Name": name, "Driver": "bridge", "CheckDuplicate": True, "Labels": labels}
+        return (await self._request("POST", "/networks/create", json=body)).json()["Id"]
+
+    async def network_connect(self, network: str, container: str, aliases: Sequence[str] | None = None) -> None:
+        body: dict[str, Any] = {"Container": container}
+        if aliases:
+            body["EndpointConfig"] = {"Aliases": [*aliases]}
+        try:
+            await self._request("POST", f"/networks/{quote(network, safe='')}/connect", json=body)
+        except DockerError as exc:
+            if "already exists" in exc.message or "already attached" in exc.message:
+                return
+            raise
+
+    async def network_disconnect(self, network: str, container: str) -> None:
+        body = {"Container": container, "Force": True}
+        await self._request("POST", f"/networks/{quote(network, safe='')}/disconnect", json=body, ok=(200, 404))
+
+    async def network_remove(self, network: str) -> None:
+        await self._request("DELETE", f"/networks/{quote(network, safe='')}", ok=(200, 204, 404))
+
+    async def networks(self, label: str) -> "list[dict[str, Any]]":
+        filters = json.dumps({"label": [label]})
+        return (await self._request("GET", "/networks", params={"filters": filters})).json()
 
     async def logs(self, container: str, tail: int = 200) -> str:
         resp = await self._request(

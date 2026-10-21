@@ -290,6 +290,11 @@ class DevTemplate(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     command: Mapped[str | None] = mapped_column(Text, nullable=True)  # main process; empty = keep running idle
     env: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON {name: value}
+    # Web interfaces the environment serves, opened through SlotServe's proxy at /devenv/<session>/port/<port>/:
+    # JSON [{name, port, kind}], kind desktop | jupyter | vscode | http. keep_entrypoint: start the image's own
+    # entrypoint (e.g. an init system) and add SSH with ``docker exec`` instead of SlotServe's start script.
+    web_ports: Mapped[str | None] = mapped_column(Text, nullable=True)
+    keep_entrypoint: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False)
     kind: Mapped[str] = mapped_column(String(16), default="custom")  # builtin | custom | saved
     builtin_key: Mapped[str | None] = mapped_column(String(32), nullable=True, unique=True)
     owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
@@ -319,6 +324,8 @@ class DevSession(Base):
     container_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
     container_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
     ssh_port: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # JSON while running: how SlotServe reaches the container's ports {token, ports, container, ip, published}
+    web: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     started_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     stopped_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)

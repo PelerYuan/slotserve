@@ -2,11 +2,11 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { NButton, NInput, NModal, NSwitch, useDialog, useMessage } from 'naive-ui'
-import { KeyRound, Plus, Terminal } from 'lucide-vue-next'
+import { NButton, NInput, NInputNumber, NModal, NSelect, NSwitch, useDialog, useMessage } from 'naive-ui'
+import { ExternalLink, KeyRound, Plus, Terminal } from 'lucide-vue-next'
 import CodeBlock from '@/components/CodeBlock.vue'
 import { api } from '@/api/client'
-import type { DevInfo, DevSession, DevTemplate, Reservation, SshKey } from '@/api/types'
+import type { DevInfo, DevSession, DevTemplate, DevWebKind, Reservation, SshKey } from '@/api/types'
 import { session } from '@/composables/session'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { formatDateTime, formatRange } from '@/utils/format'
@@ -124,8 +124,18 @@ const tplForm = reactive({
   description: '',
   command: '',
   env: '',
+  ports: [] as { name: string; port: number | null; kind: DevWebKind }[],
+  keepEntrypoint: false,
   shared: false,
 })
+const webKinds: DevWebKind[] = ['desktop', 'jupyter', 'vscode', 'http']
+const webKindOptions = computed(() => webKinds.map((k) => ({ value: k, label: t(`devenv.web.kind.${k}`) })))
+function addPort() {
+  tplForm.ports.push({ name: '', port: null, kind: 'http' })
+}
+function openLabel(p: { name: string; kind: DevWebKind }) {
+  return p.kind === 'http' ? t('devenv.web.openNamed', { name: p.name }) : t(`devenv.web.open.${p.kind}`)
+}
 function openTemplate(x?: DevTemplate) {
   Object.assign(tplForm, {
     open: true,
@@ -136,6 +146,8 @@ function openTemplate(x?: DevTemplate) {
     description: x ? (x.builtin_key ? '' : x.description) : '',
     command: x?.command ?? '',
     env: x ? Object.entries(x.env).map(([k, v]) => `${k}=${v}`).join('\n') : '',
+    ports: (x?.web_ports ?? []).map((p) => ({ ...p })),
+    keepEntrypoint: x?.keep_entrypoint ?? false,
     shared: false,
   })
 }
@@ -155,6 +167,10 @@ async function saveTemplate() {
     description: tplForm.description.trim(),
     command: tplForm.command.trim() || null,
     env: parseEnv(tplForm.env),
+    web_ports: tplForm.ports
+      .filter((p) => p.port)
+      .map((p) => ({ name: p.name.trim(), port: p.port as number, kind: p.kind })),
+    keep_entrypoint: tplForm.keepEntrypoint,
   }
   try {
     if (tplForm.id) {
@@ -295,6 +311,23 @@ const stateTone: Record<string, string> = {
         <p v-else-if="s.state === 'ready' || s.state === 'waiting'" class="muted small">{{ t('devenv.waitingStart') }}</p>
         <p v-else-if="s.state === 'starting'" class="muted small">{{ t('devenv.starting') }}</p>
 
+        <div v-if="s.state === 'running' && s.web.length" class="row wrap web">
+          <NButton
+            v-for="p in s.web"
+            :key="p.port"
+            tag="a"
+            :href="p.url"
+            target="_blank"
+            rel="noopener"
+            type="primary"
+            size="small"
+          >
+            <template #icon><ExternalLink :size="14" /></template>
+            {{ openLabel(p) }}
+          </NButton>
+          <span class="faint small">{{ t('devenv.web.newTab') }}</span>
+        </div>
+
         <template v-if="s.state === 'running' && s.ssh_command">
           <div class="ssh">
             <div class="faint small">{{ t('devenv.connect') }}</div>
@@ -363,6 +396,7 @@ const stateTone: Record<string, string> = {
           <div class="row">
             <span class="strong">{{ x.name }}</span>
             <span v-if="!x.enabled" class="badge">{{ t('devenv.off') }}</span>
+            <span v-for="p in x.web_ports" :key="p.port" class="badge brand">{{ t(`devenv.web.kind.${p.kind}`) }}</span>
             <span class="spacer" />
             <template v-if="isAdmin">
               <NSwitch :value="x.enabled" size="small" @update:value="(v: boolean) => toggleTemplate(x, v)" />
@@ -383,6 +417,7 @@ const stateTone: Record<string, string> = {
           <div class="row">
             <span class="strong">{{ x.name }}</span>
             <span class="badge" :class="{ brand: x.kind === 'saved' }">{{ t(`devenv.kind.${x.kind}`) }}</span>
+            <span v-for="p in x.web_ports" :key="p.port" class="badge brand">{{ t(`devenv.web.kind.${p.kind}`) }}</span>
           </div>
           <div class="mono small faint image">{{ x.image }}</div>
           <p v-if="x.description" class="small muted">{{ x.description }}</p>
@@ -461,6 +496,33 @@ const stateTone: Record<string, string> = {
           <span class="field-label">{{ t('devenv.env') }}</span>
           <NInput v-model:value="tplForm.env" type="textarea" class="mono" placeholder="HF_HOME=/workspace/.cache/huggingface" :autosize="{ minRows: 2, maxRows: 6 }" />
         </label>
+        <fieldset class="web-fields">
+          <legend class="field-label">{{ t('devenv.web.section') }}</legend>
+          <div v-for="(p, i) in tplForm.ports" :key="i" class="row wrap web-row">
+            <NInput v-model:value="p.name" maxlength="32" :placeholder="t('devenv.web.name')" style="width: 140px" />
+            <NInputNumber
+              v-model:value="p.port"
+              :min="1"
+              :max="65535"
+              :show-button="false"
+              :placeholder="t('devenv.web.port')"
+              style="width: 120px"
+            />
+            <NSelect v-model:value="p.kind" :options="webKindOptions" style="width: 150px" />
+            <NButton size="small" quaternary type="error" @click="tplForm.ports.splice(i, 1)">{{ t('common.delete') }}</NButton>
+          </div>
+          <div>
+            <NButton size="small" secondary :disabled="tplForm.ports.length >= 10" @click="addPort">
+              <template #icon><Plus :size="14" /></template>
+              {{ t('devenv.web.addPort') }}
+            </NButton>
+          </div>
+          <span class="faint small">{{ t('devenv.web.portHint') }}</span>
+          <label class="row small toggle">
+            <NSwitch v-model:value="tplForm.keepEntrypoint" size="small" />{{ t('devenv.web.keepEntrypoint') }}
+          </label>
+          <span class="faint small">{{ t('devenv.web.keepEntrypointHint') }}</span>
+        </fieldset>
         <label v-if="isAdmin && !tplForm.id" class="row small toggle">
           <NSwitch v-model:value="tplForm.shared" size="small" />{{ t('devenv.shared') }}
         </label>
@@ -562,6 +624,23 @@ const stateTone: Record<string, string> = {
 .ssh {
   display: grid;
   gap: 6px;
+}
+.web {
+  gap: 10px;
+}
+.web-fields {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.web-fields legend {
+  padding: 0 4px;
+}
+.web-row {
+  gap: 8px;
 }
 .vscode summary {
   cursor: pointer;

@@ -2,6 +2,7 @@
 
 import json
 from datetime import datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from pydantic import BaseModel, Field
@@ -14,10 +15,28 @@ from ..deps import current_user
 from ..errors import ApiError
 from ..orm import DevSession, DevTemplate, Lane, Reservation, SshKey, User
 from ..services.audit import record
-from ..services.devenv import DevEnvError, check_image, parse_public_key
+from ..services.devenv import DevEnvError, check_image, load_web_ports, parse_public_key, session_web, web_base
 
 router = APIRouter(prefix="/api/devenv", tags=["devenv"])
 keys_router = APIRouter(prefix="/api/ssh-keys", tags=["devenv"])
+
+
+WebKind = Literal["desktop", "jupyter", "vscode", "http"]
+
+
+class WebPort(BaseModel):
+    """A web interface a template declares: opened at /devenv/<session>/port/<port>/."""
+
+    name: str = Field(default="", max_length=32)
+    port: int = Field(ge=1, le=65535)
+    kind: WebKind = "http"
+
+
+def _web_ports(ports: list[WebPort]) -> str | None:
+    if len({p.port for p in ports}) != len(ports):
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_web_port_duplicate")
+    items = [{"name": p.name.strip() or str(p.port), "port": p.port, "kind": p.kind} for p in ports]
+    return json.dumps(items) if items else None
 
 
 class TemplateIn(BaseModel):
@@ -26,6 +45,8 @@ class TemplateIn(BaseModel):
     description: str = Field(default="", max_length=2000)
     command: str | None = Field(default=None, max_length=4000)
     env: dict[str, str] = Field(default_factory=dict)
+    web_ports: list[WebPort] = Field(default_factory=list, max_length=10)
+    keep_entrypoint: bool = False
     shared: bool = False  # admins: offer it to everyone
 
 
@@ -35,6 +56,8 @@ class TemplatePatch(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
     command: str | None = Field(default=None, max_length=4000)
     env: dict[str, str] | None = None
+    web_ports: list[WebPort] | None = Field(default=None, max_length=10)
+    keep_entrypoint: bool | None = None
     enabled: bool | None = None
 
 
@@ -45,12 +68,21 @@ class TemplateOut(BaseModel):
     description: str
     command: str | None
     env: dict[str, str]
+    web_ports: list[WebPort]
+    keep_entrypoint: bool
     kind: str  # builtin | custom | saved
     builtin_key: str | None
     owner: str | None
     mine: bool
     enabled: bool
     created_at: datetime
+
+
+class WebOut(BaseModel):
+    name: str
+    port: int
+    kind: str
+    url: str
 
 
 class SessionOut(BaseModel):
@@ -66,6 +98,7 @@ class SessionOut(BaseModel):
     error: str | None
     ssh_port: int | None
     ssh_command: str | None
+    web: list[WebOut]  # the declared web interfaces, while it runs
     start_at: datetime | None
     end_at: datetime | None
     started_at: datetime | None
@@ -114,6 +147,8 @@ async def _template_out(db: AsyncSession, rows: list[DevTemplate], user: User) -
                 description=t.description or "",
                 command=t.command,
                 env=env,
+                web_ports=[WebPort(**p) for p in load_web_ports(t.web_ports)],
+                keep_entrypoint=bool(t.keep_entrypoint),
                 kind=t.kind,
                 builtin_key=t.builtin_key,
                 owner=names.get(t.owner_id),
@@ -180,6 +215,8 @@ async def create_template(body: TemplateIn, user: User = Depends(current_user), 
         description=body.description.strip(),
         command=(body.command or "").strip() or None,
         env=json.dumps(body.env) if body.env else None,
+        web_ports=_web_ports(body.web_ports),
+        keep_entrypoint=body.keep_entrypoint,
         kind="builtin" if body.shared else "custom",
         owner_id=None if body.shared else user.id,
     )
@@ -222,6 +259,10 @@ async def update_template(
         t.command = (body.command or "").strip() or None
     if body.env is not None:
         t.env = json.dumps(body.env) if body.env else None
+    if body.web_ports is not None:
+        t.web_ports = _web_ports(body.web_ports)
+    if body.keep_entrypoint is not None:
+        t.keep_entrypoint = body.keep_entrypoint
     if body.enabled is not None:
         t.enabled = body.enabled
     if t.kind == "builtin":
@@ -255,6 +296,7 @@ async def _session_out(db: AsyncSession, request: Request, rows: list[DevSession
         owner = await db.get(User, s.user_id)
         template = await db.get(DevTemplate, s.template_id) if s.template_id else None
         lane = await db.get(Lane, s.lane_id) if s.lane_id else None
+        web = session_web(s) if s.state == "running" else None
         out.append(
             SessionOut(
                 id=s.id,
@@ -269,6 +311,10 @@ async def _session_out(db: AsyncSession, request: Request, rows: list[DevSession
                 error=s.error,
                 ssh_port=s.ssh_port if s.state == "running" else None,
                 ssh_command=f"ssh -p {s.ssh_port} root@{host}" if s.state == "running" and s.ssh_port else None,
+                web=[
+                    WebOut(name=p["name"], port=p["port"], kind=p["kind"], url=web_base(s.id, p["port"]))
+                    for p in (web or {}).get("ports", [])
+                ],
                 start_at=r.start_at if r else None,
                 end_at=r.end_at if r else None,
                 started_at=s.started_at,

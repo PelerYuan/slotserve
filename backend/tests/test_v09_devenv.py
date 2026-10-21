@@ -70,7 +70,14 @@ async def test_keys_and_templates(app, make_client):
     assert len((await bob.get("/api/ssh-keys")).json()) == 2
 
     templates = (await bob.get("/api/devenv/templates")).json()
-    assert {t["builtin_key"] for t in templates} == {"pytorch", "jupyter-pytorch", "tensorflow", "cuda"}
+    assert {t["builtin_key"] for t in templates} == {
+        "pytorch",
+        "jupyter-pytorch",
+        "tensorflow",
+        "cuda",
+        "desktop",
+        "vscode",
+    }
     info = (await bob.get("/api/devenv")).json()
     assert info["enabled"] and info["docker"] == {"ok": True} and info["host_key_fingerprint"] == "SHA256:fakehostkey"
 

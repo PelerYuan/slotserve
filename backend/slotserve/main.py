@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import logging
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -28,7 +29,7 @@ from .api import (
     waitlist,
 )
 from .config import Settings, get_settings
-from .gateway import proxy
+from .gateway import devenv_web, proxy
 from .runtime.lanes import LaneManager, ensure_default_lane
 from .services import app_settings
 from .services.devenv import DevEnvManager, seed_templates
@@ -40,6 +41,7 @@ from .services.telegram import TelegramBot
 
 log = logging.getLogger("slotserve")
 PACKAGE_STATIC = Path(__file__).parent / "static"
+WEB_PATH = re.compile(r"devenv/\d+/port(/|$)")  # dev environment ports (gateway/devenv_web.py)
 
 
 def create_app(settings: Settings | None = None, *, start_background: bool = True) -> FastAPI:
@@ -142,6 +144,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         app.include_router(module.router)
     app.include_router(devenv.keys_router)
     app.include_router(proxy.router)
+    app.include_router(devenv_web.router)
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz():
@@ -157,7 +160,7 @@ def _mount_frontend(app: FastAPI, static_dir: Path) -> None:
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa(full_path: str, request: Request):
-        if full_path.startswith(("api/", "v1/")):
+        if full_path.startswith(("api/", "v1/")) or WEB_PATH.match(full_path):
             return JSONResponse({"detail": "Not Found"}, status_code=404)
         if not index.is_file():
             return JSONResponse(

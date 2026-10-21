@@ -316,6 +316,15 @@ export interface DevInfo {
   pull_minutes: number
 }
 
+export type DevWebKind = 'desktop' | 'jupyter' | 'vscode' | 'http'
+
+// A web interface a template declares, opened at /devenv/<session>/port/<port>/
+export interface DevWebPort {
+  name: string
+  port: number
+  kind: DevWebKind
+}
+
 export interface DevTemplate {
   id: number
   name: string
@@ -323,6 +332,8 @@ export interface DevTemplate {
   description: string
   command: string | null
   env: Record<string, string>
+  web_ports: DevWebPort[]
+  keep_entrypoint: boolean
   kind: 'builtin' | 'custom' | 'saved'
   builtin_key: string | null
   owner: string | null
@@ -337,6 +348,8 @@ export interface DevTemplateInput {
   description?: string
   command?: string | null
   env?: Record<string, string>
+  web_ports?: DevWebPort[]
+  keep_entrypoint?: boolean
   shared?: boolean
   enabled?: boolean
 }
@@ -356,6 +369,7 @@ export interface DevSession {
   error: string | null
   ssh_port: number | null
   ssh_command: string | null
+  web: (DevWebPort & { url: string })[]
   start_at: string | null
   end_at: string | null
   started_at: string | null
