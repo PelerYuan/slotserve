@@ -83,8 +83,10 @@ CodeQL scans Python and TypeScript weekly and on pull requests. Dependabot opens
 
 ## Releasing
 
-1. Move the **Unreleased** entries in `CHANGELOG.md` under a new version heading and bump the version in `backend/pyproject.toml`, `backend/slotserve/__init__.py` and `frontend/package.json`.
-2. Commit, then tag and push: `git tag v0.5.0 && git push origin main v0.5.0`.
-3. `.github/workflows/release.yml` builds and pushes `ghcr.io/peleryuan/slotserve` (`0.5.0`, `0.5`, `latest`) and creates the GitHub release from the changelog section.
+Changes are described in changelog fragments (`changes/unreleased/*.md`, see `changes/README.md`), which `tools/release_notes.py` merges into `CHANGELOG.md` at release time. The full procedure, including the release candidate, is the [release checklist](release-checklist.md).
+
+1. Bump the version in `backend/pyproject.toml`, `backend/slotserve/__init__.py` and `frontend/package.json`, and tag a release candidate: `git tag v0.10.0-rc1 && git push origin v0.10.0-rc1`. The workflow publishes `0.10.0-rc1` and `rc` (never `latest`) and a GitHub pre-release.
+2. After the candidate has been verified: `python tools/release_notes.py release 0.10.0`, commit, then `git tag v0.10.0 && git push origin main v0.10.0`.
+3. `.github/workflows/release.yml` builds and pushes `ghcr.io/peleryuan/slotserve` (`0.10.0`, `0.10`, `latest`) and creates the GitHub release from the changelog section.
 
 The documentation site deploys automatically when `docs/` or `mkdocs.yml` change on `main`.

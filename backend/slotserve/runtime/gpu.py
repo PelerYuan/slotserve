@@ -19,20 +19,12 @@ def _num(value: str, cast=int, default=0):
         return default
 
 
-def _query() -> list[GpuOut]:
-    exe = shutil.which("nvidia-smi")
-    if exe is None:
-        return []
-    try:
-        out = subprocess.run(
-            [exe, f"--query-gpu={_QUERY}", "--format=csv,noheader,nounits"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=True,
-        ).stdout
-    except (OSError, subprocess.SubprocessError):
-        return []
+def parse_query_output(out: str) -> list[GpuOut]:
+    """Parses ``nvidia-smi --query-gpu=<_QUERY> --format=csv,noheader,nounits`` output.
+
+    Fields a GPU or driver does not report (``[N/A]``, ``[Not Supported]``) read as 0 (power: ``None``);
+    lines that are not GPU rows are skipped.
+    """
     gpus = []
     for line in out.strip().splitlines():
         parts = [p.strip() for p in line.split(",")]
@@ -50,6 +42,23 @@ def _query() -> list[GpuOut]:
             )
         )
     return gpus
+
+
+def _query() -> list[GpuOut]:
+    exe = shutil.which("nvidia-smi")
+    if exe is None:
+        return []
+    try:
+        out = subprocess.run(
+            [exe, f"--query-gpu={_QUERY}", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=True,
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return []
+    return parse_query_output(out)
 
 
 async def gpu_stats() -> list[GpuOut]:
