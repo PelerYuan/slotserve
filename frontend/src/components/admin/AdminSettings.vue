@@ -79,6 +79,7 @@ const GROUPS: { id: string; keys: string[] }[] = [
       'devenv_public_port_limit',
       'devenv_forwarder_image',
       'devenv_web_url',
+      'devenv_web_compat',
     ],
   },
   {

@@ -1,0 +1,9 @@
+===== 2026-10-20T09:51:40.226019+00:00 start: /opt/llama.cpp/build/bin/llama-server --model /models/old/Llama-3.2-3B-Instruct-Q4_K_M.gguf --alias Llama-3.2-3B-Instruct-Q4_K_M --host 127.0.0.1 --port 8081 -ngl 99
+main: loading model
+srv    load_model: loading model '/models/old/Llama-3.2-3B-Instruct-Q4_K_M.gguf'
+gguf_init_from_file: failed to open GGUF file '/models/old/Llama-3.2-3B-Instruct-Q4_K_M.gguf' (No such file or directory)
+llama_model_load: error loading model: llama_model_loader: failed to load model from /models/old/Llama-3.2-3B-Instruct-Q4_K_M.gguf
+llama_model_load_from_file_impl: failed to load model
+common_init_from_params: failed to load model '/models/old/Llama-3.2-3B-Instruct-Q4_K_M.gguf'
+srv    load_model: failed to load model, '/models/old/Llama-3.2-3B-Instruct-Q4_K_M.gguf'
+main: exiting due to model loading error

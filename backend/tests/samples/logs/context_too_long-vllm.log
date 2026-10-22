@@ -1,0 +1,5 @@
+===== 2026-10-20T11:14:40.120933+00:00 start: vllm serve /models/Llama-3.1-8B-Instruct --served-model-name Llama-3.1-8B-Instruct --host 127.0.0.1 --port 8082
+(EngineCore_0 pid=4410) INFO 10-20 11:15:02 [gpu_worker.py:276] Available KV cache memory: 9.71 GiB
+(EngineCore_0 pid=4410) ERROR 10-20 11:15:09 [core.py:700] EngineCore failed to start.
+(EngineCore_0 pid=4410) ERROR 10-20 11:15:09 [core.py:700] ValueError: To serve at least one request with the models's max seq len (131072), (16.00 GiB KV cache is needed, which is larger than the available KV cache memory (9.71 GiB). Based on the available memory, the estimated maximum model length is 77104. Try increasing `gpu_memory_utilization` or decreasing `max_model_len` when initializing the engine.
+(APIServer pid=4302) RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}

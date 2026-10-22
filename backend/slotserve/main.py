@@ -212,6 +212,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
     app.include_router(devenv_ports.router)
     app.include_router(proxy.router)
     app.include_router(devenv_web.router)
+    app.include_router(devenv_web.main_router)  # web-open: links to web interfaces, admin confirmation (R1-03)
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz():

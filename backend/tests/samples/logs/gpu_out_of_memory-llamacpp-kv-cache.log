@@ -1,0 +1,18 @@
+===== 2026-10-20T09:31:10.004812+00:00 start: /opt/llama.cpp/build/bin/llama-server --model /models/Llama-3.1-8B-Instruct-Q4_K_M.gguf --alias Llama-3.1-8B-Instruct-Q4_K_M --host 127.0.0.1 --port 8082 -ngl 99 -c 131072
+ggml_cuda_init: found 1 CUDA devices:
+  Device 0: NVIDIA GeForce RTX 4060 Laptop GPU, compute capability 8.9, VMM: yes
+load_tensors: offloaded 33/33 layers to GPU
+load_tensors:        CUDA0 model buffer size =  4403.49 MiB
+load_tensors:   CPU_Mapped model buffer size =   281.81 MiB
+llama_context: constructing llama_context
+llama_context: n_seq_max     = 1
+llama_context: n_ctx         = 131072
+llama_context: n_ctx_per_seq = 131072
+llama_context: n_batch       = 2048
+llama_context:  CUDA_Host  output buffer size =     0.49 MiB
+llama_kv_cache_unified: kv_size = 131072, type_k = 'f16', type_v = 'f16', n_layer = 32, can_shift = 1, padding = 32
+ggml_backend_cuda_buffer_type_alloc_buffer: allocating 16384.00 MiB on device 0: cudaMalloc failed: out of memory
+llama_init_from_model: failed to initialize the context: failed to allocate buffer for kv cache
+common_init_from_params: failed to create context with model '/models/Llama-3.1-8B-Instruct-Q4_K_M.gguf'
+srv    load_model: failed to load model, '/models/Llama-3.1-8B-Instruct-Q4_K_M.gguf'
+main: exiting due to model loading error

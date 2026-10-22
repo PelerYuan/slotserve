@@ -14,7 +14,9 @@ from ..deps import admin_user, get_lanes
 from ..errors import ApiError
 from ..orm import Lane, LlmModel, ModelLoadEvent, User
 from ..runtime.lanes import LaneContext, LaneManager
+from ..runtime.manager import RuntimeState
 from ..schemas import LaneRuntimeOut, LoadEventOut
+from ..services.diagnostics import Diagnosis, diagnose
 from .status import _runtime_out
 
 router = APIRouter(prefix="/api/admin/runtime", tags=["admin"])
@@ -23,6 +25,13 @@ STREAM_SECONDS = 60  # the browser reconnects and resumes from the last byte it 
 POLL_SECONDS = 0.5
 TAIL_BYTES = 256 * 1024
 LINE_BREAK = re.compile(rb"\r\n|\r|\n")
+
+
+def load_event_diagnosis(event: ModelLoadEvent) -> Diagnosis | None:
+    """Likely cause and next steps of a failed load (None for a successful one), from what the event kept."""
+    if event.success:
+        return None
+    return diagnose(event.log_excerpt, error=event.error, exit_code=event.exit_code)
 
 
 def _lane(lanes: LaneManager, lane_id: int) -> LaneContext:
@@ -55,6 +64,9 @@ async def runtime_overview(_: User = Depends(admin_user), lanes: LaneManager = D
                 failure_log=rt.failure_log,
                 target_model=target.model.name if target and target.model else None,
                 target_reason=target.reason if target else None,
+                diagnosis=diagnose(rt.failure_log, error=rt.error, exit_code=rt.exit_code)
+                if rt.state == RuntimeState.FAILED
+                else None,
             )
         )
     return out
@@ -92,6 +104,7 @@ async def load_events(
             command=e.command,
             exit_code=e.exit_code,
             log_excerpt=e.log_excerpt,
+            diagnosis=load_event_diagnosis(e),
         )
         for e, model, lane in (await db.execute(stmt)).all()
     ]

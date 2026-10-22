@@ -1,0 +1,2 @@
+2026-10-20 11:02:33,417 WARNING slotserve.services.devenv: starting slotserve-env-alice-3 failed
+driver failed programming external connectivity on endpoint slotserve-env-alice-3 (5f0c2a1e9d7b4c3a8e61f0b2d9c4a7e3b1f6d8a2c5e9b7f4a1d3c6e8b2f5a9d7): Bind for 0.0.0.0:2203 failed: port is already allocated

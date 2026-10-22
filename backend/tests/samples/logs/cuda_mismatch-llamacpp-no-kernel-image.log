@@ -1,0 +1,10 @@
+===== 2026-10-20T08:58:12.551006+00:00 start: /opt/llama.cpp/build/bin/llama-server --model /models/Llama-3.2-3B-Instruct-Q4_K_M.gguf --alias Llama-3.2-3B-Instruct-Q4_K_M --host 127.0.0.1 --port 8081 -ngl 99
+ggml_cuda_init: found 1 CUDA devices:
+  Device 0: NVIDIA GeForce GTX 1050, compute capability 6.1, VMM: yes
+load_tensors: offloaded 29/29 layers to GPU
+llama_context: constructing llama_context
+ggml_cuda_compute_forward: RMS_NORM failed
+CUDA error: no kernel image is available for execution on the device
+  current device: 0, in function ggml_cuda_compute_forward at /src/llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:2482
+  err
+/src/llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:77: CUDA error

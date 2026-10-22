@@ -8,6 +8,12 @@ it as a different origin, and it never accepts SlotServe's session cookie.
 Signing in there is a handover: SlotServe (where the person is signed in) checks access and redirects to the web
 listener with a one-time token valid for a minute; the listener turns it into an HttpOnly cookie that is scoped to
 that one environment's path (``slotserve_web_<session>``) and checked against the database on every request.
+
+Cookie names differ per environment, so they stay apart when environments get origins of their own (M2: a port
+pool; cookies do not tell ports apart). While all environments share one origin, a second cookie (``scope``,
+path ``/``) names the one trust group the browser may use there (``security/web_origin.py``); entering an
+environment of another group replaces it. An admin opening someone else's environment gets a cookie valid for an
+hour (``ADMIN_COOKIE_SECONDS``) after confirming it (audited as ``devenv.open_as_admin``).
 """
 
 import re
@@ -19,8 +25,10 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 
 SESSION_COOKIE = "slotserve_session"
 COOKIE_PREFIX = "slotserve_web_"
+SCOPE_COOKIE = "slotserve_web_scope"
 HANDOVER_SECONDS = 60
 COOKIE_SECONDS = 12 * 3600
+ADMIN_COOKIE_SECONDS = 3600
 ENTER_PATH = "/_slotserve/enter"
 NEXT_RE = re.compile(r"^/devenv/(\d+)/port/\d+(/[^\\]*)?$")
 UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
@@ -50,9 +58,16 @@ class Handovers:
     def __init__(self):
         self._used: dict[str, float] = {}
 
-    def issue(self, settings, user_id: int, session_id: int, next_path: str) -> str:
+    def issue(self, settings, user_id: int, session_id: int, next_path: str, *, group: str, as_admin: bool) -> str:
         return _signer(settings, "handover").dumps(
-            {"u": user_id, "s": session_id, "n": next_path, "j": secrets.token_urlsafe(12)}
+            {
+                "u": user_id,
+                "s": session_id,
+                "n": next_path,
+                "g": group,
+                "a": bool(as_admin),
+                "j": secrets.token_urlsafe(12),
+            }
         )
 
     def redeem(self, settings, token: str) -> dict | None:
@@ -63,7 +78,7 @@ class Handovers:
         if not isinstance(data, dict) or not isinstance(data.get("j"), str) or data["j"] in self._used:
             return None
         m = NEXT_RE.match(str(data.get("n", "")))
-        if m is None or int(m.group(1)) != data.get("s"):
+        if m is None or int(m.group(1)) != data.get("s") or not isinstance(data.get("g"), str):
             return None
         now = time.monotonic()
         self._used = {k: v for k, v in self._used.items() if v > now}
@@ -73,22 +88,77 @@ class Handovers:
 
 handovers = Handovers()
 
-
-def cookie_value(settings, user_id: int, session_id: int) -> str:
-    return _signer(settings, "cookie").dumps({"u": user_id, "s": session_id})
+RETURN_PARAM = "_slotserve_return"
 
 
-def cookie_user(settings, cookies: dict[str, str], session_id: int) -> int | None:
-    raw = cookies.get(cookie_name(session_id))
-    if not raw:
-        return None
+def return_note(settings, session_id: int, path: str) -> str:
+    """Sent along when the web listener sends a person back to SlotServe after a page load they made themselves
+    (Sec-Fetch-Site: none): SlotServe then hands them over without asking (pages cannot obtain one)."""
+    return _signer(settings, "return").dumps({"s": session_id, "p": path})
+
+
+def check_return_note(settings, note: str, session_id: int, path: str) -> bool:
+    if not note:
+        return False
     try:
-        data = _signer(settings, "cookie").loads(raw, max_age=COOKIE_SECONDS)
+        data = _signer(settings, "return").loads(note, max_age=HANDOVER_SECONDS)
+    except (BadSignature, ValueError, TypeError):
+        return False
+    return isinstance(data, dict) and data.get("s") == session_id and data.get("p") == path
+
+
+def cookie_seconds(as_admin: bool) -> int:
+    return ADMIN_COOKIE_SECONDS if as_admin else COOKIE_SECONDS
+
+
+def cookie_value(settings, user_id: int, session_id: int, *, as_admin: bool = False) -> str:
+    return _signer(settings, "cookie").dumps({"u": user_id, "s": session_id, "t": cookie_seconds(as_admin)})
+
+
+def cookie_values(header: str | None, name: str) -> list[str]:
+    """Every value the browser sent for a cookie name (a page can add same-named cookies for other paths; only
+    signed values count, so they cannot get anyone in, and they cannot push the real one out either)."""
+    out = []
+    for part in (header or "").split(";"):
+        key, sep, value = part.strip().partition("=")
+        if sep and key.strip() == name:
+            out.append(value.strip().strip('"'))
+    return out
+
+
+def _load(settings, purpose: str, raw: str, max_age: int) -> dict | None:
+    try:
+        data, signed_at = _signer(settings, purpose).loads(raw, max_age=max_age, return_timestamp=True)
     except (BadSignature, ValueError, TypeError):
         return None
-    if not isinstance(data, dict) or data.get("s") != session_id or not isinstance(data.get("u"), int):
+    if not isinstance(data, dict):
         return None
-    return data["u"]
+    lifetime = data.get("t", COOKIE_SECONDS)
+    if not isinstance(lifetime, int) or time.time() - signed_at.timestamp() > lifetime:
+        return None
+    return data
+
+
+def cookie_user(settings, cookie_header: str | None, session_id: int) -> int | None:
+    for raw in cookie_values(cookie_header, cookie_name(session_id)):
+        data = _load(settings, "cookie", raw, COOKIE_SECONDS)
+        if data is not None and data.get("s") == session_id and isinstance(data.get("u"), int):
+            return data["u"]
+    return None
+
+
+def scope_value(settings, user_id: int, group: str, *, as_admin: bool = False) -> str:
+    return _signer(settings, "scope").dumps({"u": user_id, "g": group, "t": cookie_seconds(as_admin)})
+
+
+def scope_groups(settings, cookie_header: str | None, user_id: int) -> set[str]:
+    """The trust group(s) this browser is currently using on the shared origin (normally one)."""
+    groups = set()
+    for raw in cookie_values(cookie_header, SCOPE_COOKIE):
+        data = _load(settings, "scope", raw, COOKIE_SECONDS)
+        if data is not None and data.get("u") == user_id and isinstance(data.get("g"), str):
+            groups.add(data["g"])
+    return groups
 
 
 def _host(hostname: str | None) -> str:
