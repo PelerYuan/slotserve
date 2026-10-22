@@ -6,13 +6,17 @@ from playwright.sync_api import Page, expect
 
 from helpers import INVITE, PASSWORD, api, sign_in
 
+CSRF = {"X-SlotServe": "1"}  # what the frontend's API client sends (security/csrf.py)
+
 
 def _register(page: Page, base: str, username: str) -> None:
     resp = page.request.post(
-        f"{base}/api/auth/register", data={"username": username, "password": PASSWORD, "invite_code": INVITE}
+        f"{base}/api/auth/register",
+        data={"username": username, "password": PASSWORD, "invite_code": INVITE},
+        headers=CSRF,
     )
     assert resp.ok, resp.text()
-    page.request.post(f"{base}/api/auth/logout")
+    page.request.post(f"{base}/api/auth/logout", headers=CSRF)
 
 
 def test_member_requests_and_admin_approves(page: Page, server: str):
@@ -21,7 +25,7 @@ def test_member_requests_and_admin_approves(page: Page, server: str):
     small = next(m for m in api(page, base, "GET", "/api/models") if m["name"] == "chat-small")
     models = Path(small["file_path"]).parent
     (models / "member-model.gguf").write_bytes(b"GGUF" + bytes(2048))
-    page.request.post(f"{base}/api/auth/logout")
+    page.request.post(f"{base}/api/auth/logout", headers=CSRF)
     _register(page, base, "args-member")
 
     sign_in(page, base, "args-member")
@@ -40,7 +44,7 @@ def test_member_requests_and_admin_approves(page: Page, server: str):
     assert model["args_pending"] == "-ngl 99 --log-file /tmp/x.log"
     assert model["needs_approval"] == ["--log-file"]
 
-    page.request.post(f"{base}/api/auth/logout")
+    page.request.post(f"{base}/api/auth/logout", headers=CSRF)
     sign_in(page, base, "admin")
     page.goto(f"{base}/models")
     row = page.locator("li").filter(has_text="member-model")
