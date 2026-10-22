@@ -1,0 +1,4 @@
+===== 2026-10-21T01:00:00.000000+00:00 start: /opt/llama.cpp/build/bin/llama-server --model /mnt/nas/models/Llama-3.3-70B-Instruct-Q4_K_M.gguf --alias Llama-3.3-70B-Instruct-Q4_K_M --host 127.0.0.1 --port 8081 -ngl 99
+main: loading model
+load_tensors: loading model tensors, this can take a while... (mmap = true)
+................................

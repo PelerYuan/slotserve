@@ -1,0 +1,2 @@
+2026-10-21 03:12:44,902 ERROR slotserve.services.downloader: download of bartowski/Qwen2.5-72B-Instruct-GGUF failed
+OSError: [Errno 28] No space left on device

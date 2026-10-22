@@ -1,0 +1,2 @@
+mount: /mnt/datasets: bad option; for several filesystems (e.g. nfs, cifs) you might need a /sbin/mount.<type> helper program.
+       dmesg(1) may have more information after failed mount system call.

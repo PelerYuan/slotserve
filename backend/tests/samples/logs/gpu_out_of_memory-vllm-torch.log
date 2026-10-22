@@ -1,0 +1,8 @@
+===== 2026-10-20T10:02:11.778201+00:00 start: vllm serve /models/Qwen2.5-14B-Instruct --served-model-name Qwen2.5-14B-Instruct --host 127.0.0.1 --port 8082
+(APIServer pid=3120) INFO 10-20 10:02:18 [api_server.py:1805] vLLM API server version 0.10.1.1
+(EngineCore_0 pid=3311) INFO 10-20 10:02:31 [gpu_model_runner.py:1953] Starting to load model /models/Qwen2.5-14B-Instruct...
+(EngineCore_0 pid=3311) ERROR 10-20 10:02:44 [core.py:700] EngineCore failed to start.
+(EngineCore_0 pid=3311) ERROR 10-20 10:02:44 [core.py:700] Traceback (most recent call last):
+(EngineCore_0 pid=3311) ERROR 10-20 10:02:44 [core.py:700]   File "/usr/local/lib/python3.12/dist-packages/vllm/model_executor/layers/linear.py", line 1342, in weight_loader
+(EngineCore_0 pid=3311) ERROR 10-20 10:02:44 [core.py:700] torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 1.02 GiB. GPU 0 has a total capacity of 23.53 GiB of which 412.06 MiB is free. Including non-PyTorch memory, this process has 23.11 GiB memory in use. Of the allocated memory 22.61 GiB is allocated by PyTorch, and 61.23 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+(APIServer pid=3120) RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
