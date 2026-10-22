@@ -40,6 +40,7 @@ plugins:
             Home: 首页
             Getting started: 快速开始
             Configuration: 配置参考
+            Operations: 运维手册
             User guide: 使用指南
             Model catalog: 模型目录
             Notifications & integrations: 通知与集成
@@ -50,6 +51,11 @@ plugins:
             How scheduling works: 调度原理
             Development: 开发
             FAQ: 常见问题
+
+validation:
+  # broken links to headings fail `mkdocs build --strict` (the backend's docs anchors are checked by
+  # backend/tests/test_docs_anchors.py)
+  anchors: warn
 
 markdown_extensions:
   - admonition
@@ -73,6 +79,7 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - Configuration: configuration.md
+  - Operations: operations.md
   - User guide: user-guide.md
   - Model catalog: model-catalog.md
   - Notifications & integrations: integrations.md

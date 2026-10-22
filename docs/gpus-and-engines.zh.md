@@ -21,7 +21,7 @@
 - 还有未结束预约的通道不能删除，最后一个通道也不能删除。
 - 每个通道的进程设置 `CUDA_VISIBLE_DEVICES` 为其 GPU，监听端口为 `SLOTSERVE_LLAMA_PORT + 通道号 - 1`，日志分开保存（`llama-server-lane<N>.log`）。
 
-### 接口请求由哪个通道处理
+### 接口请求由哪个通道处理 {#which-lane-serves-an-api-request}
 
 ```mermaid
 flowchart TD
@@ -48,7 +48,7 @@ flowchart TD
 2. 未指定模型名：有自己的预约就用自己的通道，否则用第一个模型已就绪的空闲通道。
 3. `/v1/models` 列出调用者当前能用的所有模型。
 
-## 推理后端
+## 推理后端 {#engines}
 
 每个模型选择一个推理后端，调度、预约和网关对所有后端完全一样。
 
