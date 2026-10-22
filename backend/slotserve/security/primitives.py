@@ -46,12 +46,19 @@ def encrypt_api_key(key: str, secret_key: str) -> str:
     return _fernet(secret_key).encrypt(key.encode()).decode()
 
 
+# Before 0.10 an unset SLOTSERVE_SECRET_KEY meant this value; data encrypted with it stays readable after the
+# key was replaced by a generated one (see secret_key.py).
+LEGACY_DEFAULT_KEY = "change-me"
+
+
 def decrypt_api_key(token: str, secret_key: str) -> str | None:
     """None when the copy cannot be read, e.g. after SECRET_KEY changed."""
-    try:
-        return _fernet(secret_key).decrypt(token.encode()).decode()
-    except (InvalidToken, ValueError):
-        return None
+    for key in dict.fromkeys((secret_key, LEGACY_DEFAULT_KEY)):
+        try:
+            return _fernet(key).decrypt(token.encode()).decode()
+        except (InvalidToken, ValueError):
+            continue
+    return None
 
 
 def key_display_prefix(key: str) -> str:

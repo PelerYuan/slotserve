@@ -7,6 +7,7 @@ import { api } from '@/api/client'
 import type { DevTemplate, IdleMode, Lane, Model } from '@/api/types'
 import { loadLanes, useLanes } from '@/composables/lanes'
 import { useErrorMessage } from '@/composables/useErrorMessage'
+import { useArgsGate } from '@/composables/argsGate'
 import { useStatus } from '@/composables/useStatus'
 import { session } from '@/composables/session'
 
@@ -14,6 +15,7 @@ const { t } = useI18n()
 const dialog = useDialog()
 const message = useMessage()
 const { showError } = useErrorMessage()
+const { withArgsGate } = useArgsGate()
 const { status, refresh } = useStatus()
 const { lanes } = useLanes()
 
@@ -158,7 +160,8 @@ function openArgs(l: Lane) {
 async function saveArgs() {
   busy.value = true
   try {
-    await api.updateModel(argsForm.modelId, { args: argsForm.args.trim() })
+    const saved = await withArgsGate((x) => api.updateModel(argsForm.modelId, { args: argsForm.args.trim(), ...x }))
+    if (!saved) return
     const affected = lanes.value.filter((x) => loadedModel(x.id) === argsForm.modelId)
     for (const x of affected) await api.restart(x.id)
     models.value = await api.models().catch(() => models.value)
@@ -261,7 +264,7 @@ async function saveArgs() {
     <div class="fields">
       <label>
         <span class="field-label">{{ t('admin.lanes.name') }}</span>
-        <NInput v-model:value="form.name" maxlength="64" />
+        <NInput v-model:value="form.name" maxlength="64" :placeholder="t('ph.laneName')" />
       </label>
       <div>
         <span class="field-label">GPU</span>
@@ -282,15 +285,15 @@ async function saveArgs() {
       </div>
       <label>
         <span class="field-label">{{ t('admin.lanes.defaultModel') }}</span>
-        <NSelect v-model:value="form.model" :options="modelOptions" filterable />
+        <NSelect v-model:value="form.model" :options="modelOptions" :placeholder="t('admin.lanes.noDefault')" filterable />
       </label>
       <label>
         <span class="field-label">{{ t('admin.lanes.idleMode') }}</span>
-        <NSelect v-model:value="form.idle" :options="idleOptions" data-field="idle-mode" />
+        <NSelect v-model:value="form.idle" :options="idleOptions" :placeholder="t('ph.idleMode')" data-field="idle-mode" />
       </label>
       <label v-if="form.idle === 'devenv'">
         <span class="field-label">{{ t('admin.lanes.idleTemplate') }}</span>
-        <NSelect v-model:value="form.template" :options="templateOptions" filterable data-field="idle-template" />
+        <NSelect v-model:value="form.template" :options="templateOptions" :placeholder="t('ph.template')" filterable data-field="idle-template" />
         <p class="faint small hint">{{ t('admin.lanes.idleHint') }}</p>
         <p v-if="!devenvEnabled" class="small hint warn-text">{{ t('admin.lanes.idleNoDevenv') }}</p>
       </label>

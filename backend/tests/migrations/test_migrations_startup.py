@@ -24,7 +24,9 @@ async def app(release_data, app):  # the conftest app, started on the fixture da
 
 
 async def _login(app, username: str) -> httpx.AsyncClient:
-    client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
+    client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test", headers={"X-SlotServe": "1"}
+    )
     r = await client.post("/api/auth/login", json={"username": username, "password": PASSWORD})
     assert r.status_code == 200, r.text
     return client
@@ -45,6 +47,7 @@ async def test_server_starts_on_upgraded_release_database(app, tmp_path):
         assert {k["prefix"] for k in keys} >= {"sk-fx0", "sk-fx1"}
         models = (await admin.get("/api/models")).json()
         assert {m["name"] for m in models} >= {"fixture-model-0-Q4_K_M", "fixture-model-1-Q4_K_M"}
+        assert all(m.get("args_pending") is None for m in models)  # 0004: nothing waits for review
         reservations = (
             await admin.get(
                 "/api/admin/reservations", params={"start": "2026-01-01T00:00:00Z", "end": "2026-02-01T00:00:00Z"}

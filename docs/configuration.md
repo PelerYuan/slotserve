@@ -18,10 +18,10 @@ These only exist in `docker-compose.yml` and describe the **host**.
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `SLOTSERVE_INVITE_CODE` | `change-me` | Code required to sign up |
+| `SLOTSERVE_INVITE_CODE` | `change-me` | Code required to sign up; while it is `change-me` (or empty) only the first admin can sign up, with the [setup code](#first-admin-and-setup-code) |
 | `SLOTSERVE_REGISTRATION_OPEN` | `true` | Allow sign-up with the invite code |
 | `SLOTSERVE_API_KEY_REVEAL` | `false` | Keep an encrypted copy of new API keys so owners can view them again |
-| `SLOTSERVE_SECRET_KEY` | `change-me` | Session cookie signing key |
+| `SLOTSERVE_SECRET_KEY` | *generated* | Signs session cookies and encrypts stored secrets. Unset, empty or `change-me`: SlotServe generates a random key on first start and keeps it in `DATA_DIR/secret_key` (owner-only). A value you set always wins |
 | `SLOTSERVE_HOST` | `0.0.0.0` | Listen address |
 | `SLOTSERVE_PORT` | `8000` | Listen port |
 | `SLOTSERVE_COOKIE_SECURE` | `false` | Mark cookies `Secure`; set `true` behind HTTPS |
@@ -143,11 +143,29 @@ docker compose start
 
 Keep a copy of `data/` somewhere else as well - backups on the same disk do not survive a disk failure.
 
+## First admin and setup code
+
+While no admin account exists, SlotServe prints a one-time **setup code** in its log at every start:
+
+```bash
+docker compose logs slotserve | grep -A4 "No admin account"
+docker compose exec slotserve slotserve setup-code     # or ask for it directly
+```
+
+Open SlotServe: the sign-up form asks for the setup code instead of the invite code, and the account becomes the admin. The code stops working as soon as an admin exists, and installations that already have an admin never ask for it. Everyone else signs up with the invite code (or is created in **Admin → Users**).
+
+## Requests from other pages
+
+SlotServe refuses changing requests (POST, PUT, PATCH, DELETE) to its own API that do not come from its own pages: an `Origin` must be SlotServe's own address (the host the browser used, or `SLOTSERVE_PUBLIC_URL`), `Origin: null` is always refused, and requests with the session cookie but without `Origin` must carry the header `X-SlotServe: 1` (the web UI sends it). This stops pages on dev environment ports or other sites from acting for a signed-in person. API clients are not affected: `/v1` with API keys, `/metrics`, chat platform callbacks and scripts without the session cookie.
+
+Behind a reverse proxy, pass the original host (`proxy_set_header Host $host;` for nginx) or set `SLOTSERVE_PUBLIC_URL`; otherwise changes made in the web UI are refused with "did not come from a SlotServe page".
+
 ## Admin command line
 
 Most account tasks are done in **Admin → Users**. The command line is for when no admin can sign in:
 
 ```bash
+docker compose exec slotserve slotserve setup-code               # code for creating the first admin
 docker compose exec slotserve slotserve reset-password <username>
 docker compose exec slotserve slotserve set-admin <username>
 docker compose exec slotserve slotserve set-admin <username> --revoke

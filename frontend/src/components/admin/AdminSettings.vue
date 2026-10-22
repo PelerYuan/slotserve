@@ -154,16 +154,17 @@ const choiceOptions = (s: AdminSetting) =>
     return { label: te(key) ? t(key) : `${c} ${unit(s)}`.trim(), value: c }
   })
 
-const display = (s: AdminSetting, v: SettingValue) =>
-  typeof v === 'boolean'
-    ? v
-      ? t('admin.settings.on')
-      : t('admin.settings.off')
-    : v === ''
-      ? t('admin.settings.notSet')
-      : s.secret
-        ? '••••••'
-        : `${v}${s.unit ? ' ' + unit(s) : ''}`
+// A value as people read it: choices and lists by their labels, never the raw stored text.
+const display = (s: AdminSetting, v: SettingValue) => {
+  if (typeof v === 'boolean') return v ? t('admin.settings.on') : t('admin.settings.off')
+  if (v === '') return t('admin.settings.notSet')
+  if (s.secret) return '••••••'
+  if (MULTI[s.key]) return multiOptions(s.key).filter((o) => splitList(v).includes(o.value)).map((o) => o.label).join(', ')
+  if (s.choices) return choiceOptions(s).find((o) => o.value === v)?.label ?? `${v}`
+  return `${v}${s.unit ? ' ' + unit(s) : ''}`
+}
+// An empty field uses the default, so the default is what it shows.
+const placeholder = (s: AdminSetting) => display(s, s.default)
 </script>
 
 <template>
@@ -188,6 +189,7 @@ const display = (s: AdminSetting, v: SettingValue) =>
           multiple
           :value="splitList(draft[s.key])"
           :options="multiOptions(s.key)"
+          :placeholder="placeholder(s)"
           @update:value="(v: string[]) => (draft[s.key] = v.join(','))"
         />
         <NSwitch v-else-if="s.kind === 'bool'" v-model:value="draft[s.key] as boolean" />
@@ -195,6 +197,7 @@ const display = (s: AdminSetting, v: SettingValue) =>
           v-else-if="s.choices"
           v-model:value="draft[s.key] as number | string"
           :options="choiceOptions(s)"
+          :placeholder="placeholder(s)"
           class="num-input"
         />
         <NInputNumber
@@ -204,6 +207,7 @@ const display = (s: AdminSetting, v: SettingValue) =>
           :max="s.max ?? undefined"
           :precision="s.kind === 'int' ? 0 : undefined"
           :step="s.kind === 'float' ? 0.5 : 1"
+          :placeholder="placeholder(s)"
           class="num-input"
         >
           <template v-if="s.unit" #suffix>{{ unit(s) }}</template>
@@ -213,8 +217,9 @@ const display = (s: AdminSetting, v: SettingValue) =>
           v-model:value="draft[s.key] as string"
           type="password"
           show-password-on="click"
+          :placeholder="placeholder(s)"
         />
-        <NInput v-else v-model:value="draft[s.key] as string" class="mono-input" />
+        <NInput v-else v-model:value="draft[s.key] as string" class="mono-input" :placeholder="placeholder(s)" />
       </div>
     </div>
   </section>

@@ -50,6 +50,9 @@ def test_release_database_upgrades_to_current_schema(tmp_path, release):
     ]
     assert con.execute("SELECT value FROM schema_meta WHERE key='app_version'").fetchone()[0] == __version__
     assert not con.execute("PRAGMA foreign_key_check").fetchall()
+    # 0004 (engine argument review): old models have nothing waiting for an admin
+    assert con.execute("SELECT COUNT(*) FROM models WHERE args_pending IS NOT NULL").fetchone()[0] == 0
+    assert con.execute("SELECT COUNT(*) FROM models").fetchone()[0] == before["models"]
     con.close()
 
     # the next start has nothing to do: no second snapshot
@@ -140,15 +143,16 @@ def test_cli_does_not_migrate_but_the_next_start_does(tmp_path):
         "SLOTSERVE_DATA_DIR": str(tmp_path / "data"),
         "SLOTSERVE_MODELS_DIR": str(tmp_path / "models"),
     }
-    proc = subprocess.run(
-        [sys.executable, "-m", "slotserve", "set-admin", "alice"],
-        env=env,
-        cwd=tmp_path,
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    assert proc.returncode != 0 and "Start the server once" in proc.stderr
+    for command in (["set-admin", "alice"], ["setup-code"]):
+        proc = subprocess.run(
+            [sys.executable, "-m", "slotserve", *command],
+            env=env,
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert proc.returncode != 0 and "Start the server once" in proc.stderr, command
     assert sha256(path) == digest
     assert not (tmp_path / "data" / "backups").exists()
 

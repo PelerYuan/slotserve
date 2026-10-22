@@ -289,10 +289,10 @@ const themes: { value: ThemeMode; icon: typeof Sun }[] = [
       <div class="card-header"><h3 class="card-title">{{ t('settings.changePassword') }}</h3></div>
       <NForm class="card-pad" :show-require-mark="false" @submit.prevent="changePassword">
         <NFormItem :label="t('settings.oldPassword')">
-          <NInput v-model:value="pw.old" type="password" show-password-on="click" :input-props="{ autocomplete: 'current-password' }" />
+          <NInput v-model:value="pw.old" type="password" show-password-on="click" :placeholder="t('ph.currentPassword')" :input-props="{ autocomplete: 'current-password' }" />
         </NFormItem>
         <NFormItem :label="t('settings.newPassword')" :feedback="t('auth.passwordRule')">
-          <NInput v-model:value="pw.next" type="password" show-password-on="click" :input-props="{ autocomplete: 'new-password' }" />
+          <NInput v-model:value="pw.next" type="password" show-password-on="click" :placeholder="t('auth.passwordRule')" :input-props="{ autocomplete: 'new-password' }" />
         </NFormItem>
         <NButton type="primary" attr-type="submit" class="save-btn" :loading="saving" :disabled="!pw.old || pw.next.length < 6">
           {{ t('common.save') }}

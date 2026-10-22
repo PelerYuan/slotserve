@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reservationWhat } from '@/utils/reservation'
+import { laneGpus } from '@/utils/naming'
 import { loadProgress as loadProgressOf } from '@/utils/progress'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -140,7 +141,7 @@ async function restart() {
       <section v-for="l in status!.lanes" :key="l.id" class="card card-pad lane">
         <div class="row">
           <span class="lane-name">{{ l.name }}</span>
-          <span v-if="l.gpus?.length" class="faint small">GPU {{ l.gpus.join(',') }}</span>
+          <span v-if="laneGpus(l)" class="faint small">{{ laneGpus(l) }}</span>
           <span class="spacer" />
           <StatusDot :state="l.runtime.state" />
         </div>

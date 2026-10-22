@@ -40,8 +40,8 @@ Edit `.env`. The important values:
 | `MODELS_DIR` | `/mnt/ssd/models` | Host directory with `.gguf` files (prefer an SSD) |
 | `DATA_DIR` | `./data` | Database and logs |
 | `PORT` | `8000` | Web UI and API port |
-| `SLOTSERVE_INVITE_CODE` | *your secret* | Needed to sign up |
-| `SLOTSERVE_SECRET_KEY` | `openssl rand -hex 32` | Signs session cookies |
+| `SLOTSERVE_INVITE_CODE` | *your secret* | Needed to sign up (until it is set, only the first admin can sign up) |
+| `SLOTSERVE_SECRET_KEY` | *empty* or `openssl rand -hex 32` | Signs session cookies; empty = generated and kept in `DATA_DIR/secret_key` |
 
 See [Configuration](configuration.md) for everything else.
 
@@ -68,7 +68,7 @@ Open `http://<server>:8000`.
 
 ## 4. First steps in the UI
 
-1. **Sign up.** The first account becomes the administrator.
+1. **Create the admin account.** Until an admin exists, the log shows a one-time **setup code** (`docker compose logs slotserve`, or `docker compose exec slotserve slotserve setup-code`). The sign-up form asks for it; that account becomes the administrator, and the code stops working. Everyone else signs up with the invite code. See [First admin and setup code](configuration.md#first-admin-and-setup-code).
 2. **Models → Scan folder.** Every `.gguf` in `MODELS_DIR` is registered (multimodal projector files and the non-first parts of split models are skipped).
 3. **Edit launch arguments** for each model if needed, e.g. `-ngl 99 -c 16384 --flash-attn on`.
 4. **Set a default model** (admin). It is loaded whenever the GPU is not booked. With several GPUs, first decide how to split them in **Admin → GPUs & lanes**; each lane has its own default model.

@@ -266,7 +266,10 @@ function clearPassword() {
     </template>
 
     <NModal v-model:show="creating" preset="card" :title="t('keys.create')" style="width: 440px; max-width: calc(100vw - 32px)" :bordered="false">
-      <NInput v-model:value="newName" :placeholder="t('keys.namePlaceholder')" maxlength="64" autofocus @keyup.enter="create" />
+      <label class="key-name">
+        <span class="field-label">{{ t('keys.nameLabel') }}</span>
+        <NInput v-model:value="newName" :placeholder="t('keys.namePlaceholder')" maxlength="64" autofocus @keyup.enter="create" />
+      </label>
       <template #footer>
         <div class="footer">
           <NButton @click="creating = false">{{ t('common.cancel') }}</NButton>
@@ -334,11 +337,11 @@ function clearPassword() {
         <input type="text" autocomplete="username" :value="session.user?.username" hidden />
         <label>
           <span class="field-label">{{ t('keys.newPassword') }}</span>
-          <NInput v-model:value="pwForm.password" type="password" show-password-on="click" maxlength="128" :input-props="{ autocomplete: 'new-password' }" />
+          <NInput v-model:value="pwForm.password" type="password" show-password-on="click" maxlength="128" :placeholder="t('keys.minLength')" :input-props="{ autocomplete: 'new-password' }" />
         </label>
         <label>
           <span class="field-label">{{ t('keys.repeatPassword') }}</span>
-          <NInput v-model:value="pwForm.repeat" type="password" show-password-on="click" maxlength="128" :input-props="{ autocomplete: 'new-password' }" />
+          <NInput v-model:value="pwForm.repeat" type="password" show-password-on="click" maxlength="128" :placeholder="t('ph.repeatPassword')" :input-props="{ autocomplete: 'new-password' }" />
         </label>
         <span v-if="pwError" class="small err">{{ pwError }}</span>
         <span v-else class="faint small">{{ t('keys.passwordHint') }}</span>
@@ -435,6 +438,10 @@ function clearPassword() {
   gap: 14px;
 }
 .form label {
+  display: grid;
+  gap: 6px;
+}
+.key-name {
   display: grid;
   gap: 6px;
 }

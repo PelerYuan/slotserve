@@ -11,6 +11,7 @@ import { api } from '@/api/client'
 import type { DownloadTask, HfFile, Model } from '@/api/types'
 import { session } from '@/composables/session'
 import { useErrorMessage } from '@/composables/useErrorMessage'
+import { useArgsGate } from '@/composables/argsGate'
 import { useLanes } from '@/composables/lanes'
 import { formatBytes, formatDateTime, formatDuration } from '@/utils/format'
 
@@ -23,6 +24,7 @@ const view = computed<'installed' | 'catalog'>({
   set: (v) => router.replace({ query: v === 'catalog' ? { tab: 'catalog' } : {} }),
 })
 const { showError, message } = useErrorMessage()
+const { withArgsGate } = useArgsGate()
 
 const models = ref<Model[]>([])
 const downloads = ref<DownloadTask[]>([])
@@ -90,6 +92,9 @@ function menuFor(m: Model) {
             disabled: m.status !== 'ready' || !m.file_exists,
           },
     )
+  if (m.args_pending && session.user?.is_admin)
+    items.push({ key: 'approve-args', label: t('argsGate.approve') }, { key: 'reject-args', label: t('argsGate.reject') })
+  else if (m.args_pending && canEdit(m)) items.push({ key: 'withdraw-args', label: t('argsGate.withdraw') })
   if (canEdit(m)) items.push({ type: 'divider', key: 'd' }, { key: 'delete', label: t('common.delete'), props: { style: 'color:var(--danger)' } })
   return items
 }
@@ -100,6 +105,8 @@ async function onMenu(key: string, m: Model) {
     else if (key === 'default') await api.setDefault(m.id)
     else if (key === 'unset-default') await api.clearDefault(m.id)
     else if (key === 'delete') return confirmDelete(m)
+    else if (key === 'approve-args') await withArgsGate((x) => api.approveModelArgs(m.id, !!x.confirm_args))
+    else if (key === 'reject-args' || key === 'withdraw-args') await api.dropPendingModelArgs(m.id)
     await loadModels()
   } catch (e) {
     showError(e)
@@ -111,7 +118,11 @@ async function onMenu(key: string, m: Model) {
 const editing = ref<Model | null>(null)
 const form = reactive({ name: '', args: '', description: '', engine: 'llama.cpp' as Model['engine'], path: '' })
 const creating = ref(false)
-const ENGINE_OPTIONS = ['llama.cpp', 'vllm', 'sglang', 'custom'] as const
+const ENGINE_OPTIONS = computed(() =>
+  session.user?.is_admin || editing.value?.engine === 'custom'
+    ? (['llama.cpp', 'vllm', 'sglang', 'custom'] as const)
+    : (['llama.cpp', 'vllm', 'sglang'] as const),
+)
 const engineLabel: Record<string, string> = { 'llama.cpp': 'llama.cpp', vllm: 'vLLM', sglang: 'SGLang', custom: 'Custom' }
 const argsPlaceholder = computed(
   () =>
@@ -164,9 +175,11 @@ async function savePreset(r: PresetRow) {
   if (!editing.value || !r.name.trim()) return
   presetBusy.value = true
   try {
-    const saved = r.id
-      ? await api.updatePreset(editing.value.id, r.id, r.name.trim(), r.args)
-      : await api.createPreset(editing.value.id, r.name.trim(), r.args)
+    const modelId = editing.value.id
+    const saved = await withArgsGate((x) =>
+      r.id ? api.updatePreset(modelId, r.id, r.name.trim(), r.args, x) : api.createPreset(modelId, r.name.trim(), r.args, x),
+    )
+    if (!saved) return
     Object.assign(r, { id: saved.id, name: saved.name, args: saved.args, saved: { name: saved.name, args: saved.args } })
     await loadModels()
   } catch (e) {
@@ -192,22 +205,33 @@ async function save() {
   saving.value = true
   try {
     if (creating.value) {
-      await api.createModel({
-        name: form.name.trim(),
-        engine: form.engine,
-        path: form.path.trim(),
-        args: form.args,
-        description: form.description,
-      })
+      const created = await withArgsGate((x) =>
+        api.createModel({
+          name: form.name.trim(),
+          engine: form.engine,
+          path: form.path.trim(),
+          args: form.args,
+          description: form.description,
+          ...x,
+        }),
+      )
+      if (!created) return
+      if (created.args_pending) message.info(t('argsGate.requested'))
       creating.value = false
     } else if (editing.value) {
       const moved = form.engine !== editing.value.engine || form.path.trim() !== editing.value.file_path
-      await api.updateModel(editing.value.id, {
-        name: form.name.trim(),
-        args: form.args,
-        description: form.description,
-        ...(moved ? { engine: form.engine, path: form.path.trim() } : {}),
-      })
+      const id = editing.value.id
+      const updated = await withArgsGate((x) =>
+        api.updateModel(id, {
+          name: form.name.trim(),
+          args: form.args,
+          description: form.description,
+          ...(moved ? { engine: form.engine, path: form.path.trim() } : {}),
+          ...x,
+        }),
+      )
+      if (!updated) return
+      if (updated.args_pending && updated.args_pending === form.args.trim()) message.info(t('argsGate.requested'))
       editing.value = null
     }
     await loadModels()
@@ -383,10 +407,14 @@ function eta(d: DownloadTask) {
               <span v-if="m.is_loaded" class="badge ok">{{ t('models.loaded') }}</span>
               <span v-if="!m.file_exists" class="badge danger">{{ t('models.missingFile') }}</span>
               <span v-if="m.exceeds_vram" class="badge warn" :title="t('models.exceedsVramHint')">{{ t('models.exceedsVram') }}</span>
+              <span v-if="m.args_pending" class="badge warn" :title="m.args_pending">{{ t('argsGate.pendingBadge') }}</span>
             </div>
             <div class="m-file mono faint" :title="m.file_path">{{ m.file_name }}</div>
             <div v-if="m.description" class="m-desc muted">{{ m.description }}</div>
             <code class="m-args" :title="m.args">{{ m.args || '—' }}</code>
+            <div v-if="m.args_pending" class="faint small">
+              {{ t('argsGate.pendingLine', { flags: m.needs_approval.join(' ') }) }} <code class="m-args" :title="m.args_pending">{{ m.args_pending }}</code>
+            </div>
             <div v-if="m.presets.length" class="m-presets">
               <span class="faint small">{{ t('models.presets') }}</span>
               <span v-for="p in m.presets" :key="p.id" class="badge" :title="p.args">{{ p.name }}</span>
@@ -506,21 +534,21 @@ function eta(d: DownloadTask) {
     >
       <NForm :show-require-mark="false">
         <NFormItem :label="t('models.name')">
-          <NInput v-model:value="form.name" />
+          <NInput v-model:value="form.name" :placeholder="t('ph.modelName')" />
         </NFormItem>
         <NFormItem :label="t('models.engine')">
           <NRadioGroup v-model:value="form.engine" size="small">
             <NRadioButton v-for="e in ENGINE_OPTIONS" :key="e" :value="e">{{ engineLabel[e] }}</NRadioButton>
           </NRadioGroup>
         </NFormItem>
-        <NFormItem :label="t('models.path')" :feedback="t(`models.pathHint.${form.engine}`)">
+        <NFormItem :label="t('models.path')" :feedback="t(`models.pathHint.${form.engine.replace('.', '')}`)">
           <NInput v-model:value="form.path" class="mono-input" :placeholder="pathPlaceholder" />
         </NFormItem>
-        <NFormItem :label="t('models.args')" :feedback="t('models.argsHint')">
+        <NFormItem :label="t('models.args')" :feedback="session.user?.is_admin ? t('models.argsHint') : `${t('models.argsHint')} ${t('argsGate.memberHint')}`">
           <NInput v-model:value="form.args" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" class="mono-input" :placeholder="argsPlaceholder" />
         </NFormItem>
         <NFormItem :label="t('models.description')">
-          <NInput v-model:value="form.description" type="textarea" :autosize="{ minRows: 2, maxRows: 5 }" />
+          <NInput v-model:value="form.description" type="textarea" :autosize="{ minRows: 2, maxRows: 5 }" :placeholder="t('ph.modelDescription')" />
         </NFormItem>
         <p v-if="editing?.is_loaded" class="faint small">{{ t('models.reloadHint') }}</p>
       </NForm>

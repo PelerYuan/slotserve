@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { NButton, NForm, NFormItem, NInput } from 'naive-ui'
 import { CalendarClock, Moon, Plug, RefreshCw, Sun } from 'lucide-vue-next'
 import BrandMark from '@/components/BrandMark.vue'
 import AuthShowcase from '@/components/AuthShowcase.vue'
-import { api } from '@/api/client'
+import { api, ApiError } from '@/api/client'
+import { securityApi } from '@/features/security/api'
 import { session } from '@/composables/session'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { setLocale } from '@/i18n'
@@ -18,15 +19,30 @@ const route = useRoute()
 const { describe } = useErrorMessage()
 
 const mode = ref<'login' | 'register'>('login')
-const form = reactive({ username: '', password: '', invite: '' })
+const form = reactive({ username: '', password: '', invite: '', setupCode: '' })
 const busy = ref(false)
 const error = ref('')
 const shake = ref(0)
 
-const registrationOpen = computed(() => session.config?.registration_open !== false)
+// No admin yet: the first account signs up with the setup code from the server log (not the invite code).
+const setupRequired = ref(false)
+const registrationOpen = computed(() => setupRequired.value || session.config?.registration_open !== false)
+
+async function loadSetupState() {
+  try {
+    setupRequired.value = (await securityApi.setupState()).setup_required
+  } catch {
+    setupRequired.value = false
+  }
+  if (setupRequired.value) mode.value = 'register'
+}
+onMounted(loadSetupState)
 
 const canSubmit = computed(
-  () => form.username.trim() && form.password && (mode.value === 'login' || form.invite.trim()),
+  () =>
+    form.username.trim() &&
+    form.password &&
+    (mode.value === 'login' || (setupRequired.value ? form.setupCode.trim() : form.invite.trim())),
 )
 
 async function submit() {
@@ -37,7 +53,11 @@ async function submit() {
     session.user =
       mode.value === 'login'
         ? await api.login(form.username.trim(), form.password)
-        : await api.register(form.username.trim(), form.password, form.invite.trim())
+        : await securityApi.register(
+            form.username.trim(),
+            form.password,
+            setupRequired.value ? { setup_code: form.setupCode.trim() } : { invite_code: form.invite.trim() },
+          )
     const next =
       typeof route.query.next === 'string' && route.query.next.startsWith('/') && !route.query.next.startsWith('//')
         ? route.query.next
@@ -48,6 +68,8 @@ async function submit() {
   } catch (e) {
     error.value = describe(e)
     shake.value++
+    // someone else finished the setup meanwhile, or it is needed after all
+    if (e instanceof ApiError && ['setup_code_required', 'invalid_invite_code'].includes(e.code)) loadSetupState()
   } finally {
     busy.value = false
   }
@@ -106,9 +128,14 @@ function setMode(m: 'login' | 'register') {
         <BrandMark class="mobile-brand rise" />
         <div class="title rise" style="--d: 0.05s">
           <Transition name="title" mode="out-in">
-            <h1 :key="mode">{{ mode === 'login' ? t('auth.welcome') : t('auth.createAccount') }}</h1>
+            <h1 :key="mode + setupRequired">
+              {{
+                mode === 'login' ? t('auth.welcome') : setupRequired ? t('security.setupTitle') : t('auth.createAccount')
+              }}
+            </h1>
           </Transition>
         </div>
+        <p v-if="setupRequired" class="setup faint rise" style="--d: 0.08s">{{ t('security.setupIntro') }}</p>
         <div v-if="registrationOpen" class="seg rise" style="--d: 0.1s" role="tablist">
           <span class="pill" :class="mode" />
           <button role="tab" :aria-selected="mode === 'login'" :class="{ on: mode === 'login' }" @click="setMode('login')">
@@ -139,7 +166,17 @@ function setMode(m: 'login' | 'register') {
           </NFormItem>
           <div class="collapse" :class="{ open: mode === 'register' }">
             <div>
-              <NFormItem :label="t('auth.inviteCode')">
+              <NFormItem v-if="setupRequired" :label="t('security.setupCode')">
+                <NInput
+                  v-model:value="form.setupCode"
+                  size="large"
+                  :placeholder="t('security.setupCodePlaceholder')"
+                  :disabled="mode !== 'register'"
+                  :input-props="{ autocomplete: 'off', spellcheck: false }"
+                  @keyup.enter="submit"
+                />
+              </NFormItem>
+              <NFormItem v-else :label="t('auth.inviteCode')">
                 <NInput
                   v-model:value="form.invite"
                   size="large"
@@ -383,6 +420,11 @@ h1 {
 }
 .pill.register {
   transform: translateX(100%);
+}
+.setup {
+  margin: -8px 0 20px;
+  font-size: 13px;
+  line-height: 1.55;
 }
 .closed {
   margin-top: 20px;

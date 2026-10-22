@@ -37,6 +37,9 @@ from .config import Settings, get_settings
 from .gateway import devenv_web, devenv_web_app, proxy
 from .gateway.devenv_web_auth import WebOriginGuard
 from .runtime.lanes import LaneManager, ensure_default_lane
+from .security import secret_key
+from .security.csrf import SESSION_COOKIE, CsrfGuard
+from .security.setup_code import SetupCode
 from .services import app_settings
 from .services.catalog_deploy import Deployer
 from .services.chat.hub import ChannelHub
@@ -60,8 +63,6 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
     async def lifespan(app: FastAPI):
         settings.data_dir.mkdir(parents=True, exist_ok=True)
         settings.models_dir.mkdir(parents=True, exist_ok=True)
-        if settings.secret_key == "change-me" or settings.invite_code == "change-me":
-            log.warning("SLOTSERVE_SECRET_KEY / SLOTSERVE_INVITE_CODE still use defaults - change them!")
         migrated_from = await asyncio.to_thread(
             db.prepare, settings.data_dir / "slotserve.db", settings.data_dir / "backups"
         )
@@ -74,6 +75,13 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         app.state.settings_defaults = app_settings.snapshot_defaults(settings)
         async with db.SessionLocal() as session:
             await app_settings.load_overrides(session, settings)
+            # [security] first admin: the setup code (logged while no admin exists)
+            await app.state.setup_code.refresh(session)
+        if not auth.invite_code_usable(settings.invite_code):
+            log.warning(
+                "the invite code is not set (SLOTSERVE_INVITE_CODE): only the first admin can sign up until an "
+                "admin sets one in Admin -> System settings"
+            )
         app.state.http = httpx.AsyncClient(timeout=httpx.Timeout(None, connect=10.0))
         app.state.limiter = AttemptLimiter()
         app.state.notifier = Notifier(settings)
@@ -142,15 +150,25 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         redoc_url=None,
         openapi_url="/api/openapi.json",
     )
+    # [security] middleware, outermost last: CsrfGuard -> WebOriginGuard -> SessionMiddleware (tests/security)
+    secret_key.resolve(settings)  # an unset or default key is replaced by the generated one in DATA_DIR
+    app.state.setup_code = SetupCode(settings.data_dir)
     app.add_middleware(
         SessionMiddleware,
         secret_key=settings.secret_key,
-        session_cookie="slotserve_session",
+        session_cookie=SESSION_COOKIE,
         max_age=30 * 24 * 3600,
         same_site="lax",
         https_only=settings.cookie_secure,
     )
     app.add_middleware(WebOriginGuard, settings=settings)  # [web origin] pages there cannot change things here
+    app.add_middleware(
+        CsrfGuard,
+        settings=settings,
+        exempt_prefixes=("/v1/",),  # API keys only, never the session cookie
+        exempt_paths=(channels.WECOM_CALLBACK,),  # signed by WeCom
+        no_header_prefixes=("/devenv/",),  # apps in dev environments (with DEVENV_WEB_PORT=0)
+    )
     for module in (
         auth,
         notifications,

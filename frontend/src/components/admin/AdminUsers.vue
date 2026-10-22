@@ -229,7 +229,7 @@ const usernameOk = computed(() => /^[A-Za-z0-9_.-]{3,32}$/.test(createForm.usern
       <label>
         <span class="field-label">{{ t('auth.password') }}</span>
         <div class="row">
-          <NInput v-model:value="createForm.password" class="mono-input" />
+          <NInput v-model:value="createForm.password" class="mono-input" :placeholder="t('ph.password')" />
           <NButton secondary @click="createForm.password = randomPassword()">{{ t('admin.users.generate') }}</NButton>
         </div>
       </label>
@@ -264,7 +264,7 @@ const usernameOk = computed(() => /^[A-Za-z0-9_.-]{3,32}$/.test(createForm.usern
   >
     <p class="muted hint">{{ t('admin.users.resetHint') }}</p>
     <div class="row">
-      <NInput v-model:value="resetForm.password" class="mono-input" />
+      <NInput v-model:value="resetForm.password" class="mono-input" :placeholder="t('ph.password')" />
       <NButton secondary @click="resetForm.password = randomPassword()">{{ t('admin.users.generate') }}</NButton>
     </div>
     <template #footer>
@@ -287,7 +287,7 @@ const usernameOk = computed(() => /^[A-Za-z0-9_.-]{3,32}$/.test(createForm.usern
     @update:show="(v: boolean) => !v && (deleteForm.user = null)"
   >
     <p class="muted hint">{{ t('admin.users.deleteHint') }}</p>
-    <NInput v-model:value="deleteForm.confirm" :placeholder="deleteForm.user?.username" />
+    <NInput v-model:value="deleteForm.confirm" :placeholder="deleteForm.user?.username ?? ''" />
     <template #footer>
       <div class="footer">
         <NButton @click="deleteForm.user = null">{{ t('common.cancel') }}</NButton>

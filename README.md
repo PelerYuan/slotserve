@@ -69,7 +69,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Open `http://<server>:8000`. The first account becomes the admin. Then go to **Models → Scan folder**, set a default model, create an API key, and call the API:
+Open `http://<server>:8000` and sign up with the setup code from the log (`docker compose exec slotserve slotserve setup-code`); that account becomes the admin. Then go to **Models → Scan folder**, set a default model, create an API key, and call the API:
 
 ```python
 from openai import OpenAI
