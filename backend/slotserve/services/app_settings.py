@@ -552,6 +552,57 @@ REGISTRY: dict[str, Editable] = {
             "兼容模式：用于在共享网页源的环境隔离规则下无法正常工作的网页应用（会削弱环境之间的隔离）",
         ),
     ),
+    "devenv_platform_context": Editable(
+        bool,
+        group="devenv",
+        depends_on="devenv_enabled",
+        keywords=("motd", "banner", "OPENAI_BASE_URL", "llm", "variables", "变量", "登录提示"),
+        doc=(
+            "Inside new environments: `SLOTSERVE_*` variables, a login banner (time left, `/workspace`, how to call "
+            "a model) and `OPENAI_BASE_URL` pointing at the container-side gateway",
+            "新环境内提供 `SLOTSERVE_*` 变量、登录提示（剩余时间、`/workspace`、如何调用模型）以及指向容器侧网关的"
+            " `OPENAI_BASE_URL`",
+        ),
+    ),
+    "devenv_llm_key": Editable(
+        bool,
+        group="devenv",
+        tier="expert",
+        depends_on="devenv_platform_context",
+        keywords=("OPENAI_API_KEY", "key", "llm", "密钥"),
+        doc=(
+            "Give each personal environment its own LLM key (`llm` scope, revoked when the environment stops; a "
+            "0600 file exported as `OPENAI_API_KEY` in login shells, never in the container's environment; shared "
+            "environments get none)",
+            "为每个个人环境发放专属 LLM 密钥（`llm` 权限，环境停止即吊销；以 0600 文件提供，登录 shell 中导出为 "
+            "`OPENAI_API_KEY`，从不放进容器环境变量；共享环境不发放）",
+        ),
+    ),
+    "devenv_gateway_port": Editable(
+        int,
+        group="deployment",
+        tier="expert",
+        restart_required=True,
+        keywords=("gateway", "slotserve-gw", "llm", "网关"),
+        doc=(
+            "Port of the container-side gateway: only the `/v1` API, for dev environments "
+            "(`http://slotserve-gw:<port>/v1`); 0 = off",
+            "容器侧网关的端口：只提供 `/v1` 接口，供开发环境使用（`http://slotserve-gw:<端口>/v1`）；0 表示关闭",
+        ),
+    ),
+    "devenv_gateway_host": Editable(
+        str,
+        group="deployment",
+        tier="expert",
+        restart_required=True,
+        keywords=("gateway", "slotserve-gw", "网关"),
+        doc=(
+            "Address the container-side gateway listens on; empty = the Docker bridge's address (`docker0`) when "
+            "SlotServe runs on the host, every address when it runs in a container",
+            "容器侧网关监听的地址；留空时，SlotServe 直接运行在主机上则为 Docker 网桥地址（`docker0`），"
+            "运行在容器中则为所有地址",
+        ),
+    ),
     "devenv_forwarder_image": Editable(
         str,
         min=1,

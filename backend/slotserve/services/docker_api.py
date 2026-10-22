@@ -156,10 +156,22 @@ class DockerClient:
     async def remove_image(self, ref: str) -> None:
         await self._request("DELETE", f"/images/{quote(ref, safe='')}", ok=(200, 404))
 
-    async def commit(self, container: str, ref: str, comment: str = "") -> str:
+    async def image_inspect(self, ref: str) -> dict | None:
+        """The image's details (``Config.Env``, ...), or None when there is no such image."""
+        try:
+            return (await self._request("GET", f"/images/{quote(ref, safe='')}/json")).json()
+        except DockerError as exc:
+            if exc.status == 404:
+                return None
+            raise
+
+    async def commit(self, container: str, ref: str, comment: str = "", env: list[str] | None = None) -> str:
+        """Saves a container as an image. ``env``: the image's ``Config.Env`` (Docker adds the container's
+        variables that it does not name; containers/image_clean.py)."""
         repo, tag = split_image(ref)
         params = {"container": container, "repo": repo, "tag": tag, "comment": comment, "pause": "true"}
-        resp = await self._request("POST", "/commit", params=params, timeout=None)
+        body = {"Env": list(env)} if env is not None else {}  # {}: everything from the container, as without one
+        resp = await self._request("POST", "/commit", params=params, json=body, timeout=None)
         return resp.json().get("Id", "")
 
     # ---- containers -----------------------------------------------------------
@@ -180,6 +192,11 @@ class DockerClient:
             content=data,
             headers={"Content-Type": "application/x-tar"},
         )
+
+    async def get_archive(self, container: str, path: str) -> bytes | None:
+        """A tar archive of ``path`` in a container (it need not run), or None when there is no such path."""
+        resp = await self._request("GET", f"/containers/{container}/archive", params={"path": path}, ok=(200, 404))
+        return resp.content if resp.status_code == 200 else None
 
     async def copy_path(self, source: str, path: str, target: str, target_path: str) -> bool:
         """Copies ``path`` of one container (it need not run) into ``target_path`` of another, streaming the archive
@@ -314,6 +331,10 @@ class DockerClient:
 
     async def network_remove(self, network: str) -> None:
         await self._request("DELETE", f"/networks/{quote(network, safe='')}", ok=(200, 204, 404))
+
+    async def network_inspect(self, network: str) -> dict | None:
+        resp = await self._request("GET", f"/networks/{quote(network, safe='')}", ok=(200, 404))
+        return resp.json() if resp.status_code == 200 else None
 
     async def networks(self, label: str) -> "list[dict[str, Any]]":
         filters = json.dumps({"label": [label]})

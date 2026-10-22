@@ -5,14 +5,18 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NInput, NInputNumber, NModal, NRadioButton, NRadioGroup, NTooltip, useDialog } from 'naive-ui'
 import { Copy, ExternalLink, Plus, X } from 'lucide-vue-next'
+import { ApiError } from '@/api/client'
 import type { DevSession } from '@/api/types'
 import { absolute, portsApi, type DevPort, type DevPortMode, type DevPorts } from '@/api/devenvPorts'
 import { useErrorMessage } from '@/composables/useErrorMessage'
+import { devenvApi } from '@/features/devenv/api'
+import { useWebOpen } from '@/features/devenv/useWebOpen'
 
 const props = defineProps<{ session: DevSession; canManage: boolean }>()
 const { t } = useI18n()
 const dialog = useDialog()
 const { showError } = useErrorMessage()
+const web = useWebOpen()
 
 const data = ref<DevPorts | null>(null)
 const busy = ref(false)
@@ -34,15 +38,53 @@ onMounted(() => {
 onBeforeUnmount(() => window.clearInterval(timer))
 watch(() => props.session.state, load)
 
-async function setMode(p: DevPort, mode: DevPortMode) {
+// Apps without a login of their own (VS Code, desktop, JupyterLab: SlotServe's login protects them) need a
+// confirmation before they go direct: the server answers 400 devenv_port_unauthenticated until it is given.
+async function putPort(port: number, body: { name?: string; mode: DevPortMode }): Promise<boolean> {
   busy.value = true
   try {
-    data.value = await portsApi.put(props.session.id, p.port, { mode })
+    data.value = await devenvApi.putPort(props.session.id, port, body)
+    return true
   } catch (e) {
+    if (e instanceof ApiError && e.code === 'devenv_port_unauthenticated') {
+      return confirmUnauthenticated(port, body, String(e.params.kind ?? ''))
+    }
     showError(e)
+    return false
   } finally {
     busy.value = false
   }
+}
+function confirmUnauthenticated(port: number, body: { name?: string; mode: DevPortMode }, kind: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    dialog.warning({
+      title: t('devenvUi.ports.unauthTitle', { port }),
+      content: t('devenvUi.ports.unauthBody', {
+        app: kind && ['vscode', 'desktop', 'jupyter'].includes(kind) ? t(`devenv.web.kind.${kind}`) : t('devenvUi.ports.thisApp'),
+      }),
+      positiveText: t('devenvUi.ports.unauthConfirm'),
+      negativeText: t('common.cancel'),
+      onPositiveClick: async () => {
+        busy.value = true
+        try {
+          data.value = await devenvApi.putPort(props.session.id, port, { ...body, confirm_unauthenticated: true })
+          resolve(true)
+        } catch (err) {
+          showError(err)
+          resolve(false)
+        } finally {
+          busy.value = false
+        }
+      },
+      onNegativeClick: () => resolve(false),
+      onClose: () => resolve(false),
+      onMaskClick: () => resolve(false),
+    })
+  })
+}
+
+async function setMode(p: DevPort, mode: DevPortMode) {
+  await putPort(p.port, { mode })
 }
 
 function remove(p: DevPort) {
@@ -67,15 +109,7 @@ function openAdd(port?: number) {
 }
 async function add() {
   if (!form.port) return
-  busy.value = true
-  try {
-    data.value = await portsApi.put(props.session.id, form.port, { name: form.name.trim(), mode: form.mode })
-    form.open = false
-  } catch (e) {
-    showError(e)
-  } finally {
-    busy.value = false
-  }
+  if (await putPort(form.port, { name: form.name.trim(), mode: form.mode })) form.open = false
 }
 
 const copied = ref<string | null>(null)
@@ -155,9 +189,19 @@ const running = computed(() => props.session.state === 'running')
       <div v-if="running || p.mode === 'direct'" class="row wrap line">
         <span class="mono small addr">{{ address(p) }}</span>
         <NButton
-          v-if="running && (p.mode === 'login' || p.status === 'active')"
+          v-if="running && p.mode === 'login'"
+          size="tiny"
+          quaternary
+          data-test="port-open"
+          @click="web.open(session.id, p.port)"
+        >
+          <template #icon><ExternalLink :size="13" /></template>
+          {{ t('devenv.ports.open') }}
+        </NButton>
+        <NButton
+          v-else-if="running && p.status === 'active' && p.direct_url"
           tag="a"
-          :href="p.mode === 'direct' && p.direct_url ? p.direct_url : p.url"
+          :href="p.direct_url"
           target="_blank"
           rel="noopener"
           size="tiny"

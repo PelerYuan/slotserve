@@ -7,6 +7,7 @@ from .contributors.gpu import GpuContributor
 from .contributors.limits import LimitsContributor
 from .contributors.logging import LoggingContributor
 from .contributors.models import ModelsContributor
+from .contributors.platform_env import PlatformEnvContributor
 from .contributors.session import SessionContributor
 from .contributors.ssh import SshContributor
 from .contributors.web import WebContributor
@@ -23,6 +24,7 @@ CONTRIBUTORS = [
     GpuContributor(),
     ModelsContributor(),
     CpuContributor(),
+    PlatformEnvContributor(),  # F11: variables, login banner, LLM endpoint and key
     LimitsContributor(),
     LoggingContributor(),
 ]

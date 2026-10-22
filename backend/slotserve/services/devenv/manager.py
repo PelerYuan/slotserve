@@ -10,9 +10,10 @@ import secrets
 import socket
 import subprocess
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from http.cookiejar import CookiePolicy
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 from sqlalchemy import func, or_, select
@@ -21,6 +22,7 @@ from ...containers.build import build_spec, render_for_docker
 from ...containers.context import (
     Account,
     LaneInfo,
+    PlatformInfo,
     ProjectInfo,
     Resources,
     SessionContext,
@@ -28,10 +30,12 @@ from ...containers.context import (
     TemplateInfo,
     UserInfo,
 )
+from ...containers.contributors import platform_env
 from ...containers.contributors.ssh import account_files
 from ...containers.harden import COMPAT_LABEL, HARDENED_LABEL, HardenError
 from ...containers.harden import VERSION as HARDEN_VERSION
 from ...containers.helpers import Folder, parent_binds, q
+from ...containers.image_clean import SECRET_FILES, SHADOW, committed_env, lock_root, original_shadow
 from ...containers.model import ContainerSpec, NodePolicy, SpecError
 from ...containers.names import placeholder_values
 from ...containers.redact import redact_mapping
@@ -48,6 +52,7 @@ from ...orm import (
     User,
 )
 from ...runtime.manager import RuntimeState
+from ...security import credentials
 from .. import maintenance, storage
 from ..devenv_cpu import CpuEnvs
 from ..docker_api import DockerClient, DockerError, tar_files
@@ -68,6 +73,7 @@ from .templates import load_web_ports, session_web
 from .validation import _slug, load_paths, parse_port_range, unix_names
 
 HELPER_ROOT = "/slotserve-storage"  # where helpers see the legacy storage directory
+KEY_EXTEND_SECONDS = 3600.0  # a running environment's key is moved on at least this often (it lives 24 h at most)
 log = logging.getLogger(__package__)  # the logger keeps the name of the module before the move
 
 
@@ -168,6 +174,12 @@ class DevEnvManager:
         self._accounts_digest: dict[int, str] = {}
         self._accounts_checked: dict[int, float] = {}
         self._housekept_at: datetime | None = None
+        # F11: environment keys handed to running containers (to put back after a save), the end each running
+        # environment was told, when its key was last extended, the machine's name (docker info)
+        self._env_keys: dict[int, str] = {}
+        self._env_end: dict[int, str] = {}
+        self._key_extended: dict[int, float] = {}
+        self._machine: str | None = None
         # In a container SlotServe joins each environment's network to reach its web interface;
         # on the host it uses a port Docker binds to 127.0.0.1.
         self.in_container = Path("/.dockerenv").exists()
@@ -190,6 +202,11 @@ class DevEnvManager:
 
     def poke(self) -> None:
         self._wake.set()
+
+    @property
+    def gateway(self):
+        """The container-side gateway (gateway/container_gw.py), when SlotServe runs one."""
+        return getattr(self.state, "container_gw", None)
 
     def accounts_changed(self) -> None:
         """Someone's keys or password changed: refresh the accounts in shared environments soon."""
@@ -353,6 +370,8 @@ class DevEnvManager:
                 await self.refresh_status()
                 if not self.status["ok"]:
                     return
+                if (gateway := self.gateway) is not None:
+                    await gateway.ensure(self.docker, self.in_container)  # F11: the container-side /v1
                 if not self._cleaned:
                     await self._cleanup(db)
                     self._cleaned = True
@@ -516,6 +535,8 @@ class DevEnvManager:
                 await self._fail(db, s, f"{reason}\n{tail}".strip(), notify=True)
             elif s.kind == "shared":
                 await self._refresh_accounts(db, s)
+            else:
+                await self._follow_platform(db, s, r)  # F11: key and end follow the booking
 
     async def _project_image_lost(self, db, s: DevSession) -> bool:
         """A kept environment's snapshot image is gone (pruned): start over from its template's image."""
@@ -701,7 +722,137 @@ class DevEnvManager:
             storage_dir=self.settings.devenv_storage_dir.rstrip("/"),
             models_source=models,
             in_container=self.in_container,
+            platform=await self._platform(db, s, user, template, project, r, preview),
         )
+
+    # ---- the platform inside environments (F11) ------------------------------------------------------------------
+
+    def llm_url(self) -> str:
+        """The LLM endpoint inside environments (``http://slotserve-gw:<port>/v1``), or "" without one."""
+        gateway = self.gateway
+        return gateway.url if gateway is not None else ""
+
+    def end_label(self, end: datetime | None) -> str:
+        """A booking's end as the login banner shows it: SlotServe's time zone."""
+        if end is None:
+            return ""
+        try:
+            tz = ZoneInfo(self.settings.timezone)
+        except (ZoneInfoNotFoundError, ValueError):
+            tz = UTC
+        value = end if end.tzinfo is not None else end.replace(tzinfo=UTC)
+        return value.astimezone(tz).strftime("%Y-%m-%d %H:%M ") + (self.settings.timezone or "UTC")
+
+    async def _machine_name(self) -> str:
+        if self._machine is None:
+            try:
+                self._machine = str((await self.docker.info()).get("Name") or "")
+            except Exception as exc:  # noqa: BLE001 - best effort: the banner just leaves it out
+                log.debug("docker info failed: %s", exc)
+                return ""
+        return self._machine
+
+    async def _issue_env_key(self, db, s: DevSession, until: datetime | None) -> str | None:
+        """A new environment key for a starting container (earlier ones are revoked), kept in memory to put back
+        after a save (security/credentials.py; never in Docker's environment, R1-11)."""
+        try:
+            raw = await credentials.issue_env_key(db, s.id, until=until)
+        except credentials.CredentialError as exc:
+            log.warning("dev environment %s: no environment key (%s)", s.id, exc.code)
+            return None
+        self._env_keys[s.id] = raw
+        self._key_extended[s.id] = asyncio.get_running_loop().time()
+        return raw
+
+    async def _platform(self, db, s: DevSession, user, template, project, r, preview: bool) -> PlatformInfo | None:
+        """What the platform contributor gets: endpoint, key (not for previews or shared environments), names."""
+        if not self.settings.devenv_platform_context:
+            return None
+        url = self.llm_url()
+        key = None
+        if url and not preview and s.kind != "shared" and self.settings.devenv_llm_key:
+            key = await self._issue_env_key(db, s, r.end_at if r is not None else None)
+        if not preview:
+            self._env_end[s.id] = r.end_at.isoformat() if r is not None else ""  # what /run/slotserve/env says
+        name = project.name if project is not None else (template.name if template is not None else s.image)
+        locale = getattr(user, "locale", None) if user is not None else None
+        return PlatformInfo(
+            llm_url=url,
+            extra_host=self.gateway.extra_host if url and not self.in_container else None,
+            llm_key=key,
+            env_name=name or "",
+            machine=await self._machine_name(),
+            end_label=self.end_label(r.end_at) if r is not None else "",
+            language="zh-CN" if (locale or "").lower().startswith("zh") else "en",
+        )
+
+    async def _follow_platform(self, db, s: DevSession, r: Reservation | None) -> None:
+        """A running environment: its key follows the booking's end (extended with it, and at least hourly, since
+        a key lives 24 h at most) and the end its shells read (``/run/slotserve/env``) is rewritten."""
+        if not self.settings.devenv_platform_context or s.kind == "shared" or not s.container_id:
+            return
+        end = r.end_at.isoformat() if r is not None else ""
+        now = asyncio.get_running_loop().time()
+        known = self._env_end.get(s.id)
+        if known is None:
+            self._env_end[s.id] = end  # what the container was started with (after a restart: assumed)
+        moved = known is not None and known != end
+        if moved or now - self._key_extended.get(s.id, 0.0) > KEY_EXTEND_SECONDS:
+            until = r.end_at if r is not None else utcnow() + timedelta(hours=credentials.ENV_KEY_MAX_HOURS)
+            await credentials.extend_env_keys(db, s.id, until)
+            self._key_extended[s.id] = now
+        if moved:
+            data = platform_env.env_file(end, self.end_label(r.end_at) if r is not None else "")
+            with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
+                await self.docker.put_archive(s.container_id, "/", tar_files({platform_env.ENV_FILE: (data, 0o644)}))
+            self._env_end[s.id] = end
+
+    async def _forget_platform(self, db, s: DevSession) -> None:
+        """The environment stopped: its keys die with it (the gateway refuses them anyway once it is not running)."""
+        self._env_keys.pop(s.id, None)
+        self._env_end.pop(s.id, None)
+        self._key_extended.pop(s.id, None)
+        if s.kind != "shared" and s.id is not None:
+            await credentials.revoke_env_keys(db, s.id)
+
+    async def _commit_clean(self, container_id: str, ref: str, comment: str, s: DevSession | None) -> None:
+        """Saves a container as an image without the secrets SlotServe copied in or the variables it set
+        (containers/image_clean.py, R1-11). ``s``: a running environment, whose files are put back afterwards."""
+        info = await self.docker.inspect(container_id) or {}
+        config = info.get("Config") or {}
+        image = await self.docker.image_inspect(config["Image"]) if config.get("Image") else None
+        image_env = None if image is None else list((image.get("Config") or {}).get("Env") or [])
+        env = committed_env(list(config.get("Env") or []), image_env)
+        shadow = await self.docker.get_archive(container_id, SHADOW)
+        await self.docker.put_archive(container_id, "/", tar_files(SECRET_FILES))
+        if shadow is not None:
+            locked, changed = lock_root(shadow)
+            if changed:
+                await self.docker.put_archive(container_id, "/", locked)
+        try:
+            await self.docker.commit(container_id, ref, comment=comment, env=env)
+        finally:
+            if s is not None:
+                await self._put_back(s, container_id, shadow)
+
+    async def _put_back(self, s: DevSession, container_id: str, shadow: bytes | None) -> None:
+        """A running environment gets its host key, environment key and /etc/shadow back after a save."""
+        files: dict[str, tuple[bytes, int]] = {
+            "opt/slotserve/ssh_host_key": (self.host_key(self.env_key(s))[0], 0o600),
+        }
+        key = self._env_keys.get(s.id)
+        wanted = self.settings.devenv_platform_context and self.settings.devenv_llm_key and self.llm_url()
+        if key is None and s.kind != "shared" and wanted:
+            # SlotServe restarted since the start: the key is only stored as a hash; the environment gets a new one
+            async with SessionLocal() as db:
+                r = await db.get(Reservation, s.reservation_id) if s.reservation_id else None
+                key = await self._issue_env_key(db, s, r.end_at if r is not None else None)
+                await db.commit()
+        if key is not None and s.kind != "shared":
+            files[platform_env.KEY_FILE] = (key.encode(), 0o600)
+        await self.docker.put_archive(container_id, "/", tar_files(files))
+        if shadow is not None and (original := original_shadow(shadow)) is not None:
+            await self.docker.put_archive(container_id, "/", original)
 
     async def _plan(self, db, s: DevSession) -> Plan:
         ctx = await self._context(db, s)
@@ -818,7 +969,7 @@ class DevEnvManager:
         web["container"] = name
         network = web["network"]
         if self.in_container:
-            await self.docker.network_connect(network, self.self_container)
+            await self.docker.network_connect(network, self.self_container, aliases=self._aliases())
             return
         info = await self.docker.inspect(cid) or {}
         settings = info.get("NetworkSettings") or {}
@@ -829,6 +980,10 @@ class DevEnvManager:
             if not host_port:
                 raise DevEnvError("devenv_web_port_missing")
             web["published"][str(p["port"])] = f"127.0.0.1:{host_port}"
+
+    def _aliases(self) -> list[str] | None:
+        """SlotServe's names on an environment's network: ``slotserve-gw`` while the gateway serves (F11)."""
+        return [platform_env.GATEWAY_ALIAS] if self.llm_url() else None
 
     def port_target(self, s: DevSession, port: int) -> str | None:
         """The upstream base URL (``http://host:port``) for one of a running session's container ports, or None.
@@ -1033,7 +1188,7 @@ class DevEnvManager:
         s.detail = "snapshot"
         await db.commit()
         ref = f"slotserve/project-{project.id}:{utcnow().strftime('%Y%m%d%H%M%S')}"
-        await self.docker.commit(project.container_id, ref, comment=f"SlotServe project {project.name}")
+        await self._commit_clean(project.container_id, ref, f"SlotServe project {project.name}", None)
         await self.docker.remove(project.container_id)
         old = project.image
         project.image, project.container_id, project.container_port = ref, None, None
@@ -1078,6 +1233,7 @@ class DevEnvManager:
             await self._drop_network(network_name(s.id))
             if s.kind != "shared":
                 self.drop_host_key(self.env_key(s))  # a new environment next time, with a new key
+        await self._forget_platform(db, s)  # F11: its environment key is revoked
         s.web = None
 
     async def _stop(self, db, s: DevSession, state: str) -> None:
@@ -1134,7 +1290,7 @@ class DevEnvManager:
                 if self.in_container:
                     # SlotServe may have been recreated: join the network again to reach the web interface
                     with contextlib.suppress(DockerError):
-                        await self.docker.network_connect(name, self.self_container)
+                        await self.docker.network_connect(name, self.self_container, aliases=self._aliases())
                 continue
             if project_id and project_id.isdigit() and int(project_id) in projects:
                 await self._leave_network(name)  # a paused kept environment's: stays with it
@@ -1209,7 +1365,7 @@ class DevEnvManager:
             slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:30] or "env"
             ref = f"slotserve/u{owner_id}-{slug}:{utcnow().strftime('%Y%m%d%H%M%S')}"
             try:
-                await self.docker.commit(s.container_id, ref, comment=f"saved in SlotServe from {s.image}")
+                await self._commit_clean(s.container_id, ref, f"saved in SlotServe from {s.image}", s)
                 db.add(
                     DevTemplate(
                         name=name,

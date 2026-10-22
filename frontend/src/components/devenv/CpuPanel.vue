@@ -11,7 +11,9 @@ import { cpuCanStart, cpuInfo, formatCores, loadCpu } from '@/composables/devenv
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { formatBytes, relativeFromNow } from '@/utils/format'
 
-const props = defineProps<{ templates: DevTemplate[]; projects: DevProject[]; canLogIn: boolean }>()
+// No credentials are needed here: web interfaces open without one, and the server refuses an SSH-only template
+// without a way to log in (ssh_key_required / ssh_login_required), which the start card asks for inline (F03).
+const props = defineProps<{ templates: DevTemplate[]; projects: DevProject[] }>()
 const emit = defineEmits<{ changed: [] }>()
 
 const { t } = useI18n()
@@ -91,7 +93,7 @@ async function stop(id: number) {
         size="small"
         type="primary"
         secondary
-        :disabled="!cpuCanStart() || !canLogIn"
+        :disabled="!cpuCanStart()"
         data-test="cpu-open"
         @click="openPicker"
       >
@@ -108,16 +110,17 @@ async function stop(id: number) {
           ·
           {{ info.memory_gb > 0 ? t('devenvCpu.memoryEach', { n: info.memory_gb }) : t('devenvCpu.memoryAny') }}
         </li>
-        <li v-if="info.pool_cpus !== null">
+        <!-- the core numbers of the shared pool and the lanes are admin details (F03) -->
+        <li v-if="isAdmin && info.pool_cpus !== null">
           {{ t('devenvCpu.pool', { n: info.pool_cpus, total: info.host_cpus ?? '?', cpus: info.pool ?? '—' }) }}
         </li>
-        <li v-if="info.lanes.length">
+        <li v-if="isAdmin && info.lanes.length">
           {{ t('devenvCpu.reserved') }}
           <span v-for="(l, i) in info.lanes" :key="l.lane_id">
             {{ i ? ', ' : '' }}{{ t('devenvCpu.laneCores', { name: l.name, n: l.cpus, cpus: l.cpuset }) }}
           </span>
         </li>
-        <li v-if="info.memory_pool_gb > 0">
+        <li v-if="isAdmin && info.memory_pool_gb > 0">
           {{ t('devenvCpu.memoryPool', { used: info.memory_claimed_gb, n: info.memory_pool_gb }) }}
         </li>
       </ul>

@@ -80,6 +80,8 @@ Admins change every setting except the deployment parameters in **Admin → Syst
 | `SLOTSERVE_DEVENV_PUBLIC_PORT_LIMIT` | `5` | advanced | Direct ports per person; admins have no limit; 0 = only admins |
 | `SLOTSERVE_DEVENV_WEB_URL` | *empty* | expert | How browsers reach the web port of dev environments, e.g. behind a reverse proxy; empty = the same host on `DEVENV_WEB_PORT` |
 | `SLOTSERVE_DEVENV_WEB_COMPAT` | `false` | expert | Compatibility mode for web apps that break on the shared web origin's rules between environments (weakens the isolation between environments) |
+| `SLOTSERVE_DEVENV_PLATFORM_CONTEXT` | `true` | advanced | Inside new environments: `SLOTSERVE_*` variables, a login banner (time left, `/workspace`, how to call a model) and `OPENAI_BASE_URL` pointing at the container-side gateway |
+| `SLOTSERVE_DEVENV_LLM_KEY` | `true` | expert | Give each personal environment its own LLM key (`llm` scope, revoked when the environment stops; a 0600 file exported as `OPENAI_API_KEY` in login shells, never in the container's environment; shared environments get none) |
 | `SLOTSERVE_DEVENV_FORWARDER_IMAGE` | `alpine/socat:1.8.1.1` | expert | ⚠️ **Runs as root on the host.** Image of the per-port forwarder containers (needs `socat` on its PATH) |
 | `SLOTSERVE_DEVENV_STORAGE_DIR` | *empty* | expert | ⚠️ **Runs as root on the host.** Directory on the Docker host for persistent data (bind mounts); empty = Docker named volumes. System directories (`/etc`, `/root`, `/var/lib/docker`, `/proc`, `/sys`, `/boot`, `/usr`, `/bin`, `/lib*`, `/var/run` …) are refused |
 
@@ -187,6 +189,8 @@ Admins change every setting except the deployment parameters in **Admin → Syst
 
 | Variable | Default | Level | Description |
 | --- | --- | --- | --- |
+| `SLOTSERVE_DEVENV_GATEWAY_PORT` | `8002` | expert | Port of the container-side gateway: only the `/v1` API, for dev environments (`http://slotserve-gw:<port>/v1`); 0 = off |
+| `SLOTSERVE_DEVENV_GATEWAY_HOST` | *empty* | expert | Address the container-side gateway listens on; empty = the Docker bridge's address (`docker0`) when SlotServe runs on the host, every address when it runs in a container |
 | `SLOTSERVE_SECRET_KEY` | *generated* | expert | Signs session cookies and encrypts stored secrets. Unset, empty or `change-me`: SlotServe generates a random key on first start and keeps it in `DATA_DIR/secret_key` (owner-only). A value you set always wins |
 | `SLOTSERVE_HOST` | `0.0.0.0` | expert | Listen address |
 | `SLOTSERVE_PORT` | `8000` | expert | Listen port |

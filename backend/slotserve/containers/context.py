@@ -74,6 +74,20 @@ class Resources:
 
 
 @dataclass(frozen=True)
+class PlatformInfo:
+    """The platform inside the environment (F11, ``contributors/platform_env.py``); None: switched off."""
+
+    llm_url: str = ""  # the container-side gateway, e.g. http://slotserve-gw:8002/v1; "" = none
+    extra_host: str | None = None  # "slotserve-gw:<address>" for /etc/hosts (SlotServe on the host); None: DNS alias
+    llm_key: str | None = None  # the environment key (a 0600 file, never Docker Env); None: no key
+    env_name: str = ""  # what the person calls the environment (project or template name)
+    machine: str = ""  # the machine it runs on
+    end_label: str = ""  # the booking's end in SlotServe's time zone, e.g. "Mon 17:30"
+    language: str = "en"  # of the login banner: "en" or "zh-CN"
+    checkpoint_dir: str = "/workspace/.checkpoints"
+
+
+@dataclass(frozen=True)
 class SessionContext:
     session_id: int
     kind: str  # booking | shared | cpu
@@ -91,3 +105,4 @@ class SessionContext:
     storage_dir: str = ""  # legacy devenv_storage_dir (bind mounts), without the trailing slash
     models_source: str | None = None  # host path of the models directory, mounted read-only at /models
     in_container: bool = False  # SlotServe itself runs in a container (joins the environment's network)
+    platform: PlatformInfo | None = None  # F11: variables, login banner, LLM endpoint and key

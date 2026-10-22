@@ -39,6 +39,8 @@ KEY_ALICE_2 = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQGoldenAliceRsa alice@deskto
 KEY_BOB = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGoldenBobKeyGoldenBobKeyGoldenBobKeyGo bob@box"
 HASH_ALICE = "$6$goldensalt$alicehash"
 HASH_BOB = "$6$goldensalt$bobhash"
+GATEWAY_URL = "http://slotserve-gw:8002/v1"
+ENV_KEY = "sk-ss-env-goldenkeygoldenkeygoldenkey"
 
 
 class StubDocker:
@@ -259,6 +261,33 @@ def cases() -> dict[str, tuple]:
         "web_desktop_keep_entrypoint": ([builtin("desktop", id=3), *booking(template_id=3)], {}, {}),
         # SlotServe in a container: no port bindings (it joins the environment's network).
         "web_vscode_in_container": ([builtin("vscode", id=4), *booking(template_id=4)], {}, {"in_container": True}),
+        # F11: the container-side gateway runs (SlotServe on the host: slotserve-gw in /etc/hosts) and the booking
+        # gets an environment key - as a 0600 file, never in Env.
+        "booking_platform_llm_key": ([builtin("pytorch", id=1), *booking()], {}, {"gateway": True}),
+        # F11 in a lane's shared environment: the endpoint, no key (people use their own).
+        "shared_platform_no_key": (
+            [
+                builtin("pytorch", id=1),
+                *members(),
+                DevSession(
+                    id=11, kind="shared", lane_id=2, template_id=1, image="pytorch/pytorch:latest", state="starting"
+                ),
+            ],
+            {},
+            {"gateway": True},
+        ),
+        # F11 for a CPU-only environment with SlotServe in a container (the alias on the network, no ExtraHosts) and
+        # the key switched off by admins.
+        "cpu_platform_in_container_key_off": (
+            [
+                builtin("pytorch", id=1),
+                DevSession(
+                    id=11, kind="cpu", user_id=1, template_id=1, image="pytorch/pytorch:latest", state="starting"
+                ),
+            ],
+            {"devenv_llm_key": False},
+            {"gateway": True, "in_container": True},
+        ),
         # A custom template with several ports (a direct one, one that knows its base path, a plain HTTP app), its own
         # environment with placeholders and a command.
         "web_custom_ports_env": (
@@ -352,6 +381,13 @@ async def _plan(rows: list, settings_overrides: dict, manager_overrides: dict) -
     manager._models_source = manager_overrides.get("models", "/srv/models")
     manager._bundle = SshBundle(b"ELF golden dropbear")
     manager.host_key = lambda env: (f"golden host key of {env}".encode(), "SHA256:golden")
+    if manager_overrides.get("gateway"):  # F11: a running container-side gateway and a fixed environment key
+        manager.state.container_gw = SimpleNamespace(url=GATEWAY_URL, extra_host="slotserve-gw:172.17.0.1")
+
+        async def issue_env_key(db, s, until):
+            return ENV_KEY
+
+        manager._issue_env_key = issue_env_key
     with Session(ENGINE, expire_on_commit=False) as db:
         return _normalize(await manager._plan(SyncDb(db), db.get(DevSession, 11)))
 
@@ -382,6 +418,8 @@ async def test_every_case_is_hardened(case, monkeypatch):
     assert not host.get("Privileged") and host["NetworkMode"] != "host"
     assert all(m.get("Source") != "/" for m in host.get("Mounts", []))
     assert all(r.get("Count") != -1 and r.get("DeviceIDs") for r in host.get("DeviceRequests", []))
+    # R1-11: the environment key never reaches Docker's environment (docker inspect, /proc/1/environ, commit)
+    assert not any(ENV_KEY in e or e.startswith("OPENAI_API_KEY=") for e in config.get("Env", []))
 
 
 async def test_a_lane_without_gpus_cannot_start_a_gpu_environment(monkeypatch):
