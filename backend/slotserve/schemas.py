@@ -104,6 +104,8 @@ class PresetOut(ORMModel):
 class PresetIn(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     args: str = Field(default="", max_length=4000)
+    # Admins: yes, really use flags that can run code or write files (otherwise 400 args_confirm_required).
+    confirm_args: bool = False
 
 
 class ModelOut(BaseModel):
@@ -127,6 +129,13 @@ class ModelOut(BaseModel):
     default_lane_ids: list[int] = []
     # The weights alone are larger than the GPU memory: full offload (-ngl 99) will not fit.
     exceeds_vram: bool = False
+    # Launch arguments waiting for an admin's approval, and the flags in them that need it.
+    args_pending: str | None = None
+    needs_approval: list[str] = []
+
+
+class ModelArgsReviewIn(BaseModel):
+    confirm_args: bool = False
 
 
 class ModelUpdateIn(BaseModel):
@@ -135,6 +144,10 @@ class ModelUpdateIn(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
     engine: str | None = Field(default=None, pattern=r"^(llama\.cpp|vllm|sglang|custom)$")
     path: str | None = Field(default=None, min_length=1, max_length=1000)
+    # Admins: confirm flags that can run code or write files. Members: store arguments that need an admin as a
+    # request instead of failing with 400 args_need_approval.
+    confirm_args: bool = False
+    request_approval: bool = False
 
 
 class ModelCreateIn(BaseModel):
@@ -143,6 +156,8 @@ class ModelCreateIn(BaseModel):
     path: str = Field(min_length=1, max_length=1000)
     args: str = Field(default="", max_length=4000)
     description: str = Field(default="", max_length=2000)
+    confirm_args: bool = False
+    request_approval: bool = False
 
 
 class ScanResultOut(BaseModel):

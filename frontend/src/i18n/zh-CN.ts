@@ -1,5 +1,6 @@
 import type en from './en'
 import { storageZh } from './storage' // storage hook
+import { argsGateZh } from './argsGate' // launch-argument policy
 
 const zh: typeof en = {
   app: {
@@ -1258,8 +1259,10 @@ const zh: typeof en = {
     cancelled: '已取消',
   },
   storage: storageZh.storage, // storage hook
+  argsGate: argsGateZh.argsGate, // launch-argument policy
   errors: {
     ...storageZh.errors, // storage hook
+    ...argsGateZh.errors, // launch-argument policy
     hf_token_required: '{repo} 是受限仓库：请先在「管理 → 系统设置」中填写 Hugging Face Token。',
     insufficient_disk: '磁盘空间不足：剩余 {free_gb} GB，需要 {need_gb} GB。',
     catalog_engine_mismatch: '此版本不能在 {engine} 上运行。',

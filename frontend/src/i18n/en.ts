@@ -1,4 +1,5 @@
 import { storageEn } from './storage' // storage hook
+import { argsGateEn } from './argsGate' // launch-argument policy
 
 export default {
   app: {
@@ -1259,8 +1260,10 @@ export default {
     cancelled: 'Cancelled',
   },
   storage: storageEn.storage, // storage hook
+  argsGate: argsGateEn.argsGate, // launch-argument policy
   errors: {
     ...storageEn.errors, // storage hook
+    ...argsGateEn.errors, // launch-argument policy
     hf_token_required: '{repo} is gated: add a Hugging Face token in Admin → System settings first.',
     insufficient_disk: 'Not enough disk space: {free_gb} GB free, {need_gb} GB needed.',
     catalog_engine_mismatch: 'This variant cannot run on {engine}.',

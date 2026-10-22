@@ -64,6 +64,15 @@ Each model has an inference engine. Scheduling, booking and the gateway work the
 - Flags SlotServe sets itself (host, port, model, served name) are removed from your arguments. For tensor parallelism across a multi-GPU lane add, for example, `--tensor-parallel-size 2` (vLLM) or `--tp 2` (SGLang).
 - The gateway always sends the served model name upstream, so clients may omit `model`.
 
+### Who may set which arguments
+
+Model servers run with SlotServe's own permissions, so some flags amount to running code or writing files on the server (`--trust-remote-code`, plugin and module flags, anything ending in `-file`, `-path` or `-dir`, `--log*`, `--ssl*`, `--api-key`…).
+
+- Members may use each engine's tuning flags (context size, GPU layers, parallelism, batching, cache types, sampling defaults…) and point models at the models folder, a model library or a Hugging Face repository id. File flags such as `--mmproj` must name a file in the models folder or a library.
+- Other flags are refused, or, if the member chooses **Ask an admin**, saved as a request: the model keeps its current arguments until an admin approves it on **Models** (admins are notified). Presets have no requests: ask an admin to set them.
+- Admins may set anything; the flags listed above need an explicit confirmation first. Every change is in the audit log (`model.args_update`).
+- The custom engine is admin-only. Catalog one-click deploys only generate allowed flags.
+
 ### vLLM in Docker
 
 The default image contains Python and the SlotServe server only; llama.cpp is mounted from the host. For vLLM, build the variant based on the official vLLM image:
