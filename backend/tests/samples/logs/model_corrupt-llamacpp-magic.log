@@ -1,0 +1,8 @@
+===== 2026-10-20T09:44:27.009163+00:00 start: /opt/llama.cpp/build/bin/llama-server --model /models/Mistral-7B-Instruct-v0.3-Q4_K_M.gguf --alias Mistral-7B-Instruct-v0.3-Q4_K_M --host 127.0.0.1 --port 8081
+main: loading model
+srv    load_model: loading model '/models/Mistral-7B-Instruct-v0.3-Q4_K_M.gguf'
+gguf_init_from_file_impl: invalid magic characters: '<!DO', expected 'GGUF'
+llama_model_load: error loading model: llama_model_loader: failed to load model from /models/Mistral-7B-Instruct-v0.3-Q4_K_M.gguf
+llama_model_load_from_file_impl: failed to load model
+srv    load_model: failed to load model, '/models/Mistral-7B-Instruct-v0.3-Q4_K_M.gguf'
+main: exiting due to model loading error

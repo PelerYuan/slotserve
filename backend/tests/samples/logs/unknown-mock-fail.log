@@ -1,0 +1,2 @@
+===== 2026-10-20T12:30:00.000000+00:00 start: python tools/mock_llama_server.py --model /models/good.gguf --mock-fail
+mock: simulated load failure

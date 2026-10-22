@@ -1,0 +1,16 @@
+===== 2026-10-20T10:41:07.552190+00:00 start: vllm serve /models/Qwen2.5-7B-Instruct --served-model-name Qwen2.5-7B-Instruct --host 127.0.0.1 --port 8082
+INFO 10-20 10:41:12 [__init__.py:241] Automatically detected platform cuda.
+(APIServer pid=2817) INFO 10-20 10:41:15 [api_server.py:1805] vLLM API server version 0.10.1.1
+(APIServer pid=2817) INFO 10-20 10:41:15 [utils.py:326] non-default args: {'model_tag': '/models/Qwen2.5-7B-Instruct', 'host': '127.0.0.1', 'port': 8082, 'model': '/models/Qwen2.5-7B-Instruct', 'served_model_name': ['Qwen2.5-7B-Instruct']}
+(APIServer pid=2817) Traceback (most recent call last):
+(APIServer pid=2817)   File "/usr/local/bin/vllm", line 10, in <module>
+(APIServer pid=2817)     sys.exit(main())
+(APIServer pid=2817)              ^^^^^^
+(APIServer pid=2817)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cli/main.py", line 54, in main
+(APIServer pid=2817)     args.dispatch_function(args)
+(APIServer pid=2817)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 1838, in run_server
+(APIServer pid=2817)     listen_address, sock = setup_server(args)
+(APIServer pid=2817)                            ^^^^^^^^^^^^^^^^^^
+(APIServer pid=2817)   File "/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/openai/api_server.py", line 1793, in create_server_socket
+(APIServer pid=2817)     sock.bind(addr)
+(APIServer pid=2817) OSError: [Errno 98] Address already in use
