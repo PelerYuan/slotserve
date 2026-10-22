@@ -164,6 +164,10 @@ class Settings(BaseSettings):
     # How browsers reach that port, e.g. https://gpu-box:8443 behind a reverse proxy; empty = the host name the
     # browser uses for SlotServe with devenv_web_port.
     devenv_web_url: str = ""
+    # Compatibility mode for apps that break on the shared web origin's cross-environment rules (a missing
+    # Referer, one browser using one person's environments at a time; gateway/devenv_web.py). Weakens the
+    # isolation between environments; nothing else.
+    devenv_web_compat: bool = False
 
     @property
     def database_url(self) -> str:
