@@ -1,11 +1,12 @@
 <script setup lang="ts">
-// "My work" in the Overview's next-step slot (F01): what runs now or starts within 24 hours. Each row: name ·
-// machine/GPU · time left · [+1 h] · [Open] · [Copy ssh]. The environment card's own row component
-// (features/devenv/WorkItem.vue, W1-08) can take over the row once it exists; the data comes from ../work.ts.
+// "My work" in the Overview's next-step slot (F01): what runs now or starts within 24 hours. Environments use the
+// environment card's row (features/devenv/WorkItem.vue: name, state, where, time left, Open / Copy ssh); bookings
+// without an environment get a row of the same shape here. A running booking adds [+1 h].
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton } from 'naive-ui'
-import { Boxes, Copy, ExternalLink, Lock, Terminal } from 'lucide-vue-next'
+import { Boxes, Lock } from 'lucide-vue-next'
+import WorkItem from '@/features/devenv/WorkItem.vue'
 import { api } from '@/api/client'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { useNow } from '@/composables/useNow'
@@ -35,7 +36,6 @@ function when(row: WorkRow): string {
   return ''
 }
 function icon(row: WorkRow) {
-  if (row.env) return Terminal
   return row.booking?.exclusive ? Lock : Boxes
 }
 
@@ -53,60 +53,26 @@ async function extend(row: WorkRow) {
   }
 }
 
-async function copySsh(command: string) {
-  try {
-    await navigator.clipboard.writeText(command)
-  } catch {
-    const ta = document.createElement('textarea')
-    ta.value = command
-    document.body.appendChild(ta)
-    ta.select()
-    document.execCommand('copy')
-    ta.remove()
-  }
-  message.success(t('onboarding.work.sshCopied'))
-}
 </script>
 
 <template>
   <ul class="work" data-component="my-work">
     <li v-for="row in rows" :key="row.key" class="work-row" :data-row="row.key">
-      <span class="w-icon" :class="{ active: row.active }"><component :is="icon(row)" :size="16" /></span>
-      <span class="w-main">
-        <span class="w-title">{{ title(row) }}</span>
-        <span class="w-meta faint">
-          <span v-if="where(row)">{{ where(row) }}</span>
-          <span v-if="where(row) && when(row)">·</span>
-          <span :class="{ pending: row.booking?.phase === 'pending' }">{{ when(row) }}</span>
+      <WorkItem v-if="row.env" :session="row.env" class="w-env" />
+      <template v-else>
+        <span class="w-icon" :class="{ active: row.active }"><component :is="icon(row)" :size="16" /></span>
+        <span class="w-main">
+          <span class="w-title">{{ title(row) }}</span>
+          <span class="w-meta faint">
+            <span v-if="where(row)">{{ where(row) }}</span>
+            <span v-if="where(row) && when(row)">·</span>
+            <span :class="{ pending: row.booking?.phase === 'pending' }">{{ when(row) }}</span>
+          </span>
         </span>
-      </span>
-      <span class="w-actions">
-        <NButton
-          v-if="row.booking && row.booking.phase === 'active'"
-          size="small"
-          secondary
-          :loading="busy === row.key"
-          data-action="work-extend"
-          @click="extend(row)"
-        >
+      </template>
+      <span v-if="row.booking && row.booking.phase === 'active'" class="w-actions">
+        <NButton size="small" secondary :loading="busy === row.key" data-action="work-extend" @click="extend(row)">
           {{ t('onboarding.work.extend') }}
-        </NButton>
-        <NButton
-          v-if="row.env?.web?.length && row.env.state === 'running'"
-          size="small"
-          secondary
-          type="primary"
-          tag="a"
-          :href="row.env.web[0].url"
-          target="_blank"
-          rel="noopener"
-        >
-          <template #icon><ExternalLink :size="14" /></template>
-          {{ t('onboarding.work.open') }}
-        </NButton>
-        <NButton v-if="row.env?.ssh_command" size="small" quaternary @click="copySsh(row.env.ssh_command)">
-          <template #icon><Copy :size="14" /></template>
-          {{ t('onboarding.work.copySsh') }}
         </NButton>
       </span>
     </li>
@@ -127,6 +93,10 @@ async function copySsh(command: string) {
 }
 .work-row + .work-row {
   border-top: 1px solid var(--border);
+}
+.w-env {
+  flex: 1;
+  min-width: 0;
 }
 .w-icon {
   flex: none;

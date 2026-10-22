@@ -22,6 +22,7 @@ import CodeBlock from '@/components/CodeBlock.vue'
 import LogDrawer from '@/components/LogDrawer.vue'
 import QuickBook from '@/features/quickbook/components/QuickBook.vue'
 import NextStep from '@/features/onboarding/components/NextStep.vue'
+import PreviewLine from '@/features/devenv/components/PreviewLine.vue'
 import PlaygroundDrawer from '@/features/playground/components/PlaygroundDrawer.vue'
 import ModelBadge from '@/features/playground/components/ModelBadge.vue'
 import { availabilityOf, playgroundApi, type KeyInfo } from '@/features/playground/api'
@@ -65,7 +66,20 @@ const canRestart = computed(() => !holder.value || mine.value || session.user?.i
 const manual = computed(() => status.value?.manual ?? null)
 const multiLane = computed(() => (status.value?.lanes.length ?? 0) > 1)
 const fallbackFrom = computed(() => (status.value?.reason === 'fallback' ? status.value.fallback_from : null))
-const exclusive = computed(() => !!holder.value?.exclusive)
+// The GPU is in use without a model server: a whole-GPU booking or a dev environment (booked, or the lane's shared
+// one). The lane then says who uses it, not "Stopped" / "No model loaded".
+const exclusive = computed(() => !!holder.value && !holder.value.model_id)
+function inUse(l: LaneStatus | undefined): string | null {
+  if (!l) return null
+  const r = l.active_reservation
+  if (r && !r.model_id) {
+    const env = r.devenv_template_id || r.devenv_project_id
+    if (r.user_id === session.user?.id) return env ? t('onboarding.ov.yourEnv') : t('onboarding.ov.inUseYou')
+    return env ? t('onboarding.ov.envOf', { user: r.username }) : t('onboarding.ov.inUseBy', { user: r.username })
+  }
+  if (!r && l.idle_mode === 'devenv' && !l.runtime.model_name) return t('onboarding.ov.sharedEnv')
+  return null
+}
 const modelLabel = computed(() => {
   const rt = runtime.value
   if (!rt?.model_name) return null
@@ -179,11 +193,11 @@ async function restart() {
           <span class="lane-name">{{ l.name }}</span>
           <span v-if="laneGpus(l)" class="faint small">{{ laneGpus(l) }}</span>
           <span class="spacer" />
-          <span v-if="l.active_reservation && !l.active_reservation.model_id" class="in-use">{{ t('onboarding.ov.inUse') }}</span>
+          <span v-if="inUse(l)" class="in-use">{{ inUse(l) }}</span>
           <StatusDot v-else :state="l.runtime.state" />
         </div>
         <div class="lane-model mono">
-          {{ l.active_reservation?.exclusive ? reservationWhat(l.active_reservation, t) : (l.runtime.model_name ?? idleLabel(l) ?? t('overview.noModel')) }}
+          {{ l.active_reservation && !l.active_reservation.model_id ? reservationWhat(l.active_reservation, t) : (l.runtime.model_name ?? idleLabel(l) ?? t('overview.noModel')) }}
         </div>
         <ModelBadge v-if="l.runtime.model_name && l.active_reservation?.model_id !== null" :model="badgeOf(l.runtime.model_name)" short />
         <div class="muted small">
@@ -204,7 +218,7 @@ async function restart() {
         <div class="row">
           <span class="label">{{ t('overview.currentModel') }}</span>
           <span class="spacer" />
-          <span v-if="exclusive" class="in-use">{{ t('onboarding.ov.inUse') }}</span>
+          <span v-if="inUse(firstLane)" class="in-use">{{ inUse(firstLane) }}</span>
           <StatusDot v-else-if="runtime" :state="runtime.state" />
         </div>
         <div class="model-name">{{ exclusive && holder ? reservationWhat(holder, t) : (modelLabel ?? idleLabel(firstLane) ?? t('overview.noModel')) }}</div>
@@ -224,7 +238,9 @@ async function restart() {
             <span class="err">{{ runtime.error_hint === 'oom' ? t('overview.oomHint') : runtime.error }}</span>
           </template>
           <template v-else-if="runtime?.draining">{{ t('overview.draining') }}</template>
-          <template v-else-if="exclusive">{{ t('overview.exclusiveHint') }}</template>
+          <template v-else-if="exclusive && holder">
+            {{ holder.devenv_template_id || holder.devenv_project_id ? t('onboarding.ov.envHint', { time: formatTime(holder.end_at) }) : t('overview.exclusiveHint') }}
+          </template>
           <template v-else-if="idleLabel(firstLane)">
             {{ firstLane?.idle_mode === 'devenv' ? t('overview.idleDevenvHint') : t('overview.idleNoneHint') }}
           </template>
@@ -389,7 +405,11 @@ async function restart() {
     </div>
 
     <LogDrawer v-model:show="showLogs" />
-    <QuickBook v-model:show="quickBook" :intent="bookIntent" @done="booked" />
+    <QuickBook v-model:show="quickBook" :intent="bookIntent" @done="booked">
+      <template #summary="{ kind, templateId, projectId, laneId }">
+        <PreviewLine v-if="kind === 'devenv'" :template-id="templateId" :project-id="projectId" :lane-id="laneId" gpu />
+      </template>
+    </QuickBook>
     <PlaygroundDrawer v-model:show="playground" />
   </div>
 </template>

@@ -1,11 +1,12 @@
 import { api } from '@/api/client'
-import type { DevSession, Reservation } from '@/api/types'
+import type { Reservation } from '@/api/types'
 import { session } from '@/composables/session'
+import { devenvApi, type DevSessionX } from '@/features/devenv/api'
 
 /** One row of "My work": a dev environment and/or a booking that runs now or starts within 24 hours. */
 export interface WorkRow {
   key: string
-  env: DevSession | null
+  env: DevSessionX | null
   booking: Reservation | null
   start: string | null
   end: string | null
@@ -19,7 +20,7 @@ export async function loadWork(): Promise<WorkRow[]> {
   const now = new Date()
   const [bookings, envs] = await Promise.all([
     api.reservations(new Date(now.getTime() - DAY_MS), new Date(now.getTime() + DAY_MS), true).catch(() => []),
-    session.config?.devenv_enabled ? api.devenv.sessions().catch(() => []) : Promise.resolve([] as DevSession[]),
+    session.config?.devenv_enabled ? devenvApi.sessions().catch(() => []) : Promise.resolve([] as DevSessionX[]),
   ])
   const mine = bookings.filter(
     (r) =>

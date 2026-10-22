@@ -88,17 +88,6 @@ export const en = {
     noExpiry: 'Never',
     createdCode: 'Ready to run, with your key filled in:',
   },
-  admin: {
-    settings: {
-      playground_enabled: 'Playground',
-      playground_enabled_desc:
-        'Signed-in people can chat with a free, running model on the Overview without creating an API key. Requests count as their usage (source "playground").',
-      playground_rate_per_minute: 'Playground requests per person and minute',
-      playground_rate_per_minute_desc: 'Enforced on the server. 0 = no limit.',
-      playground_default_model_only: 'Playground: default model only',
-      playground_default_model_only_desc: 'Only the default model answers in the Playground, never another loaded one.',
-    },
-  },
 }
 
 export const zh: typeof en = {
@@ -189,16 +178,5 @@ export const zh: typeof en = {
     expired: '已过期',
     noExpiry: '永不',
     createdCode: '已填入密钥、可直接运行的代码：',
-  },
-  admin: {
-    settings: {
-      playground_enabled: 'Playground',
-      playground_enabled_desc:
-        '登录用户可以在总览中直接和空闲、正在运行的模型对话，无需创建 API 密钥。请求计入本人用量（来源「playground」）。',
-      playground_rate_per_minute: 'Playground 每人每分钟请求数',
-      playground_rate_per_minute_desc: '由服务器强制执行。0 = 不限。',
-      playground_default_model_only: 'Playground 只用默认模型',
-      playground_default_model_only_desc: 'Playground 中只有默认模型会回复，不使用其他已加载的模型。',
-    },
   },
 }

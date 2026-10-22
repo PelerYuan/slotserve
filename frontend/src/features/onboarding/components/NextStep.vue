@@ -166,7 +166,7 @@ defineExpose({ refresh })
             <li v-for="c in setup.slice(0, 4)" :key="c.id" :class="c.level">{{ c.title }}</li>
           </ul>
         </div>
-        <RouterLink :to="{ name: 'admin' }">
+        <RouterLink :to="{ name: 'admin', query: { tab: 'overview' } }">
           <NButton type="primary" secondary>{{ t('onboarding.setup.continue') }} →</NButton>
         </RouterLink>
       </section>

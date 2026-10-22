@@ -2,6 +2,12 @@ export const en = {
   onboarding: {
     ov: {
       inUse: 'In use',
+      inUseYou: 'Yours now',
+      inUseBy: 'In use by {user}',
+      yourEnv: 'Your dev environment',
+      envOf: '{user}’s dev environment',
+      sharedEnv: 'Shared dev environment',
+      envHint: 'A dev environment has the GPU until {time}; no model server runs meanwhile.',
       tryHere: 'Try it here',
       useKey: 'Use your key “{name}” ({prefix}…) as the API key.',
     },
@@ -78,6 +84,12 @@ export const zh: typeof en = {
   onboarding: {
     ov: {
       inUse: '使用中',
+      inUseYou: '你正在使用',
+      inUseBy: '{user} 使用中',
+      yourEnv: '你的开发环境',
+      envOf: '{user} 的开发环境',
+      sharedEnv: '共享开发环境',
+      envHint: '开发环境占用 GPU 至 {time}；期间不运行模型服务。',
       tryHere: '在这里试试',
       useKey: '把你的密钥「{name}」（{prefix}…）作为 API 密钥。',
     },
