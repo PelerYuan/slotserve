@@ -123,21 +123,24 @@ jobs:
           exit 1
       - name: SSH into a dev environment container (no GPU)
         # Builds the files exactly as SlotServe does for a booking (booking_ssh_files) with the bundled
-        # Dropbear, then logs in to a stock Ubuntu container with a key and with a password.
+        # Dropbear and a host key made by SlotServe's own generator (per-environment host keys), then logs in to a
+        # stock Ubuntu container with a key and with a password, checking the host key against its fingerprint.
         run: |
           set -eux
           sudo apt-get install -y -qq sshpass >/dev/null
           cid=$(docker create slotserve:ci)
           docker cp "$cid:/opt/slotserve/bin/dropbearmulti" ./dropbearmulti
           docker rm "$cid"
-          ./dropbearmulti dropbearkey -t ed25519 -f hostkey
           ssh-keygen -q -t ed25519 -N "" -f client
           mkdir -p ctx
           docker run --rm -v "$PWD:/w" -w /w --entrypoint python slotserve:ci -c '
           import pathlib
           from slotserve.services.devenv import SshBundle, booking_ssh_files
+          from slotserve.services.devenv.ssh import generate_host_key, host_public_key
           from slotserve.services.shacrypt import sha512_crypt
-          bundle = SshBundle(pathlib.Path("dropbearmulti").read_bytes(), pathlib.Path("hostkey").read_bytes(), "")
+          key = generate_host_key()
+          pathlib.Path("known_hosts").write_text("[127.0.0.1]:2222 " + host_public_key(key) + chr(10))
+          bundle = SshBundle(pathlib.Path("dropbearmulti").read_bytes(), key)
           files = booking_ssh_files(bundle, [pathlib.Path("client.pub").read_text().strip()], sha512_crypt("ci-secret-pw"))
           for rel, (data, mode) in files.items():
               path = pathlib.Path("ctx", rel)
@@ -153,7 +156,7 @@ jobs:
           sudo tar -C ctx -cf - opt etc | docker cp - devenv:/
           docker start devenv
           sleep 2
-          opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5"
+          opts="-o StrictHostKeyChecking=yes -o UserKnownHostsFile=$PWD/known_hosts -o ConnectTimeout=5"
           for i in $(seq 1 20); do
             ssh $opts -o BatchMode=yes -i client -p 2222 root@127.0.0.1 true 2>/dev/null && break
             sleep 0.5

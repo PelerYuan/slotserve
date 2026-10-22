@@ -89,8 +89,8 @@ flowchart LR
 
 - **Isolation**: every environment runs on its own Docker network. Web ports are never published: when SlotServe runs in a container it joins the environment's network and reaches any port by container name; when it runs directly on the host, Docker binds each declared port to a random port on `127.0.0.1`, and other ports are reached on the container's address in its network (on Linux hosts). The network is removed when the environment stops (a kept environment keeps its network, and its web addresses, until it is deleted), and leftovers are cleaned up after a restart. A lane's shared environment gets a network too; its web interfaces are open to everyone signed in.
 - **Proxy**: SlotServe forwards HTTP (streamed) and WebSockets (Jupyter kernels, VS Code, desktop streaming), keeps redirects and cookies under the environment's path and never passes its own session cookie on.
-- **Token**: each start gets a random token. JupyterLab is started with it (`--IdentityProvider.token`) and the desktop uses it as its password; SlotServe adds it to every request, so nobody can use these apps without going through SlotServe.
-- **Base path**: the main process and environment variables can use the placeholders `{base_path}` and `{port}` (the first declared port, e.g. `/devenv/7/port/8888/` and `8888`), `{base_path_<port>}` (any declared port, e.g. `{base_path_6006}`), `{token}` and `{session}`. Ports whose app is given its base path (Jupyter `--ServerApp.base_url`, the desktop's `SUBFOLDER`) receive the full path; for all other ports (code-server, most simple apps, ports that are not declared) SlotServe strips the prefix, so those apps should use relative links. The variables `SLOTSERVE_WEB_BASE`, `SLOTSERVE_WEB_PORT` and `SLOTSERVE_WEB_TOKEN` (first declared port) are set as well.
+- **Token**: each start gets a random token. JupyterLab is started with it (`--IdentityProvider.token`), the desktop uses it as its password and VS Code (code-server, `--auth password`) gets its SHA-256 as `HASHED_PASSWORD` (placeholder `{token_sha256}`); SlotServe signs you in on every request it trusts (a token header, or code-server's session cookie), so you never see a password page while nobody can use these apps without going through SlotServe. Opening one of these apps as a **direct port** bypasses that, so it has to be confirmed.
+- **Base path**: the main process and environment variables can use the placeholders `{base_path}` and `{port}` (the first declared port, e.g. `/devenv/7/port/8888/` and `8888`), `{base_path_<port>}` (any declared port, e.g. `{base_path_6006}`), `{token}`, `{token_sha256}` and `{session}`. Ports whose app is given its base path (Jupyter `--ServerApp.base_url`, the desktop's `SUBFOLDER`) receive the full path; for all other ports (code-server, most simple apps, ports that are not declared) SlotServe strips the prefix, so those apps should use relative links. The variables `SLOTSERVE_WEB_BASE`, `SLOTSERVE_WEB_PORT` and `SLOTSERVE_WEB_TOKEN` (first declared port) are set as well.
 - **Keep the image's entrypoint**: images such as the linuxserver desktop run their own init system. With this option SlotServe keeps the image's entrypoint and command and starts the SSH server next to it with `docker exec`, instead of using its own start script.
 
 The built-ins: **JupyterLab + PyTorch** (JupyterLab on port 8888, files in `/workspace`), **Ubuntu desktop** (an XFCE desktop streamed to the browser, port 3000) and **VS Code** (code-server on port 8080, opened on `/workspace`; extensions come from Open VSX). SSH works in all of them as before.
@@ -122,7 +122,7 @@ sequenceDiagram
 - Environments share the web port's origin among themselves. When an app must be fully isolated from other environments' pages, publish it as a [direct port](#ports) (each host port is an origin of its own).
 - `SLOTSERVE_DEVENV_WEB_PORT=0` serves web interfaces on SlotServe's own address again, as in earlier versions. Not recommended.
 
-code-server has no token of its own; it relies on the per-environment network (and the port bound to `127.0.0.1` when SlotServe runs on the host).
+code-server runs with `--auth password`: SlotServe signs you in with its session cookie, so a request that does not come through SlotServe (another container, someone on the host) gets its login page.
 
 ### Ports
 
@@ -155,7 +155,22 @@ Your credentials are on the **Access credentials** page (next to your API keys):
 - **SSH public keys**: paste the content of `~/.ssh/id_ed25519.pub` (create one with `ssh-keygen -t ed25519`).
 - **Environment password**: an SSH password for dev environments, separate from your SlotServe password. SlotServe stores only its SHA-512-crypt hash (the `/etc/shadow` format) and writes that hash into the container; the password itself is never stored. Each connection gets three tries.
 
-A dev environment booking needs an SSH key, or an environment password while **Password logins** is on (the default). Admins can switch password logins off; then only keys work and SSH servers reject passwords. A new password reaches a running booked environment the next time it starts; shared environments pick it up within a minute.
+A template with a web interface (JupyterLab, the desktop, VS Code) starts without any credentials: you use it in the browser, and SSH simply lets nobody in until you add a key. Any other template needs an SSH key, or an environment password while **Password logins** is on (the default). Admins can switch password logins off; then only keys work and SSH servers reject passwords. A new password reaches a running booked environment the next time it starts. Shared environments only accept keys.
+
+Every environment has its own SSH host key; its fingerprint is shown with the environment. A kept environment keeps its key across pauses, GPU changes and snapshots. Environments created before this version get their own key the next time they start, so `ssh` warns about a changed host key once: remove the old line from `~/.ssh/known_hosts` (`ssh-keygen -R "[server]:port"`) and check the new fingerprint.
+
+## Limits and hardening {#limits-and-hardening}
+
+Every container SlotServe creates goes through one last, fixed step before Docker sees it:
+
+- **No new privileges** (setuid programs such as `sudo` cannot gain rights) and a few capabilities dropped (`NET_RAW`, `MKNOD`, `SYS_CHROOT`, `AUDIT_WRITE`, `SETFCAP`; `ping` does not work). Templates whose image needs setuid programs (the built-in desktop: its init system) run in **compatibility mode** without the first rule; admins switch it per template and the template shows it.
+- **Processes**: at most `SLOTSERVE_DEVENV_PIDS_LIMIT` (default 4096), so a fork bomb stays inside its container.
+- **Memory**: the **Memory limit** setting, or - when it is 0 - the host's memory less max(4 GB, 10 %). Before this version 0 meant "no limit"; now an out-of-memory process is killed inside its container instead of taking SlotServe and everyone else with it. Admins see the limit that applies on the Dev environments information (`/api/devenv`, `hardening`).
+- **Open files**: 1048576. **Logs**: at most 5 files of 50 MB per container.
+- **GPUs**: exactly the lane's GPUs. A lane that names no GPUs cannot start a GPU environment (it used to get every GPU of the machine); give the lane its GPUs under Admin.
+- Never privileged, never the host's network, process or IPC namespace, never a bind of `/` or of the Docker socket.
+
+Kept environments created by an older version are snapshotted and recreated once on their next start, because these settings cannot be added to an existing container.
 
 ## Kept environments (projects)
 
@@ -195,7 +210,7 @@ flowchart LR
 ```
 
 - Every GPU lane **reserves CPU cores** for whoever uses it: **CPU cores reserved per GPU** (default 8) times its number of GPUs (a lane that does not restrict its GPUs counts as one). Its booking containers and its shared idle environment run on exactly those cores (Docker cpuset), so CPU-only work cannot slow a GPU booking down. 0 reserves nothing.
-- Environments without a GPU share **all other cores** (the pool). They all get the same CPU weight, so an idle core can be used by anyone and a busy pool is split evenly. On top of that each has a hard limit: **CPU limit without GPU** (cores, default 4; 0 = the whole pool) and **Memory limit without GPU** (default 16 GB; 0 = no limit).
+- Environments without a GPU share **all other cores** (the pool). They all get the same CPU weight, so an idle core can be used by anyone and a busy pool is split evenly. On top of that each has a hard limit: **CPU limit without GPU** (cores, default 4; 0 = the whole pool) and **Memory limit without GPU** (default 16 GB; 0 = the host default, see [Limits](#limits-and-hardening)).
 - **Memory pool without GPU** caps how much memory all environments without a GPU may claim together: when one starts, the memory limits of all running ones are added up, and a new one that would not fit is refused until another is paused. 0 = no total.
 - SlotServe reads the number of cores and the memory of the host from Docker. If there are fewer cores than the lanes want, each lane gets its share and at least one core stays in the pool. The section on the Dev environments page shows the pool and each lane's cores. Reserved cores are assigned by logical CPU number, in lane order.
 
@@ -216,18 +231,18 @@ Admins choose per lane what runs while nobody has it booked (**Admin → GPUs & 
 | Mode | While the lane is not booked |
 | --- | --- |
 | Run the default model | The lane's default model is loaded (as before). |
-| Shared dev environment | One container from a chosen template runs with the lane's GPUs. Everyone can log in. |
+| Shared dev environment | One container from a chosen template runs with the lane's GPUs. Everyone who joined it can log in. |
 | Nothing | No model server and no container; the GPUs stay free. |
 
 The shared environment is stopped ahead of the next booking (like a model preload, or a whole-GPU booking's lead time) and starts again when the lane is idle; a model does not start loading until the shared environment has let go of the GPUs. The overview and the lanes page show what an idle lane is doing.
 
-Inside, every active SlotServe user has their own account (their user name in lower case, with characters other than letters, digits, `_` and `-` replaced), their SSH keys in `~/.ssh/authorized_keys` and, with password logins on, their environment password. Home directories live on a volume per lane and are kept. `root` cannot log in. The **Dev environments** page shows the shared environment of each idle lane with your own command:
+Inside, everyone who **joined** the lane's shared environment (on the Dev environments page; an SSH key is needed) has their own account (their user name in lower case, with characters other than letters, digits, `_` and `-` replaced) and their SSH keys in `~/.ssh/authorized_keys`. Password logins are off there, so no password hashes are copied into it. People who had an SSH key when SlotServe was upgraded to this version were joined to every lane. Home directories live on a volume per lane and are kept. `root` cannot log in. The **Dev environments** page shows the shared environment of each idle lane with your own command:
 
 ```bash
 ssh -p 2205 alice@server
 ```
 
-Accounts are created when the container starts and refreshed when someone changes their keys or password (and once a minute). The image needs `useradd` or `adduser`; if it has neither the environment fails with a clear message. Only templates offered to everyone (built-in or shared by an admin) can be used.
+Accounts are created when the container starts and refreshed when someone joins, leaves or changes their keys (and once a minute). The image needs `useradd` or `adduser`; if it has neither the environment fails with a clear message. Only templates offered to everyone (built-in or shared by an admin) can be used.
 
 ## Storage
 
@@ -244,7 +259,7 @@ With **Storage directory** set to a directory on the Docker host (for example `/
 | A kept environment's directory | `<storage>/projects/p<id>/<path>` |
 | Homes of a shared environment | `<storage>/lanes/l<lane id>/home` |
 
-The path is a path on the Docker host, not inside the SlotServe container. Missing directories are created (and filled from the image, like a new volume) by a short-lived helper container started from the environment's image, so SlotServe does not need access to the directory itself.
+The path is a path on the Docker host, not inside the SlotServe container. Missing directories are created by a short-lived helper container of SlotServe's own helper image (`SLOTSERVE_STORAGE_HELPER_IMAGE`, default `busybox:1.37`) that mounts only the parent folders it works in, so SlotServe does not need access to the directory itself. A new directory is filled from the environment's image, like a new volume: the content is copied out of the image with Docker's archive API, the image itself never runs for this.
 
 ## What admins see
 

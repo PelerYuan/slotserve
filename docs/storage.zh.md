@@ -30,7 +30,7 @@ SMB 密码用 `SLOTSERVE_SECRET_KEY` 加密保存，之后不会再显示（留�
 | **项目数据** | 保留的环境和模板的保留目录 | `projects/p<项目 ID>/<路径>`、`templates/u<用户 ID>-t<模板 ID>/<路径>` |
 | **模型库** | 设置了挂载路径时挂载在那里（例如 `/mnt/models/team`），通常只读 | 模型文件 |
 
-- 个人目录（以及每个保留目录）在第一次需要时创建，并像新的 Docker 卷一样填入镜像中的内容。这由一个基于环境镜像、用完即删的辅助容器完成，因此 SlotServe 本身不需要访问存储。
+- 个人目录（以及每个保留目录）在第一次需要时创建，并像新的 Docker 卷一样填入镜像中的内容。这由一个使用 `SLOTSERVE_STORAGE_HELPER_IMAGE`、用完即删的辅助容器完成（从不使用环境自己的镜像；镜像中的内容通过 Docker 的归档 API 复制出来），因此 SlotServe 本身不需要访问存储。对于宿主机目录，辅助容器只挂载它要处理的目录的上一级；NFS 导出和 SMB 共享只能从根目录挂载，因为还不存在的子目录无法挂载。
 - 空闲时的共享环境（见[开发环境](dev-environments.md)）会挂载所有面向**所有人**的存储，并把个人空间整体挂载在 `/workspaces`：每个人的目录 `/workspaces/u<用户 ID>` 属于他在那里的账号，只对他开放。在预约的环境中以 `root` 写入的文件，可能需要 `chown` 后才能在共享环境中修改。
 - **项目数据**取代**存储目录**设置来存放保留目录；两者都没有时使用 Docker 卷。共享环境的主目录仍由该设置决定。
 - **模型库**：SlotServe 会扫描其中的 GGUF 文件（**模型 → 扫描目录**），下载时也可以选它作为目标（`POST /api/downloads` 和 `POST /api/downloads/hf` 的 `storage_id`）。SlotServe 通过**SlotServe 读取它的路径**来读写模型库：主机目录默认就是该目录（SlotServe 运行在主机上时）。NFS 或 SMB 需要先挂载到 SlotServe 所在机器（或 SlotServe 容器）上，再填写那个路径。`SLOTSERVE_MODELS_DIR` 仍是默认模型库，并照旧挂载在 `/models`。
