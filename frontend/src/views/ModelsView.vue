@@ -506,7 +506,7 @@ function eta(d: DownloadTask) {
     >
       <NForm :show-require-mark="false">
         <NFormItem :label="t('models.name')">
-          <NInput v-model:value="form.name" />
+          <NInput v-model:value="form.name" :placeholder="t('ph.modelName')" />
         </NFormItem>
         <NFormItem :label="t('models.engine')">
           <NRadioGroup v-model:value="form.engine" size="small">
@@ -520,7 +520,7 @@ function eta(d: DownloadTask) {
           <NInput v-model:value="form.args" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" class="mono-input" :placeholder="argsPlaceholder" />
         </NFormItem>
         <NFormItem :label="t('models.description')">
-          <NInput v-model:value="form.description" type="textarea" :autosize="{ minRows: 2, maxRows: 5 }" />
+          <NInput v-model:value="form.description" type="textarea" :autosize="{ minRows: 2, maxRows: 5 }" :placeholder="t('ph.modelDescription')" />
         </NFormItem>
         <p v-if="editing?.is_loaded" class="faint small">{{ t('models.reloadHint') }}</p>
       </NForm>

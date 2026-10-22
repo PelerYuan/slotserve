@@ -166,19 +166,19 @@ async function save() {
           <NInput v-model:value="form.name" maxlength="80" placeholder="My Model 7B" />
         </NFormItem>
         <NFormItem :label="t('catalog.admin.id')" :feedback="t('catalog.admin.idHint')">
-          <NInput v-model:value="form.id" :disabled="editing" class="mono-input" maxlength="64" />
+          <NInput v-model:value="form.id" :disabled="editing" class="mono-input" maxlength="64" :placeholder="t('ph.catalogId')" />
         </NFormItem>
         <NFormItem :label="t('catalog.publisher')">
-          <NInput v-model:value="form.publisher" maxlength="60" />
+          <NInput v-model:value="form.publisher" maxlength="60" :placeholder="t('ph.publisher')" />
         </NFormItem>
         <NFormItem :label="t('catalog.license')">
           <NInput v-model:value="form.license" maxlength="60" placeholder="Apache-2.0" />
         </NFormItem>
         <NFormItem :label="t('catalog.admin.paramsB')">
-          <NInputNumber v-model:value="form.params_b" :min="0.01" :step="0.1" />
+          <NInputNumber v-model:value="form.params_b" :min="0.01" :step="0.1" :placeholder="t('ph.paramsB')" />
         </NFormItem>
         <NFormItem :label="t('catalog.admin.contextLength')">
-          <NInputNumber v-model:value="form.context_length" :min="256" :step="1024" />
+          <NInputNumber v-model:value="form.context_length" :min="256" :step="1024" :placeholder="t('ph.contextLength')" />
         </NFormItem>
       </div>
       <NFormItem :label="t('catalog.admin.tasks')">
@@ -188,10 +188,10 @@ async function save() {
       </NFormItem>
       <div class="grid2">
         <NFormItem :label="t('catalog.admin.descEn')">
-          <NInput v-model:value="form.en" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" maxlength="1000" />
+          <NInput v-model:value="form.en" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" maxlength="1000" :placeholder="t('ph.descEn')" />
         </NFormItem>
         <NFormItem :label="t('catalog.admin.descZh')">
-          <NInput v-model:value="form.zh" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" maxlength="1000" />
+          <NInput v-model:value="form.zh" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" maxlength="1000" :placeholder="t('ph.descZh')" />
         </NFormItem>
         <NFormItem :label="t('catalog.admin.sourceRepo')" :feedback="t('catalog.admin.sourceRepoHint')">
           <NInput v-model:value="form.source_repo" placeholder="org/model" class="mono-input" />
@@ -218,7 +218,7 @@ async function save() {
         </NButton>
       </div>
       <div v-for="(v, i) in form.variants" :key="i" class="variant">
-        <NSelect v-model:value="v.format" :options="formatOptions" size="small" class="fmt" />
+        <NSelect v-model:value="v.format" :options="formatOptions" size="small" :placeholder="t('ph.format')" class="fmt" />
         <NInput v-model:value="v.quant" size="small" :placeholder="t('catalog.admin.quant')" class="quant" />
         <NInput v-model:value="v.repo" size="small" placeholder="org/repo-GGUF" class="repo mono-input" />
         <template v-if="v.format === 'gguf'">

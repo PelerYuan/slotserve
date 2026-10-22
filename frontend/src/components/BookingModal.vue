@@ -24,6 +24,7 @@ import { session } from '@/composables/session'
 import { useLanes } from '@/composables/lanes'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { formatBytes, formatDuration } from '@/utils/format'
+import { laneLabel } from '@/utils/naming'
 
 const show = defineModel<boolean>('show', { default: false })
 const props = defineProps<{
@@ -44,7 +45,7 @@ const { describe } = useErrorMessage()
 const { lanes, multi } = useLanes()
 const lane = ref<number | null>(null)
 const laneOptions = computed(() =>
-  lanes.value.map((l) => ({ label: l.gpus.length ? `${l.name}  ·  GPU ${l.gpus.join(',')}` : l.name, value: l.id })),
+  lanes.value.map((l) => ({ label: laneLabel(l), value: l.id })),
 )
 const kind = ref<'model' | 'exclusive' | 'devenv'>('model')
 const devenvEnabled = computed(() => !!session.config?.devenv_enabled)
@@ -280,14 +281,14 @@ async function joinWaitlist() {
   <NModal
     v-model:show="show"
     preset="card"
-    :title="editing ? t('schedule.editTitle') : t('schedule.bookingTitle')"
+    :title="editing ? t('schedule.editTitle') : t(`schedule.bookingTitle.${kind}`)"
     :auto-focus="false"
     style="width: 540px; max-width: calc(100vw - 32px)"
     :bordered="false"
   >
     <NForm :show-require-mark="false" @submit.prevent="submit">
       <NFormItem v-if="multi" :label="t('schedule.lane')">
-        <NSelect v-model:value="lane" :options="laneOptions" :disabled="isActive" />
+        <NSelect v-model:value="lane" :options="laneOptions" :placeholder="t('ph.lane')" :disabled="isActive" />
       </NFormItem>
       <NFormItem :label="t('schedule.kind')">
         <NRadioGroup v-model:value="kind" :disabled="isActive" class="kind">
@@ -305,6 +306,7 @@ async function joinWaitlist() {
             <NRadioButton value="project">{{ t('devenv.sourceProject') }}</NRadioButton>
           </NRadioGroup>
         </NFormItem>
+        <p class="faint small tpl-desc">{{ t(`devenv.sourceHint.${devSource}`) }}</p>
         <template v-if="devSource === 'project'">
           <NFormItem :label="t('devenv.projectPick')">
             <NSelect
@@ -317,7 +319,7 @@ async function joinWaitlist() {
         </template>
         <template v-else>
           <NFormItem :label="t('devenv.template')">
-            <NSelect v-model:value="templateId" :options="templateOptions" filterable :disabled="isActive" />
+            <NSelect v-model:value="templateId" :options="templateOptions" :placeholder="t('ph.template')" filterable :disabled="isActive" />
           </NFormItem>
           <p v-if="template?.description" class="faint small tpl-desc">
             {{ template.builtin_key ? t(`devenv.builtin.${template.builtin_key}`) : template.description }}
@@ -332,7 +334,7 @@ async function joinWaitlist() {
         <div v-if="!ready.length" class="muted empty-models">{{ t('schedule.noModels') }}</div>
         <div v-else class="two">
           <NFormItem :label="t('schedule.model')">
-            <NSelect v-model:value="modelId" :options="options" filterable :disabled="isActive" />
+            <NSelect v-model:value="modelId" :options="options" :placeholder="t('ph.model')" filterable :disabled="isActive" />
           </NFormItem>
           <NFormItem :label="t('schedule.preset')">
             <NSelect
@@ -351,6 +353,7 @@ async function joinWaitlist() {
             v-model:value="startTs"
             type="datetime"
             format="yyyy-MM-dd HH:mm"
+            :placeholder="t('ph.dateTime')"
             :time-picker-props="{ format: 'HH:mm', minutes: session.config?.slot_minutes ?? 30 }"
             :is-date-disabled="disablePast"
             :disabled="isActive"
@@ -362,6 +365,7 @@ async function joinWaitlist() {
             v-model:value="endTs"
             type="datetime"
             format="yyyy-MM-dd HH:mm"
+            :placeholder="t('ph.dateTime')"
             :time-picker-props="{ format: 'HH:mm', minutes: session.config?.slot_minutes ?? 30 }"
             :is-date-disabled="disablePast"
             style="width: 100%"
@@ -380,7 +384,7 @@ async function joinWaitlist() {
           <NSwitch v-model:value="repeat" size="small" />
           <span>{{ t('schedule.repeatWeekly') }}</span>
           <template v-if="repeat">
-            <NInputNumber v-model:value="repeatWeeks" size="small" :min="1" :max="maxWeeks" class="weeks" />
+            <NInputNumber v-model:value="repeatWeeks" size="small" :min="1" :max="maxWeeks" :placeholder="t('ph.weeks')" class="weeks" />
             <span class="faint small">{{ t('schedule.moreWeeks') }}</span>
           </template>
         </label>

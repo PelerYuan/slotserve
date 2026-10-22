@@ -35,9 +35,12 @@ const actionLabel = (a: string) => {
   return te(key) ? t(key) : a
 }
 
+// An empty GPU list means every visible GPU; say so instead of showing "gpus=".
+const noGpus = (k: string, v: unknown) => k === 'gpus' && (v === '' || v === null || (Array.isArray(v) && !v.length))
+
 function detail(d: Record<string, unknown>) {
   return Object.entries(d)
-    .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
+    .map(([k, v]) => `${k}=${noGpus(k, v) ? t('admin.audit.allGpus') : typeof v === 'string' ? v : JSON.stringify(v)}`)
     .join('  ')
 }
 </script>

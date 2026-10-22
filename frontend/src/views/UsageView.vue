@@ -10,6 +10,7 @@ import type { Usage, UsageExport, UsageKind } from '@/api/types'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { isDark } from '@/composables/theme'
 import { formatCompact, formatNumber } from '@/utils/format'
+import { gpuInLane } from '@/utils/naming'
 
 // Categorical slots in fixed order (validated reference palette, stepped per theme); color follows the entity.
 const SERIES_LIGHT = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6']
@@ -358,8 +359,7 @@ const hasData = computed(() => {
             <tbody>
               <tr v-for="g in meteredGpus" :key="`${g.lane_id}-${g.gpu_index}`">
                 <td>
-                  <span class="mono">GPU {{ g.gpu_index }}</span>
-                  <span v-if="multiLane" class="faint"> · {{ g.lane_name }}</span>
+                  <span class="mono">{{ gpuInLane(g.gpu_index, multiLane ? g.lane_name : null, t) }}</span>
                 </td>
                 <td class="right num">{{ hours(g.used_gpu_hours) }}</td>
                 <td class="right num">{{ pct(g.avg_utilization) }}</td>

@@ -172,6 +172,7 @@ const seconds = (a: string, b: string) => (new Date(b).getTime() - new Date(a).g
           v-if="multi"
           :value="lane?.id ?? null"
           :options="laneOptions"
+          :placeholder="t('ph.lane')"
           size="small"
           class="lane-select"
           @update:value="(v: number) => (laneId = v)"
@@ -209,13 +210,13 @@ const seconds = (a: string, b: string) => (new Date(b).getTime() - new Date(a).g
   >
     <p class="muted hint">{{ t('admin.manual.hint') }}</p>
     <NFormItem :label="t('schedule.model')">
-      <NSelect v-model:value="loadForm.modelId" :options="modelOptions" filterable />
+      <NSelect v-model:value="loadForm.modelId" :options="modelOptions" :placeholder="t('ph.model')" filterable />
     </NFormItem>
     <NFormItem :label="t('schedule.preset')">
-      <NSelect v-model:value="loadForm.presetId" :options="presetOptions" />
+      <NSelect v-model:value="loadForm.presetId" :options="presetOptions" :placeholder="t('schedule.presetDefault')" />
     </NFormItem>
     <NFormItem :label="t('admin.manual.duration')">
-      <NSelect v-model:value="loadForm.hours" :options="durationOptions" />
+      <NSelect v-model:value="loadForm.hours" :options="durationOptions" :placeholder="t('admin.manual.untilNext')" />
     </NFormItem>
     <template #footer>
       <div class="footer">

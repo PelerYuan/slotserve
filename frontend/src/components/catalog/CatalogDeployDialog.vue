@@ -94,7 +94,7 @@ async function submit() {
   >
     <NForm :show-require-mark="false" label-placement="top">
       <NFormItem :label="t('catalog.deploy.variant')">
-        <NSelect v-model:value="variantId" :options="variantOptions" />
+        <NSelect v-model:value="variantId" :options="variantOptions" :placeholder="t('ph.variant')" />
       </NFormItem>
       <NFormItem v-if="variant.engines.length > 1" :label="t('models.engine')">
         <NRadioGroup v-model:value="engine" size="small">
@@ -103,10 +103,10 @@ async function submit() {
       </NFormItem>
       <div class="two">
         <NFormItem :label="t('catalog.deploy.context')">
-          <NSelect v-model:value="ctx" :options="ctxOptions" />
+          <NSelect v-model:value="ctx" :options="ctxOptions" :placeholder="t('ph.contextSize')" />
         </NFormItem>
         <NFormItem v-if="lanes.length" :label="t('catalog.deploy.lane')">
-          <NSelect v-model:value="laneId" :options="laneOptions" />
+          <NSelect v-model:value="laneId" :options="laneOptions" :placeholder="t('ph.lane')" />
         </NFormItem>
       </div>
 

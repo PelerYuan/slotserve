@@ -48,6 +48,7 @@ watch(show, (open) => {
             v-if="multi"
             v-model:value="lane"
             :options="laneOptions()"
+            :placeholder="t('ph.lane')"
             size="small"
             style="width: 160px"
             @update:value="load"
