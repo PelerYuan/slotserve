@@ -616,3 +616,47 @@ class Storage(Base):
     warned: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON: user ids told they are over quota
     checked_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+# ---- [health] in-app inbox and check state (services/notify.py, services/health.py; migration 0005) ----------
+
+
+class Notification(Base):
+    """One message in a person's in-app inbox. ``notify`` writes it before any chat platform is tried, so an event
+    is never lost when no chat platform is set up. ``category`` admin: alerts and to-dos only admins receive."""
+
+    __tablename__ = "notifications"
+    __table_args__ = (Index("ix_notifications_user_read", "user_id", "read_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # NULL: every admin (rows written today always name the recipient; read_at is then shared)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    event: Mapped[str] = mapped_column(String(48))
+    category: Mapped[str] = mapped_column(String(16), default="personal")  # personal | admin
+    level: Mapped[str] = mapped_column(String(8), default="info")  # info | success | warn | error
+    title_key: Mapped[str] = mapped_column(String(64))
+    params_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    message: Mapped[str] = mapped_column(Text, default="")  # rendered in the recipient's language
+    link: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    interruption_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+    read_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class CheckState(Base):
+    """The last known level of each health check: when it started, whether admins were alerted, and a dismissal
+    (with its reason) that holds until the check changes level."""
+
+    __tablename__ = "check_state"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    level: Mapped[str] = mapped_column(String(8))  # ok | info | warn | error
+    since: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    last_run: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    title_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    params_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
+    alerted_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    dismissed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    dismissed_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    dismissed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)

@@ -1,8 +1,6 @@
-import asyncio
 import csv
 import io
 import json
-import re
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query, Request, status
@@ -889,28 +887,28 @@ async def request_log(
 
 # ---- backups --------------------------------------------------------------
 
-_BACKUP_NAME = re.compile(r"^slotserve-(daily|manual|v\d+)-\d{8}-\d{6}\.db$")
-
 
 def _backup_out(path) -> BackupOut:
-    kind = path.name.split("-")[1]
-    st = path.stat()
+    # [health] bundles (folders) and single files from earlier versions alike (services/maintenance.py)
+    kind = maintenance.kind_of(path)
+    created = maintenance.stamp_of(path) or datetime.fromtimestamp(path.stat().st_mtime, UTC)
     return BackupOut(
         name=path.name,
         kind=kind if kind in ("daily", "manual") else "upgrade",
-        size_bytes=st.st_size,
-        created_at=datetime.fromtimestamp(st.st_mtime, UTC),
+        size_bytes=maintenance.size_of(path),
+        created_at=created,
     )
 
 
 @router.get("/backups", response_model=list[BackupOut])
 async def list_backups(_: User = Depends(admin_user)):
-    return [_backup_out(p) for p in maintenance.list_backups(get_settings()) if _BACKUP_NAME.match(p.name)]
+    return [_backup_out(p) for p in maintenance.list_backups(get_settings())]
 
 
 @router.post("/backups", response_model=BackupOut, status_code=201)
 async def create_backup(admin: User = Depends(admin_user), db: AsyncSession = Depends(get_db)):
-    path = await asyncio.to_thread(maintenance.make_backup, get_settings(), "manual")
+    status_ = await maintenance.run_backup(get_settings(), None, "manual", offsite=False)
+    path = maintenance.backup_dir(get_settings()) / status_["last_bundle"]
     record(db, admin, "backup.create", path.name)
     await db.commit()
     return _backup_out(path)
@@ -920,15 +918,18 @@ async def create_backup(admin: User = Depends(admin_user), db: AsyncSession = De
 async def download_backup(
     name: str, request: Request, admin: User = Depends(admin_user), db: AsyncSession = Depends(get_db)
 ):
-    if not _BACKUP_NAME.match(name):
-        raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    """The database of a backup (a bundle's secret key and host keys stay on the server and its copies)."""
     path = maintenance.backup_dir(get_settings()) / name
-    if not path.is_file():
+    if "/" in name or "\\" in name or not maintenance.is_backup(path):
+        raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    db_file = maintenance.database_of(path)
+    if not db_file.is_file():
         raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
     # A backup holds every account and the stored chat secrets: who took one is worth knowing.
     record(db, admin, "backup.download", name, ip=request)
     await db.commit()
-    return FileResponse(path, media_type="application/vnd.sqlite3", filename=name)
+    filename = name if name.endswith(".db") else f"{name}.db"
+    return FileResponse(db_file, media_type="application/vnd.sqlite3", filename=filename)
 
 
 # ---- approval -------------------------------------------------------------

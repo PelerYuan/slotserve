@@ -178,7 +178,9 @@ Admins change every setting except the deployment parameters in **Admin → Syst
 | `SLOTSERVE_USAGE_RETENTION_DAYS` | `365` | advanced | Keep per-request rows this long, then fold them into daily totals (0 = forever; otherwise ≥ 90) |
 | `SLOTSERVE_USAGE_SAMPLE_DAYS` | `30` | expert | Keep per-minute GPU usage samples this long, then fold them into hourly totals (0 = never fold) |
 | `SLOTSERVE_AUDIT_RETENTION_DAYS` | `730` | advanced | Keep audit log entries this long (0 = forever) |
-| `SLOTSERVE_BACKUP_KEEP` | `7` | advanced | Daily database backups to keep (0 = no automatic backups) |
+| `SLOTSERVE_BACKUP_KEEP` | `7` | advanced | Daily backup bundles to keep (0 = no automatic backups) |
+| `SLOTSERVE_BACKUP_TARGET` | *empty* | basic | Where each backup bundle is also copied: an absolute path or `storage:<id>` (empty = no copy off this machine) |
+| `SLOTSERVE_BACKUP_HOUR` | `3` | advanced | Local hour of the daily backup (-1 = every 24 hours from start) |
 
 ### Deployment (restart to apply)
 

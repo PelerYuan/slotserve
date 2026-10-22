@@ -10,7 +10,8 @@ from ..orm import DownloadTask, Lane, LlmModel, ModelLoadEvent, Reservation, Usa
 from ..runtime.gpu import gpu_stats
 from ..runtime.manager import RuntimeState
 from ..security import constant_time_equals
-from ..services import queries, usage_sampler
+from ..services import maintenance, queries, usage_sampler
+from ..services.health import RANK
 
 router = APIRouter(tags=["metrics"])
 
@@ -164,6 +165,7 @@ async def metrics(request: Request):
             if getattr(g, attr) is not None
         ]
         w.metric(name, "gauge", help_text, samples)
+    await _health_metrics(w, request, now)
     return PlainTextResponse(w.text(), media_type="text/plain; version=0.0.4; charset=utf-8")
 
 
@@ -241,3 +243,29 @@ async def _compute_metrics(w: _Writer, db, lanes, users: dict[int, str], gpus, s
         "Sampled GPU time at or above the busy threshold during each person's bookings.",
         [({"user": users.get(uid, "?"), "kind": k}, int(b or 0)) for uid, k, _s, b in per_user],
     )
+
+
+async def _health_metrics(w: _Writer, request: Request, now) -> None:
+    """[health] check levels (0 ok, 1 info, 2 warn, 3 error) and the age of the newest backup."""
+    monitor = getattr(request.app.state, "health", None)
+    if monitor is not None:
+        if not monitor.results:
+            await monitor.run_checks()
+        w.metric(
+            "slotserve_check_status",
+            "gauge",
+            "Level of each health check: 0 ok, 1 info, 2 warn, 3 error (see /api/health).",
+            [({"check": cid, "group": item["group"]}, RANK[item["level"]]) for cid, item in _items(monitor)],
+        )
+    newest = maintenance.newest(get_settings())
+    age = (now - newest).total_seconds() if newest is not None else float("inf")
+    w.metric(
+        "slotserve_backup_age_seconds",
+        "gauge",
+        "Seconds since the newest daily or manual backup (+Inf: none yet).",
+        [({}, round(age, 1) if age != float("inf") else "+Inf")],
+    )
+
+
+def _items(monitor) -> list[tuple[str, dict]]:
+    return [(item["id"], item) for item in monitor.items()]

@@ -178,7 +178,9 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_USAGE_RETENTION_DAYS` | `365` | 进阶 | 逐条请求记录保留天数，之后合并为按天汇总（0 表示永久；否则至少 90） |
 | `SLOTSERVE_USAGE_SAMPLE_DAYS` | `30` | 专家 | 按分钟的 GPU 使用采样保留天数，之后合并为按小时汇总（0 表示不合并） |
 | `SLOTSERVE_AUDIT_RETENTION_DAYS` | `730` | 进阶 | 审计日志保留天数（0 表示永久） |
-| `SLOTSERVE_BACKUP_KEEP` | `7` | 进阶 | 保留的每日数据库备份份数（0 表示关闭自动备份） |
+| `SLOTSERVE_BACKUP_KEEP` | `7` | 进阶 | 保留的每日备份包份数（0 表示关闭自动备份） |
+| `SLOTSERVE_BACKUP_TARGET` | *空* | 常用 | 每个备份包另外复制到哪里：绝对路径或 `storage:<id>`（留空表示不复制到本机以外） |
+| `SLOTSERVE_BACKUP_HOUR` | `3` | 进阶 | 每日备份的本地时间（小时；-1 表示从启动起每 24 小时一次） |
 
 ### 部署参数（重启后生效）
 

@@ -1,6 +1,7 @@
 """Draining, VRAM warnings, login throttling, persistence, outbox, backups and retention."""
 
 import asyncio
+import json
 import sqlite3
 from datetime import timedelta
 
@@ -180,7 +181,12 @@ async def test_backups(app, make_client):
     assert r.status_code == 201 and r.json()["kind"] == "manual"
     data = await admin.get(f"/api/admin/backups/{r.json()['name']}")
     assert data.status_code == 200 and data.content.startswith(b"SQLite format 3")
-    con = sqlite3.connect(maintenance.backup_dir(app.state.settings) / r.json()["name"])
+    bundle = maintenance.backup_dir(app.state.settings) / r.json()["name"]
+    manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    # the tests set SLOTSERVE_SECRET_KEY: the admin keeps that key, the bundle only names its fingerprint
+    assert manifest["secret_key"]["source"] == "environment" and not (bundle / "secret_key").exists()
+    assert manifest["rows"]["users"] == 2 and "workspaces" in manifest["not_included"]
+    con = sqlite3.connect(bundle / "slotserve.db")
     assert con.execute("SELECT count(*) FROM users").fetchone()[0] == 2
     con.close()
     assert (await bob.get("/api/admin/backups")).status_code == 403

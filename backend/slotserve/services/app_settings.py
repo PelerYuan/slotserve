@@ -950,8 +950,33 @@ REGISTRY: dict[str, Editable] = {
         group="maintenance",
         keywords=("backup", "备份"),
         doc=(
-            "Daily database backups to keep (0 = no automatic backups)",
-            "保留的每日数据库备份份数（0 表示关闭自动备份）",
+            "Daily backup bundles to keep (0 = no automatic backups)",
+            "保留的每日备份包份数（0 表示关闭自动备份）",
+        ),
+    ),
+    "backup_target": Editable(
+        str,
+        max=500,
+        group="maintenance",
+        tier="basic",
+        keywords=("backup", "nas", "copy", "off-site", "备份", "异地"),
+        doc=(
+            "Where each backup bundle is also copied: an absolute path or `storage:<id>` (empty = no copy off this "
+            "machine)",
+            "每个备份包另外复制到哪里：绝对路径或 `storage:<id>`（留空表示不复制到本机以外）",
+        ),
+    ),
+    "backup_hour": Editable(
+        int,
+        min=-1,
+        max=23,
+        unit="h",
+        group="maintenance",
+        tier="advanced",
+        keywords=("backup", "schedule", "备份", "时间"),
+        doc=(
+            "Local hour of the daily backup (-1 = every 24 hours from start)",
+            "每日备份的本地时间（小时；-1 表示从启动起每 24 小时一次）",
         ),
     ),
     # ---- deployment (read-only, .env) --------------------------------------------------------------------------
@@ -1210,6 +1235,13 @@ def validate(key: str, value: Any) -> Any:
             split_args(value)
         except ValueError as exc:
             raise InvalidSetting(key, str(exc)) from exc
+    if key == "backup_target" and value:
+        from .maintenance import BackupError, parse_target
+
+        try:
+            parse_target(value)
+        except BackupError as exc:
+            raise InvalidSetting(key, "an absolute path or storage:<id>") from exc
     if key in ("devenv_ssh_ports", "devenv_public_ports"):
         from .devenv import parse_port_range
 
