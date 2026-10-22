@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import shlex
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,8 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import Settings
 from ..db import SessionLocal, utcnow
 from ..errors import ApiError
-from ..orm import CatalogDeploy, CatalogEntryRow, DownloadTask, Lane, LlmModel
-from . import catalog, kv, scanner
+from ..orm import CatalogDeploy, CatalogEntryRow, DownloadTask, Lane, LlmModel, User
+from ..runtime.engines import ENGINES, parse_flags, review_args
+from . import catalog, kv, queries, scanner
 from .catalog import Entry, Variant
 
 log = logging.getLogger(__name__)
@@ -321,6 +323,26 @@ class Deployer:
                     self.lanes.poke(lane.id)
         return model
 
+    async def governed_args(self, db: AsyncSession, deploy: CatalogDeploy) -> tuple[str, str | None]:
+        """``(args, args_pending)`` for the new model.
+
+        Generated arguments (``catalog.launch_args`` and the built-in entries' extras) are all on the members'
+        allowlist. A custom entry's extras may not be: for a member they then wait for an admin's approval, and
+        the model starts with the generated defaults only.
+        """
+        user = await db.get(User, deploy.user_id) if deploy.user_id is not None else None
+        if user is not None and user.is_admin:
+            return deploy.args, None
+        roots, excluded = await queries.model_roots(db, self.settings)
+        try:
+            review = review_args(ENGINES[deploy.engine], deploy.args, roots, (), excluded)
+        except ValueError:
+            return "", deploy.args
+        if not review.needs_approval:
+            return deploy.args, None
+        kept = [f for f in parse_flags(deploy.args) if f.name not in review.needs_approval]
+        return " ".join(shlex.join([f.name, *f.values]) for f in kept), deploy.args
+
     async def _register(self, db: AsyncSession, deploy: CatalogDeploy) -> LlmModel:
         path = Path(deploy.target_path)
         engine = engine_column(deploy.engine)
@@ -338,12 +360,14 @@ class Deployer:
             if not (path / "config.json").is_file():
                 raise RuntimeError(f"incomplete model folder: {path.name}")
             size = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+        args, pending = await self.governed_args(db, deploy)
         model = LlmModel(
             name=await scanner.unique_name(db, deploy.model_name),
             file_path=str(path),
             size_bytes=size,
             status="ready",
-            args=deploy.args,
+            args=args,
+            args_pending=pending,
             description=deploy.description,
             engine=engine,
             created_by=deploy.user_id,

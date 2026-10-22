@@ -7,6 +7,7 @@ import { api } from '@/api/client'
 import type { DevTemplate, IdleMode, Lane, Model } from '@/api/types'
 import { loadLanes, useLanes } from '@/composables/lanes'
 import { useErrorMessage } from '@/composables/useErrorMessage'
+import { useArgsGate } from '@/composables/argsGate'
 import { useStatus } from '@/composables/useStatus'
 import { session } from '@/composables/session'
 
@@ -14,6 +15,7 @@ const { t } = useI18n()
 const dialog = useDialog()
 const message = useMessage()
 const { showError } = useErrorMessage()
+const { withArgsGate } = useArgsGate()
 const { status, refresh } = useStatus()
 const { lanes } = useLanes()
 
@@ -158,7 +160,8 @@ function openArgs(l: Lane) {
 async function saveArgs() {
   busy.value = true
   try {
-    await api.updateModel(argsForm.modelId, { args: argsForm.args.trim() })
+    const saved = await withArgsGate((x) => api.updateModel(argsForm.modelId, { args: argsForm.args.trim(), ...x }))
+    if (!saved) return
     const affected = lanes.value.filter((x) => loadedModel(x.id) === argsForm.modelId)
     for (const x of affected) await api.restart(x.id)
     models.value = await api.models().catch(() => models.value)
