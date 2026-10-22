@@ -3,10 +3,28 @@ import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { NButton, NCheckbox, NDropdown, NForm, NFormItem, NInput, NModal, NProgress, NTab, NTabPane, NTabs, useDialog } from 'naive-ui'
-import { Download, FolderSearch, MoreHorizontal, Plus, RotateCw, ScrollText, Search, Star, Trash2, X } from 'lucide-vue-next'
+import {
+  CalendarPlus,
+  Download,
+  FolderSearch,
+  MessageSquare,
+  MoreHorizontal,
+  Plus,
+  RotateCw,
+  ScrollText,
+  Search,
+  Star,
+  Trash2,
+  X,
+} from 'lucide-vue-next'
 import { NRadioButton, NRadioGroup } from 'naive-ui'
 import LogDrawer from '@/components/LogDrawer.vue'
 import ModelCatalog from '@/components/catalog/ModelCatalog.vue'
+import QuickBook from '@/features/quickbook/components/QuickBook.vue'
+import ModelBadge from '@/features/playground/components/ModelBadge.vue'
+import PlaygroundDrawer from '@/features/playground/components/PlaygroundDrawer.vue'
+import { availabilityOf } from '@/features/playground/api'
+import { useStatus } from '@/composables/useStatus'
 import { api } from '@/api/client'
 import type { DownloadTask, HfFile, Model } from '@/api/types'
 import { session } from '@/composables/session'
@@ -28,6 +46,24 @@ const { withArgsGate } = useArgsGate()
 
 const models = ref<Model[]>([])
 const downloads = ref<DownloadTask[]>([])
+
+// The same availability badge as the Overview and the Playground (computed once, in /api/status), and its
+// next step: try a model that answers now, book one that does not.
+const { status, refresh: refreshStatus } = useStatus()
+const availability = computed(() => availabilityOf(status.value))
+const badgeOf = (m: Model) => availability.value.find((a) => a.id === m.id)
+const playgroundModel = ref<string | null>(null)
+const playgroundOpen = ref(false)
+function tryModel(m: Model) {
+  playgroundModel.value = m.name
+  playgroundOpen.value = true
+}
+const bookModelId = ref<number | null>(null)
+const bookOpen = ref(false)
+function bookModel(m: Model) {
+  bookModelId.value = m.id
+  bookOpen.value = true
+}
 const scanning = ref(false)
 const showLogs = ref(false)
 
@@ -404,10 +440,11 @@ function eta(d: DownloadTask) {
               <span>{{ m.name }}</span>
               <span v-if="m.is_default" class="badge brand"><Star :size="11" />{{ defaultLabel(m) }}</span>
               <span v-if="m.engine !== 'llama.cpp'" class="badge">{{ engineLabel[m.engine] }}</span>
-              <span v-if="m.is_loaded" class="badge ok">{{ t('models.loaded') }}</span>
+              <ModelBadge v-if="badgeOf(m)" :model="badgeOf(m)" />
+              <span v-else-if="m.is_loaded" class="badge ok">{{ t('models.loaded') }}</span>
               <span v-if="!m.file_exists" class="badge danger">{{ t('models.missingFile') }}</span>
               <span v-if="m.exceeds_vram" class="badge warn" :title="t('models.exceedsVramHint')">{{ t('models.exceedsVram') }}</span>
-              <span v-if="m.args_pending" class="badge warn" :title="m.args_pending">{{ t('argsGate.pendingBadge') }}</span>
+              <span v-if="m.args_pending && !badgeOf(m)" class="badge warn" :title="m.args_pending">{{ t('argsGate.pendingBadge') }}</span>
             </div>
             <div class="m-file mono faint" :title="m.file_path">{{ m.file_name }}</div>
             <div v-if="m.description" class="m-desc muted">{{ m.description }}</div>
@@ -434,6 +471,29 @@ function eta(d: DownloadTask) {
               <div class="stat">{{ m.created_by_name ?? '—' }}</div>
             </div>
           </div>
+          <NButton
+            v-if="badgeOf(m)?.state === 'now'"
+            size="small"
+            secondary
+            type="primary"
+            class="m-next"
+            :data-action="`try-${m.name}`"
+            @click="tryModel(m)"
+          >
+            <template #icon><MessageSquare :size="14" /></template>
+            {{ t('playground.badge.try') }}
+          </NButton>
+          <NButton
+            v-else-if="badgeOf(m) && m.file_exists"
+            size="small"
+            secondary
+            class="m-next"
+            :data-action="`book-${m.name}`"
+            @click="bookModel(m)"
+          >
+            <template #icon><CalendarPlus :size="14" /></template>
+            {{ t('playground.book') }}
+          </NButton>
           <NDropdown v-if="menuFor(m).length" trigger="click" :options="menuFor(m)" placement="bottom-end" @select="(k: string) => onMenu(k, m)">
             <NButton quaternary circle size="small"><MoreHorizontal :size="17" /></NButton>
           </NDropdown>
@@ -580,6 +640,8 @@ function eta(d: DownloadTask) {
       </template>
     </NModal>
 
+    <PlaygroundDrawer v-model:show="playgroundOpen" :model="playgroundModel" />
+    <QuickBook v-model:show="bookOpen" intent="model" :model-id="bookModelId" :models="models" @done="refreshStatus" />
     <LogDrawer v-model:show="showLogs" />
   </div>
 </template>
@@ -740,6 +802,9 @@ function eta(d: DownloadTask) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.m-next {
+  flex: none;
 }
 .m-stats {
   display: flex;

@@ -21,6 +21,11 @@ import { logout, session } from '@/composables/session'
 import { useStatus } from '@/composables/useStatus'
 import { setLocale, type Locale } from '@/i18n'
 import { isDark, setThemeMode, themeMode, type ThemeMode } from '@/composables/theme'
+import InboxBell from '@/features/inbox/components/InboxBell.vue'
+import InboxPanel from '@/features/inbox/components/InboxPanel.vue'
+import { inbox, openInbox } from '@/features/inbox/useInbox'
+import { resetOnboarding } from '@/features/onboarding/api'
+import { resetSuggestions } from '@/features/suggestions/useSuggestions'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -57,6 +62,8 @@ const userMenu = computed(() => [
 async function onUserMenu(key: string) {
   if (key === 'logout') {
     await logout()
+    resetOnboarding()
+    resetSuggestions()
     router.push({ name: 'login' })
   } else if (key.startsWith('theme:')) {
     setThemeMode(key.slice(6) as ThemeMode)
@@ -72,7 +79,10 @@ const runtime = computed(() => status.value?.runtime)
   <div class="shell">
     <aside class="sidebar">
       <div class="side-inner">
-        <RouterLink to="/" class="brand-link"><BrandMark /></RouterLink>
+        <div class="brand-row">
+          <RouterLink to="/" class="brand-link"><BrandMark /></RouterLink>
+          <InboxBell />
+        </div>
 
         <nav class="nav">
           <RouterLink
@@ -84,6 +94,16 @@ const runtime = computed(() => status.value?.runtime)
           >
             <component :is="item.icon" :size="17" :stroke-width="1.8" />
             <span>{{ item.label }}</span>
+            <button
+              v-if="item.name === 'admin' && inbox.unread.admin"
+              class="nav-count"
+              :title="t('inbox.adminBadge', { n: inbox.unread.admin })"
+              :aria-label="t('inbox.adminBadge', { n: inbox.unread.admin })"
+              data-field="admin-inbox-count"
+              @click.prevent.stop="openInbox('admin')"
+            >
+              {{ inbox.unread.admin }}
+            </button>
           </RouterLink>
         </nav>
 
@@ -108,7 +128,9 @@ const runtime = computed(() => status.value?.runtime)
       <BrandMark :size="24" />
       <span class="spacer" />
       <StatusDot v-if="runtime" :state="runtime.state" />
+      <InboxBell />
     </header>
+    <InboxPanel />
 
     <NDrawer v-model:show="drawer" placement="left" :width="260">
       <div class="drawer">
@@ -123,6 +145,16 @@ const runtime = computed(() => status.value?.runtime)
           >
             <component :is="item.icon" :size="17" :stroke-width="1.8" />
             <span>{{ item.label }}</span>
+            <button
+              v-if="item.name === 'admin' && inbox.unread.admin"
+              class="nav-count"
+              :title="t('inbox.adminBadge', { n: inbox.unread.admin })"
+              :aria-label="t('inbox.adminBadge', { n: inbox.unread.admin })"
+              data-field="admin-inbox-count"
+              @click.prevent.stop="openInbox('admin')"
+            >
+              {{ inbox.unread.admin }}
+            </button>
           </RouterLink>
         </nav>
         <button class="nav-item" @click="onUserMenu(locale === 'zh-CN' ? 'en' : 'zh-CN')">
@@ -159,8 +191,29 @@ const runtime = computed(() => status.value?.runtime)
   height: 100%;
   padding: 20px 14px 14px;
 }
+.brand-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
 .brand-link {
   padding: 2px 8px 20px;
+}
+.nav-count {
+  margin-left: auto;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+  line-height: 18px;
+  cursor: pointer;
 }
 .nav {
   display: flex;

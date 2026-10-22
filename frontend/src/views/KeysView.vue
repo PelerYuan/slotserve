@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NInput, NModal, useDialog, useMessage } from 'naive-ui'
+import { NButton, NInput, NModal, NSelect, NTab, NTabs, useDialog, useMessage } from 'naive-ui'
 import { KeyRound, LockKeyhole, Plus } from 'lucide-vue-next'
 import CodeBlock from '@/components/CodeBlock.vue'
 import { api } from '@/api/client'
-import type { ApiKey, ApiKeyCreated, SshKey } from '@/api/types'
+import type { SshKey } from '@/api/types'
 import { session } from '@/composables/session'
+import { useStatus } from '@/composables/useStatus'
+import { playgroundApi, type KeyInfo } from '@/features/playground/api'
+import { codeSamples, type CodeLang } from '@/features/playground/code'
+import SuggestionCard from '@/features/suggestions/components/SuggestionCard.vue'
+import { offerSuggestion } from '@/features/suggestions/useSuggestions'
+import { useRouter } from 'vue-router'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { formatDateTime, relativeFromNow } from '@/utils/format'
 
@@ -16,16 +22,38 @@ const dialog = useDialog()
 const message = useMessage()
 const { showError } = useErrorMessage()
 
-const keys = ref<ApiKey[]>([])
+const router = useRouter()
+const { status } = useStatus()
+const keys = ref<KeyInfo[]>([])
 const creating = ref(false)
 const newName = ref('')
+const newExpiry = ref<number>(0)
 const busy = ref(false)
-const created = ref<ApiKeyCreated | null>(null)
+const created = ref<(KeyInfo & { key: string }) | null>(null)
 const baseUrl = computed(() => `${window.location.origin}/v1`)
 const devenv = computed(() => !!session.config?.devenv_enabled)
 
+// Expiry of a new key (days; 0 = never). Keys only call models (scope llm).
+const expiryOptions = computed(() => [
+  { label: t('keys.expiryNever'), value: 0 },
+  ...[30, 90, 365].map((d) => ({ label: t('keys.expiryDays', { n: d }), value: d })),
+])
+
+// Ready-to-run code with the new key filled in: it is shown only once.
+const codeLang = ref<CodeLang>('python')
+const createdCode = computed(() =>
+  created.value
+    ? codeSamples({
+        baseUrl: baseUrl.value,
+        key: created.value.key,
+        model: status.value?.default_model ?? status.value?.runtime.model_name ?? 'default',
+        prompt: 'Hello',
+      })
+    : null,
+)
+
 async function load() {
-  keys.value = await api.keys().catch((e) => (showError(e), keys.value))
+  keys.value = await playgroundApi.keys().catch((e) => (showError(e), keys.value))
 }
 
 // ---- SSH keys and environment password (dev environments) ----------------------
@@ -48,7 +76,7 @@ onMounted(() => {
 
 // Shown again on request, when admins allow keeping a copy (Admin > System settings).
 const revealed = ref<{ name: string; key: string } | null>(null)
-async function reveal(k: ApiKey) {
+async function reveal(k: KeyInfo) {
   try {
     revealed.value = { name: k.name, key: (await api.revealKey(k.id)).key }
   } catch (e) {
@@ -60,9 +88,10 @@ async function create() {
   if (!newName.value.trim()) return
   busy.value = true
   try {
-    created.value = await api.createKey(newName.value.trim())
+    created.value = await playgroundApi.createKey(newName.value.trim(), newExpiry.value || null)
     creating.value = false
     newName.value = ''
+    newExpiry.value = 0
     await load()
   } catch (e) {
     showError(e)
@@ -71,7 +100,7 @@ async function create() {
   }
 }
 
-function revoke(k: ApiKey) {
+function revoke(k: KeyInfo) {
   dialog.warning({
     title: t('keys.revoke'),
     content: t('keys.revokeConfirm', { name: k.name }),
@@ -86,6 +115,11 @@ function revoke(k: ApiKey) {
       }
     },
   })
+}
+
+function closeCreated() {
+  created.value = null
+  if (devenv.value) void offerSuggestion('key_created')
 }
 
 const keyForm = reactive({ open: false, name: '', key: '' })
@@ -178,6 +212,14 @@ function clearPassword() {
         </NButton>
       </div>
 
+      <SuggestionCard
+        id="key_created"
+        class="suggest"
+        :text="t('suggestions.keyCreated')"
+        :action="t('suggestions.openDevenv')"
+        @action="router.push({ name: 'devenv' })"
+      />
+
       <div class="card endpoint card-pad">
         <div class="label">{{ t('keys.endpoint') }}</div>
         <CodeBlock :code="baseUrl" inline />
@@ -196,6 +238,7 @@ function clearPassword() {
                 <th>{{ t('keys.prefix') }}</th>
                 <th>{{ t('keys.created') }}</th>
                 <th>{{ t('keys.lastUsed') }}</th>
+                <th>{{ t('keys.expires') }}</th>
                 <th />
               </tr>
             </thead>
@@ -205,6 +248,9 @@ function clearPassword() {
                 <td><code class="prefix">{{ k.prefix }}••••••••</code></td>
                 <td class="muted num">{{ formatDateTime(k.created_at) }}</td>
                 <td class="muted">{{ k.last_used_at ? relativeFromNow(k.last_used_at) : t('keys.never') }}</td>
+                <td class="muted num" :class="{ expired: k.expired }">
+                  {{ k.expired ? t('keys.expired') : k.expires_at ? formatDateTime(k.expires_at) : t('keys.noExpiry') }}
+                </td>
                 <td class="right nowrap">
                   <NButton v-if="k.revealable" size="small" quaternary @click="reveal(k)">{{ t('keys.reveal') }}</NButton>
                   <NButton size="small" quaternary type="error" @click="revoke(k)">{{ t('keys.revoke') }}</NButton>
@@ -270,6 +316,10 @@ function clearPassword() {
         <span class="field-label">{{ t('keys.nameLabel') }}</span>
         <NInput v-model:value="newName" :placeholder="t('keys.namePlaceholder')" maxlength="64" autofocus @keyup.enter="create" />
       </label>
+      <label class="key-name">
+        <span class="field-label">{{ t('keys.expiry') }}</span>
+        <NSelect v-model:value="newExpiry" :options="expiryOptions" :placeholder="t('keys.expiry')" data-field="key-expiry" />
+      </label>
       <template #footer>
         <div class="footer">
           <NButton @click="creating = false">{{ t('common.cancel') }}</NButton>
@@ -285,13 +335,22 @@ function clearPassword() {
       style="width: 560px; max-width: calc(100vw - 32px)"
       :bordered="false"
       :mask-closable="false"
-      @update:show="(v: boolean) => !v && (created = null)"
+      @update:show="(v: boolean) => !v && closeCreated()"
     >
       <p class="muted hint">{{ created?.revealable ? t('keys.createdHintRevealable') : t('keys.createdHint') }}</p>
       <CodeBlock v-if="created" :code="created.key" inline />
+      <template v-if="createdCode">
+        <div class="label run-label">{{ t('keys.createdCode') }}</div>
+        <NTabs v-model:value="codeLang" type="line" size="small">
+          <NTab name="python">Python</NTab>
+          <NTab name="curl">cURL</NTab>
+          <NTab name="js">JavaScript</NTab>
+        </NTabs>
+        <CodeBlock :code="createdCode[codeLang]" data-field="created-key-code" />
+      </template>
       <template #footer>
         <div class="footer">
-          <NButton type="primary" @click="created = null">{{ t('common.close') }}</NButton>
+          <NButton type="primary" @click="closeCreated">{{ t('common.close') }}</NButton>
         </div>
       </template>
     </NModal>
@@ -444,6 +503,18 @@ function clearPassword() {
 .key-name {
   display: grid;
   gap: 6px;
+}
+.key-name + .key-name {
+  margin-top: 14px;
+}
+.run-label {
+  margin: 18px 0 2px;
+}
+.expired {
+  color: var(--danger-text);
+}
+.suggest {
+  margin-bottom: 12px;
 }
 .field-label {
   font-size: 13px;

@@ -22,7 +22,9 @@ const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced
 const p = ref(0.22)
 const tokens = ref(18240)
 const util = ref(12)
-const log = ref<{ id: number; user: string; code: number; note: string }[]>([])
+// kind "env": someone opens a dev environment in the browser (what else SlotServe does besides the API)
+const log = ref<{ id: number; kind: 'api' | 'env'; user: string; code: number; note: string }[]>([])
+const ENV_USER = 'carol'
 
 const active = computed(() => bookings.find((b) => p.value >= b.s && p.value < b.e))
 const preloading = computed(() => bookings.find((b) => p.value >= b.s - PRELOAD && p.value < b.s))
@@ -38,20 +40,23 @@ let lastTick = 0
 let lastReq = 0
 let seq = 0
 
+// Mostly successful traffic: during a booking the requests are its owner's, between bookings everyone uses the
+// default model; the one non-200 is a readable "queued while the next booking's model loads".
 function request() {
-  const user = users[Math.floor(Math.random() * users.length)]
   const owner = active.value?.user
+  if (seq % 5 === 4) {
+    log.value = [{ id: seq++, kind: 'env' as const, user: ENV_USER, code: 200, note: t('auth.demoEnvNote') }, ...log.value].slice(0, 3)
+    return
+  }
+  const user = owner ?? users[Math.floor(Math.random() * users.length)]
   let code = 200
   let note = owner ? active.value!.model : DEFAULT_MODEL
   if (preloading.value && !owner) {
     code = 503
-    note = 'loading'
-  } else if (owner && owner !== user) {
-    code = 403
-    note = 'gpu_reserved'
+    note = t('auth.demoQueued', { model: preloading.value.model, user: preloading.value.user })
   }
   if (code === 200) tokens.value += 200 + Math.floor(Math.random() * 900)
-  log.value = [{ id: seq++, user, code, note }, ...log.value].slice(0, 3)
+  log.value = [{ id: seq++, kind: 'api' as const, user, code, note }, ...log.value].slice(0, 3)
 }
 
 function frame(now: number) {
@@ -123,9 +128,10 @@ const pct = (v: number) => `${(v * 100).toFixed(2)}%`
     <div class="card requests">
       <TransitionGroup name="log" tag="ul">
         <li v-for="r in log" :key="r.id">
-          <span class="mono path">POST /v1/chat/completions</span>
+          <span v-if="r.kind === 'env'" class="path env">{{ t('auth.demoEnv') }}</span>
+          <span v-else class="mono path">POST /v1/chat/completions</span>
           <span class="u">{{ r.user }}</span>
-          <span :class="['code', `c${r.code}`]">{{ r.code }}</span>
+          <span v-if="r.kind === 'api'" :class="['code', `c${r.code}`]">{{ r.code }}</span>
           <span class="mono note">{{ r.note }}</span>
         </li>
       </TransitionGroup>
@@ -379,6 +385,14 @@ const pct = (v: number) => `${(v * 100).toFixed(2)}%`
   color: var(--text-3);
   font-size: 11px;
   margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.path.env {
+  font-weight: 600;
+  color: var(--brand);
 }
 
 .swap-enter-active,
