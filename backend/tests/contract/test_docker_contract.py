@@ -14,12 +14,13 @@ import sys
 from pathlib import Path
 
 import pytest
-from docker_backends import GPU, free_port
 
 from slotserve.services import docker_endpoints
 from slotserve.services.devenv import SshBundle, booking_ssh_files
 from slotserve.services.docker_api import DockerError, tar_files
 from slotserve.services.shacrypt import sha512_crypt
+
+from .docker_backends import GPU, free_port
 
 GOLDEN = Path(__file__).resolve().parents[1] / "unit" / "containers" / "golden"
 MiB = 1024**2

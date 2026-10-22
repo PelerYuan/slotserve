@@ -15,10 +15,11 @@ import os
 
 import httpx
 import pytest
-from docker_backends import IMAGE, REAL, Backend
 from docker_mock import FakeDocker
 
 from slotserve.services.docker_api import DockerClient
+
+from .docker_backends import IMAGE, REAL, Backend
 
 
 def pytest_configure(config):
