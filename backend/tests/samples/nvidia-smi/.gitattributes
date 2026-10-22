@@ -1,0 +1,2 @@
+# Keep the samples byte for byte (the Windows capture has CRLF line endings).
+* -text
