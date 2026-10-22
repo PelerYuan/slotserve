@@ -1,12 +1,61 @@
-"""In-process stand-in for the parts of the Docker Engine API that SlotServe uses."""
+"""In-process stand-in for the parts of the Docker Engine API that SlotServe uses.
+
+Every request is first checked against ``slotserve/services/docker_endpoints.py``: an endpoint, query parameter or
+body field that table does not declare is answered with 400 (real Docker might treat it differently, or the node
+agent's guard would refuse it). A new Docker call needs a row there and a case in ``tests/contract/``.
+"""
 
 import io
 import json
 import tarfile
-from urllib.parse import unquote
+from urllib.parse import parse_qsl, unquote
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
+
+from slotserve.services import docker_endpoints
+
+
+class _DeclaredOnly:
+    """ASGI middleware: 400 for requests that ``docker_endpoints`` does not declare; records what was used."""
+
+    def __init__(self, app, fake: "FakeDocker"):
+        self.app = app
+        self.fake = fake
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        chunks, more = [], True
+        while more:
+            message = await receive()
+            chunks.append(message.get("body", b""))
+            more = message.get("more_body", False)
+        raw = b"".join(chunks)
+        query = [k for k, _ in parse_qsl(scope.get("query_string", b"").decode("latin-1"), keep_blank_values=True)]
+        headers = dict(scope.get("headers") or [])
+        body = raw or None
+        if raw and b"json" in headers.get(b"content-type", b""):
+            try:
+                body = json.loads(raw)
+            except ValueError:
+                body = raw
+        endpoint, problems = docker_endpoints.check_request(scope["method"], scope["path"], query, body)
+        if problems:
+            self.fake.rejected.append((scope["method"], scope["path"], problems))
+            message = "fake docker: undeclared request (services/docker_endpoints.py): " + "; ".join(problems)
+            return await JSONResponse({"message": message}, status_code=400)(scope, receive, send)
+        self.fake.used.append(endpoint.name)
+        sent = False
+
+        async def replay():
+            nonlocal sent
+            if not sent:
+                sent = True
+                return {"type": "http.request", "body": raw, "more_body": False}
+            return await receive()
+
+        await self.app(scope, replay, send)
 
 
 class FakeDocker:
@@ -37,6 +86,9 @@ class FakeDocker:
         self.mem_used: dict[str, int] = {}
         self.updates: list[tuple[str, dict]] = []  # (container id, body) of every docker update
         self._next = 1
+        self.used: list[str] = []  # docker_endpoints names of every accepted request, in order
+        self.rejected: list[tuple[str, str, list[str]]] = []  # (method, path, problems) answered with 400
+        self.app.add_middleware(_DeclaredOnly, fake=self)
 
         def ref(name: str, tag: str) -> str:
             return f"{name}:{tag}"
