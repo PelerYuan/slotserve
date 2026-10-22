@@ -264,7 +264,7 @@ async function saveArgs() {
     <div class="fields">
       <label>
         <span class="field-label">{{ t('admin.lanes.name') }}</span>
-        <NInput v-model:value="form.name" maxlength="64" />
+        <NInput v-model:value="form.name" maxlength="64" :placeholder="t('ph.laneName')" />
       </label>
       <div>
         <span class="field-label">GPU</span>
@@ -285,15 +285,15 @@ async function saveArgs() {
       </div>
       <label>
         <span class="field-label">{{ t('admin.lanes.defaultModel') }}</span>
-        <NSelect v-model:value="form.model" :options="modelOptions" filterable />
+        <NSelect v-model:value="form.model" :options="modelOptions" :placeholder="t('admin.lanes.noDefault')" filterable />
       </label>
       <label>
         <span class="field-label">{{ t('admin.lanes.idleMode') }}</span>
-        <NSelect v-model:value="form.idle" :options="idleOptions" data-field="idle-mode" />
+        <NSelect v-model:value="form.idle" :options="idleOptions" :placeholder="t('ph.idleMode')" data-field="idle-mode" />
       </label>
       <label v-if="form.idle === 'devenv'">
         <span class="field-label">{{ t('admin.lanes.idleTemplate') }}</span>
-        <NSelect v-model:value="form.template" :options="templateOptions" filterable data-field="idle-template" />
+        <NSelect v-model:value="form.template" :options="templateOptions" :placeholder="t('ph.template')" filterable data-field="idle-template" />
         <p class="faint small hint">{{ t('admin.lanes.idleHint') }}</p>
         <p v-if="!devenvEnabled" class="small hint warn-text">{{ t('admin.lanes.idleNoDevenv') }}</p>
       </label>

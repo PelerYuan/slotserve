@@ -189,8 +189,8 @@ const entryName = (id: string) => data.value?.entries.find((e) => e.id === id)?.
       <NInput v-model:value="filters.q" :placeholder="t('catalog.search')" clearable class="search">
         <template #prefix><Search :size="15" /></template>
       </NInput>
-      <NSelect v-model:value="filters.size" :options="sizeOptions" class="sel" />
-      <NSelect v-model:value="filters.engine" :options="engineOptions" class="sel" />
+      <NSelect v-model:value="filters.size" :options="sizeOptions" :placeholder="t('ph.sizeAny')" class="sel" />
+      <NSelect v-model:value="filters.engine" :options="engineOptions" :placeholder="t('catalog.filter.anyEngine')" class="sel" />
       <NSelect
         v-model:value="filters.lane"
         :options="laneOptions"

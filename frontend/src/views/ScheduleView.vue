@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reservationWhat } from '@/utils/reservation'
+import { laneGpus } from '@/utils/naming'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -226,7 +227,7 @@ const what = (r: Reservation) =>
             :class="{ on: l.id === currentLane }"
             @click="laneId = l.id"
           >
-            {{ l.name }}<span v-if="l.gpus.length" class="faint"> · GPU {{ l.gpus.join(',') }}</span>
+            {{ l.name }}<span v-if="laneGpus(l)" class="faint"> · {{ laneGpus(l) }}</span>
           </button>
         </div>
         <div class="toolbar">

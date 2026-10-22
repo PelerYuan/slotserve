@@ -341,16 +341,16 @@ function pct(s: Storage) {
     <div class="fields">
       <label>
         <span class="field-label">{{ t('storage.name') }}</span>
-        <NInput v-model:value="form.name" maxlength="64" data-field="storage-name" />
+        <NInput v-model:value="form.name" maxlength="64" :placeholder="t('ph.storageName')" data-field="storage-name" />
       </label>
       <div class="two">
         <label>
           <span class="field-label">{{ t('storage.kindLabel') }}</span>
-          <NSelect v-model:value="form.kind" :options="kindOptions" data-field="storage-kind" />
+          <NSelect v-model:value="form.kind" :options="kindOptions" :placeholder="t('ph.storageKind')" data-field="storage-kind" />
         </label>
         <label>
           <span class="field-label">{{ t('storage.purposeLabel') }}</span>
-          <NSelect v-model:value="form.purpose" :options="purposeOptions" data-field="storage-purpose" />
+          <NSelect v-model:value="form.purpose" :options="purposeOptions" :placeholder="t('ph.storagePurpose')" data-field="storage-purpose" />
         </label>
       </div>
       <p class="faint small hint">{{ t(`storage.purposeHint.${form.purpose}`) }}</p>
@@ -379,7 +379,7 @@ function pct(s: Storage) {
           <div class="two">
             <label>
               <span class="field-label">{{ t('storage.username') }}</span>
-              <NInput v-model:value="form.username" autocomplete="off" />
+              <NInput v-model:value="form.username" autocomplete="off" :placeholder="t('ph.serverUser')" />
             </label>
             <label>
               <span class="field-label">{{ t('storage.password') }}</span>
@@ -388,7 +388,7 @@ function pct(s: Storage) {
                 type="password"
                 show-password-on="click"
                 autocomplete="new-password"
-                :placeholder="form.hasPassword ? t('storage.passwordKept') : ''"
+                :placeholder="form.hasPassword ? t('storage.passwordKept') : t('auth.password')"
               />
             </label>
           </div>
@@ -422,7 +422,7 @@ function pct(s: Storage) {
       </label>
       <label v-if="form.purpose === 'personal'">
         <span class="field-label">{{ t('storage.quota') }}</span>
-        <NInputNumber v-model:value="form.quota_gb" :min="0" :show-button="false" clearable>
+        <NInputNumber v-model:value="form.quota_gb" :min="0" :show-button="false" :placeholder="t('ph.noLimit')" clearable>
           <template #suffix>GB</template>
         </NInputNumber>
         <p class="faint small hint">{{ t('storage.quotaHint') }}</p>
@@ -430,11 +430,11 @@ function pct(s: Storage) {
 
       <label>
         <span class="field-label">{{ t('storage.accessLabel') }}</span>
-        <NSelect v-model:value="form.access" :options="accessOptions" />
+        <NSelect v-model:value="form.access" :options="accessOptions" :placeholder="t('ph.access')" />
       </label>
       <label v-if="form.access === 'users'">
         <span class="field-label">{{ t('storage.users') }}</span>
-        <NSelect v-model:value="form.user_ids" :options="userOptions" multiple filterable />
+        <NSelect v-model:value="form.user_ids" :options="userOptions" :placeholder="t('ph.people')" multiple filterable />
       </label>
       <div class="row">
         <NSwitch v-model:value="form.enabled" size="small" />

@@ -603,7 +603,7 @@ const stateTone: Record<string, string> = {
       <div class="form">
         <label>
           <span class="field-label">{{ t('devenv.templateName') }}</span>
-          <NInput v-model:value="tplForm.name" maxlength="64" />
+          <NInput v-model:value="tplForm.name" maxlength="64" :placeholder="t('ph.templateName')" />
         </label>
         <label>
           <span class="field-label">{{ t('devenv.image') }}</span>
@@ -612,7 +612,7 @@ const stateTone: Record<string, string> = {
         </label>
         <label>
           <span class="field-label">{{ t('devenv.description') }}</span>
-          <NInput v-model:value="tplForm.description" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" />
+          <NInput v-model:value="tplForm.description" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" :placeholder="t('ph.description')" />
         </label>
         <label>
           <span class="field-label">{{ t('devenv.command') }}</span>
@@ -635,8 +635,8 @@ const stateTone: Record<string, string> = {
               :placeholder="t('devenv.web.port')"
               style="width: 120px"
             />
-            <NSelect v-model:value="p.kind" :options="webKindOptions" style="width: 150px" />
-            <NSelect v-model:value="p.mode" :options="portModeOptions" style="width: 160px" />
+            <NSelect v-model:value="p.kind" :options="webKindOptions" :placeholder="t('ph.webKind')" style="width: 150px" />
+            <NSelect v-model:value="p.mode" :options="portModeOptions" :placeholder="t('ph.portMode')" style="width: 160px" />
             <NButton size="small" quaternary type="error" @click="tplForm.ports.splice(i, 1)">{{ t('common.delete') }}</NButton>
           </div>
           <div>
@@ -674,7 +674,7 @@ const stateTone: Record<string, string> = {
       <div class="form">
         <label>
           <span class="field-label">{{ t('devenv.templateName') }}</span>
-          <NInput v-model:value="projectForm.name" maxlength="64" />
+          <NInput v-model:value="projectForm.name" maxlength="64" :placeholder="t('ph.keptName')" />
         </label>
         <label>
           <span class="field-label">{{ t('devenv.persistPaths') }}</span>

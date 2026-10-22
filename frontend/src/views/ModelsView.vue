@@ -534,21 +534,21 @@ function eta(d: DownloadTask) {
     >
       <NForm :show-require-mark="false">
         <NFormItem :label="t('models.name')">
-          <NInput v-model:value="form.name" />
+          <NInput v-model:value="form.name" :placeholder="t('ph.modelName')" />
         </NFormItem>
         <NFormItem :label="t('models.engine')">
           <NRadioGroup v-model:value="form.engine" size="small">
             <NRadioButton v-for="e in ENGINE_OPTIONS" :key="e" :value="e">{{ engineLabel[e] }}</NRadioButton>
           </NRadioGroup>
         </NFormItem>
-        <NFormItem :label="t('models.path')" :feedback="t(`models.pathHint.${form.engine}`)">
+        <NFormItem :label="t('models.path')" :feedback="t(`models.pathHint.${form.engine.replace('.', '')}`)">
           <NInput v-model:value="form.path" class="mono-input" :placeholder="pathPlaceholder" />
         </NFormItem>
         <NFormItem :label="t('models.args')" :feedback="session.user?.is_admin ? t('models.argsHint') : `${t('models.argsHint')} ${t('argsGate.memberHint')}`">
           <NInput v-model:value="form.args" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" class="mono-input" :placeholder="argsPlaceholder" />
         </NFormItem>
         <NFormItem :label="t('models.description')">
-          <NInput v-model:value="form.description" type="textarea" :autosize="{ minRows: 2, maxRows: 5 }" />
+          <NInput v-model:value="form.description" type="textarea" :autosize="{ minRows: 2, maxRows: 5 }" :placeholder="t('ph.modelDescription')" />
         </NFormItem>
         <p v-if="editing?.is_loaded" class="faint small">{{ t('models.reloadHint') }}</p>
       </NForm>
