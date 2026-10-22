@@ -33,7 +33,7 @@ from ..schemas import (
     ReviewIn,
     SettingOut,
 )
-from ..security import hash_password
+from ..security import hash_password, sessions
 from ..services import app_settings, booking, kv, maintenance, queries
 from ..services.audit import record
 from ..services.review import review
@@ -244,6 +244,7 @@ async def update_user(
             if user.is_admin:
                 await _ensure_other_admin(db, user)
             user.disabled_at = utcnow()
+            await sessions.revoke_user(db, user.id, "disabled")
             ended = await _end_reservations(db, user)
             record(db, admin, "user.disable", user.username, reservations_ended=ended)
         else:
@@ -260,6 +261,7 @@ async def reset_password(
 ):
     user = await _get_user(db, user_id)
     user.password_hash = hash_password(body.password)
+    await sessions.revoke_user(db, user.id, "password")
     record(db, admin, "user.reset_password", user.username)
     await db.commit()
 
@@ -476,6 +478,7 @@ async def request_log(
     offset: int = Query(default=0, ge=0),
     user_id: int | None = None,
     errors_only: bool = False,
+    source: str | None = Query(default=None, pattern="^(api|env|playground)$"),
     _: User = Depends(admin_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -483,6 +486,8 @@ async def request_log(
     count = select(func.count(UsageLog.id))
     if user_id is not None:
         stmt, count = stmt.where(UsageLog.user_id == user_id), count.where(UsageLog.user_id == user_id)
+    if source is not None:
+        stmt, count = stmt.where(UsageLog.source == source), count.where(UsageLog.source == source)
     if errors_only:
         stmt, count = stmt.where(UsageLog.status_code >= 400), count.where(UsageLog.status_code >= 400)
     total = (await db.execute(count)).scalar_one()
@@ -504,6 +509,7 @@ async def request_log(
                 duration_ms=u.duration_ms,
                 prompt_tokens=u.prompt_tokens,
                 completion_tokens=u.completion_tokens,
+                source=u.source,
             )
             for u in rows
         ],
