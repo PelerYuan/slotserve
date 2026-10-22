@@ -343,7 +343,12 @@ class LlamaRuntime:
         log.info("model %s ready after %.1fs", self.model_name, (self.ready_at - started).total_seconds())
         await self._record_event(model_id, started, True, None)
 
-        await asyncio.to_thread(proc.wait)
+        # Poll rather than proc.wait() in a thread: a thread blocked on a process nobody stops keeps the
+        # event loop from closing (its default executor waits for it), while this loop just cancels.
+        while True:
+            if proc.poll() is not None:
+                break
+            await asyncio.sleep(1.0)
         if self._proc is proc:
             self.exit_code = proc.returncode
             self._mark_failed(f"{engine.label} server exited unexpectedly with code {proc.returncode}")
