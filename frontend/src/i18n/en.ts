@@ -1302,7 +1302,7 @@ export default {
     devenv_project_template: 'Choose a template for the new environment.',
     devenv_project_image_missing: 'The snapshot of this environment is gone and its template was deleted.',
     devenv_lane_no_gpus: 'The lane {lane} names no GPUs, so it cannot start a GPU environment. An admin can give it its GPUs under Admin.',
-    devenv_memory_unknown: 'Docker did not report the host's memory, so no memory limit could be set. Try again later.',
+    devenv_memory_unknown: 'Docker did not report the memory of the host, so no memory limit could be set. Try again later.',
     container_forbidden: 'This container asks for something SlotServe never allows ({detail}).',
     devenv_port_unauthenticated: 'Opened directly, this app can be used by anyone who reaches the port, without signing in to SlotServe. Confirm to open it anyway.',
     devenv_storage_failed: 'Preparing the storage directory failed. {detail}',
