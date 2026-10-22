@@ -30,8 +30,17 @@ def test_lanes_and_approval_ui(page: Page, server: str):
         f"{server}/api/auth/register", data={"username": "member", "password": PASSWORD, "invite_code": INVITE}
     )
     member.goto(f"{server}/schedule")
-    member.get_by_role("button", name="New booking").first.click()
+    # Wait until the schedule has loaded: a click before that does not open the dialog.
+    expect(member.locator(".lane-tab")).to_have_count(2)
     dialog = member.get_by_role("dialog")  # QuickBook
+    for _ in range(3):
+        member.get_by_role("button", name="New booking").first.click()
+        try:
+            expect(dialog).to_be_visible(timeout=3000)
+            break
+        except AssertionError:
+            continue
+    expect(dialog).to_be_visible()
     expect(dialog.get_by_text("needs an admin's approval")).to_be_visible()
     dialog.locator("[data-action=quickbook-submit]").click()
     expect(member.locator(".mine li").first).to_contain_text("Awaiting approval")
