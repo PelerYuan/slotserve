@@ -2,14 +2,31 @@
 import { reservationWhat } from '@/utils/reservation'
 import { laneGpus } from '@/utils/naming'
 import { loadProgress as loadProgressOf } from '@/utils/progress'
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NDropdown, NProgress, NTabPane, NTabs } from 'naive-ui'
-import { CalendarPlus, Cpu, Hand, KeyRound, Lock, RotateCw, ScrollText, ShieldCheck, TriangleAlert } from 'lucide-vue-next'
+import {
+  CalendarPlus,
+  Cpu,
+  Hand,
+  KeyRound,
+  Lock,
+  MessageSquare,
+  RotateCw,
+  ScrollText,
+  ShieldCheck,
+  TriangleAlert,
+} from 'lucide-vue-next'
 import StatusDot from '@/components/StatusDot.vue'
 import CodeBlock from '@/components/CodeBlock.vue'
 import LogDrawer from '@/components/LogDrawer.vue'
 import QuickBook from '@/features/quickbook/components/QuickBook.vue'
+import NextStep from '@/features/onboarding/components/NextStep.vue'
+import PreviewLine from '@/features/devenv/components/PreviewLine.vue'
+import PlaygroundDrawer from '@/features/playground/components/PlaygroundDrawer.vue'
+import ModelBadge from '@/features/playground/components/ModelBadge.vue'
+import { availabilityOf, playgroundApi, type KeyInfo } from '@/features/playground/api'
+import { codeSamples, endpoint } from '@/features/playground/code'
 import { api } from '@/api/client'
 import type { LaneStatus } from '@/api/types'
 import { session } from '@/composables/session'
@@ -24,7 +41,23 @@ const now = useNow()
 const { showError, message } = useErrorMessage()
 const showLogs = ref(false)
 const quickBook = ref(false)
+const bookIntent = ref<'devenv' | 'model' | 'exclusive' | null>(null)
+const playground = ref(false)
 const restarting = ref(false)
+const nextStep = ref<InstanceType<typeof NextStep> | null>(null)
+
+function openBook(intent: 'devenv' | 'model' | 'exclusive' | null = null) {
+  bookIntent.value = intent
+  quickBook.value = true
+}
+function booked() {
+  refresh()
+  nextStep.value?.refresh()
+}
+
+// one availability badge per model, computed by the server (api/status.py)
+const availability = computed(() => availabilityOf(status.value))
+const badgeOf = (name: string | null | undefined) => (name ? availability.value.find((m) => m.name === name) : undefined)
 
 const runtime = computed(() => status.value?.runtime)
 const holder = computed(() => status.value?.active_reservation ?? null)
@@ -33,7 +66,20 @@ const canRestart = computed(() => !holder.value || mine.value || session.user?.i
 const manual = computed(() => status.value?.manual ?? null)
 const multiLane = computed(() => (status.value?.lanes.length ?? 0) > 1)
 const fallbackFrom = computed(() => (status.value?.reason === 'fallback' ? status.value.fallback_from : null))
-const exclusive = computed(() => !!holder.value?.exclusive)
+// The GPU is in use without a model server: a whole-GPU booking or a dev environment (booked, or the lane's shared
+// one). The lane then says who uses it, not "Stopped" / "No model loaded".
+const exclusive = computed(() => !!holder.value && !holder.value.model_id)
+function inUse(l: LaneStatus | undefined): string | null {
+  if (!l) return null
+  const r = l.active_reservation
+  if (r && !r.model_id) {
+    const env = r.devenv_template_id || r.devenv_project_id
+    if (r.user_id === session.user?.id) return env ? t('onboarding.ov.yourEnv') : t('onboarding.ov.inUseYou')
+    return env ? t('onboarding.ov.envOf', { user: r.username }) : t('onboarding.ov.inUseBy', { user: r.username })
+  }
+  if (!r && l.idle_mode === 'devenv' && !l.runtime.model_name) return t('onboarding.ov.sharedEnv')
+  return null
+}
 const modelLabel = computed(() => {
   const rt = runtime.value
   if (!rt?.model_name) return null
@@ -69,24 +115,20 @@ const firstLane = computed(() => status.value?.lanes[0])
 
 const loadProgress = computed(() => (runtime.value ? loadProgressOf(runtime.value, now.value) : null))
 
-const baseUrl = computed(() => `${window.location.origin}/v1`)
-const modelName = computed(() => runtime.value?.model_name ?? 'default')
-const curl = computed(
-  () => `curl ${baseUrl.value}/chat/completions \\
-  -H "Authorization: Bearer $SLOTSERVE_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"model": "${modelName.value}", "messages": [{"role": "user", "content": "Hello"}]}'`,
-)
-const python = computed(
-  () => `from openai import OpenAI
-
-client = OpenAI(base_url="${baseUrl.value}", api_key="sk-ss-...")
-resp = client.chat.completions.create(
-    model="${modelName.value}",
-    messages=[{"role": "user", "content": "Hello"}],
-)
-print(resp.choices[0].message.content)`,
-)
+// Quick start knows your keys and fills in the model you can call: your booked one, else the default.
+const baseUrl = endpoint()
+const keys = ref<KeyInfo[]>([])
+onMounted(async () => {
+  keys.value = (await playgroundApi.keys().catch(() => [])).filter((k) => !k.expired)
+})
+const ownKey = computed(() => keys.value[0] ?? null)
+const modelName = computed(() => {
+  const mine = status.value?.lanes.find(
+    (l) => l.active_reservation?.user_id === session.user?.id && l.active_reservation?.model_name,
+  )
+  return mine?.active_reservation?.model_name ?? status.value?.default_model ?? runtime.value?.model_name ?? 'default'
+})
+const samples = computed(() => codeSamples({ baseUrl, key: null, model: modelName.value, prompt: 'Hello' }))
 
 function memPct(used: number, total: number) {
   return total ? Math.round((used / total) * 100) : 0
@@ -113,11 +155,19 @@ async function restart() {
         <h1>{{ t('overview.title') }}</h1>
         <p>{{ t('overview.subtitle') }}</p>
       </div>
-      <NButton type="primary" @click="quickBook = true">
-        <template #icon><CalendarPlus :size="16" /></template>
-        {{ t('overview.book') }}
-      </NButton>
+      <div class="head-actions">
+        <NButton secondary data-action="open-playground" @click="playground = true">
+          <template #icon><MessageSquare :size="16" /></template>
+          {{ t('playground.title') }}
+        </NButton>
+        <NButton type="primary" @click="openBook()">
+          <template #icon><CalendarPlus :size="16" /></template>
+          {{ t('overview.book') }}
+        </NButton>
+      </div>
     </div>
+
+    <NextStep ref="nextStep" @playground="playground = true" @book="openBook" />
 
     <div v-if="fallbackFrom" class="banner warn">
       <TriangleAlert :size="16" />
@@ -143,11 +193,13 @@ async function restart() {
           <span class="lane-name">{{ l.name }}</span>
           <span v-if="laneGpus(l)" class="faint small">{{ laneGpus(l) }}</span>
           <span class="spacer" />
-          <StatusDot :state="l.runtime.state" />
+          <span v-if="inUse(l)" class="in-use">{{ inUse(l) }}</span>
+          <StatusDot v-else :state="l.runtime.state" />
         </div>
         <div class="lane-model mono">
-          {{ l.active_reservation?.exclusive ? reservationWhat(l.active_reservation, t) : (l.runtime.model_name ?? idleLabel(l) ?? t('overview.noModel')) }}
+          {{ l.active_reservation && !l.active_reservation.model_id ? reservationWhat(l.active_reservation, t) : (l.runtime.model_name ?? idleLabel(l) ?? t('overview.noModel')) }}
         </div>
+        <ModelBadge v-if="l.runtime.model_name && l.active_reservation?.model_id !== null" :model="badgeOf(l.runtime.model_name)" short />
         <div class="muted small">
           <template v-if="l.active_reservation">
             <Lock :size="12" />
@@ -166,9 +218,11 @@ async function restart() {
         <div class="row">
           <span class="label">{{ t('overview.currentModel') }}</span>
           <span class="spacer" />
-          <StatusDot v-if="runtime" :state="runtime.state" />
+          <span v-if="inUse(firstLane)" class="in-use">{{ inUse(firstLane) }}</span>
+          <StatusDot v-else-if="runtime" :state="runtime.state" />
         </div>
         <div class="model-name">{{ exclusive && holder ? reservationWhat(holder, t) : (modelLabel ?? idleLabel(firstLane) ?? t('overview.noModel')) }}</div>
+        <ModelBadge v-if="!exclusive && runtime?.model_name" :model="badgeOf(runtime.model_name)" class="model-badge" />
         <div class="model-sub muted">
           <template v-if="loadProgress">
             {{
@@ -184,7 +238,9 @@ async function restart() {
             <span class="err">{{ runtime.error_hint === 'oom' ? t('overview.oomHint') : runtime.error }}</span>
           </template>
           <template v-else-if="runtime?.draining">{{ t('overview.draining') }}</template>
-          <template v-else-if="exclusive">{{ t('overview.exclusiveHint') }}</template>
+          <template v-else-if="exclusive && holder">
+            {{ holder.devenv_template_id || holder.devenv_project_id ? t('onboarding.ov.envHint', { time: formatTime(holder.end_at) }) : t('overview.exclusiveHint') }}
+          </template>
           <template v-else-if="idleLabel(firstLane)">
             {{ firstLane?.idle_mode === 'devenv' ? t('overview.idleDevenvHint') : t('overview.idleNoneHint') }}
           </template>
@@ -313,22 +369,35 @@ async function restart() {
             <h3 class="card-title">{{ t('overview.quickStart') }}</h3>
             <div class="card-sub">{{ t('overview.quickStartHint') }}</div>
           </div>
-          <RouterLink :to="{ name: 'keys' }">
-            <NButton size="small" secondary>
-              <template #icon><KeyRound :size="14" /></template>
-              {{ t('overview.createKey') }}
+          <div class="quick-actions">
+            <NButton size="small" secondary @click="playground = true">
+              <template #icon><MessageSquare :size="14" /></template>
+              {{ t('onboarding.ov.tryHere') }}
             </NButton>
-          </RouterLink>
+            <RouterLink v-if="!ownKey" :to="{ name: 'keys' }">
+              <NButton size="small" secondary>
+                <template #icon><KeyRound :size="14" /></template>
+                {{ t('overview.createKey') }}
+              </NButton>
+            </RouterLink>
+          </div>
         </div>
         <div class="card-pad quick">
           <div class="label">{{ t('keys.endpoint') }}</div>
           <CodeBlock :code="baseUrl" inline />
+          <p v-if="ownKey" class="faint small key-line" data-field="quick-start-key">
+            <KeyRound :size="13" />
+            {{ t('onboarding.ov.useKey', { name: ownKey.name, prefix: ownKey.prefix }) }}
+          </p>
           <NTabs type="line" size="small" animated class="tabs">
             <NTabPane name="python" tab="Python">
-              <CodeBlock :code="python" />
+              <CodeBlock :code="samples.python" />
             </NTabPane>
             <NTabPane name="curl" tab="cURL">
-              <CodeBlock :code="curl" />
+              <CodeBlock :code="samples.curl" />
+            </NTabPane>
+            <NTabPane name="js" tab="JavaScript">
+              <CodeBlock :code="samples.js" />
             </NTabPane>
           </NTabs>
         </div>
@@ -336,11 +405,49 @@ async function restart() {
     </div>
 
     <LogDrawer v-model:show="showLogs" />
-    <QuickBook v-model:show="quickBook" @done="refresh" />
+    <QuickBook v-model:show="quickBook" :intent="bookIntent" @done="booked">
+      <template #summary="{ kind, templateId, projectId, laneId }">
+        <PreviewLine v-if="kind === 'devenv'" :template-id="templateId" :project-id="projectId" :lane-id="laneId" gpu />
+      </template>
+    </QuickBook>
+    <PlaygroundDrawer v-model:show="playground" />
   </div>
 </template>
 
 <style scoped>
+.head-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.in-use {
+  font-size: 12.5px;
+  font-weight: 550;
+  padding: 2px 9px;
+  border-radius: 999px;
+  line-height: 20px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  white-space: nowrap;
+}
+.model-badge {
+  margin-top: 8px;
+}
+.quick-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.key-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+}
+.bottom > *,
+.top > * {
+  min-width: 0;
+}
 .top.multi {
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
 }

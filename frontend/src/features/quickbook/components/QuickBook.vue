@@ -18,6 +18,9 @@ import { laneLabel } from '@/utils/naming'
 import { placementApi, type BookingKind, type Candidate, type FitRequest, type FitResult } from '../api'
 import { useReasonText } from '../reasons'
 import WherePicker from './WherePicker.vue'
+import ModelBadge from '@/features/playground/components/ModelBadge.vue'
+import { availabilityOf } from '@/features/playground/api'
+import { useStatus } from '@/composables/useStatus'
 
 const show = defineModel<boolean>('show', { default: false })
 const props = defineProps<{
@@ -50,6 +53,9 @@ const allModels = computed(() => props.models ?? loadedModels.value)
 const ready = computed(() => allModels.value.filter((m) => m.status === 'ready' && m.file_exists))
 const modelId = ref<number | null>(null)
 const modelOptions = computed(() => ready.value.map((m) => ({ label: m.name, value: m.id })))
+// the same availability badge as everywhere else (F05; computed in /api/status)
+const { status: liveStatus } = useStatus()
+const modelBadge = computed(() => availabilityOf(liveStatus.value).find((m) => m.id === modelId.value))
 const templates = ref<DevTemplate[]>([])
 const projects = ref<DevProject[]>([])
 /** "t:<template id>" (new from a template) or "p:<project id>" (continue a kept environment) */
@@ -357,6 +363,7 @@ function moreOptions() {
               size="small"
               data-field="model"
             />
+            <ModelBadge v-if="modelBadge" :model="modelBadge" class="qb-badge" />
             <span v-else class="faint small">{{ t('schedule.noModels') }}</span>
           </template>
         </div>
@@ -514,6 +521,9 @@ function moreOptions() {
 .kind {
   display: flex;
   flex-wrap: wrap;
+}
+.qb-badge {
+  justify-self: start;
 }
 .chips {
   display: flex;
