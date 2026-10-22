@@ -15,7 +15,8 @@ import urllib.request
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
-from conftest import INVITE, PASSWORD, ROOT, _free_port
+from conftest import ROOT, _free_port
+from helpers import INVITE, PASSWORD
 
 # Naive UI's own placeholders (enUS / zhCN locales): seeing one means an input has no placeholder of ours.
 DEFAULT_PLACEHOLDERS = {
