@@ -51,7 +51,9 @@ async def test_switch_waits_for_running_requests(monkeypatch, app, make_client, 
         return "".join(chunks)
 
     task = asyncio.create_task(stream())
-    await asyncio.sleep(0.5)
+    deadline = asyncio.get_running_loop().time() + 10  # slow CI machines take a while to start the stream
+    while app.state.runtime.inflight == 0 and asyncio.get_running_loop().time() < deadline:
+        await asyncio.sleep(0.05)
     assert app.state.runtime.inflight == 1
 
     now = utcnow()
