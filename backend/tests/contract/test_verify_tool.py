@@ -5,7 +5,10 @@ import sys
 from pathlib import Path
 
 import httpx
+from sqlalchemy import update
 
+from slotserve.db import SessionLocal
+from slotserve.orm import Lane
 from slotserve.services.devenv import SshBundle
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
@@ -19,6 +22,10 @@ async def test_verify_tool_against_the_test_app(app, make_client, models_dir, tm
     admin = await make_client("root")
     r = await admin.put("/api/admin/settings", json={"devenv_enabled": True, "devenv_cpu_enabled": True})
     assert r.status_code == 200, r.text
+    # Without nvidia-smi (CI) the default lane names no GPUs and GPU environments refuse it: give it GPU 0.
+    async with SessionLocal() as db:
+        await db.execute(update(Lane).where(Lane.gpu_indices == "").values(gpu_indices="0"))
+        await db.commit()
     builtins = {t["builtin_key"] for t in (await admin.get("/api/devenv/templates")).json()}
     assert builtins == set(BUILTIN_TEMPLATES)  # the tool knows every built-in template
     (models_dir / "tiny.gguf").write_bytes(b"GGUF" + b"\0" * 1020)
