@@ -118,12 +118,16 @@ async def login(body: LoginIn, request: Request, db: AsyncSession = Depends(get_
     user = (await db.execute(select(User).where(func.lower(User.username) == username.lower()))).scalar_one_or_none()
     if user is None or not verify_password(body.password, user.password_hash):
         limiter.failure(username=username, ip=ip)
+        record(db, user, "auth.login_failed", username[:64], ip=ip)
+        await db.commit()
         raise ApiError(status.HTTP_401_UNAUTHORIZED, "invalid_credentials")
     limiter.success(username=username)
     if user.disabled_at is not None:
         raise ApiError(status.HTTP_403_FORBIDDEN, "account_disabled")
     request.session[SESSION_USER_KEY] = user.id
     sudo.grant(request, user.id)  # the password was just entered
+    record(db, user, "auth.login", user.username, ip=ip)
+    await db.commit()
     return user
 
 

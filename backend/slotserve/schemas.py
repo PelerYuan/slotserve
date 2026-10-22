@@ -510,9 +510,11 @@ class AdminStatsOut(BaseModel):
 
 
 class SettingOut(BaseModel):
+    """One setting with its registry metadata (services/app_settings.py)."""
+
     key: str
-    value: bool | int | float | str
-    default: bool | int | float | str
+    value: bool | int | float | str | None
+    default: bool | int | float | str | None
     overridden: bool
     secret: bool
     kind: str = "str"  # bool | int | float | str
@@ -520,6 +522,77 @@ class SettingOut(BaseModel):
     min: float | None = None
     max: float | None = None
     choices: list[int | float | str] | None = None
+    # registry metadata (A04)
+    env_var: str = ""
+    group: str = "other"
+    card: str | None = None
+    tier: str = "advanced"  # basic | advanced | expert
+    order: int = 0
+    depends_on: str | None = None  # "key" (shown while that setting is on/non-empty) or "key=value"
+    keywords: list[str] = []
+    scope: str = "global"
+    danger: str | None = None  # "root": can run commands on the host; needs sudo once enforced
+    restart_required: bool = False  # deployment parameter, read-only
+    has_impact: bool = False  # PUT ?dry_run=true computes who is affected
+    has_value: bool = True  # for secrets: whether one is set (the value itself may be masked)
+    source: str = "default"  # default | env | admin
+
+
+class SettingChangeOut(BaseModel):
+    key: str
+    before: bool | int | float | str | None  # secrets: fingerprint "fp:xxxxxxxx" or "" (not set)
+    after: bool | int | float | str | None
+    reset: bool  # back to the .env default
+    secret: bool = False
+    danger: str | None = None
+
+
+class ImpactUserOut(BaseModel):
+    model_config = ConfigDict(extra="allow")  # numbers that depend on the setting (hours_this_week, ...)
+
+    user_id: int
+    username: str
+    over: bool = False
+
+
+class ImpactReservationOut(BaseModel):
+    id: int
+    user_id: int
+    username: str
+    lane_id: int | None
+    start_at: datetime
+    end_at: datetime
+    status: str
+    reason: str  # over_quota | over_upcoming | too_long | too_far | would_need_approval | still_pending
+
+
+class ImpactOut(BaseModel):
+    key: str
+    text_key: str
+    params: dict
+    users: list[ImpactUserOut]
+    reservations: list[ImpactReservationOut]
+
+
+class SettingsPreviewOut(BaseModel):
+    """``PUT /api/admin/settings?dry_run=true``: what a save would do. Nothing is stored."""
+
+    dry_run: bool = True
+    changes: list[SettingChangeOut]
+    impacts: list[ImpactOut]
+    sudo_required: bool  # the save will need sudo mode (danger settings, once enforced)
+    notify_user_ids: list[int]  # people ?notify=true would message
+
+
+class SettingsHistoryOut(BaseModel):
+    audit_id: int
+    action: str
+    actor_name: str
+    created_at: datetime
+    before: bool | int | float | str | None
+    after: bool | int | float | str | None
+    reset: bool = False
+    undoable: bool  # not a secret, not an undo target already superseded
 
 
 class AuditOut(BaseModel):
@@ -530,6 +603,46 @@ class AuditOut(BaseModel):
     target: str
     detail: dict
     created_at: datetime
+    ip: str = ""
+
+
+class QuotaGrantIn(BaseModel):
+    extra_hours: float = Field(gt=0, le=24 * 7)
+    until: datetime
+    starts_at: datetime | None = None  # default: now
+    reason: str = Field(default="", max_length=200)
+
+
+class QuotaGrantOut(BaseModel):
+    id: str
+    user_id: int
+    extra_hours: float
+    starts_at: datetime
+    until: datetime
+    reason: str
+    by: str
+    created_at: datetime
+    revoked_at: datetime | None = None
+    revoked_by: str = ""
+    active: bool
+
+
+class UserPolicyOut(BaseModel):
+    """The limits one person books under (global settings + extra hours); 0 = unlimited."""
+
+    user_id: int
+    username: str
+    exempt: bool  # admins
+    quota_weekly_hours: float  # this week, including extra hours
+    base_weekly_hours: int
+    extra_hours: float
+    quota_upcoming: int
+    max_reservation_hours: int
+    max_advance_days: int
+    week_start: datetime
+    booked_hours_this_week: float
+    open_bookings: int
+    grants: list[QuotaGrantOut]
 
 
 class AuditPageOut(BaseModel):

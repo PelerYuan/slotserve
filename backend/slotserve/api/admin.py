@@ -1,16 +1,18 @@
 import asyncio
+import csv
+import io
 import json
 import re
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from fastapi.responses import FileResponse
-from sqlalchemy import func, select, update
+from fastapi.responses import FileResponse, Response
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..db import get_db, utcnow
-from ..deps import admin_user, get_lanes
+from ..deps import admin_user, get_lanes, sudo_admin
 from ..errors import ApiError
 from ..orm import HOLDING_STATUSES, ApiKey, AuditLog, LlmModel, ModelLoadEvent, Reservation, UsageLog, User
 from ..runtime.lanes import LaneManager
@@ -27,15 +29,21 @@ from ..schemas import (
     BackupOut,
     LoadEventOut,
     ManualIn,
+    QuotaGrantIn,
+    QuotaGrantOut,
     RequestLogOut,
     RequestPageOut,
     ReservationOut,
     ReviewIn,
+    SettingChangeOut,
     SettingOut,
+    SettingsHistoryOut,
+    SettingsPreviewOut,
+    UserPolicyOut,
 )
-from ..security import hash_password
-from ..services import app_settings, booking, kv, maintenance, queries
-from ..services.audit import record
+from ..security import hash_password, sudo
+from ..services import app_settings, booking, kv, maintenance, policies, queries
+from ..services.audit import AUDIT_ACTIONS, record, split_detail
 from ..services.review import review
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -278,9 +286,108 @@ async def delete_user(
     if user.is_admin:
         await _ensure_other_admin(db, user)
     record(db, admin, "user.delete", user.username)
+    await policies.delete_all(db, user.id)
     await db.delete(user)
     await db.commit()
     lanes.poke()
+
+
+# ---- per-person limits (quota grants) -------------------------------------
+
+
+def _grant_out(g: policies.Grant) -> QuotaGrantOut:
+    return QuotaGrantOut(**{k: v for k, v in g.__dict__.items()}, active=g.active(utcnow()))
+
+
+@router.get("/users/{user_id}/policy", response_model=UserPolicyOut)
+async def user_policy(user_id: int, _: User = Depends(admin_user), db: AsyncSession = Depends(get_db)):
+    """The limits a person books under now: the global settings plus temporary extra hours."""
+    user = await _get_user(db, user_id)
+    settings = get_settings()
+    now = utcnow()
+    limits = await policies.policy_for(db, settings, user, now)
+    week_start, week_end = booking.week_bounds(settings, now)
+    rows = (
+        await db.execute(
+            select(Reservation.start_at, Reservation.end_at).where(
+                Reservation.user_id == user.id,
+                Reservation.status.in_(HOLDING_STATUSES),
+                Reservation.start_at < week_end,
+                Reservation.end_at > week_start,
+            )
+        )
+    ).all()
+    booked = sum(
+        (min(booking.aware(e), week_end) - max(booking.aware(s), week_start)).total_seconds() / 3600 for s, e in rows
+    )
+    open_bookings = (
+        await db.execute(
+            select(func.count(Reservation.id)).where(
+                Reservation.user_id == user.id, Reservation.status.in_(HOLDING_STATUSES), Reservation.end_at > now
+            )
+        )
+    ).scalar_one()
+    return UserPolicyOut(
+        user_id=user.id,
+        username=user.username,
+        exempt=limits.exempt,
+        quota_weekly_hours=limits.quota_weekly_hours,
+        base_weekly_hours=limits.base_weekly_hours,
+        extra_hours=limits.extra_hours,
+        quota_upcoming=limits.quota_upcoming,
+        max_reservation_hours=limits.max_reservation_hours,
+        max_advance_days=limits.max_advance_days,
+        week_start=week_start,
+        booked_hours_this_week=round(booked, 2),
+        open_bookings=open_bookings,
+        grants=[_grant_out(g) for g in limits.grants],
+    )
+
+
+@router.post("/users/{user_id}/quota-grants", response_model=QuotaGrantOut, status_code=201)
+async def add_quota_grant(
+    user_id: int,
+    body: QuotaGrantIn,
+    request: Request,
+    admin: User = Depends(admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Extra weekly hours for one person until ``until`` (e.g. 10 more hours this week for a thesis defence)."""
+    user = await _get_user(db, user_id)
+    now = utcnow()
+    starts_at = booking.aware(body.starts_at) if body.starts_at else now
+    until = booking.aware(body.until)
+    if until <= max(now, starts_at):
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "grant_until_past")
+    grant = await policies.add_grant(db, user, body.extra_hours, until, body.reason, admin, starts_at)
+    record(
+        db,
+        admin,
+        "user.quota_grant",
+        user.username,
+        ip=request,
+        extra_hours=grant.extra_hours,
+        until=grant.until,
+        reason=grant.reason,
+    )
+    await db.commit()
+    return _grant_out(grant)
+
+
+@router.delete("/users/{user_id}/quota-grants/{grant_id}", status_code=204)
+async def revoke_quota_grant(
+    user_id: int,
+    grant_id: str,
+    request: Request,
+    admin: User = Depends(admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await _get_user(db, user_id)
+    grant = await policies.revoke_grant(db, user, grant_id, admin)
+    if grant is None:
+        raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    record(db, admin, "user.quota_revoke", user.username, ip=request, extra_hours=grant.extra_hours, until=grant.until)
+    await db.commit()
 
 
 # ---- api keys -------------------------------------------------------------
@@ -352,79 +459,341 @@ async def list_reservations(
 
 # ---- settings -------------------------------------------------------------
 
+SETTINGS_ACTIONS = ("settings.update", "settings.sensitive_update", "settings.undo")
+_ORDER = {key: i for i, key in enumerate(app_settings.REGISTRY)}
+
+
+def _setting_out(key: str, defaults: dict, overridden: set[str], *, mask: bool) -> SettingOut:
+    spec = app_settings.REGISTRY[key]
+    value = app_settings.plain(getattr(get_settings(), key))
+    default = defaults.get(key)
+    masked = spec.secret and (mask or spec.restart_required)
+    return SettingOut(
+        key=key,
+        value="" if masked else value,
+        default="" if masked else default,
+        overridden=key in overridden,
+        secret=spec.secret,
+        kind=spec.kind,
+        unit=spec.unit,
+        min=spec.min,
+        max=spec.max,
+        choices=list(spec.choices) if spec.choices else None,
+        env_var=app_settings.env_var(key),
+        group=spec.group,
+        card=spec.card,
+        tier=spec.tier,
+        order=_ORDER[key],
+        depends_on=spec.depends_on,
+        keywords=list(spec.keywords),
+        scope=spec.scope,
+        danger=spec.danger,
+        restart_required=spec.restart_required,
+        has_impact=spec.impact is not None,
+        has_value=value not in (None, ""),
+        source=app_settings.source(key, defaults, overridden),
+    )
+
 
 @router.get("/settings", response_model=list[SettingOut])
-async def get_settings_view(request: Request, _: User = Depends(admin_user), db: AsyncSession = Depends(get_db)):
-    settings = get_settings()
+async def get_settings_view(
+    request: Request,
+    _: User = Depends(admin_user),
+    db: AsyncSession = Depends(get_db),
+    include_deployment: bool = False,
+    mask_secrets: bool = False,
+):
+    """Every editable setting with its value and registry metadata. ``include_deployment=true`` adds the
+    read-only deployment parameters (``restart_required``; their secrets are always masked);
+    ``mask_secrets=true`` returns ``""`` instead of secret values (``has_value`` tells whether one is set)."""
     defaults = request.app.state.settings_defaults
     overridden = await app_settings.overridden_keys(db)
-    return [
-        SettingOut(
-            key=key,
-            value=getattr(settings, key),
-            default=defaults[key],
-            overridden=key in overridden,
-            secret=spec.secret,
-            kind=spec.kind,
-            unit=spec.unit,
-            min=spec.min,
-            max=spec.max,
-            choices=list(spec.choices) if spec.choices else None,
-        )
-        for key, spec in app_settings.EDITABLE.items()
-    ]
+    keys = app_settings.REGISTRY if include_deployment else app_settings.EDITABLE
+    return [_setting_out(key, defaults, overridden, mask=mask_secrets) for key in keys]
 
 
-@router.put("/settings", response_model=list[SettingOut])
-async def put_settings(
-    changes: dict[str, bool | int | float | str | None],
+def _change_out(change: app_settings.Change, secret_key: str) -> SettingChangeOut:
+    spec = app_settings.EDITABLE[change.key]
+    return SettingChangeOut(
+        key=change.key,
+        before=app_settings.audit_value(change.key, change.before, secret_key),
+        after=app_settings.audit_value(change.key, change.after, secret_key),
+        reset=change.reset,
+        secret=spec.secret,
+        danger=spec.danger,
+    )
+
+
+def _audit_settings(
+    db: AsyncSession, admin: User, request: Request, planned: list[app_settings.Change], undo_of: int | None
+) -> None:
+    """One entry for ordinary settings and one ``settings.sensitive_update`` for root-equivalent ones, each with
+    before/after (secrets as fingerprints), the keys reset to their default and the keys that had no override."""
+    secret_key = get_settings().secret_key
+    danger = [c for c in planned if app_settings.EDITABLE[c.key].danger]
+    ordinary = [c for c in planned if not app_settings.EDITABLE[c.key].danger]
+    for action, changes in (
+        ("settings.undo" if undo_of else "settings.update", ordinary),
+        ("settings.sensitive_update", danger),
+    ):
+        if not changes:
+            continue
+        detail: dict = {
+            "before": {c.key: app_settings.audit_value(c.key, c.before, secret_key) for c in changes},
+            "after": {c.key: app_settings.audit_value(c.key, c.after, secret_key) for c in changes},
+            "reset": [c.key for c in changes if c.reset],
+            "was_default": [c.key for c in changes if c.was_default],
+        }
+        if undo_of:
+            detail["undo_of"] = undo_of
+        record(db, admin, action, ", ".join(c.key for c in changes), ip=request, **detail)
+
+
+async def _save_settings(
     request: Request,
-    admin: User = Depends(admin_user),
-    db: AsyncSession = Depends(get_db),
+    admin: User,
+    db: AsyncSession,
+    changes: dict,
+    *,
+    dry_run: bool,
+    notify: bool,
+    undo_of: int | None = None,
 ):
-    """Body maps setting keys to new values; ``null`` restores the ``.env`` default."""
+    settings = get_settings()
     try:
-        applied = await app_settings.apply(db, get_settings(), request.app.state.settings_defaults, changes)
+        planned = await app_settings.plan(db, settings, request.app.state.settings_defaults, changes)
     except app_settings.InvalidSetting as exc:
         raise ApiError(status.HTTP_400_BAD_REQUEST, "invalid_setting", key=exc.key, reason=exc.reason) from exc
-    if applied:
-        record(db, admin, "settings.update", ", ".join(applied), **applied)
-    if "api_key_reveal" in applied and not get_settings().api_key_reveal:
+    danger = [c.key for c in planned if app_settings.EDITABLE[c.key].danger]
+    needs_sudo = bool(danger) and app_settings.ENFORCE_SUDO_FOR_DANGER
+    impacts = await app_settings.dry_run(db, settings, planned) if (dry_run or notify) else []
+    notify_ids = sorted({u["user_id"] for impact in impacts for u in impact["users"]})
+    if dry_run:
+        return SettingsPreviewOut(
+            changes=[_change_out(c, settings.secret_key) for c in planned],
+            impacts=impacts,
+            sudo_required=needs_sudo and not sudo.is_active(request, admin.id),
+            notify_user_ids=notify_ids,
+        )
+    if needs_sudo:
+        await sudo_admin(request, admin)  # 403 sudo_required unless the password was entered recently
+    await app_settings.store(db, settings, planned)
+    _audit_settings(db, admin, request, planned, undo_of)
+    keys = {c.key for c in planned}
+    if "api_key_reveal" in keys and not settings.api_key_reveal:
         # Off means off: no copy of any key stays readable.
         await db.execute(update(ApiKey).values(key_encrypted=None))
     await db.commit()
-    if applied:
-        request.app.state.channels.reload_for(applied.keys())
+    if keys:
+        request.app.state.channels.reload_for(keys)
+    notifier = request.app.state.notifier
+    if danger:
+        notifier.emit("settings_sensitive", by=admin.username, keys=", ".join(danger))
+    if notify:
+        after = {c.key: c.after for c in planned}
+        for impact in impacts:
+            for u in impact["users"]:
+                notifier.emit(f"policy_{impact['key']}", user_id=u["user_id"], after=after.get(impact["key"], ""))
     return await get_settings_view(request, admin, db)
 
 
+@router.put("/settings", response_model=list[SettingOut] | SettingsPreviewOut)
+async def put_settings(
+    changes: dict[str, bool | int | float | str | None],
+    request: Request,
+    dry_run: bool = False,
+    notify: bool = False,
+    admin: User = Depends(admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Body maps setting keys to new values; ``null`` restores the ``.env`` default.
+
+    ``dry_run=true`` stores nothing and returns ``SettingsPreviewOut`` (changes with before/after and the impact
+    on people and bookings). ``notify=true`` messages the people a new booking limit affects. Existing bookings
+    are never cancelled by a settings change. Root-equivalent settings need sudo mode once
+    ``ENFORCE_SUDO_FOR_DANGER`` is on (403 ``sudo_required``)."""
+    return await _save_settings(request, admin, db, changes, dry_run=dry_run, notify=notify)
+
+
+@router.get("/settings/{key}/history", response_model=list[SettingsHistoryOut])
+async def setting_history(
+    key: str,
+    limit: int = Query(default=20, ge=1, le=200),
+    _: User = Depends(admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Who changed ``key`` when, from what to what (newest first); secrets show fingerprints only."""
+    spec = app_settings.EDITABLE.get(key)
+    if spec is None:
+        raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    rows = (
+        (
+            await db.execute(
+                select(AuditLog)
+                .where(AuditLog.action.in_(SETTINGS_ACTIONS), AuditLog.detail.contains(f'"{key}"'))
+                .order_by(AuditLog.id.desc())
+                .limit(500)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    out = []
+    for row in rows:
+        detail, _ip = split_detail(row.detail)
+        before, after = detail.get("before"), detail.get("after")
+        if not isinstance(before, dict) or key not in before:
+            continue
+        out.append(
+            SettingsHistoryOut(
+                audit_id=row.id,
+                action=row.action,
+                actor_name=row.actor_name,
+                created_at=row.created_at,
+                before=before[key],
+                after=(after or {}).get(key),
+                reset=key in (detail.get("reset") or []),
+                undoable=not spec.secret,
+            )
+        )
+        if len(out) >= limit:
+            break
+    return out
+
+
+@router.post("/audit/{audit_id}/undo", response_model=list[SettingOut] | SettingsPreviewOut)
+async def undo_settings_change(
+    audit_id: int,
+    request: Request,
+    dry_run: bool = False,
+    notify: bool = False,
+    admin: User = Depends(admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Puts the settings of one audit entry back to their ``before`` values, through the same preview, sudo and
+    audit rules as a save (the entry it writes is ``settings.undo`` with ``undo_of``). Secrets cannot be undone
+    (they are only fingerprinted): they are left out, the admin enters them again."""
+    row = await db.get(AuditLog, audit_id)
+    if row is None:
+        raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    detail, _ip = split_detail(row.detail)
+    before = detail.get("before")
+    if row.action not in SETTINGS_ACTIONS or not isinstance(before, dict):
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "not_undoable")
+    was_default = set(detail.get("was_default") or [])
+    changes = {
+        key: (None if key in was_default else value)
+        for key, value in before.items()
+        if key in app_settings.EDITABLE and not app_settings.EDITABLE[key].secret
+    }
+    if not changes:
+        raise ApiError(status.HTTP_409_CONFLICT, "nothing_to_undo")
+    return await _save_settings(request, admin, db, changes, dry_run=dry_run, notify=notify, undo_of=row.id)
+
+
 # ---- audit log ------------------------------------------------------------
+
+
+def _audit_query(
+    actor_id: int | None, action: str | None, target: str | None, since: datetime | None, until: datetime | None
+):
+    stmt = select(AuditLog)
+    if actor_id is not None:
+        stmt = stmt.where(AuditLog.actor_id == actor_id)
+    if action:
+        names = [a.strip() for a in action.split(",") if a.strip()]
+        exact = [a for a in names if not a.endswith("*")]
+        prefixes = [a[:-1] for a in names if a.endswith("*")]
+        stmt = stmt.where(or_(AuditLog.action.in_(exact), *(AuditLog.action.startswith(p) for p in prefixes)))
+    if target:
+        stmt = stmt.where(AuditLog.target.contains(target))
+    if since is not None:
+        stmt = stmt.where(AuditLog.created_at >= booking.aware(since))
+    if until is not None:
+        stmt = stmt.where(AuditLog.created_at < booking.aware(until))
+    return stmt
+
+
+def _audit_out(r: AuditLog) -> AuditOut:
+    detail, ip = split_detail(r.detail)
+    return AuditOut(
+        id=r.id,
+        actor_id=r.actor_id,
+        actor_name=r.actor_name,
+        action=r.action,
+        target=r.target,
+        detail=detail,
+        created_at=r.created_at,
+        ip=ip,
+    )
 
 
 @router.get("/audit", response_model=AuditPageOut)
 async def audit_log(
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    actor_id: int | None = None,
+    action: str | None = Query(default=None, max_length=500),
+    target: str | None = Query(default=None, max_length=160),
+    since: datetime | None = None,
+    until: datetime | None = None,
     _: User = Depends(admin_user),
     db: AsyncSession = Depends(get_db),
 ):
-    total = (await db.execute(select(func.count(AuditLog.id)))).scalar_one()
-    rows = (await db.execute(select(AuditLog).order_by(AuditLog.id.desc()).offset(offset).limit(limit))).scalars().all()
-    return AuditPageOut(
-        total=total,
-        items=[
-            AuditOut(
-                id=r.id,
-                actor_id=r.actor_id,
-                actor_name=r.actor_name,
-                action=r.action,
-                target=r.target,
-                detail=json.loads(r.detail or "{}"),
-                created_at=r.created_at,
-            )
-            for r in rows
-        ],
+    """Newest first. ``action`` takes exact names separated by commas and ``domain.*`` prefixes; ``target``
+    matches a part of the target."""
+    stmt = _audit_query(actor_id, action, target, since, until)
+    total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
+    rows = (await db.execute(stmt.order_by(AuditLog.id.desc()).offset(offset).limit(limit))).scalars().all()
+    return AuditPageOut(total=total, items=[_audit_out(r) for r in rows])
+
+
+@router.get("/audit/actions", response_model=list[str])
+async def audit_actions(_: User = Depends(admin_user)):
+    """Every action name the server records (for the filter)."""
+    return sorted(AUDIT_ACTIONS)
+
+
+@router.get("/audit.csv")
+async def audit_csv(
+    actor_id: int | None = None,
+    action: str | None = Query(default=None, max_length=500),
+    target: str | None = Query(default=None, max_length=160),
+    since: datetime | None = None,
+    until: datetime | None = None,
+    _: User = Depends(admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """The filtered audit log as CSV (at most 50 000 rows, newest first)."""
+    stmt = _audit_query(actor_id, action, target, since, until).order_by(AuditLog.id.desc()).limit(50_000)
+    rows = (await db.execute(stmt)).scalars().all()
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["id", "time", "actor", "action", "target", "ip", "detail"])
+    for r in rows:
+        out = _audit_out(r)
+        detail = json.dumps(out.detail, ensure_ascii=False, default=str)
+        writer.writerow(
+            [
+                out.id,
+                out.created_at.isoformat(),
+                _cell(out.actor_name),
+                out.action,
+                _cell(out.target),
+                out.ip,
+                _cell(detail),
+            ]
+        )
+    return Response(
+        buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="slotserve-audit.csv"'},
     )
+
+
+def _cell(text: str) -> str:
+    """Keeps spreadsheets from reading a cell as a formula."""
+    return "'" + text if text[:1] in ("=", "+", "-", "@") else text
 
 
 # ---- runtime control ------------------------------------------------------
@@ -540,12 +909,17 @@ async def create_backup(admin: User = Depends(admin_user), db: AsyncSession = De
 
 
 @router.get("/backups/{name}")
-async def download_backup(name: str, _: User = Depends(admin_user)):
+async def download_backup(
+    name: str, request: Request, admin: User = Depends(admin_user), db: AsyncSession = Depends(get_db)
+):
     if not _BACKUP_NAME.match(name):
         raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
     path = maintenance.backup_dir(get_settings()) / name
     if not path.is_file():
         raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    # A backup holds every account and the stored chat secrets: who took one is worth knowing.
+    record(db, admin, "backup.download", name, ip=request)
+    await db.commit()
     return FileResponse(path, media_type="application/vnd.sqlite3", filename=name)
 
 

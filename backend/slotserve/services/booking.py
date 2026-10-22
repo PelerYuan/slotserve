@@ -13,6 +13,7 @@ from ..config import Settings
 from ..db import utcnow
 from ..errors import ApiError
 from ..orm import HOLDING_STATUSES, Lane, LlmModel, ModelPreset, Reservation, User
+from . import policies
 
 # Serialises every overlap check + write (single-process deployment).
 booking_lock = asyncio.Lock()
@@ -114,6 +115,19 @@ def _week_start(dt: datetime, tz: ZoneInfo) -> datetime:
     return monday.astimezone(UTC)
 
 
+def quota_tz(settings: Settings) -> ZoneInfo:
+    try:
+        return ZoneInfo(settings.timezone)
+    except Exception:  # noqa: BLE001
+        return ZoneInfo("UTC")
+
+
+def week_bounds(settings: Settings, at: datetime) -> Window:
+    """The quota week (Monday 00:00 in the configured time zone) that contains ``at``."""
+    start = _week_start(at, quota_tz(settings))
+    return start, start + timedelta(days=7)
+
+
 async def check_quota(
     db: AsyncSession, settings: Settings, user: User, windows: list[Window], exclude: set[int] = frozenset()
 ) -> None:
@@ -129,10 +143,8 @@ async def check_quota(
         if len(existing) + len(windows) > settings.quota_upcoming:
             raise ApiError(status.HTTP_400_BAD_REQUEST, "quota_upcoming", limit=settings.quota_upcoming)
     if settings.quota_weekly_hours:
-        try:
-            tz = ZoneInfo(settings.timezone)
-        except Exception:  # noqa: BLE001
-            tz = ZoneInfo("UTC")
+        tz = quota_tz(settings)
+        grants = await policies.grants(db, user.id)  # temporary extra hours an admin gave this person
         weeks: dict[datetime, float] = defaultdict(float)
         for start, end in windows:
             weeks[_week_start(start, tz)] += (end - start).total_seconds() / 3600
@@ -149,8 +161,13 @@ async def check_quota(
             for rid, s, e in rows.all():
                 if rid not in exclude:
                     hours += (min(e, week_end) - max(s, week)).total_seconds() / 3600
-            if hours > settings.quota_weekly_hours + 0.01:
-                raise ApiError(status.HTTP_400_BAD_REQUEST, "quota_weekly", limit=settings.quota_weekly_hours)
+            limit = settings.quota_weekly_hours + policies.extra_hours(grants, week, week_end)
+            if hours > limit + 0.01:
+                raise ApiError(
+                    status.HTTP_400_BAD_REQUEST,
+                    "quota_weekly",
+                    limit=int(limit) if float(limit).is_integer() else round(limit, 2),
+                )
 
 
 def series_windows(start: datetime, end: datetime, repeat_weeks: int) -> list[Window]:

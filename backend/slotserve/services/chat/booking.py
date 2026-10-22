@@ -20,6 +20,7 @@ from ...errors import ApiError
 from ...orm import HOLDING_STATUSES, Lane, LlmModel, Reservation, User, WaitlistEntry
 from .. import booking, queries
 from ..notify import lang
+from ..reservations import create_core, end_core
 
 Buttons = list[list[tuple[str, str]]]
 
@@ -280,7 +281,6 @@ class BookingFlow:
         return Reply(text, [[(_t(user, "book"), f"bko:{payload}")], nav], edit=True)
 
     async def book(self, db, user: User, parts: list[str], waitlist: bool = False) -> Reply:
-        from ...api.reservations import create_core
         from ...schemas import ReservationCreateIn
 
         if len(parts) != 5:
@@ -381,7 +381,6 @@ class BookingFlow:
         return Reply(_t(user, "cancel_pick"), buttons)
 
     async def cancel(self, db, user: User, reservation_id: int, confirmed: bool) -> Reply:
-        from ...api.reservations import end_core
 
         notifier = self.app.state.notifier
         r = await db.get(Reservation, reservation_id)

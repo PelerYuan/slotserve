@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +9,7 @@ from ..errors import ApiError
 from ..orm import ApiKey, User
 from ..schemas import ApiKeyCreatedOut, ApiKeyCreateIn, ApiKeyOut, ApiKeyRevealOut
 from ..security import decrypt_api_key, encrypt_api_key, generate_api_key, hash_api_key, key_display_prefix
+from ..services.audit import record
 
 router = APIRouter(prefix="/api/keys", tags=["api-keys"])
 
@@ -35,7 +36,9 @@ async def list_keys(user: User = Depends(current_user), db: AsyncSession = Depen
 
 
 @router.post("", response_model=ApiKeyCreatedOut, status_code=201)
-async def create_key(body: ApiKeyCreateIn, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
+async def create_key(
+    body: ApiKeyCreateIn, request: Request, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
+):
     existing = (await db.execute(select(ApiKey.id).where(ApiKey.user_id == user.id, ApiKey.revoked_at.is_(None)))).all()
     if len(existing) >= MAX_KEYS_PER_USER:
         raise ApiError(status.HTTP_400_BAD_REQUEST, "too_many_keys", limit=MAX_KEYS_PER_USER)
@@ -45,6 +48,7 @@ async def create_key(body: ApiKeyCreateIn, user: User = Depends(current_user), d
     if settings.api_key_reveal:
         key.key_encrypted = encrypt_api_key(raw, settings.secret_key)
     db.add(key)
+    record(db, user, "key.create", f"{user.username}/{key.name}", ip=request, prefix=key.prefix)
     await db.commit()
     return ApiKeyCreatedOut(
         id=key.id,

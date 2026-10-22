@@ -16,93 +16,192 @@ These only exist in `docker-compose.yml` and describe the **host**.
 
 ## SlotServe settings
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `SLOTSERVE_INVITE_CODE` | `change-me` | Code required to sign up; while it is `change-me` (or empty) only the first admin can sign up, with the [setup code](#first-admin-and-setup-code) |
-| `SLOTSERVE_REGISTRATION_OPEN` | `true` | Allow sign-up with the invite code |
-| `SLOTSERVE_API_KEY_REVEAL` | `false` | Keep an encrypted copy of new API keys so owners can view them again |
-| `SLOTSERVE_SECRET_KEY` | *generated* | Signs session cookies and encrypts stored secrets. Unset, empty or `change-me`: SlotServe generates a random key on first start and keeps it in `DATA_DIR/secret_key` (owner-only). A value you set always wins |
-| `SLOTSERVE_HOST` | `0.0.0.0` | Listen address |
-| `SLOTSERVE_PORT` | `8000` | Listen port |
-| `SLOTSERVE_COOKIE_SECURE` | `false` | Mark cookies `Secure`; set `true` behind HTTPS |
-| `SLOTSERVE_DATA_DIR` | `data` | Database and logs |
-| `SLOTSERVE_MODELS_DIR` | `models` | Model directory (scanned, and target of downloads) |
-| `SLOTSERVE_STATIC_DIR` | *bundled* | Built frontend directory |
-| `SLOTSERVE_LLAMA_SERVER_CMD` | `llama-server` | Command used to start llama-server; may include a prefix such as `taskset -c 0-15 llama-server` |
-| `SLOTSERVE_LLAMA_HOST` | `127.0.0.1` | Address the model servers bind to (keep it local) |
-| `SLOTSERVE_LLAMA_PORT` | `8081` | Port of the first lane's model server; lane *N* uses this + *N* - 1 |
-| `SLOTSERVE_DEFAULT_LLAMA_ARGS` | `-ngl 99 -c 8192` | Arguments given to newly registered models |
-| `SLOTSERVE_LOAD_TIMEOUT_SECONDS` | `1800` | Give up if a model is not ready after this long |
-| `SLOTSERVE_STOP_TIMEOUT_SECONDS` | `20` | Grace period before a model server is killed |
-| `SLOTSERVE_DISK_READ_MBPS` | `150` | Used to estimate load time before a model's first load |
-| `SLOTSERVE_SLOT_MINUTES` | `30` | Calendar granularity |
-| `SLOTSERVE_MAX_RESERVATION_HOURS` | `8` | Longest single booking |
-| `SLOTSERVE_MAX_ADVANCE_DAYS` | `30` | How far ahead people can book |
-| `SLOTSERVE_PRELOAD_BUFFER_SECONDS` | `60` | Extra margin when preloading before a booking |
-| `SLOTSERVE_PRELOAD_MIN_MINUTES` | `3` | Start loading a booked model at least this many minutes early |
-| `SLOTSERVE_APPROVAL_MODE` | `off` | `off`, `long` or `all`: which bookings need an admin's approval |
-| `SLOTSERVE_APPROVAL_HOURS` | `4` | With `long`, bookings longer than this need approval |
-| `SLOTSERVE_VLLM_CMD` | `vllm serve` | Command for the vLLM engine |
-| `SLOTSERVE_SGLANG_CMD` | `python -m sglang.launch_server` | Command for the SGLang engine |
-| `SLOTSERVE_CUSTOM_ENGINE_CMD` | *empty* | Template for the custom engine: `{model}` `{host}` `{port}` `{name}` |
-| `SLOTSERVE_CUSTOM_ENGINE_HEALTH` | `/health` | Path polled until the custom engine is ready |
-| `SLOTSERVE_SCHEDULER_INTERVAL_SECONDS` | `5` | How often the scheduler re-evaluates |
-| `SLOTSERVE_DOWNLOAD_MIN_FREE_GB` | `2` | Disk space that must remain free after a download |
-| `SLOTSERVE_PUBLIC_URL` | *empty* | Address people use to reach SlotServe; used in calendar links |
-| `SLOTSERVE_TIMEZONE` | `UTC` | IANA time zone for notifications and weekly quotas |
-| `SLOTSERVE_QUOTA_WEEKLY_HOURS` | `0` | Hours one person may book per week (0 = unlimited; admins exempt) |
-| `SLOTSERVE_QUOTA_UPCOMING` | `0` | Open bookings one person may hold (0 = unlimited) |
-| `SLOTSERVE_REMINDER_MINUTES` | `10` | Lead time of start and end reminders |
-| `SLOTSERVE_HF_ENDPOINT` | `https://huggingface.co` | Hugging Face endpoint or mirror |
-| `SLOTSERVE_HF_TOKEN` | *empty* | Token for gated or private repositories |
-| `SLOTSERVE_TELEGRAM_BOT_TOKEN` | *empty* | Telegram bot token; empty disables the bot |
-| `SLOTSERVE_TELEGRAM_PROXY` | *empty* | `http://` or `socks5://` proxy for Telegram |
-| `SLOTSERVE_TELEGRAM_API_BASE` | `https://api.telegram.org` | Telegram Bot API address, for a self-hosted Bot API server |
-| `SLOTSERVE_CHAT_DEFAULT_LOCALE` | `en` | `en` or `zh-CN`: language of group webhooks, group chats and chats not linked yet |
-| `SLOTSERVE_FEISHU_ENABLED`, `_APP_ID`, `_APP_SECRET`, `_DOMAIN` | `false`, *empty*, *empty*, `https://open.feishu.cn` | Feishu / Lark bot ([setup](integrations.md#feishu-lark)); Lark uses `https://open.larksuite.com` |
-| `SLOTSERVE_DINGTALK_ENABLED`, `_CLIENT_ID`, `_CLIENT_SECRET`, `_ROBOT_CODE` | `false`, *empty* … | DingTalk bot in Stream mode; robot code empty = client id |
-| `SLOTSERVE_WECOM_ENABLED`, `_CORP_ID`, `_AGENT_ID`, `_SECRET`, `_TOKEN`, `_AES_KEY` | `false`, *empty* … | WeCom app; token and AES key only for receiving commands |
-| `SLOTSERVE_QQ_ENABLED`, `_APP_ID`, `_APP_SECRET`, `_SANDBOX` | `false`, *empty*, *empty*, `false` | QQ official bot |
-| `SLOTSERVE_FEISHU_WEBHOOK_URL`, `_SECRET` | *empty* | Feishu / Lark group robot webhook and signing secret |
-| `SLOTSERVE_DINGTALK_WEBHOOK_URL`, `_SECRET` | *empty* | DingTalk group robot webhook and signing secret |
-| `SLOTSERVE_WECOM_WEBHOOK_URL` | *empty* | WeCom group robot webhook |
-| `SLOTSERVE_GROUP_EVENTS` | `admin_alerts,announcements` | What group webhooks receive: `admin_alerts`, `approvals`, `announcements` |
-| `SLOTSERVE_DINGTALK_API_BASE`, `SLOTSERVE_WECOM_API_BASE`, `SLOTSERVE_QQ_API_BASE`, `SLOTSERVE_QQ_TOKEN_URL` | official addresses | API addresses (only for proxies or testing) |
-| `SLOTSERVE_METRICS_TOKEN` | *empty* | Bearer token for `/metrics`; empty disables it |
-| `SLOTSERVE_DRAIN_SECONDS` | `30` | Before a model switch, wait this long for running requests to finish |
-| `SLOTSERVE_USAGE_RETENTION_DAYS` | `365` | Keep per-request rows this long, then fold them into daily totals (0 = forever; otherwise ≥ 90) |
-| `SLOTSERVE_USAGE_SAMPLE_DAYS` | `30` | Keep per-minute GPU usage samples this long, then fold them into hourly totals (0 = never fold) |
-| `SLOTSERVE_USAGE_BUSY_PERCENT` | `10` | A GPU counts as used in a minute when its utilization is at least this (applies to new samples) |
-| `SLOTSERVE_AUDIT_RETENTION_DAYS` | `730` | Keep audit log entries this long (0 = forever) |
-| `SLOTSERVE_BACKUP_KEEP` | `7` | Daily database backups to keep (0 = no automatic backups) |
-| `SLOTSERVE_DEVENV_ENABLED` | `false` | Dev environments: book GPU time as a Docker container with SSH |
-| `SLOTSERVE_DOCKER_HOST` | `unix:///var/run/docker.sock` | Docker (or Podman) API used for dev environments |
-| `SLOTSERVE_DEVENV_SSH_HOST` | *empty* | Host name shown in ssh commands; empty = the address the browser uses |
-| `SLOTSERVE_DEVENV_SSH_PORTS` | `2200-2299` | Host ports given to dev environments |
-| `SLOTSERVE_DEVENV_CPUS` / `_MEMORY_GB` / `_SHM_GB` | `0` / `0` / `8` | Per-environment limits (0 = no limit) |
-| `SLOTSERVE_DEVENV_CUSTOM_IMAGES` | `true` | Let people create templates from any image |
-| `SLOTSERVE_DEVENV_ALLOWED_REGISTRIES` | *empty* | Comma-separated registries images may come from; empty = any |
-| `SLOTSERVE_DEVENV_SAVED_IMAGES` | `3` | Saved environment images per person |
-| `SLOTSERVE_DEVENV_PULL_MINUTES` | `60` | Download the image this long before a booking |
-| `SLOTSERVE_DEVENV_PASSWORD_LOGIN` | `true` | Allow SSH logins with the environment password as well as keys |
-| `SLOTSERVE_DEVENV_STORAGE_DIR` | *empty* | Directory on the Docker host for persistent data (bind mounts); empty = Docker named volumes |
-| `SLOTSERVE_STORAGE_HELPER_IMAGE` | `busybox:1.37` | Image of the short-lived containers that check storages from **Admin → Storage** (pulled when missing) |
-| `SLOTSERVE_STORAGE_CHECK_MINUTES` | `30` | How often storages are checked (free space, per-person usage); 0 = only on demand |
-| `SLOTSERVE_DEVENV_PROJECTS` | `3` | Kept (paused) environments per person; 0 = none |
-| `SLOTSERVE_DEVENV_PROJECT_DAYS` | `0` | Remove kept environments unused this many days (0 = never) |
-| `SLOTSERVE_DEVENV_CPU_ENABLED` | `true` | Let people start dev environments without a GPU (no booking) |
-| `SLOTSERVE_DEVENV_CPU_PER_USER` | `2` | Environments without a GPU one person can run at once |
-| `SLOTSERVE_DEVENV_CPU_CORES_PER_GPU` | `8` | CPU cores each lane reserves per GPU for its bookings (cpuset); 0 = none |
-| `SLOTSERVE_DEVENV_CPU_CORES` / `_MEMORY_GB` | `4` / `16` | Limits of one environment without a GPU (0 = the whole pool / no limit) |
-| `SLOTSERVE_DEVENV_CPU_MEMORY_POOL_GB` | `0` | Memory all environments without a GPU may claim together (0 = no limit) |
-| `SLOTSERVE_DEVENV_PUBLIC_PORTS_ENABLED` | `true` | Let people publish container ports directly on host ports (no SlotServe login) |
-| `SLOTSERVE_DEVENV_PUBLIC_PORTS` | `2300-2399` | Host ports for direct ports (keep apart from the SSH ports) |
-| `SLOTSERVE_DEVENV_PUBLIC_PORT_LIMIT` | `5` | Direct ports per person; admins have no limit; 0 = only admins |
-| `SLOTSERVE_DEVENV_FORWARDER_IMAGE` | `alpine/socat:1.8.1.1` | Image of the per-port forwarder containers (needs `socat` on its PATH) |
-| `SLOTSERVE_DEVENV_WEB_PORT` | `8001` | Port of the dev environment web interfaces, a separate origin (0 = serve them on `PORT`, not recommended) |
-| `SLOTSERVE_DEVENV_WEB_URL` | *empty* | How browsers reach that port, e.g. behind a reverse proxy; empty = the same host on `DEVENV_WEB_PORT` |
+<!-- settings:start (generated by tools/gen_settings_doc.py from the settings registry; do not edit) -->
 
-Admins can change every setting in **Admin → System settings** without a restart, except the deployment ones (`HOST`, `PORT`, `SECRET_KEY`, `COOKIE_SECURE`, `STATIC_DIR`, `DATA_DIR`, `MODELS_DIR`, `LLAMA_SERVER_CMD`, `LLAMA_HOST`, `LLAMA_PORT`, `TELEGRAM_API_BASE`, the `…_API_BASE` and `QQ_TOKEN_URL` addresses, `DOCKER_HOST`, `DROPBEAR_PATH`, `DEVENV_WEB_PORT`), which need a restart and therefore stay in `.env`. Overrides live in the database and win over `.env`; **Use default** removes an override.
+Admins change every setting except the deployment parameters in **Admin → System settings**, without a restart: overrides live in the database and win over `.env`, and **Use default** removes one. Each change is in the audit log with its old and new value (secrets only as a fingerprint) and can be undone. *Level* is where the setting appears: *basic* on the policy cards, *advanced* in the full list, *expert* folded away. Settings marked ⚠️ can run commands as root on the host (an engine command, a mounted directory, a forwarder image): changing them is recorded as a sensitive change and announced to all admins (a later version also asks for your password again). The deployment parameters are read at start: change them in `.env` and restart.
+
+### Sign-up and access
+
+| Variable | Default | Level | Description |
+| --- | --- | --- | --- |
+| `SLOTSERVE_REGISTRATION_OPEN` | `true` | basic | Allow sign-up with the invite code |
+| `SLOTSERVE_INVITE_CODE` | `change-me` | basic | Code required to sign up; while it is `change-me` (or empty) only the first admin can sign up, with the [setup code](#first-admin-and-setup-code) |
+| `SLOTSERVE_APPROVAL_MODE` | `off` | basic | `off`, `long` or `all`: which bookings need an admin's approval |
+| `SLOTSERVE_APPROVAL_HOURS` | `4` | advanced | With `long`, bookings longer than this need approval |
+| `SLOTSERVE_API_KEY_REVEAL` | `false` | advanced | Keep an encrypted copy of new API keys so owners can view them again |
+
+### Booking and fair use
+
+| Variable | Default | Level | Description |
+| --- | --- | --- | --- |
+| `SLOTSERVE_QUOTA_WEEKLY_HOURS` | `0` | basic | Hours one person may book per week (0 = unlimited; admins exempt; admins can grant extra hours per person) |
+| `SLOTSERVE_MAX_RESERVATION_HOURS` | `8` | basic | Longest single booking |
+| `SLOTSERVE_MAX_ADVANCE_DAYS` | `30` | basic | How far ahead people can book |
+| `SLOTSERVE_QUOTA_UPCOMING` | `0` | advanced | Open bookings one person may hold (0 = unlimited) |
+| `SLOTSERVE_SLOT_MINUTES` | `30` | advanced | Calendar granularity |
+| `SLOTSERVE_REMINDER_MINUTES` | `10` | advanced | Lead time of start and end reminders |
+
+### Notifications and time
+
+| Variable | Default | Level | Description |
+| --- | --- | --- | --- |
+| `SLOTSERVE_TIMEZONE` | `UTC` | basic | IANA time zone for notifications and weekly quotas |
+| `SLOTSERVE_PUBLIC_URL` | *empty* | basic | Address people use to reach SlotServe; used in links and to recognise SlotServe's own pages |
+| `SLOTSERVE_CHAT_DEFAULT_LOCALE` | `en` | advanced | `en` or `zh-CN`: language of group webhooks, group chats and chats not linked yet |
+| `SLOTSERVE_TELEGRAM_BOT_TOKEN` | *empty* | advanced | Telegram bot token; empty disables the bot |
+| `SLOTSERVE_TELEGRAM_PROXY` | *empty* | advanced | `http://` or `socks5://` proxy for Telegram |
+
+### Dev environments
+
+| Variable | Default | Level | Description |
+| --- | --- | --- | --- |
+| `SLOTSERVE_DEVENV_ENABLED` | `false` | basic | Dev environments: book GPU time as a Docker container with SSH |
+| `SLOTSERVE_DEVENV_CPU_ENABLED` | `true` | advanced | Let people start dev environments without a GPU (no booking) |
+| `SLOTSERVE_DEVENV_CPU_PER_USER` | `2` | basic | Environments without a GPU one person can run at once |
+| `SLOTSERVE_DEVENV_CPU_CORES` | `4` | basic | CPU cores one environment without a GPU may use (0 = the whole shared pool) |
+| `SLOTSERVE_DEVENV_CPU_MEMORY_GB` | `16` | basic | Memory one environment without a GPU may use (0 = no limit) |
+| `SLOTSERVE_DEVENV_CPU_MEMORY_POOL_GB` | `0` | expert | Memory all environments without a GPU may claim together (0 = no limit) |
+| `SLOTSERVE_DEVENV_CPU_CORES_PER_GPU` | `8` | expert | CPU cores each lane reserves per GPU for its bookings (cpuset); 0 = none |
+| `SLOTSERVE_DEVENV_SSH_HOST` | *empty* | advanced | Host name shown in ssh commands; empty = the address the browser uses |
+| `SLOTSERVE_DEVENV_SSH_PORTS` | `2200-2299` | advanced | Host ports given to dev environments |
+| `SLOTSERVE_DEVENV_PASSWORD_LOGIN` | `true` | advanced | Allow SSH logins with the environment password as well as keys |
+| `SLOTSERVE_DEVENV_CPUS` | `0` | advanced | CPU limit of one environment with a GPU (0 = no limit) |
+| `SLOTSERVE_DEVENV_MEMORY_GB` | `0` | advanced | Memory limit of one environment with a GPU (0 = no limit) |
+| `SLOTSERVE_DEVENV_SHM_GB` | `8` | advanced | Shared memory (`/dev/shm`) of one environment |
+| `SLOTSERVE_DEVENV_CUSTOM_IMAGES` | `true` | advanced | Let people create templates from any image |
+| `SLOTSERVE_DEVENV_ALLOWED_REGISTRIES` | *empty* | advanced | Comma-separated registries images may come from; empty = any |
+| `SLOTSERVE_DEVENV_SAVED_IMAGES` | `3` | advanced | Saved environment images per person |
+| `SLOTSERVE_DEVENV_PULL_MINUTES` | `60` | expert | Download the image this long before a booking |
+| `SLOTSERVE_DEVENV_PROJECTS` | `3` | advanced | Kept (paused) environments per person; 0 = none |
+| `SLOTSERVE_DEVENV_PROJECT_DAYS` | `0` | advanced | Remove kept environments unused this many days (0 = never) |
+| `SLOTSERVE_DEVENV_PUBLIC_PORTS_ENABLED` | `true` | advanced | Let people publish container ports directly on host ports (no SlotServe login) |
+| `SLOTSERVE_DEVENV_PUBLIC_PORTS` | `2300-2399` | advanced | Host ports for direct ports (keep apart from the SSH ports) |
+| `SLOTSERVE_DEVENV_PUBLIC_PORT_LIMIT` | `5` | advanced | Direct ports per person; admins have no limit; 0 = only admins |
+| `SLOTSERVE_DEVENV_WEB_URL` | *empty* | expert | How browsers reach the web port of dev environments, e.g. behind a reverse proxy; empty = the same host on `DEVENV_WEB_PORT` |
+| `SLOTSERVE_DEVENV_FORWARDER_IMAGE` | `alpine/socat:1.8.1.1` | expert | ⚠️ **Runs as root on the host.** Image of the per-port forwarder containers (needs `socat` on its PATH) |
+| `SLOTSERVE_DEVENV_STORAGE_DIR` | *empty* | expert | ⚠️ **Runs as root on the host.** Directory on the Docker host for persistent data (bind mounts); empty = Docker named volumes. System directories (`/etc`, `/root`, `/var/lib/docker`, `/proc`, `/sys`, `/boot`, `/usr`, `/bin`, `/lib*`, `/var/run` …) are refused |
+
+### Models and downloads
+
+| Variable | Default | Level | Description |
+| --- | --- | --- | --- |
+| `SLOTSERVE_DEFAULT_LLAMA_ARGS` | `-ngl 99 -c 8192` | basic | Arguments given to newly registered models |
+| `SLOTSERVE_HF_ENDPOINT` | `https://huggingface.co` | basic | Hugging Face endpoint or mirror |
+| `SLOTSERVE_HF_TOKEN` | *empty* | advanced | Token for gated or private repositories |
+| `SLOTSERVE_DOWNLOAD_MIN_FREE_GB` | `2` | advanced | Disk space that must remain free after a download |
+
+### Model loading
+
+| Variable | Default | Level | Description |
+| --- | --- | --- | --- |
+| `SLOTSERVE_PRELOAD_MIN_MINUTES` | `3` | advanced | Start loading a booked model at least this many minutes early |
+| `SLOTSERVE_LOAD_TIMEOUT_SECONDS` | `1800` | advanced | Give up if a model is not ready after this long |
+| `SLOTSERVE_DRAIN_SECONDS` | `30` | advanced | Before a model switch, wait this long for running requests to finish |
+| `SLOTSERVE_PRELOAD_BUFFER_SECONDS` | `60` | expert | Extra margin when preloading before a booking |
+| `SLOTSERVE_STOP_TIMEOUT_SECONDS` | `20` | expert | Grace period before a model server is killed |
+| `SLOTSERVE_DISK_READ_MBPS` | `150` | expert | Used to estimate load time before a model's first load |
+| `SLOTSERVE_SCHEDULER_INTERVAL_SECONDS` | `5` | expert | How often the scheduler re-evaluates |
+
+### Engines
+
+| Variable | Default | Level | Description |
+| --- | --- | --- | --- |
+| `SLOTSERVE_VLLM_CMD` | `vllm serve` | expert | ⚠️ **Runs as root on the host.** Command for the vLLM engine |
+| `SLOTSERVE_SGLANG_CMD` | `python -m sglang.launch_server` | expert | ⚠️ **Runs as root on the host.** Command for the SGLang engine |
+| `SLOTSERVE_CUSTOM_ENGINE_CMD` | *empty* | expert | ⚠️ **Runs as root on the host.** Template for the custom engine: `{model}` `{host}` `{port}` `{name}` |
+| `SLOTSERVE_CUSTOM_ENGINE_HEALTH` | `/health` | expert | Path polled until the custom engine is ready |
+
+### Feishu / Lark
+
+| Variable | Default | Level | Description |
+| --- | --- | --- | --- |
+| `SLOTSERVE_FEISHU_ENABLED` | `false` | advanced | Feishu / Lark bot ([setup](integrations.md#feishu-lark)) |
+| `SLOTSERVE_FEISHU_APP_ID` | *empty* | advanced | App ID of the Feishu app |
+| `SLOTSERVE_FEISHU_APP_SECRET` | *empty* | advanced | App secret of the Feishu app |
+| `SLOTSERVE_FEISHU_DOMAIN` | `https://open.feishu.cn` | expert | Open platform address; Lark uses `https://open.larksuite.com` |
+
+### DingTalk
+
+| Variable | Default | Level | Description |
+| --- | --- | --- | --- |
+| `SLOTSERVE_DINGTALK_ENABLED` | `false` | advanced | DingTalk bot in Stream mode |
+| `SLOTSERVE_DINGTALK_CLIENT_ID` | *empty* | advanced | Client ID (AppKey) of the DingTalk app |
+| `SLOTSERVE_DINGTALK_CLIENT_SECRET` | *empty* | advanced | Client secret (AppSecret) of the DingTalk app |
+| `SLOTSERVE_DINGTALK_ROBOT_CODE` | *empty* | expert | Robot code; empty = the client ID |
+
+### WeCom
+
+| Variable | Default | Level | Description |
+| --- | --- | --- | --- |
+| `SLOTSERVE_WECOM_ENABLED` | `false` | advanced | WeCom self-built app |
+| `SLOTSERVE_WECOM_CORP_ID` | *empty* | advanced | Corp ID of the WeCom app |
+| `SLOTSERVE_WECOM_AGENT_ID` | *empty* | advanced | Agent ID of the WeCom app |
+| `SLOTSERVE_WECOM_SECRET` | *empty* | advanced | Secret of the WeCom app |
+| `SLOTSERVE_WECOM_TOKEN` | *empty* | advanced | Callback token; only for receiving commands |
+| `SLOTSERVE_WECOM_AES_KEY` | *empty* | advanced | Callback EncodingAESKey (43 characters); only for receiving commands |
+
+### QQ
+
+| Variable | Default | Level | Description |
+| --- | --- | --- | --- |
+| `SLOTSERVE_QQ_ENABLED` | `false` | advanced | QQ official bot |
+| `SLOTSERVE_QQ_APP_ID` | *empty* | advanced | App ID of the QQ bot |
+| `SLOTSERVE_QQ_APP_SECRET` | *empty* | advanced | App secret of the QQ bot |
+| `SLOTSERVE_QQ_SANDBOX` | `false` | expert | Use the QQ sandbox environment |
+
+### Group webhooks
+
+| Variable | Default | Level | Description |
+| --- | --- | --- | --- |
+| `SLOTSERVE_GROUP_EVENTS` | `admin_alerts,announcements` | advanced | What group webhooks receive: `admin_alerts`, `approvals`, `announcements` |
+| `SLOTSERVE_FEISHU_WEBHOOK_URL` | *empty* | advanced | Feishu / Lark group robot webhook |
+| `SLOTSERVE_FEISHU_WEBHOOK_SECRET` | *empty* | advanced | Signing secret of the Feishu / Lark group robot |
+| `SLOTSERVE_DINGTALK_WEBHOOK_URL` | *empty* | advanced | DingTalk group robot webhook |
+| `SLOTSERVE_DINGTALK_WEBHOOK_SECRET` | *empty* | advanced | Signing secret of the DingTalk group robot |
+| `SLOTSERVE_WECOM_WEBHOOK_URL` | *empty* | advanced | WeCom group robot webhook |
+
+### Monitoring
+
+| Variable | Default | Level | Description |
+| --- | --- | --- | --- |
+| `SLOTSERVE_METRICS_TOKEN` | *empty* | expert | Bearer token for `/metrics`; empty disables it |
+| `SLOTSERVE_USAGE_BUSY_PERCENT` | `10` | expert | A GPU counts as used in a minute when its utilization is at least this (applies to new samples) |
+
+### Housekeeping and backups
+
+| Variable | Default | Level | Description |
+| --- | --- | --- | --- |
+| `SLOTSERVE_USAGE_RETENTION_DAYS` | `365` | advanced | Keep per-request rows this long, then fold them into daily totals (0 = forever; otherwise ≥ 90) |
+| `SLOTSERVE_USAGE_SAMPLE_DAYS` | `30` | expert | Keep per-minute GPU usage samples this long, then fold them into hourly totals (0 = never fold) |
+| `SLOTSERVE_AUDIT_RETENTION_DAYS` | `730` | advanced | Keep audit log entries this long (0 = forever) |
+| `SLOTSERVE_BACKUP_KEEP` | `7` | advanced | Daily database backups to keep (0 = no automatic backups) |
+
+### Deployment (restart to apply)
+
+| Variable | Default | Level | Description |
+| --- | --- | --- | --- |
+| `SLOTSERVE_SECRET_KEY` | *generated* | expert | Signs session cookies and encrypts stored secrets. Unset, empty or `change-me`: SlotServe generates a random key on first start and keeps it in `DATA_DIR/secret_key` (owner-only). A value you set always wins |
+| `SLOTSERVE_HOST` | `0.0.0.0` | expert | Listen address |
+| `SLOTSERVE_PORT` | `8000` | expert | Listen port |
+| `SLOTSERVE_COOKIE_SECURE` | `false` | expert | Mark cookies `Secure`; set `true` behind HTTPS |
+| `SLOTSERVE_DATA_DIR` | `data` | expert | Database and logs |
+| `SLOTSERVE_MODELS_DIR` | `models` | expert | Model directory (scanned, and target of downloads) |
+| `SLOTSERVE_STATIC_DIR` | *bundled* | expert | Built frontend directory |
+| `SLOTSERVE_LLAMA_SERVER_CMD` | `llama-server` | expert | ⚠️ **Runs as root on the host.** Command used to start llama-server; may include a prefix such as `taskset -c 0-15 llama-server` |
+| `SLOTSERVE_LLAMA_HOST` | `127.0.0.1` | expert | Address the model servers bind to (keep it local) |
+| `SLOTSERVE_LLAMA_PORT` | `8081` | expert | Port of the first lane's model server; lane *N* uses this + *N* - 1 |
+| `SLOTSERVE_DOCKER_HOST` | `unix:///var/run/docker.sock` | expert | ⚠️ **Runs as root on the host.** Docker (or Podman) API used for dev environments |
+| `SLOTSERVE_DROPBEAR_PATH` | `/opt/slotserve/bin/dropbearmulti` | expert | Static Dropbear (`dropbearmulti`) copied into each dev environment; bundled in the image |
+| `SLOTSERVE_DEVENV_WEB_PORT` | `8001` | expert | Port of the dev environment web interfaces, a separate origin (0 = serve them on `PORT`, not recommended) |
+| `SLOTSERVE_STORAGE_HELPER_IMAGE` | `busybox:1.37` | expert | Image of the short-lived containers that check storages from **Admin → Storage** (pulled when missing) |
+| `SLOTSERVE_STORAGE_CHECK_MINUTES` | `30` | expert | How often storages are checked (free space, per-person usage); 0 = only on demand |
+| `SLOTSERVE_TELEGRAM_API_BASE` | `https://api.telegram.org` | expert | Telegram Bot API address, for a self-hosted Bot API server |
+| `SLOTSERVE_DINGTALK_API_BASE` | `https://api.dingtalk.com` | expert | DingTalk API address (only for proxies or testing) |
+| `SLOTSERVE_WECOM_API_BASE` | `https://qyapi.weixin.qq.com` | expert | WeCom API address (only for proxies or testing) |
+| `SLOTSERVE_QQ_API_BASE` | `https://api.sgroup.qq.com` | expert | QQ bot API address (only for proxies or testing) |
+| `SLOTSERVE_QQ_TOKEN_URL` | `https://bots.qq.com/app/getAppAccessToken` | expert | QQ bot token address (only for proxies or testing) |
+
+<!-- settings:end -->
 
 ## Per-model launch arguments
 

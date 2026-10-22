@@ -55,9 +55,17 @@ EVENT_PREF = {
     "storage_quota": "downloads",
     "storage_quota_admin": "admin_alerts",
     "storage_down": "admin_alerts",
+    # settings changes (services/settings_impact.py): the people a new booking rule affects, if the admin asks
+    "policy_quota_weekly_hours": "booking_changes",
+    "policy_quota_upcoming": "booking_changes",
+    "policy_max_reservation_hours": "booking_changes",
+    "policy_max_advance_days": "booking_changes",
+    "policy_approval_mode": "booking_changes",
+    "settings_sensitive": "admin_alerts",
 }
 
 ADMIN_EVENTS = {
+    "settings_sensitive",
     "load_failed",
     "user_registered",
     "disk_low",
@@ -72,6 +80,7 @@ GROUP_KIND = {
     "disk_low": "admin_alerts",
     "storage_quota_admin": "admin_alerts",
     "storage_down": "admin_alerts",
+    "settings_sensitive": "admin_alerts",
     "fallback_admin": "admin_alerts",
     "approval_requested": "approvals",
     "args_approval_requested": "approvals",
@@ -121,6 +130,15 @@ MESSAGES: dict[str, dict[str, str]] = {
         "reject": "Reject",
         "announcement": "📢 {text}",
         "review_on_web": " Review it in SlotServe.",
+        "policy_quota_weekly_hours": "ℹ️ An admin set the weekly booking limit to {after} hours. Your bookings are "
+        "kept; new bookings and changes must fit the new limit.",
+        "policy_quota_upcoming": "ℹ️ An admin set the number of open bookings per person to {after}. Your bookings "
+        "are kept; new bookings must fit the new limit.",
+        "policy_max_reservation_hours": "ℹ️ An admin set the longest booking to {after} hours. Your bookings are "
+        "kept; changes to them must fit the new limit.",
+        "policy_max_advance_days": "ℹ️ An admin set how far ahead you can book to {after} days. Your bookings are kept.",
+        "policy_approval_mode": "ℹ️ An admin changed which bookings need approval. Your bookings are kept.",
+        "settings_sensitive": "⚠️ {by} changed settings that can run commands on the host: {keys}.",
     },
     "zh-CN": {
         "reminder_start": "⏰ 你的预约将在 {start} 开始：{what}。",
@@ -161,6 +179,15 @@ MESSAGES: dict[str, dict[str, str]] = {
         "reject": "拒绝",
         "announcement": "📢 {text}",
         "review_on_web": "请到 SlotServe 审批。",
+        "policy_quota_weekly_hours": "ℹ️ 管理员把每人每周可预约时长设为 {after} 小时。你已有的预约保留不变；"
+        "新预约和修改需符合新上限。",
+        "policy_quota_upcoming": "ℹ️ 管理员把每人可持有的未结束预约数设为 {after}。你已有的预约保留不变；"
+        "新预约需符合新上限。",
+        "policy_max_reservation_hours": "ℹ️ 管理员把单次预约最长时长设为 {after} 小时。你已有的预约保留不变；"
+        "修改时需符合新上限。",
+        "policy_max_advance_days": "ℹ️ 管理员把最多可提前预约的天数设为 {after} 天。你已有的预约保留不变。",
+        "policy_approval_mode": "ℹ️ 管理员调整了需要审批的预约范围。你已有的预约保留不变。",
+        "settings_sensitive": "⚠️ {by} 修改了可在宿主机上执行命令的设置：{keys}。",
     },
 }
 

@@ -531,6 +531,7 @@ async def add_key(
     name = body.name.strip() or (parts[2] if len(parts) > 2 else parts[0])
     k = SshKey(user_id=user.id, name=name[:64], public_key=key, fingerprint=fingerprint)
     db.add(k)
+    record(db, user, "ssh_key.add", f"{user.username}/{k.name}", ip=request, fingerprint=fingerprint)
     await db.commit()
     request.app.state.devenv.accounts_changed()
     return _key_out(k)
@@ -544,6 +545,7 @@ async def delete_key(
     if k is None or k.user_id != user.id:
         raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
     await db.delete(k)
+    record(db, user, "ssh_key.remove", f"{user.username}/{k.name}", ip=request, fingerprint=k.fingerprint)
     await db.commit()
     request.app.state.devenv.accounts_changed()
 

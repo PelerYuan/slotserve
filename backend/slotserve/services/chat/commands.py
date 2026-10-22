@@ -14,6 +14,7 @@ from ...errors import ApiError
 from ...orm import HOLDING_STATUSES, Reservation, User
 from .. import queries
 from ..notify import lang
+from ..reservations import end_core, extend_core
 from .booking import TEXT as BOOKING_TEXT
 from .booking import BookingFlow, Reply
 
@@ -311,7 +312,6 @@ class ChatCommands:
         return r if r is not None and (r.user_id == user.id or user.is_admin) else None
 
     async def _extend(self, db, user: User, reservation_id: int | None, minutes: int) -> str:
-        from ...api.reservations import extend_core
 
         r = await self._own_reservation(db, user, reservation_id)
         if r is None:
@@ -342,7 +342,6 @@ class ChatCommands:
         return reply(user, "approved" if approve else "rejected", count=len(done))
 
     async def _release(self, db, user: User, reservation_id: int | None) -> str:
-        from ...api.reservations import end_core
 
         r = await self._own_reservation(db, user, reservation_id)
         if r is None or queries.reservation_phase(r, utcnow()) != "active":
