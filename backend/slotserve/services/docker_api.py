@@ -181,6 +181,27 @@ class DockerClient:
             headers={"Content-Type": "application/x-tar"},
         )
 
+    async def copy_path(self, source: str, path: str, target: str, target_path: str) -> bool:
+        """Copies ``path`` of one container (it need not run) into ``target_path`` of another, streaming the archive
+        through SlotServe; ownership is kept. False when the source has no such path."""
+        async with self._http.stream(
+            "GET", f"/containers/{source}/archive", params={"path": path}, timeout=None
+        ) as resp:
+            if resp.status_code == 404:
+                return False
+            if resp.status_code != 200:
+                body = (await resp.aread()).decode(errors="replace")
+                raise DockerError(resp.status_code, body.strip() or f"HTTP {resp.status_code}")
+            await self._request(
+                "PUT",
+                f"/containers/{target}/archive",
+                params={"path": target_path, "copyUIDGID": "1"},
+                content=resp.aiter_bytes(),
+                headers={"Content-Type": "application/x-tar"},
+                timeout=None,
+            )
+        return True
+
     async def start(self, container: str) -> None:
         await self._request("POST", f"/containers/{container}/start", ok=(204, 304))
 

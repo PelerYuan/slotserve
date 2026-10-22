@@ -471,18 +471,37 @@ async def test_storage_dir(app, make_client):
             json={"name": "Conda", "image": "example/conda:1", "persist_paths": ["/opt/conda"]},
         )
     ).json()
+    docker.image_files["example/conda:1"] = {"/opt/conda/bin/python": b"#!python"}
     await _book(bob, t["id"])
     await _ticks(app)
     [session] = (await bob.get("/api/devenv/sessions")).json()
     assert session["state"] == "running", session
     uid = (await bob.get("/api/auth/me")).json()["id"]
-    helper_name, helper = next((n, c) for n, c in docker.created if n.startswith("slotserve-prep-"))
-    assert helper["HostConfig"]["Binds"] == ["/srv/slotserve:/slotserve-storage"]
+    # SlotServe's helper image (never the environment's), only the parent folders of what it creates (R1-06)
+    helper_name, helper = next((n, c) for n, c in docker.created if n == f"slotserve-prep-{session['id']}")
+    assert helper["Image"] == "busybox:1.37" and helper["Labels"]["slotserve.hardened"] == "1"
+    assert helper["HostConfig"]["Binds"] == [
+        f"/srv/slotserve/users/u{uid}:/slotserve-storage/users/u{uid}",
+        f"/srv/slotserve/users/u{uid}/t{t['id']}:/slotserve-storage/users/u{uid}/t{t['id']}",
+    ]
     script = helper["Entrypoint"][2]
-    assert f"/slotserve-storage/users/u{uid}/workspace" in script
-    assert f'cp -a "/opt/conda/." "/slotserve-storage/users/u{uid}/t{t["id"]}/opt-conda/"' in script
-    assert not any(c["Name"] == helper_name for c in docker.containers.values())  # removed after use
-    [container] = docker.containers.values()
+    assert f"mkdir -p '/slotserve-storage/users/u{uid}/workspace'" in script and "cp " not in script
+    # new folders are seeded from the image without running it: a never-started container, Docker's archive API
+    src_name, src = next((n, c) for n, c in docker.created if n == f"{helper_name}-src")
+    assert (
+        src["Image"] == "example/conda:1"
+        and src["HostConfig"]["NetworkMode"] == "none"
+        and "Mounts" not in src["HostConfig"]
+    )
+    seed_name, seed = next((n, c) for n, c in docker.created if n == f"{helper_name}-seed")
+    assert seed["Image"] == "busybox:1.37" and seed["HostConfig"]["Binds"] == helper["HostConfig"]["Binds"]
+    assert (
+        f"cp -a '/tmp/slotserve-seed/1/conda/.' '/slotserve-storage/users/u{uid}/t{t['id']}/opt-conda'/"
+        in (seed["Entrypoint"][2])
+    )
+    assert any("conda/bin/python" in files for files in docker.archives.values())
+    assert not any(c["Name"] in (helper_name, src_name, seed_name) for c in docker.containers.values())  # removed
+    [container] = [c for c in docker.containers.values() if c["Name"].startswith("slotserve-dev-")]
     mounts = container["Config"]["HostConfig"]["Mounts"]
     assert {
         "Type": "bind",

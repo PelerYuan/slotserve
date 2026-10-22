@@ -2,6 +2,7 @@
 
 import io
 import json
+import re
 import tarfile
 from urllib.parse import unquote
 
@@ -30,6 +31,10 @@ class FakeDocker:
         self.volumes: dict[str, dict] = {}  # name -> {Name, Driver, Options, Labels}
         self.helper_output: dict[str, str] = {}  # text in a helper's script -> its output (logs)
         self.mount_errors: dict[str, str] = {}  # mount source (prefix) -> error when a container starts
+        # Seeding new folders (containers/helpers.py): files of images (image -> {absolute path: content}) that
+        # GET /containers/{id}/archive reads, and folders a helper finds already there (all others are new).
+        self.image_files: dict[str, dict[str, bytes]] = {}
+        self.existing_folders: set[str] = set()
         self._exec_ids: dict[str, int] = {}
         self.ncpu = 32  # what /info reports
         self.mem_total = 128 * 2**30
@@ -223,6 +228,28 @@ class FakeDocker:
             c.setdefault("Modes", {}).update(modes)
             return Response(status_code=200)
 
+        @self.app.get("/v1.41/containers/{cid}/archive")
+        async def get_archive(cid: str, path: str):
+            c = find(cid)
+            if c is None:
+                return JSONResponse({"message": "no such container"}, status_code=404)
+            base = path.rstrip("/")
+            files = {
+                p: data
+                for p, data in self.image_files.get(c["Config"].get("Image", ""), {}).items()
+                if p.startswith(base + "/")
+            }
+            if not files:
+                return JSONResponse({"message": f"Could not find the file {path} in container"}, status_code=404)
+            name = base.rsplit("/", 1)[-1]
+            buf = io.BytesIO()
+            with tarfile.open(fileobj=buf, mode="w") as tar:
+                for p, data in sorted(files.items()):
+                    info = tarfile.TarInfo(name + p[len(base) :])
+                    info.size = len(data)
+                    tar.addfile(info, io.BytesIO(data))
+            return Response(content=buf.getvalue(), media_type="application/x-tar")
+
         @self.app.post("/v1.41/containers/{cid}/start")
         async def start(cid: str):
             c = find(cid)
@@ -356,6 +383,9 @@ class FakeDocker:
             c = find(cid)
             text = b"dropbear: Not backgrounding\n" + (b"Killed\n" if c and c["ExitCode"] else b"")
             script = " ".join((c or {}).get("Config", {}).get("Entrypoint") or [])
+            if "==NEW==" in script:  # a helper creating folders: it reports the ones that were missing
+                new = re.findall(r"if \[ ! -d '([^']*)' \]; then mkdir -p '[^']*'; echo \"(==NEW== \d+)\"", script)
+                text = "".join(mark + "\n" for path, mark in new if path not in self.existing_folders).encode()
             for needle, output in self.helper_output.items():
                 if needle in script:
                     text = output.encode()

@@ -17,7 +17,8 @@ storage's settings, so changing a storage gives new volumes (the old ones are re
 
 Short-lived helper containers do the work SlotServe cannot do itself (it may run in a container and reach host
 paths only through Docker): checking a storage (``df``, a write test), measuring each person's folder (``du``)
-and creating folders before an environment starts.
+and creating folders before an environment starts. They always run SlotServe's own helper image
+(``storage_helper_image``) and mount as little of a storage as they can (``containers/helpers.py``).
 """
 
 import asyncio
@@ -34,11 +35,11 @@ from pathlib import Path
 import httpx
 from sqlalchemy import select
 
-from ..containers.helpers import helper_body, helper_spec
+from ..containers import helpers
 from ..db import SessionLocal, utcnow
 from ..orm import Storage, User
 from ..security import decrypt_api_key, encrypt_api_key
-from .docker_api import DockerClient, DockerError
+from .docker_api import DockerClient, DockerError, tar_files
 
 log = logging.getLogger(__name__)
 
@@ -362,10 +363,24 @@ def _helper_mount(st: Storage, secret_key: str, target: str, read_only: bool = F
     return {"Type": "volume", "Source": name, "Target": target, "ReadOnly": read_only}, volumes
 
 
+def _helper_access(st: Storage, secret_key: str, rels: list[str]) -> tuple[list[dict], list[str], dict]:
+    """What a helper working on ``rels`` of a storage mounts (at ROOT/<rel>): for a host directory only the parent
+    folders of ``rels``; an NFS/SMB storage only from its root (see containers/helpers.py)."""
+    if st.kind == "host":
+        return [], helpers.parent_binds(st.host_path, rels, ROOT), {}
+    mount, volumes = _helper_mount(st, secret_key, ROOT)
+    return [mount], [], volumes
+
+
 async def ensure_volumes(docker: DockerClient, volumes: dict[str, tuple[dict, dict]]) -> None:
     for name, (opts, labels) in volumes.items():
         if await docker.volume_inspect(name) is None:
             await docker.volume_create(name, opts, labels)
+
+
+async def ensure_image(docker: DockerClient, image: str) -> None:
+    if not await docker.image_exists(image):
+        await docker.pull(image)
 
 
 async def run_helper(
@@ -376,11 +391,12 @@ async def run_helper(
     script: str,
     env: dict[str, str] | None = None,
     timeout: float = 600,
+    binds: list[str] | None = None,
 ) -> tuple[int, str]:
-    """Runs a script in a short-lived container; returns (exit code, output)."""
-    config = helper_body(helper_spec(image, script, label_key=LABEL, mounts=mounts, env=env))
+    """Runs a script in a short-lived container of SlotServe's helper image; returns (exit code, output)."""
+    spec = helpers.helper_spec(image, script, label_key=LABEL, mounts=mounts, binds=binds, env=env)
     await docker.remove(name)
-    cid = await docker.create(name, config)
+    cid = await docker.create(name, helpers.helper_body(spec))
     try:
         await docker.start(cid)
         code = await docker.wait(cid, timeout)
@@ -391,42 +407,86 @@ async def run_helper(
 
 
 def _q(text: str) -> str:
-    return "'" + text.replace("'", "'\\''") + "'"
+    return helpers.q(text)
 
 
-async def prepare(docker: DockerClient, image: str, plan: StoragePlan, name: str) -> None:
-    """Creates the volumes and missing folders a container needs (folders seeded from the image like a new volume
-    would be). Raises StorageError("devenv_storage_failed")."""
+async def prepare_folders(
+    docker: DockerClient,
+    *,
+    helper_image: str,
+    seed_image: str | None,
+    name: str,
+    folders: list[helpers.Folder],
+    mounts: list[dict] | None = None,
+    binds: list[str] | None = None,
+    label: str = LABEL,
+) -> str | None:
+    """Creates missing folders with a helper of SlotServe's image, then seeds the new ones from ``seed_image``
+    (copied out of a never-started container of it). Returns None, or why it failed."""
+    await ensure_image(docker, helper_image)
+    code, output = await run_helper(
+        docker, name, helper_image, mounts or [], helpers.prepare_script(folders), binds=binds
+    )
+    if code != 0:
+        return f"exit code {code}: {output.strip()[-500:]}"
+    new = helpers.new_folders(output)
+    seeds = [(i, f) for i, f in enumerate(folders) if i in new and f.seed]
+    if not seeds or not seed_image:
+        return None
+    await docker.remove(f"{name}-src")
+    source = await docker.create(
+        f"{name}-src", helpers.helper_body(helpers.seed_source_spec(seed_image, label_key=label))
+    )
+    spec = helpers.helper_spec(helper_image, helpers.seed_script(seeds), label_key=label, mounts=mounts, binds=binds)
+    await docker.remove(f"{name}-seed")
+    cid = await docker.create(f"{name}-seed", helpers.helper_body(spec))
+    try:
+        dirs = {f"{helpers.seed_path(i).lstrip('/')}/.keep": (b"", 0o600) for i, _ in seeds}
+        await docker.put_archive(cid, "/", tar_files(dirs))
+        for i, f in seeds:
+            await docker.copy_path(source, f.seed, cid, helpers.seed_path(i))
+        await docker.start(cid)
+        code = await docker.wait(cid, 3600)
+        if code != 0:
+            return f"seeding: exit code {code}: {(await docker.logs(cid, 50)).strip()[-500:]}"
+    finally:
+        for c in (cid, source):
+            with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
+                await docker.remove(c)
+    return None
+
+
+async def prepare(docker: DockerClient, helper_image: str, seed_image: str, plan: StoragePlan, name: str) -> None:
+    """Creates the volumes and missing folders a container needs (new folders seeded from the environment's image like
+    a new volume would be). Raises StorageError("devenv_storage_failed")."""
     try:
         for sid, preps in plan.preps.items():
             st = plan.storages[sid]
-            mount, volumes = _helper_mount(st, plan.secret_key, ROOT)
+            mounts, binds, volumes = _helper_access(st, plan.secret_key, [p.rel for p in preps])
             await ensure_volumes(docker, volumes)
-            lines = ["set -e"]
-            for p in preps:
-                d = _q(f"{ROOT}/{p.rel}")
-                steps = [f"mkdir -p {d}"]
-                if p.seed:
-                    steps.append(f"if [ -d {_q(p.seed)} ]; then cp -a {_q(p.seed + '/.')} {d}/ || true; fi")
-                lines.append(f"if [ ! -d {d} ]; then {'; '.join(steps)}; fi")
-                if p.owner is not None:
-                    # the folder (not its content) belongs to the person's account in shared environments
-                    lines.append(f"chown {p.owner}:{p.owner} {d} && chmod 700 {d} || true")
-            code, output = await run_helper(docker, f"{name}-st{sid}", image, [mount], "\n".join(lines))
-            if code != 0:
-                raise StorageError(
-                    "devenv_storage_failed", detail=f"{st.name}: exit code {code}: {output.strip()[-500:]}"
-                )
+            folders = [helpers.Folder(f"{ROOT}/{p.rel}", p.seed, p.owner) for p in preps]
+            problem = await prepare_folders(
+                docker,
+                helper_image=helper_image,
+                seed_image=seed_image,
+                name=f"{name}-st{sid}",
+                folders=folders,
+                mounts=mounts,
+                binds=binds,
+            )
+            if problem:
+                raise StorageError("devenv_storage_failed", detail=f"{st.name}: {problem}")
         await ensure_volumes(docker, plan.volumes)
     except DockerError as exc:
         raise StorageError("devenv_storage_failed", detail=exc.message[:500]) from exc
 
 
 async def remove_folder(docker: DockerClient, st: Storage, secret_key: str, image: str, rel: str, name: str) -> None:
-    """Deletes a folder of a storage (a kept environment's data)."""
-    mount, volumes = _helper_mount(st, secret_key, ROOT)
+    """Deletes a folder of a storage (a kept environment's data); ``image`` is SlotServe's helper image."""
+    mounts, binds, volumes = _helper_access(st, secret_key, [rel])
     await ensure_volumes(docker, volumes)
-    code, output = await run_helper(docker, name, image, [mount], f"rm -rf {_q(f'{ROOT}/{rel}')}")
+    await ensure_image(docker, image)
+    code, output = await run_helper(docker, name, image, mounts, f"rm -rf {_q(f'{ROOT}/{rel}')}", binds=binds)
     if code != 0:
         raise StorageError("devenv_storage_failed", detail=f"exit code {code}: {output.strip()[-500:]}")
     with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
@@ -498,8 +558,7 @@ async def check_storage(docker: DockerClient, settings, st: Storage) -> tuple[di
     """Mounts a storage in a helper container: reachable? total/used/free, writable, per-person usage."""
     image = settings.storage_helper_image
     try:
-        if not await docker.image_exists(image):
-            await docker.pull(image)
+        await ensure_image(docker, image)
         mount, volumes = _helper_mount(st, settings.secret_key, "/s", read_only=bool(st.read_only))
         await ensure_volumes(docker, volumes)
         env = {"W": "0" if st.read_only else "1", "DU": "1" if st.purpose == "personal" else "0"}

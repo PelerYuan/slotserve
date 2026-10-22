@@ -30,7 +30,7 @@ from ...containers.context import (
 )
 from ...containers.contributors.ssh import account_files
 from ...containers.harden import HardenError
-from ...containers.helpers import helper_body, helper_spec
+from ...containers.helpers import Folder, parent_binds, q
 from ...containers.model import ContainerSpec, NodePolicy, SpecError
 from ...db import SessionLocal, utcnow
 from ...orm import HOLDING_STATUSES, DevProject, DevSession, DevTemplate, Lane, Reservation, SshKey, User
@@ -54,6 +54,7 @@ from .ssh import SshBundle
 from .templates import load_web_ports, session_web
 from .validation import _slug, load_paths, parse_port_range, unix_names
 
+HELPER_ROOT = "/slotserve-storage"  # where helpers see the legacy storage directory
 log = logging.getLogger(__package__)  # the logger keeps the name of the module before the move
 
 
@@ -734,36 +735,47 @@ class DevEnvManager:
         return {p for p in used if p}, kept
 
     async def _prepare_storage(self, s: DevSession, plan: Plan) -> None:
-        """Creates missing directories under the storage dir (seeded from the image, like a new volume would be).
+        """Creates missing directories under the legacy storage dir (new ones seeded from the image, like a new
+        volume would be).
 
         SlotServe may itself run in a container and only reach host paths through the Docker daemon, so a
-        short-lived helper container from the environment's image does the work.
+        short-lived helper container of SlotServe's helper image does the work (never the environment's image;
+        ``containers/helpers.py``).
         """
-        storage = self.settings.devenv_storage_dir.rstrip("/")
-        if not storage or not plan.binds:
+        root = self.settings.devenv_storage_dir.rstrip("/")
+        if not root or not plan.binds:
             return
-        lines = ["set -e"]
-        for rel, target in plan.binds:
-            d = f"/slotserve-storage/{rel}"
-            lines.append(
-                f'if [ ! -d "{d}" ]; then mkdir -p "{d}"; '
-                f'if [ -d "{target}" ]; then cp -a "{target}/." "{d}/" || true; fi; fi'
-            )
-        await self._helper(f"slotserve-prep-{s.id}", s.image, storage, "\n".join(lines))
+        folders = [Folder(f"{HELPER_ROOT}/{rel}", seed=target) for rel, target in plan.binds]
+        await self._helper(
+            f"slotserve-prep-{s.id}", parent_binds(root, [rel for rel, _ in plan.binds], HELPER_ROOT), folders, s.image
+        )
 
-    async def _helper(self, name: str, image: str, storage: str, script: str) -> None:
-        config = helper_body(helper_spec(image, script, label_key=LABEL, binds=[f"{storage}:/slotserve-storage"]))
-        await self.docker.remove(name)
-        cid = await self.docker.create(name, config)
+    async def _helper(self, name: str, binds: list[str], folders: list[Folder], seed_image: str | None = None) -> None:
         try:
-            await self.docker.start(cid)
-            code = await self.docker.wait(cid)
-            if code != 0:
-                tail = await self.docker.logs(cid, 20)
-                raise DevEnvError("devenv_storage_failed", detail=f"exit code {code}: {tail.strip()[-500:]}")
-        finally:
-            with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
-                await self.docker.remove(cid)
+            problem = await storage.prepare_folders(
+                self.docker,
+                helper_image=self.settings.storage_helper_image,
+                seed_image=seed_image,
+                name=name,
+                folders=folders,
+                binds=binds,
+                label=LABEL,
+            )
+        except DockerError as exc:
+            raise DevEnvError("devenv_storage_failed", detail=exc.message[:500]) from exc
+        if problem:
+            raise DevEnvError("devenv_storage_failed", detail=problem)
+
+    async def _remove_storage_dir(self, name: str, root: str, rel: str) -> None:
+        """Deletes a folder under the legacy storage dir with a helper of SlotServe's image."""
+        image = self.settings.storage_helper_image
+        await storage.ensure_image(self.docker, image)
+        binds = parent_binds(root, [rel], HELPER_ROOT)
+        code, output = await storage.run_helper(
+            self.docker, name, image, [], f"rm -rf {q(f'{HELPER_ROOT}/{rel}')}", binds=binds
+        )
+        if code != 0:
+            raise DevEnvError("devenv_storage_failed", detail=f"exit code {code}: {output.strip()[-500:]}")
 
     async def _start(self, db, s: DevSession) -> None:
         used, kept = await self._used_ports(db, s)
@@ -776,7 +788,8 @@ class DevEnvManager:
         await self._prepare_storage(s, plan)
         if plan.storage is not None:  # volumes and folders of managed storages
             try:
-                await storage.prepare(self.docker, s.image, plan.storage, f"slotserve-prep-{s.id}")
+                helper = self.settings.storage_helper_image
+                await storage.prepare(self.docker, helper, s.image, plan.storage, f"slotserve-prep-{s.id}")
             except storage.StorageError as exc:
                 raise DevEnvError(exc.code, **exc.params) from exc
         lo, hi = parse_port_range(self.settings.devenv_ssh_ports)
@@ -1110,10 +1123,7 @@ class DevEnvManager:
             storage_dir = self.settings.devenv_storage_dir.rstrip("/")
             # the project storage of Admin -> Storage keeps the data under projects/p<id>
             st = await storage.projects_storage(db, await db.get(User, project.owner_id))
-            image = project.image
-            if (storage_dir or st is not None) and not await self.docker.image_exists(image):
-                template = await db.get(DevTemplate, project.template_id) if project.template_id else None
-                image = template.image if template else image
+            image = self.settings.storage_helper_image  # never the project's own image
             if st is not None:
                 try:
                     await storage.remove_folder(
@@ -1127,8 +1137,7 @@ class DevEnvManager:
                 except storage.StorageError as exc:
                     raise DevEnvError(exc.code, **exc.params) from exc
             if storage_dir:
-                script = f"rm -rf /slotserve-storage/projects/p{project.id}"
-                await self._helper(f"slotserve-clean-p{project.id}", image, storage_dir, script)
+                await self._remove_storage_dir(f"slotserve-clean-p{project.id}", storage_dir, f"projects/p{project.id}")
             else:
                 for path in {*load_paths(project.persist_paths), *load_paths(project.container_paths)}:
                     with contextlib.suppress(DockerError, httpx.HTTPError, OSError):

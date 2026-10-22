@@ -275,6 +275,7 @@ async def test_environment_mounts(app, make_client):
             "/api/devenv/templates", json={"name": "Conda", "image": "example/conda:1", "persist_paths": ["/opt/conda"]}
         )
     ).json()
+    docker.image_files["example/conda:1"] = {"/opt/conda/bin/python": b"#!python"}
     await _book(bob, t["id"])
     await _ticks(app)
     [session] = (await bob.get("/api/devenv/sessions")).json()
@@ -299,20 +300,35 @@ async def test_environment_mounts(app, make_client):
     }
     assert mounts["/mnt/models"]["ReadOnly"] is True
     # folders were created (and seeded from the image) by helpers on each storage's root
-    preps = {n: c for n, c in docker.created if n.startswith(f"slotserve-prep-{session['id']}-st")}
+    preps = {
+        n: c
+        for n, c in docker.created
+        if n.startswith(f"slotserve-prep-{session['id']}-st") and not n.endswith(("-src", "-seed"))
+    }
     assert set(preps) == {
         f"slotserve-prep-{session['id']}-st{homes['id']}",
         f"slotserve-prep-{session['id']}-st{projects['id']}",
     }
+    # SlotServe's helper image, never the environment's (R1-06)
     home_prep = preps[f"slotserve-prep-{session['id']}-st{homes['id']}"]
-    assert home_prep["Image"] == "example/conda:1"
+    assert home_prep["Image"] == "busybox:1.37"
     script = home_prep["Entrypoint"][2]
-    assert f"mkdir -p '/slotserve-storage/users/u{uid}'" in script and "cp -a '/workspace/.'" in script
-    assert "chown" not in script
+    assert f"mkdir -p '/slotserve-storage/users/u{uid}'" in script and "chown" not in script
+    # an NFS share can only be mounted from its root (its sub-folders may not exist yet)
     base = home_prep["HostConfig"]["Mounts"][0]
     assert base["Target"] == "/slotserve-storage" and docker.volumes[base["Source"]]["Options"]["device"] == ":/homes"
+    # a host directory: only the parent of the folder it creates, not the storage's root
     proj_prep = preps[f"slotserve-prep-{session['id']}-st{projects['id']}"]
-    assert proj_prep["HostConfig"]["Mounts"][0]["Source"] == "/srv/projects"
+    assert "Mounts" not in proj_prep["HostConfig"]
+    assert proj_prep["HostConfig"]["Binds"] == [
+        f"/srv/projects/templates/u{uid}-t{t['id']}:/slotserve-storage/templates/u{uid}-t{t['id']}"
+    ]
+    # the new folders are seeded from the image
+    seed = next(c for n, c in docker.created if n == f"slotserve-prep-{session['id']}-st{projects['id']}-seed")
+    assert seed["Image"] == "busybox:1.37" and "/tmp/slotserve-seed/0/conda/." in seed["Entrypoint"][2]
+    assert any("conda/bin/python" in files for files in docker.archives.values())
+    src = next(c for n, c in docker.created if n.endswith("-src"))
+    assert src["Image"] == "example/conda:1" and not src["HostConfig"].get("Mounts")
 
     # a person's own view
     mine = {s["name"]: s for s in (await bob.get("/api/storage")).json()}
@@ -345,17 +361,13 @@ async def test_shared_environment_plan(app, make_client):
     assert plan.signature and plan.personal is None
     docker = app.state.fake_docker
     docker.images.add("example/shared:1")
-    await svc.prepare(app.state.devenv.docker, "example/shared:1", plan, "slotserve-prep-x")
+    await svc.prepare(app.state.devenv.docker, "busybox:1.37", "example/shared:1", plan, "slotserve-prep-x")
     [helper] = [c for n, c in docker.created if n.startswith("slotserve-prep-x-st")]
+    assert helper["Image"] == "busybox:1.37"
     script = helper["Entrypoint"][2]
     bob = users["bob"]
     assert f"chown {20000 + bob}:{20000 + bob} '/slotserve-storage/users/u{bob}' && chmod 700" in script
-    assert helper["HostConfig"]["Mounts"][0] == {
-        "Type": "bind",
-        "Source": "/srv/homes",
-        "Target": "/slotserve-storage",
-        "ReadOnly": False,
-    }
+    assert helper["HostConfig"]["Binds"] == ["/srv/homes/users:/slotserve-storage/users"]
 
 
 async def test_kept_environment_recreated_when_storage_changes(app, make_client):
