@@ -38,7 +38,7 @@ from .api import (
     waitlist,
 )
 from .config import Settings, get_settings
-from .gateway import devenv_web, devenv_web_app, proxy
+from .gateway import container_gw, devenv_web, devenv_web_app, proxy
 from .gateway.devenv_web_auth import WebOriginGuard
 from .runtime.lanes import LaneManager, ensure_default_lane
 from .security import secret_key
@@ -108,6 +108,9 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
             await seed_templates(session)
         app.state.devenv = DevEnvManager(app.state, docker=getattr(app.state, "docker_client", None))
         app.state.lanes.gpu_holder = app.state.devenv.holds_gpu
+        # [F11] the container-side gateway: only /v1, for dev environments; started by the dev environment manager
+        # once Docker answers (gateway/container_gw.py)
+        app.state.container_gw = container_gw.ContainerGateway(app.state, serve=start_background)
         app.state.storage = StorageService(app.state)  # storage hook: Admin -> Storage checks
         # [web origin] dev environment web interfaces on their own port (gateway/devenv_web_app.py)
         app.state.web_app = devenv_web_app.create_web_app(app.state)
@@ -151,6 +154,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
                 with contextlib.suppress(asyncio.CancelledError):
                     await t
             await devenv_web_app.stop(web_listener)
+            await app.state.container_gw.close()
             await app.state.housekeeper.close()
             await app.state.notifier.save_pending()
             await app.state.lanes.shutdown()

@@ -176,6 +176,17 @@ class Settings(BaseSettings):
     # Referer, one browser using one person's environments at a time; gateway/devenv_web.py). Weakens the
     # isolation between environments; nothing else.
     devenv_web_compat: bool = False
+    # The platform inside every dev environment (F11): SLOTSERVE_* variables, a login banner and the LLM endpoint
+    # (OPENAI_BASE_URL) on the container-side gateway; devenv_llm_key adds an environment key (a 0600 file, never in
+    # the container's environment).
+    devenv_platform_context: bool = True
+    devenv_llm_key: bool = True
+    # The container-side gateway (gateway/container_gw.py): only /v1, reachable from the environments as
+    # http://slotserve-gw:<port>/v1. 0 = off (no LLM endpoint or key inside environments).
+    devenv_gateway_port: int = 8002
+    # Address it listens on; empty = automatic (the Docker bridge's address on the host, all addresses inside a
+    # container).
+    devenv_gateway_host: str = ""
 
     # Playground: the web page's chat with a model (api/playground.py). It uses the browser session, never a key.
     playground_enabled: bool = True

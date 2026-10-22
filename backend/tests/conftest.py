@@ -40,6 +40,9 @@ async def app(tmp_path, monkeypatch):
         "MOCK_TOKEN_DELAY": "0",
         # no second listener for dev environment web interfaces (tests serve app.state.web_app themselves)
         "SLOTSERVE_DEVENV_WEB_PORT": "0",
+        # no container-side gateway listener either (tests that need one install gateway/container_gw.py's
+        # ContainerGateway with serve=False)
+        "SLOTSERVE_DEVENV_GATEWAY_PORT": "0",
     }
     for key, value in env.items():
         monkeypatch.setenv(key, value)
