@@ -1,31 +1,11 @@
-"""Dev environments: Docker containers with SSH, for a booking or for whoever wants an idle lane.
-
-When a dev environment booking comes up, its lane's model server is stopped (it is scheduled like a whole-GPU
-booking), the image is pulled ahead of time, and a container is started with the lane's GPUs, the person's
-persistent ``/workspace`` and the shared models read-only. SSH comes from a static Dropbear that SlotServe
-copies into the container, so any image works; logins use the person's public keys and, when admins allow
-it, their environment password. When the booking ends the container is removed (``/workspace`` stays) - or,
-for a kept environment ("project"), stopped and started again at the next booking.
-
-A lane whose idle mode is ``devenv`` runs one shared container while nobody has it booked. Every SlotServe
-user gets an account there with their own keys and password; it is stopped ahead of the next booking.
-
-Every container gets its own Docker network (a kept environment keeps one for as long as it exists), and SlotServe
-reverse-proxies any of the container's ports under ``/devenv/<session>/port/<port>/`` to the people allowed to use
-the environment (see ``gateway/devenv_web.py``). A template declares the ports of its web interfaces (a desktop in
-the browser, JupyterLab, VS Code or any HTTP app) with a name and kind. SlotServe reaches a port over the
-environment's network when it runs in a container itself (it joins that network), otherwise through a random port
-bound to 127.0.0.1 (declared ports) or the container's address on its network. Web ports are never published.
-"""
+"""The dev environment manager: plans, starts, pauses and removes the containers (see the package docstring)."""
 
 import asyncio
-import base64
 import contextlib
 import hashlib
 import json
 import logging
 import os
-import posixpath
 import re
 import secrets
 import socket
@@ -38,476 +18,31 @@ from pathlib import Path
 import httpx
 from sqlalchemy import func, or_, select
 
-from ..db import SessionLocal, utcnow
-from ..orm import HOLDING_STATUSES, DevProject, DevSession, DevTemplate, Lane, Reservation, SshKey, User
-from ..runtime.manager import RuntimeState
-from . import storage
-from .devenv_cpu import CpuEnvs
-from .docker_api import DockerClient, DockerError, registry_of, tar_files
-
-log = logging.getLogger(__name__)
-
-TICK_SECONDS = 3.0
-ACCOUNTS_REFRESH_SECONDS = 60.0
-HOUSEKEEPING_SECONDS = 3600.0
-OPEN_STATES = ("waiting", "pulling", "ready", "starting", "running", "stopping", "failed")
-GPU_STATES = ("starting", "running", "stopping")
-LABEL = "slotserve.devenv"
-UID_BASE = 20000  # Unix uid of a SlotServe user in shared environments: UID_BASE + user id
-MAX_AUTH_TRIES = 3
-KEY_TYPES = (
-    "ssh-ed25519",
-    "ssh-rsa",
-    "ecdsa-sha2-nistp256",
-    "ecdsa-sha2-nistp384",
-    "ecdsa-sha2-nistp521",
-    "sk-ssh-ed25519@openssh.com",
-    "sk-ecdsa-sha2-nistp256@openssh.com",
+from ...db import SessionLocal, utcnow
+from ...orm import HOLDING_STATUSES, DevProject, DevSession, DevTemplate, Lane, Reservation, SshKey, User
+from ...runtime.manager import RuntimeState
+from .. import storage
+from ..devenv_cpu import CpuEnvs
+from ..docker_api import DockerClient, DockerError, tar_files
+from .constants import (
+    ACCOUNTS_REFRESH_SECONDS,
+    GPU_STATES,
+    HOUSEKEEPING_SECONDS,
+    LABEL,
+    MAX_AUTH_TRIES,
+    OPEN_STATES,
+    TICK_SECONDS,
+    UID_BASE,
+    DevEnvError,
+    network_name,
+    project_network_name,
 )
-IMAGE_RE = re.compile(r"^[a-z0-9][a-z0-9._\-/:@]{0,250}$", re.I)
-WEB_KINDS = ("desktop", "jupyter", "vscode", "http")
-PATH_RE = re.compile(r"^/[A-Za-z0-9._+@/-]{1,200}$")
-MAX_PERSIST_PATHS = 8
-# Paths that cannot be kept: system directories, SlotServe's own and the ones that are mounted anyway.
-FORBIDDEN_PATHS = (
-    "/proc",
-    "/sys",
-    "/dev",
-    "/run",
-    "/var/run",
-    "/etc",
-    "/bin",
-    "/sbin",
-    "/lib",
-    "/lib32",
-    "/lib64",
-    "/libx32",
-    "/usr",
-    "/boot",
-    "/tmp",
-    "/opt/slotserve",
-    "/workspace",
-    "/models",
-)
-# Names a SlotServe user cannot get as a Unix account (system accounts and the usual image users).
-RESERVED_NAMES = {
-    "root",
-    "daemon",
-    "bin",
-    "sys",
-    "sync",
-    "games",
-    "man",
-    "lp",
-    "mail",
-    "news",
-    "uucp",
-    "proxy",
-    "www-data",
-    "backup",
-    "list",
-    "irc",
-    "gnats",
-    "nobody",
-    "systemd-network",
-    "systemd-resolve",
-    "messagebus",
-    "sshd",
-    "ubuntu",
-    "jovyan",
-    "admin",
-    "operator",
-    "halt",
-    "shutdown",
-    "ftp",
-    "postgres",
-    "mysql",
-    "redis",
-    "_apt",
-}
+from .scripts import ACCOUNTS_SCRIPT, LIB_SCRIPT, SHARED_SETUP, SSH_SCRIPT, START_SCRIPT
+from .ssh import SshBundle, booking_ssh_files
+from .templates import fill_placeholders, load_web_ports, placeholder_values, session_web
+from .validation import _slug, load_paths, parse_port_range, unix_names
 
-LIB_SCRIPT = r"""# SlotServe helpers
-set_hash() {
-  # $1 = account, $2 = SHA-512-crypt hash, "*" (no password) or "!" (locked)
-  if command -v chpasswd >/dev/null 2>&1 && printf '%s:%s\n' "$1" "$2" | chpasswd -e >/dev/null 2>&1; then
-    return 0
-  fi
-  if command -v usermod >/dev/null 2>&1 && usermod -p "$2" "$1" >/dev/null 2>&1; then
-    return 0
-  fi
-  for f in /etc/shadow /etc/passwd; do
-    if [ -f "$f" ] && grep -q "^$1:" "$f"; then
-      awk -F: -v OFS=: -v u="$1" -v h="$2" '$1 == u { $2 = h } { print }' "$f" > "$f.slotserve" \
-        && cat "$f.slotserve" > "$f"
-      rm -f "$f.slotserve"
-      return 0
-    fi
-  done
-  echo "slotserve: could not set the password of $1" >&2
-  return 1
-}
-"""
-
-# The SSH server of every container, set up per container: "--setup" only prepares the logins (root's password,
-# or the accounts of a shared environment), "--run" only runs Dropbear, no argument does both (docker exec).
-SSH_SCRIPT = """#!/bin/sh
-# Started by SlotServe: sets up the logins, then runs the SSH server (Dropbear).
-S=/opt/slotserve
-. $S/lib.sh
-setup() {{
-{setup}
-}}
-case "$1" in
-  --setup) setup; exit $? ;;
-  --run) ;;
-  *) setup || exit 1 ;;
-esac
-exec $S/dropbearmulti dropbear -F -e {flags} -K 60 -T {tries} -p 22 \\
-  -r $S/ssh_host_key {key_dir}-P /tmp/.slotserve-dropbear.pid
-"""
-ROOT_SETUP = """  if [ -f $S/root.hash ]; then
-    set_hash root "$(cat $S/root.hash)" || true
-    rm -f $S/root.hash
-  fi
-  return 0"""
-SHARED_SETUP = """  if ! /bin/sh $S/accounts.sh; then
-    echo "slotserve: could not create the user accounts, see above" >&2
-    return 1
-  fi"""
-
-START_SCRIPT = """#!/bin/sh
-# Started by SlotServe: an SSH server (dropbear) next to the environment's own main process.
-/bin/sh /opt/slotserve/ssh.sh --setup || exit 1
-/bin/sh /opt/slotserve/ssh.sh --run &
-{cd}
-if [ "$#" -gt 0 ]; then exec "$@"; fi
-while :; do sleep 3600; done
-"""
-
-ACCOUNTS_SCRIPT = r"""#!/bin/sh
-# Written by SlotServe: one account per SlotServe user (name:uid:hash lines in /opt/slotserve/accounts).
-S=/opt/slotserve
-. $S/lib.sh
-if command -v useradd >/dev/null 2>&1; then
-  ADD=useradd
-elif command -v adduser >/dev/null 2>&1; then
-  ADD=adduser
-else
-  echo "slotserve: this image has neither useradd nor adduser, so it cannot host a shared environment" >&2
-  exit 2
-fi
-SH=/bin/sh
-[ -x /bin/bash ] && SH=/bin/bash
-mkdir -p /home
-status=0
-while IFS=: read -r name uid hash; do
-  [ -n "$name" ] || continue
-  if id "$name" >/dev/null 2>&1; then
-    if [ "$(id -u "$name")" != "$uid" ]; then
-      echo "slotserve: the image already has an account $name; skipped" >&2
-      continue
-    fi
-  elif [ "$ADD" = useradd ]; then
-    useradd -M -d "/home/$name" -s "$SH" -u "$uid" "$name" || { status=1; continue; }
-  else
-    adduser -D -H -h "/home/$name" -s "$SH" -u "$uid" "$name" || { status=1; continue; }
-  fi
-  h="/home/$name"
-  mkdir -p "$h/.ssh"
-  cat "$S/keys/$name" > "$h/.ssh/authorized_keys" 2>/dev/null || : > "$h/.ssh/authorized_keys"
-  chown "$uid:$(id -g "$name")" "$h" "$h/.ssh" "$h/.ssh/authorized_keys"
-  chmod 700 "$h" "$h/.ssh"
-  chmod 600 "$h/.ssh/authorized_keys"
-  set_hash "$name" "$hash" || status=1
-done < $S/accounts
-# People who are no longer listed (disabled) lose access.
-if [ -f $S/accounts.done ]; then
-  for name in $(cat $S/accounts.done); do
-    if ! grep -q "^$name:" $S/accounts; then
-      rm -f "/home/$name/.ssh/authorized_keys"
-      set_hash "$name" '!' || true
-    fi
-  done
-fi
-cut -d: -f1 $S/accounts > $S/accounts.done
-rm -rf $S/accounts $S/keys
-exit $status
-"""
-
-PROFILE = """# Added by SlotServe
-[ -d /workspace ] && [ "$PWD" = "$HOME" ] && cd /workspace
-"""
-
-# The built-in templates (admins can change the image, disable them or add their own).
-BUILTINS = (
-    {
-        "builtin_key": "pytorch",
-        "name": "PyTorch",
-        "image": "pytorch/pytorch:2.14.1-cuda12.6-cudnn9-devel",
-        "description": "PyTorch 2.14, CUDA 12.6, cuDNN 9 and compilers. conda and pip work.",
-    },
-    {
-        "builtin_key": "jupyter-pytorch",
-        "name": "JupyterLab + PyTorch",
-        "image": "quay.io/jupyter/pytorch-notebook:cuda12-pytorch-2.11.0",
-        "description": "JupyterLab in the browser: Jupyter Docker Stacks with conda and PyTorch 2.11 (CUDA 12).",
-        "command": (
-            "jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --ServerApp.root_dir=/workspace"
-            " --ServerApp.base_url={base_path} --IdentityProvider.token={token} --ServerApp.allow_remote_access=True"
-        ),
-        "web_ports": json.dumps([{"name": "JupyterLab", "port": 8888, "kind": "jupyter"}]),
-    },
-    {
-        "builtin_key": "tensorflow",
-        "name": "TensorFlow",
-        "image": "tensorflow/tensorflow:2.21.0-gpu-jupyter",
-        "description": "TensorFlow 2.21 with GPU support and Jupyter.",
-    },
-    {
-        "builtin_key": "cuda",
-        "name": "CUDA",
-        "image": "nvidia/cuda:12.9.2-cudnn-devel-ubuntu24.04",
-        "description": "Ubuntu 24.04 with the CUDA 12.9 toolkit and cuDNN. Install what you need with apt and pip.",
-    },
-    {
-        "builtin_key": "desktop",
-        "name": "Ubuntu desktop",
-        "image": "linuxserver/webtop:ubuntu-xfce-388f14a2-ls7",
-        "description": "An Ubuntu XFCE desktop in the browser (linuxserver webtop) with the lane's GPUs.",
-        "env": json.dumps(
-            {"SUBFOLDER": "{base_path}", "CUSTOM_USER": "slotserve", "PASSWORD": "{token}", "TITLE": "SlotServe"}
-        ),
-        "web_ports": json.dumps([{"name": "Desktop", "port": 3000, "kind": "desktop"}]),
-        "keep_entrypoint": True,
-    },
-    {
-        "builtin_key": "vscode",
-        "name": "VS Code",
-        "image": "codercom/code-server:4.141.0",
-        "description": "VS Code in the browser (code-server), opened on /workspace.",
-        "command": "code-server --bind-addr 0.0.0.0:8080 --auth none --disable-telemetry --disable-update-check"
-        " /workspace",
-        "web_ports": json.dumps([{"name": "VS Code", "port": 8080, "kind": "vscode"}]),
-    },
-)
-WEB_FIELDS = ("command", "env", "web_ports", "keep_entrypoint")
-
-
-class DevEnvError(Exception):
-    def __init__(self, code: str, **params):
-        super().__init__(code)
-        self.code = code
-        self.params = params
-
-
-def parse_port_range(value: str) -> tuple[int, int]:
-    m = re.fullmatch(r"\s*(\d+)\s*-\s*(\d+)\s*", value)
-    if not m:
-        raise ValueError("expected a range like 2200-2299")
-    lo, hi = int(m.group(1)), int(m.group(2))
-    if not (1 <= lo <= hi <= 65535):
-        raise ValueError("ports must be between 1 and 65535, low to high")
-    return lo, hi
-
-
-def parse_public_key(text: str) -> tuple[str, str]:
-    """Validates an OpenSSH public key line; returns (normalized key, SHA256 fingerprint)."""
-    parts = text.strip().split()
-    if len(parts) < 2 or parts[0] not in KEY_TYPES:
-        raise ValueError("not an OpenSSH public key")
-    try:
-        blob = base64.b64decode(parts[1], validate=True)
-    except ValueError as exc:
-        raise ValueError("not an OpenSSH public key") from exc
-    if len(blob) < 4 or blob[4 : 4 + int.from_bytes(blob[:4], "big")].decode(errors="replace") != parts[0]:
-        raise ValueError("not an OpenSSH public key")
-    fingerprint = "SHA256:" + base64.b64encode(hashlib.sha256(blob).digest()).decode().rstrip("=")
-    return " ".join(parts[:3]), fingerprint
-
-
-def check_image(settings, image: str) -> str:
-    image = image.strip()
-    if not IMAGE_RE.match(image):
-        raise DevEnvError("devenv_image_invalid")
-    allowed = [r.strip().lower() for r in settings.devenv_allowed_registries.split(",") if r.strip()]
-    if allowed and registry_of(image) not in allowed:
-        raise DevEnvError("devenv_registry_not_allowed", registries=", ".join(allowed))
-    return image
-
-
-def check_persist_paths(paths: list[str]) -> list[str]:
-    """Extra directories kept between bookings: absolute, normalized, not a system directory."""
-    out: list[str] = []
-    for raw in paths:
-        path = raw.strip()
-        if not path:
-            continue
-        norm = posixpath.normpath(path)
-        bad = (
-            not PATH_RE.match(path)
-            or norm != path.rstrip("/")
-            or norm == "/"
-            or any(norm == f or norm.startswith(f + "/") or f.startswith(norm + "/") for f in FORBIDDEN_PATHS)
-        )
-        if bad:
-            raise DevEnvError("devenv_path_invalid", path=path[:200])
-        if norm not in out:
-            out.append(norm)
-    if len(out) > MAX_PERSIST_PATHS:
-        raise DevEnvError("devenv_path_limit", limit=MAX_PERSIST_PATHS)
-    return out
-
-
-def load_paths(value: str | None) -> list[str]:
-    try:
-        data = json.loads(value) if value else []
-    except ValueError:
-        return []
-    return [str(p) for p in data] if isinstance(data, list) else []
-
-
-def dump_paths(paths: list[str]) -> str | None:
-    return json.dumps(paths) if paths else None
-
-
-def _slug(path: str) -> str:
-    return re.sub(r"[^A-Za-z0-9_.-]", "_", path.strip("/").replace("/", "-"))[:60] or "root"
-
-
-def unix_names(users: list[User]) -> dict[int, str]:
-    """A stable, valid Unix account name for every user (lower case; clashes get the user id appended)."""
-    out: dict[int, str] = {}
-    taken: set[str] = set()
-    for u in sorted(users, key=lambda x: x.id):
-        name = re.sub(r"[^a-z0-9_-]", "_", u.username.lower())[:28]
-        if not re.match(r"^[a-z_]", name):
-            name = "u" + name
-        if name in RESERVED_NAMES or name in taken:
-            name = f"{name[:24]}_{u.id}"
-        taken.add(name)
-        out[u.id] = name
-    return out
-
-
-async def unix_name(db, user: User) -> str:
-    users = (await db.execute(select(User).where(User.disabled_at.is_(None)))).scalars().all()
-    return unix_names([*users, user]).get(user.id, user.username.lower())
-
-
-def can_access(session: DevSession, user: User | None) -> bool:
-    """Who may see and use a dev environment (and open its web interfaces): its owner, admins, and anyone for an
-    environment that belongs to no booking (a lane's shared environment). Never a disabled account."""
-    if user is None or getattr(user, "disabled_at", None) is not None:
-        return False
-    kind = getattr(session, "kind", None)
-    shared = kind == "shared" if kind else session.reservation_id is None
-    if user.is_admin or shared:
-        return True
-    return session.user_id is not None and session.user_id == user.id
-
-
-async def seed_templates(db) -> None:
-    existing = {
-        t.builtin_key: t
-        for t in (await db.execute(select(DevTemplate).where(DevTemplate.builtin_key.is_not(None)))).scalars()
-    }
-    for spec in BUILTINS:
-        row = existing.get(spec["builtin_key"])
-        if row is None:
-            db.add(DevTemplate(kind="builtin", **spec))
-        elif (
-            spec.get("web_ports")
-            and row.image == spec["image"]
-            and row.web_ports is None
-            and row.command is None
-            and row.env is None
-        ):
-            # seeded before templates had web interfaces and not changed since
-            for name in WEB_FIELDS:
-                setattr(row, name, spec.get(name))
-            row.name, row.description = spec["name"], spec["description"]
-    await db.commit()
-
-
-def web_base(session_id: int, port: int) -> str:
-    """The path one of a dev environment's container ports is served under."""
-    return f"/devenv/{session_id}/port/{port}/"
-
-
-def load_web_ports(raw: str | None) -> list[dict]:
-    """A template's declared web interfaces: [{name, port, kind, mode?}] (invalid entries are skipped)."""
-    try:
-        items = json.loads(raw) if raw else []
-    except ValueError:
-        return []
-    out, seen = [], set()
-    for item in items if isinstance(items, list) else []:
-        try:
-            port = int(item["port"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        if not 1 <= port <= 65535 or port in seen:
-            continue
-        seen.add(port)
-        kind = item.get("kind") if item.get("kind") in WEB_KINDS else "http"
-        entry = {"name": str(item.get("name") or port)[:32], "port": port, "kind": kind}
-        if item.get("mode") == "direct":  # direct ports: published on the host (services/devenv_ports.py)
-            entry["mode"] = "direct"
-        out.append(entry)
-    return out
-
-
-def placeholder_values(session_id: int, ports: list[dict], token: str) -> dict[str, str]:
-    """``{base_path}``/``{port}`` are the first declared port's, ``{base_path_<port>}`` any declared port's."""
-    values = {"session": str(session_id), "token": token, "base_path": "", "port": ""}
-    for i, p in enumerate(ports):
-        values[f"base_path_{p['port']}"] = web_base(session_id, p["port"])
-        if i == 0:
-            values.update(base_path=web_base(session_id, p["port"]), port=str(p["port"]))
-    return values
-
-
-def port_entry(web: dict | None, port: int) -> dict:
-    """How the proxy treats a port: the declared entry, or a plain HTTP app that gets the prefix stripped."""
-    for p in (web or {}).get("ports", []):
-        if p["port"] == port:
-            return p
-    return {"name": str(port), "port": port, "kind": "http", "strip": True}
-
-
-def network_name(session_id: int) -> str:
-    return f"slotserve-devenv-{session_id}"
-
-
-def project_network_name(project_id: int) -> str:
-    """A kept environment's container keeps its network between bookings (until the project is deleted)."""
-    return f"slotserve-devenv-p{project_id}"
-
-
-def fill_placeholders(text: str, values: dict[str, str]) -> str:
-    """Replaces ``{base_path}``, ``{token}``, ``{port}`` and ``{session}``; other braces are left alone."""
-    for key, value in values.items():
-        text = text.replace("{" + key + "}", value)
-    return text
-
-
-def session_web(session: DevSession) -> dict | None:
-    """How SlotServe reaches a running session's ports: {token, ports: [{name, port, kind, strip}], container,
-    ip, published: {"<port>": "127.0.0.1:<host port>"}}."""
-    if not session.web:
-        return None
-    try:
-        return json.loads(session.web)
-    except ValueError:
-        return None
-
-
-def visible(template: DevTemplate | None, user: User) -> bool:
-    if template is None or template.deleted_at is not None:
-        return False
-    if template.kind == "builtin":
-        return template.enabled
-    return template.owner_id == user.id or user.is_admin
+log = logging.getLogger(__package__)  # the logger keeps the name of the module before the move
 
 
 class _NoCookies(CookiePolicy):
@@ -526,29 +61,6 @@ class _NoCookies(CookiePolicy):
 
     def path_return_ok(self, path, request) -> bool:
         return False
-
-
-def booking_ssh_files(bundle: "SshBundle", keys: list[str], secret: str | None) -> dict[str, tuple[bytes, int]]:
-    """Files that give a booking container its SSH server: root logs in with the person's keys, and with their
-    password (``secret``, a SHA-512 crypt hash) when one is set and password login is allowed."""
-    ssh = SSH_SCRIPT.format(setup=ROOT_SETUP, flags="" if secret else "-s", tries=MAX_AUTH_TRIES, key_dir="-D $S/ssh ")
-    return {
-        "opt/slotserve/dropbearmulti": (bundle.binary, 0o755),
-        "opt/slotserve/ssh_host_key": (bundle.host_key, 0o600),
-        "opt/slotserve/lib.sh": (LIB_SCRIPT.encode(), 0o644),
-        "opt/slotserve/ssh/authorized_keys": ("".join(k + "\n" for k in keys).encode(), 0o600),
-        "opt/slotserve/root.hash": ((secret or "*").encode(), 0o600),
-        "etc/profile.d/slotserve.sh": (PROFILE.encode(), 0o644),
-        "opt/slotserve/ssh.sh": (ssh.encode(), 0o755),
-        "opt/slotserve/start.sh": (START_SCRIPT.format(cd="cd /workspace 2>/dev/null || true").encode(), 0o755),
-    }
-
-
-@dataclass
-class SshBundle:
-    binary: bytes
-    host_key: bytes
-    fingerprint: str
 
 
 @dataclass
@@ -595,7 +107,7 @@ class DevEnvManager:
         self.self_container = socket.gethostname()
         self.cpu = CpuEnvs(self)  # devenv_cpu: environments without a GPU
         # [ports hook] direct ports and their forwarder containers (services/devenv_ports.py)
-        from .devenv_ports import PortManager
+        from ..devenv_ports import PortManager
 
         self.ports = PortManager(self)
 
