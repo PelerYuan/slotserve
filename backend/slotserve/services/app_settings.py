@@ -121,6 +121,8 @@ EDITABLE: dict[str, Editable] = {
     "usage_busy_percent": Editable(int, min=1, max=100, unit="%"),
     "audit_retention_days": Editable(int, min=0, max=3650, unit="d"),
     "backup_keep": Editable(int, min=0, max=100),
+    "backup_target": Editable(str, max=500),
+    "backup_hour": Editable(int, min=-1, max=23, unit="h"),
 }
 
 # Changing one of these restarts the Telegram bot.
@@ -169,6 +171,13 @@ def validate(key: str, value: Any) -> Any:
             split_args(value)
         except ValueError as exc:
             raise InvalidSetting(key, str(exc)) from exc
+    if key == "backup_target" and value:
+        from .maintenance import BackupError, parse_target
+
+        try:
+            parse_target(value)
+        except BackupError as exc:
+            raise InvalidSetting(key, "an absolute path or storage:<id>") from exc
     if key in ("devenv_ssh_ports", "devenv_public_ports"):
         from .devenv import parse_port_range
 

@@ -21,6 +21,8 @@ from .api import (
     devenv_cpu,
     devenv_ports,
     downloads,
+    health,
+    inbox,
     keys,
     lanes,
     metrics,
@@ -40,7 +42,8 @@ from .runtime.lanes import LaneManager, ensure_default_lane
 from .security import secret_key
 from .security.csrf import SESSION_COOKIE, CsrfGuard
 from .security.setup_code import SetupCode
-from .services import app_settings
+from .services import app_settings, maintenance
+from .services import health as health_service
 from .services.catalog_deploy import Deployer
 from .services.chat.hub import ChannelHub
 from .services.devenv import DevEnvManager, seed_templates
@@ -115,16 +118,26 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         app.state.notifier.hub = app.state.channels
         if restored := await app.state.notifier.restore_pending():
             log.info("re-queued %s notification(s) saved at the last shutdown", restored)
+        # [health] checks, alerts and the supervision of the background tasks below (services/health.py)
+        health_service.reset_runtime_state()
+        app.state.health = health_service.HealthMonitor(settings, app.state)
+        if maintenance.restore_hold(settings):
+            log.warning("restored from a backup: nothing unknown is removed until an admin has seen the report")
+        supervised = health_service.supervised
         tasks = []
         if start_background:
             tasks = [
-                asyncio.create_task(app.state.downloader.run(), name="downloader"),
-                asyncio.create_task(app.state.notifier.run(), name="notifier"),
-                asyncio.create_task(app.state.housekeeper.run(), name="housekeeper"),
-                *(asyncio.create_task(c.run(), name=f"chat-{c.id}") for c in app.state.channels),
-                asyncio.create_task(app.state.devenv.run(), name="devenv"),
-                asyncio.create_task(app.state.usage_sampler.run(), name="usage-sampler"),
-                asyncio.create_task(app.state.storage.run(), name="storage"),  # storage hook
+                asyncio.create_task(supervised("downloader", app.state.downloader.run), name="downloader"),
+                asyncio.create_task(supervised("notifier", app.state.notifier.run), name="notifier"),
+                asyncio.create_task(supervised("housekeeper", app.state.housekeeper.run), name="housekeeper"),
+                *(
+                    asyncio.create_task(supervised(f"chat-{c.id}", c.run), name=f"chat-{c.id}")
+                    for c in app.state.channels
+                ),
+                asyncio.create_task(supervised("devenv", app.state.devenv.run), name="devenv"),
+                asyncio.create_task(supervised("usage-sampler", app.state.usage_sampler.run), name="usage-sampler"),
+                asyncio.create_task(supervised("storage", app.state.storage.run), name="storage"),  # storage hook
+                asyncio.create_task(supervised("health", app.state.health.run), name="health"),
             ]
         try:
             yield
@@ -135,6 +148,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
                 with contextlib.suppress(asyncio.CancelledError):
                     await t
             await devenv_web_app.stop(web_listener)
+            await app.state.housekeeper.close()
             await app.state.notifier.save_pending()
             await app.state.lanes.shutdown()
             await app.state.channels.close()
@@ -172,6 +186,8 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
     for module in (
         auth,
         notifications,
+        inbox,
+        health,
         keys,
         models,
         downloads,

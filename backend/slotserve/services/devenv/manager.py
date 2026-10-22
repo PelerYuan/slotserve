@@ -21,7 +21,7 @@ from sqlalchemy import func, or_, select
 from ...db import SessionLocal, utcnow
 from ...orm import HOLDING_STATUSES, DevProject, DevSession, DevTemplate, Lane, Reservation, SshKey, User
 from ...runtime.manager import RuntimeState
-from .. import storage
+from .. import maintenance, storage
 from ..devenv_cpu import CpuEnvs
 from ..docker_api import DockerClient, DockerError, tar_files
 from .constants import (
@@ -1017,6 +1017,8 @@ class DevEnvManager:
             if project is not None and project.container_id == c["Id"]:
                 if c.get("State") == "running":
                     await self._pause(db, project, c["Id"])
+                continue
+            if maintenance.restore_hold(self.settings):  # [health] after a restore: keep until the report is seen
                 continue
             await self.docker.remove(c["Id"])
         projects = set((await db.execute(select(DevProject.id))).scalars())

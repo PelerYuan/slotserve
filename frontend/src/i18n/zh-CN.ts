@@ -1035,7 +1035,12 @@ const zh: typeof en = {
       audit_retention_days: '审计日志保留天数',
       audit_retention_days_desc: '0 表示永久保留。',
       backup_keep: '保留的每日备份数',
-      backup_keep_desc: '每 24 小时自动备份一次数据库。0 表示关闭自动备份。',
+      backup_keep_desc: '每天生成一份备份包（数据库、会话密钥、SSH 主机密钥）。0 表示关闭自动备份。不包含 workspace 与保留的环境。',
+      backup_target: '备份复制到',
+      backup_target_desc:
+        '在本机以外保留一份：填写 SlotServe 可写的绝对路径（已挂载的 NAS 共享），或 storage:<id> 使用「管理 → 存储」中的存储。留空则备份只在本机磁盘上。',
+      backup_hour: '每日备份时间（时）',
+      backup_hour_desc: '每日备份的本地小时（0–23）；-1 表示每 24 小时一次。',
 
       devenv_enabled: '开发环境',
       devenv_enabled_desc: '允许把 GPU 时段预约成带 SSH 的 Docker 容器。需要把 Docker 套接字挂载进 SlotServe，这相当于给它宿主机的 root 权限。',
@@ -1210,6 +1215,8 @@ const zh: typeof en = {
         reservation_approve: '通过预约',
         reservation_reject: '拒绝预约',
         backup_create: '创建备份',
+        health_dismiss: '忽略健康检查项',
+        health_undismiss: '恢复已忽略的健康检查项',
         reservation_create_for: '替他人预约',
         reservation_update: '修改预约',
         runtime_load: '手动加载模型',
