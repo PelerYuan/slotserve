@@ -122,7 +122,9 @@ async def test_settings_override_and_reset(make_client):
     r = await newcomer.post("/api/auth/register", json={**body, "invite_code": "fresh-code"})
     assert r.status_code == 201
 
-    audit = (await admin.get("/api/admin/audit")).json()["items"][0]
+    items = (await admin.get("/api/admin/audit")).json()["items"]
+    assert items[0]["action"] == "auth.register" and items[0]["detail"]["method"] == "invite_code"
+    audit = items[1]
     assert audit["action"] == "settings.update" and audit["detail"]["invite_code"] == "***"
 
 

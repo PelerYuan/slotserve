@@ -1,0 +1,699 @@
+{
+  "_comment": [
+    "Error pattern library (services/diagnostics). Order matters: the first pattern whose regex matches wins.",
+    "match: regexes (case-insensitive, one log line each); named groups become params usable as {name} in the texts.",
+    "exit_codes: used only when no regex of any pattern matched. sources: limit a pattern to callers that pass one of them.",
+    "Texts with {placeholders} need a 'generic' variant, used when a placeholder was not captured.",
+    "i18n keys: diag_<id>_cause and diag_<id>_step<n> (no dots). Every pattern has a real log sample in tests/samples/logs/<id>*.log."
+  ],
+  "patterns": [
+    {
+      "id": "port_in_use",
+      "category": "network",
+      "doc": "configuration.md#slotserve-settings",
+      "match": [
+        "couldn't bind HTTP server socket, hostname: \\S+, port: (?P<port>\\d+)",
+        "couldn't bind to server socket",
+        "error while attempting to bind on address \\('[^']*', (?P<port>\\d+)\\)",
+        "Bind for \\S*:(?P<port>\\d+) failed: port is already allocated",
+        "listen tcp\\d? \\S*:(?P<port>\\d+): bind: address already in use",
+        "\\[Errno (?:98|48|10048)\\]",
+        "address already in use",
+        "only one usage of each socket address"
+      ],
+      "text": {
+        "en": {
+          "cause": {"text": "Port {port} is already in use by another program", "generic": "The port is already in use by another program"},
+          "steps": [
+            {"text": "Find and stop the program that holds port {port} (often a llama-server or vLLM started by hand, or an old service). Linux: ss -ltnp | grep :{port}; Windows: netstat -ano | findstr :{port}", "generic": "Find and stop the program that holds the port (often a llama-server or vLLM started by hand, or an old service). Linux: ss -ltnp; Windows: netstat -ano"},
+            "Or move SlotServe's ports away from it: SLOTSERVE_LLAMA_PORT for the model servers (each lane uses the next port), the SSH and direct port ranges for dev environments; then restart SlotServe",
+            "Retry the load once the port is free"
+          ]
+        },
+        "zh-CN": {
+          "cause": {"text": "端口 {port} 已被其他程序占用", "generic": "端口已被其他程序占用"},
+          "steps": [
+            {"text": "找到并停掉占用端口 {port} 的程序（常见：手动启动的 llama-server / vLLM，或旧的服务）。Linux：ss -ltnp | grep :{port}；Windows：netstat -ano | findstr :{port}", "generic": "找到并停掉占用该端口的程序（常见：手动启动的 llama-server / vLLM，或旧的服务）。Linux：ss -ltnp；Windows：netstat -ano"},
+            "或把 SlotServe 的端口挪开：模型服务用 SLOTSERVE_LLAMA_PORT（每个通道依次使用后面的端口），开发环境用 SSH 与直连端口范围；改完重启 SlotServe",
+            "端口空出后重试加载"
+          ]
+        }
+      }
+    },
+    {
+      "id": "disk_full",
+      "category": "disk",
+      "doc": "faq.md",
+      "match": [
+        "No space left on device",
+        "\\[Errno 28\\]",
+        "There is not enough space on the disk",
+        "\\bENOSPC\\b"
+      ],
+      "text": {
+        "en": {
+          "cause": "The disk is full",
+          "steps": [
+            "Free space on the disk named in the log: the models folder, the data directory or Docker's data root (docker system df; docker image prune)",
+            "Remove models or saved environment images that are no longer needed",
+            "Retry once there is enough room"
+          ]
+        },
+        "zh-CN": {
+          "cause": "磁盘已满",
+          "steps": [
+            "清理日志中提到的磁盘：模型目录、数据目录或 Docker 数据目录（docker system df；docker image prune）",
+            "删除不再需要的模型或已保存的环境镜像",
+            "空间足够后重试"
+          ]
+        }
+      }
+    },
+    {
+      "id": "context_too_long",
+      "category": "gpu",
+      "doc": "model-catalog.md#will-it-fit",
+      "match": [
+        "max seq len \\((?P<max_len>\\d+)\\) is larger than the maximum number of tokens that can be stored in KV cache",
+        "max seq len \\((?P<max_len>\\d+)\\), \\([\\d.]+ GiB KV cache is needed",
+        "estimated maximum model length is (?P<fit_len>\\d+)"
+      ],
+      "text": {
+        "en": {
+          "cause": {"text": "The context length ({max_len} tokens) does not fit into the GPU memory left for the KV cache", "generic": "The context length does not fit into the GPU memory left for the KV cache"},
+          "steps": [
+            {"text": "Lower --max-model-len (about {fit_len} fits on this GPU)", "generic": "Lower --max-model-len"},
+            "Or raise --gpu-memory-utilization (up to about 0.95) when nothing else uses the GPU",
+            "Or use more GPUs (--tensor-parallel-size) or a smaller / more quantized model"
+          ]
+        },
+        "zh-CN": {
+          "cause": {"text": "上下文长度（{max_len} tokens）放不进剩余给 KV 缓存的显存", "generic": "上下文长度放不进剩余给 KV 缓存的显存"},
+          "steps": [
+            {"text": "调小 --max-model-len（这块 GPU 约能放下 {fit_len}）", "generic": "调小 --max-model-len"},
+            "或在 GPU 无其他占用时调大 --gpu-memory-utilization（最高约 0.95）",
+            "或使用更多 GPU（--tensor-parallel-size）、更小或量化程度更高的模型"
+          ]
+        }
+      }
+    },
+    {
+      "id": "gpu_out_of_memory",
+      "category": "gpu",
+      "doc": "model-catalog.md#will-it-fit",
+      "match": [
+        "allocating (?P<size>[\\d.]+ [MG]iB) on device (?P<device>\\d+): cudaMalloc failed: out of memory",
+        "Tried to allocate (?P<size>[\\d.]+ [MG]iB)\\. GPU (?P<device>\\d+) has a total capacity",
+        "cudaMalloc failed: out of memory",
+        "CUDA out of memory",
+        "CUDA error: out of memory",
+        "HIP out of memory",
+        "torch\\.(?:cuda\\.)?OutOfMemoryError",
+        "failed to allocate (?:CUDA|ROCm|Vulkan|Metal)\\d* buffer",
+        "unable to allocate (?:CUDA|ROCm|Vulkan|Metal)\\d* buffer",
+        "failed to allocate buffer for kv cache",
+        "No available memory for the cache blocks",
+        "ErrorOutOfDeviceMemory"
+      ],
+      "text": {
+        "en": {
+          "cause": {"text": "GPU {device} ran out of memory while loading the model", "generic": "The GPU ran out of memory while loading the model"},
+          "steps": [
+            "Lower the context size (llama.cpp -c, vLLM --max-model-len): the KV cache grows with it",
+            "Offload fewer layers to the GPU (llama.cpp -ngl) or use a smaller quantization of the model",
+            "Check that nothing else uses the GPU (nvidia-smi): another model, a dev environment or a job"
+          ]
+        },
+        "zh-CN": {
+          "cause": {"text": "加载模型时 GPU {device} 显存不足", "generic": "加载模型时 GPU 显存不足"},
+          "steps": [
+            "调小上下文长度（llama.cpp 的 -c，vLLM 的 --max-model-len）：KV 缓存随之增长",
+            "少放几层到 GPU（llama.cpp 的 -ngl），或换用量化程度更高的模型",
+            "确认没有其他程序占用 GPU（nvidia-smi）：另一个模型、开发环境或任务"
+          ]
+        }
+      }
+    },
+    {
+      "id": "host_out_of_memory",
+      "category": "memory",
+      "doc": "faq.md",
+      "match": [
+        "^Killed$",
+        "^(?:/bin/)?(?:ba)?sh: line \\d+:\\s+\\d+ Killed\\s",
+        "Out of memory: Killed process",
+        "std::bad_alloc",
+        "\\bMemoryError\\b"
+      ],
+      "exit_codes": [137, -9],
+      "text": {
+        "en": {
+          "cause": "The process was stopped because the machine ran out of RAM",
+          "steps": [
+            "Check free memory (free -h) and what else is running; dev environments and other models use RAM too",
+            "Use a smaller model or quantization; with llama.cpp put more layers on the GPU (-ngl) and do not use --no-mmap",
+            "For dev environments: set a memory limit so one container cannot take everything"
+          ]
+        },
+        "zh-CN": {
+          "cause": "机器内存（RAM）不足，进程被系统终止",
+          "steps": [
+            "查看可用内存（free -h）和其他正在运行的程序；开发环境和其他模型也占用内存",
+            "换用更小的模型或量化版本；llama.cpp 用 -ngl 放更多层到 GPU，且不要加 --no-mmap",
+            "开发环境：设置内存上限，避免一个容器占满全部内存"
+          ]
+        }
+      }
+    },
+    {
+      "id": "gpu_runtime_missing",
+      "category": "docker",
+      "doc": "dev-environments.md#setting-it-up-admin",
+      "match": [
+        "could not select device driver \"(?P<driver>[^\"]*)\" with capabilities",
+        "unknown or invalid runtime name: nvidia",
+        "Unknown runtime specified nvidia",
+        "nvidia-container-cli: initialization error",
+        "nvidia-container-runtime-hook: .*(?:not found|error)"
+      ],
+      "text": {
+        "en": {
+          "cause": "Docker cannot give the container a GPU: the NVIDIA Container Toolkit is missing or not set up",
+          "steps": [
+            "Install the NVIDIA Container Toolkit on the Docker host, run sudo nvidia-ctk runtime configure --runtime=docker and restart Docker",
+            "Check that the host driver works (nvidia-smi) and test: docker run --rm --gpus all ubuntu nvidia-smi",
+            "Docker Desktop on Windows: use the WSL 2 backend with a current NVIDIA driver"
+          ]
+        },
+        "zh-CN": {
+          "cause": "Docker 无法为容器分配 GPU：未安装或未配置 NVIDIA Container Toolkit",
+          "steps": [
+            "在 Docker 主机上安装 NVIDIA Container Toolkit，执行 sudo nvidia-ctk runtime configure --runtime=docker 并重启 Docker",
+            "确认宿主机驱动正常（nvidia-smi），并测试：docker run --rm --gpus all ubuntu nvidia-smi",
+            "Windows 上的 Docker Desktop：使用 WSL 2 后端并安装较新的 NVIDIA 驱动"
+          ]
+        }
+      }
+    },
+    {
+      "id": "cuda_mismatch",
+      "category": "gpu",
+      "doc": "getting-started.md#requirements",
+      "match": [
+        "CUDA driver version is insufficient for CUDA runtime version",
+        "unsatisfied condition: cuda>=(?P<cuda>[\\d.]+)",
+        "The NVIDIA driver on your system is too old",
+        "forward compatibility was attempted on non supported HW",
+        "no kernel image is available for execution on the device",
+        "ggml_cuda_init: failed to initialize CUDA"
+      ],
+      "text": {
+        "en": {
+          "cause": {"text": "The engine was built for CUDA {cuda}, which the GPU driver or the GPU does not support", "generic": "The engine's CUDA version does not match the GPU driver or the GPU"},
+          "steps": [
+            "Update the NVIDIA driver on the host, or use an engine build for an older CUDA version",
+            "With Docker: the CUDA major version of CUDA_IMAGE must match the one llama-server was built with",
+            "A very new or very old GPU needs a build that includes its architecture (CMAKE_CUDA_ARCHITECTURES)"
+          ]
+        },
+        "zh-CN": {
+          "cause": {"text": "引擎按 CUDA {cuda} 构建，GPU 驱动或 GPU 不支持", "generic": "引擎的 CUDA 版本与 GPU 驱动或 GPU 不匹配"},
+          "steps": [
+            "升级宿主机 NVIDIA 驱动，或改用针对较低 CUDA 版本构建的引擎",
+            "使用 Docker 时：CUDA_IMAGE 的 CUDA 主版本必须与构建 llama-server 时一致",
+            "很新或很老的 GPU 需要包含其架构的构建（CMAKE_CUDA_ARCHITECTURES）"
+          ]
+        }
+      }
+    },
+    {
+      "id": "engine_library_missing",
+      "category": "engine",
+      "doc": "getting-started.md#requirements",
+      "match": [
+        "error while loading shared libraries: (?P<library>\\S+): cannot open shared object file",
+        "because (?P<library>\\S+\\.dll) was not found",
+        "ImportError: (?P<library>lib\\S+\\.so[\\d.]*): cannot open shared object file"
+      ],
+      "exit_codes": [3221225781],
+      "text": {
+        "en": {
+          "cause": {"text": "The engine cannot start: the library {library} is missing", "generic": "The engine cannot start: a library it needs (a DLL or .so) is missing"},
+          "steps": [
+            "Usually the CUDA runtime does not match the engine build: install the matching CUDA runtime or use an engine build for the installed CUDA",
+            "Windows: put the cudart DLLs from the llama.cpp release next to llama-server.exe",
+            "Linux: ldd $(which llama-server) shows which libraries are missing"
+          ]
+        },
+        "zh-CN": {
+          "cause": {"text": "引擎无法启动：缺少库 {library}", "generic": "引擎无法启动：缺少所需的库（DLL 或 .so）"},
+          "steps": [
+            "通常是 CUDA 运行库与引擎构建不匹配：安装对应的 CUDA 运行库，或换用与已安装 CUDA 对应的引擎构建",
+            "Windows：把 llama.cpp 发布包里的 cudart DLL 放到 llama-server.exe 同一目录",
+            "Linux：ldd $(which llama-server) 可以看到缺少哪些库"
+          ]
+        }
+      }
+    },
+    {
+      "id": "engine_not_executable",
+      "category": "engine",
+      "doc": "configuration.md#slotserve-settings",
+      "match": [
+        "spawn failed: \\[Errno 13\\] Permission denied: '(?P<path>[^']+)'",
+        "spawn failed: \\[Errno 13\\] Permission denied",
+        "spawn failed: \\[Errno 8\\] Exec format error(?:: '(?P<path>[^']+)')?",
+        "spawn failed: \\[WinError 193\\]",
+        "exec: \"(?P<path>[^\"]+)\": permission denied",
+        "exec format error"
+      ],
+      "exit_codes": [126],
+      "text": {
+        "en": {
+          "cause": {"text": "The engine program {path} cannot be run (not executable or built for another system)", "generic": "The engine program cannot be run (not executable or built for another system)"},
+          "steps": [
+            {"text": "Make it executable: chmod +x {path}", "generic": "Make it executable: chmod +x <path to llama-server>"},
+            "Check that the build matches this machine (x86_64 or arm64, Linux or Windows)",
+            "A folder mounted with noexec cannot run programs: move the engine or remount without noexec"
+          ]
+        },
+        "zh-CN": {
+          "cause": {"text": "引擎程序 {path} 无法运行（没有执行权限或为其他系统构建）", "generic": "引擎程序无法运行（没有执行权限或为其他系统构建）"},
+          "steps": [
+            {"text": "加上执行权限：chmod +x {path}", "generic": "加上执行权限：chmod +x <llama-server 路径>"},
+            "确认构建与本机匹配（x86_64 或 arm64，Linux 或 Windows）",
+            "以 noexec 挂载的目录不能运行程序：把引擎移到别处，或去掉 noexec 重新挂载"
+          ]
+        }
+      }
+    },
+    {
+      "id": "engine_not_found",
+      "category": "engine",
+      "doc": "configuration.md#slotserve-settings",
+      "match": [
+        "spawn failed: \\[Errno 2\\] No such file or directory: '(?P<path>[^']+)'",
+        "spawn failed: \\[WinError 2\\]",
+        "^/bin/(?:ba)?sh: (?:\\d+: )?(?:line \\d+: )?(?P<path>[^:\\s]+): (?:command )?not found",
+        "^(?P<path>[\\w./-]+): command not found",
+        "exec: \"(?P<path>[^\"]+)\": executable file not found in \\$PATH",
+        "'(?P<path>[^']+)' is not recognized as an internal or external command"
+      ],
+      "exit_codes": [127, 9009],
+      "text": {
+        "en": {
+          "cause": {"text": "The engine program {path} was not found", "generic": "The engine program was not found"},
+          "steps": [
+            "Set the full path of the engine: SLOTSERVE_LLAMA_SERVER_CMD for llama.cpp, SLOTSERVE_VLLM_CMD for vLLM; then restart SlotServe",
+            "With Docker: use the image variant that contains the engine (the vLLM image for vLLM models)",
+            "Check that the model uses the engine you installed (Models → engine)"
+          ]
+        },
+        "zh-CN": {
+          "cause": {"text": "找不到引擎程序 {path}", "generic": "找不到引擎程序"},
+          "steps": [
+            "设置引擎的完整路径：llama.cpp 用 SLOTSERVE_LLAMA_SERVER_CMD，vLLM 用 SLOTSERVE_VLLM_CMD；改完重启 SlotServe",
+            "使用 Docker 时：选择包含该引擎的镜像（vLLM 模型需要 vLLM 镜像）",
+            "确认模型使用的是已安装的引擎（模型 → 引擎）"
+          ]
+        }
+      }
+    },
+    {
+      "id": "docker_unreachable",
+      "category": "docker",
+      "doc": "dev-environments.md#setting-it-up-admin",
+      "match": [
+        "Cannot connect to the Docker daemon at (?P<endpoint>[^\\s?]+?)\\.? Is the docker daemon running",
+        "permission denied while trying to connect to the Docker daemon socket at (?P<endpoint>[^\\s:]+:[^\\s:]+)",
+        "Docker is not reachable",
+        "error during connect: .*open (?P<endpoint>//\\./pipe/\\w+)",
+        "error during connect",
+        "dial unix (?P<endpoint>\\S+docker\\.sock): connect"
+      ],
+      "text": {
+        "en": {
+          "cause": {"text": "SlotServe cannot reach Docker at {endpoint}", "generic": "SlotServe cannot reach Docker"},
+          "steps": [
+            "Check that Docker is running on the host (docker info)",
+            "In Docker: mount the socket into SlotServe (-v /var/run/docker.sock:/var/run/docker.sock); outside Docker: the user running SlotServe needs access to it (docker group)",
+            "Check SLOTSERVE_DOCKER_HOST if Docker listens elsewhere (e.g. Podman's socket or tcp://)"
+          ]
+        },
+        "zh-CN": {
+          "cause": {"text": "SlotServe 无法连接 Docker（{endpoint}）", "generic": "SlotServe 无法连接 Docker"},
+          "steps": [
+            "确认宿主机上 Docker 正在运行（docker info）",
+            "Docker 部署时把 socket 挂进 SlotServe（-v /var/run/docker.sock:/var/run/docker.sock）；非 Docker 部署时运行 SlotServe 的用户需要有权限访问它（docker 组）",
+            "如果 Docker 监听在别处（例如 Podman 的 socket 或 tcp://），检查 SLOTSERVE_DOCKER_HOST"
+          ]
+        }
+      }
+    },
+    {
+      "id": "image_pull_failed",
+      "category": "docker",
+      "doc": "dev-environments.md#templates",
+      "match": [
+        "pull access denied for (?P<image>[^,\\s]+)",
+        "manifest for (?P<image>\\S+) not found",
+        "failed to resolve reference \"(?P<image>[^\"]+)\"",
+        "manifest unknown",
+        "toomanyrequests",
+        "pull rate limit",
+        "Get \"?https://(?P<registry>[^/\"\\s]+)/v2/[^\"\\s]*\"?: (?:net/http|dial tcp|context deadline exceeded|proxyconnect|x509|EOF)",
+        "unauthorized: authentication required",
+        "No such image: (?P<image>\\S+)"
+      ],
+      "text": {
+        "en": {
+          "cause": {"text": "The image {image} could not be downloaded", "generic": "The Docker image could not be downloaded"},
+          "steps": [
+            "Check the image name and tag (typos, a tag that does not exist)",
+            "Check that the Docker host can reach the registry (proxy, firewall, a registry mirror in /etc/docker/daemon.json)",
+            "Private images or Docker Hub's rate limit: docker login on the host, or pull the image once by hand (docker pull)"
+          ]
+        },
+        "zh-CN": {
+          "cause": {"text": "镜像 {image} 拉取失败", "generic": "Docker 镜像拉取失败"},
+          "steps": [
+            "检查镜像名称和 tag（拼写错误、tag 不存在）",
+            "确认 Docker 主机能访问镜像仓库（代理、防火墙，或在 /etc/docker/daemon.json 配置镜像加速）",
+            "私有镜像或触发 Docker Hub 拉取限额：在宿主机 docker login，或先手动 docker pull 一次"
+          ]
+        }
+      }
+    },
+    {
+      "id": "mount_helper_missing",
+      "category": "storage",
+      "doc": "storage.md#types",
+      "match": [
+        "you might need a /sbin/mount\\.(?:<type>|(?P<fstype>\\w+)) helper program",
+        "failed to mount local volume: .*: no such device",
+        "wrong fs type, bad option, bad superblock on (?P<share>\\S+?),",
+        "cifs filesystem not supported by the system",
+        "unknown filesystem type '(?P<fstype>[^']+)'",
+        "mount\\.nfs4?: No such device"
+      ],
+      "text": {
+        "en": {
+          "cause": "The Docker host cannot mount this NFS/SMB share: the mount helper is missing",
+          "steps": [
+            "Install the helper on the Docker host (not in the container): nfs-common (Debian/Ubuntu) or nfs-utils (RHEL) for NFS, cifs-utils for SMB",
+            "Then click Check on the storage again",
+            "Docker Desktop: the mount happens in its VM; use a host directory storage instead"
+          ]
+        },
+        "zh-CN": {
+          "cause": "Docker 主机无法挂载该 NFS/SMB 共享：缺少挂载工具",
+          "steps": [
+            "在 Docker 主机上（不是容器里）安装挂载工具：NFS 用 nfs-common（Debian/Ubuntu）或 nfs-utils（RHEL），SMB 用 cifs-utils",
+            "然后在存储上重新点击「检查」",
+            "Docker Desktop：挂载发生在其虚拟机内，请改用宿主机目录类型的存储"
+          ]
+        }
+      }
+    },
+    {
+      "id": "mount_access_denied",
+      "category": "storage",
+      "doc": "storage.md#types",
+      "match": [
+        "mount\\.nfs4?: access denied by server while mounting (?P<share>\\S+)",
+        "mount error\\(13\\): Permission denied",
+        "STATUS_LOGON_FAILURE",
+        "failed to mount local volume: mount (?P<share>\\S*?):/var/lib/docker\\S*, .*(?:permission denied|access denied|operation not permitted)",
+        "failed to mount local volume: .*(?:permission denied|access denied|operation not permitted)"
+      ],
+      "text": {
+        "en": {
+          "cause": {"text": "The storage server refused the mount of {share}", "generic": "The storage server refused the mount (wrong credentials or not allowed)"},
+          "steps": [
+            "SMB: check user name, password and domain in the storage settings",
+            "NFS: check that the export allows this Docker host's IP address (/etc/exports on the server, then exportfs -ra)",
+            "Then click Check on the storage again"
+          ]
+        },
+        "zh-CN": {
+          "cause": {"text": "存储服务器拒绝挂载 {share}", "generic": "存储服务器拒绝挂载（凭据错误或未授权）"},
+          "steps": [
+            "SMB：检查存储设置中的用户名、密码和域",
+            "NFS：确认导出允许本 Docker 主机的 IP（服务器上的 /etc/exports，然后 exportfs -ra）",
+            "然后在存储上重新点击「检查」"
+          ]
+        }
+      }
+    },
+    {
+      "id": "mount_failed",
+      "category": "storage",
+      "doc": "storage.md#types",
+      "match": [
+        "mount\\.nfs4?: (?:Connection timed out|Connection refused|No route to host|Network is unreachable)",
+        "mount\\.nfs4?: mounting (?P<share>\\S+) failed",
+        "mount error\\((?:2|6|11|111|112|113|115)\\)",
+        "failed to mount local volume: mount (?P<share>\\S*?):/var/lib/docker",
+        "failed to mount local volume",
+        "error while mounting volume"
+      ],
+      "text": {
+        "en": {
+          "cause": {"text": "The share {share} could not be mounted: the server is not reachable or the share does not exist", "generic": "The NFS/SMB share could not be mounted: the server is not reachable or the share does not exist"},
+          "steps": [
+            "Check the server address and the share path in the storage settings",
+            "Check that the Docker host reaches the server (ping; NFS port 2049, SMB port 445 open)",
+            "Then click Check on the storage again"
+          ]
+        },
+        "zh-CN": {
+          "cause": {"text": "共享 {share} 挂载失败：服务器不可达或共享不存在", "generic": "NFS/SMB 共享挂载失败：服务器不可达或共享不存在"},
+          "steps": [
+            "检查存储设置中的服务器地址和共享路径",
+            "确认 Docker 主机能访问服务器（ping；NFS 端口 2049、SMB 端口 445 已放行）",
+            "然后在存储上重新点击「检查」"
+          ]
+        }
+      }
+    },
+    {
+      "id": "hf_auth",
+      "category": "auth",
+      "doc": "model-catalog.md#deploying",
+      "match": [
+        "Access to model (?P<repo>\\S+?) is restricted",
+        "Cannot access gated repo for url https://huggingface\\.co/(?P<repo>[^/\\s]+/[^/\\s]+)",
+        "GatedRepoError",
+        "401 Client Error: Unauthorized for url: https://huggingface\\.co/",
+        "Repository Not Found for url: https://huggingface\\.co/api/models/(?P<repo>[^/\\s]+/[^/\\s]+)",
+        "Invalid user token"
+      ],
+      "text": {
+        "en": {
+          "cause": {"text": "Hugging Face refused access to {repo}", "generic": "Hugging Face refused access to the model"},
+          "steps": [
+            "Gated models: accept the license on the model's Hugging Face page with your account",
+            "Set a Hugging Face access token (SLOTSERVE_HF_TOKEN, read permission) and retry",
+            "Check the repository name (private or renamed repositories also answer 401/404)"
+          ]
+        },
+        "zh-CN": {
+          "cause": {"text": "Hugging Face 拒绝访问 {repo}", "generic": "Hugging Face 拒绝访问该模型"},
+          "steps": [
+            "受限模型：先用你的账号在该模型的 Hugging Face 页面同意许可",
+            "设置 Hugging Face 访问令牌（SLOTSERVE_HF_TOKEN，读权限）后重试",
+            "检查仓库名称（私有或改名的仓库同样返回 401/404）"
+          ]
+        }
+      }
+    },
+    {
+      "id": "models_permission_denied",
+      "category": "permission",
+      "doc": "getting-started.md#2-configure",
+      "match": [
+        "failed to open GGUF file '(?P<path>[^']+)' \\(Permission denied\\)",
+        "PermissionError: \\[Errno 13\\] Permission denied: '(?P<path>[^']+)'",
+        "\\[Errno 13\\] Permission denied: '(?P<path>[^']+)'",
+        "open\\((?P<path>[^)]+)\\): Permission denied"
+      ],
+      "text": {
+        "en": {
+          "cause": {"text": "No permission to read {path}", "generic": "No permission to read the model files"},
+          "steps": [
+            "Give the user that runs SlotServe and the engine read access to the models folder: chmod -R a+rX <models folder>",
+            "In Docker the container user must be able to read it; on NFS/SMB check the uid/gid mapping and mount options (uid=, file_mode=)",
+            "SELinux hosts: mount the folder with :z, or check the audit log"
+          ]
+        },
+        "zh-CN": {
+          "cause": {"text": "没有读取 {path} 的权限", "generic": "没有读取模型文件的权限"},
+          "steps": [
+            "给运行 SlotServe 和引擎的用户模型目录的读权限：chmod -R a+rX <模型目录>",
+            "Docker 中需容器用户可读；NFS/SMB 上检查 uid/gid 映射与挂载选项（uid=、file_mode=）",
+            "启用 SELinux 的主机：挂载目录时加 :z，或查看审计日志"
+          ]
+        }
+      }
+    },
+    {
+      "id": "model_corrupt",
+      "category": "model",
+      "doc": "faq.md",
+      "match": [
+        "invalid magic characters: '[^']*', expected 'GGUF'",
+        "model is corrupted or incomplete",
+        "failed to read tensor info",
+        "failed to read key-value pairs",
+        "tensor '[^']+' data is not within the file bounds",
+        "SafetensorError: Error while deserializing header",
+        "incomplete metadata, file not fully covered"
+      ],
+      "text": {
+        "en": {
+          "cause": "The model file is damaged or incomplete",
+          "steps": [
+            "Download the model again: an interrupted download is the usual cause (compare size or SHA-256 with the source)",
+            "Split models (…-00001-of-00003.gguf): all parts must be there; load the first part",
+            "Check that the file really is a GGUF model for llama.cpp (not a safetensors file renamed)"
+          ]
+        },
+        "zh-CN": {
+          "cause": "模型文件已损坏或不完整",
+          "steps": [
+            "重新下载模型：常见原因是下载中断（与来源比对大小或 SHA-256）",
+            "分卷模型（…-00001-of-00003.gguf）：所有分卷都要在，加载第一卷",
+            "确认文件确实是 llama.cpp 用的 GGUF 模型（不是改了扩展名的 safetensors）"
+          ]
+        }
+      }
+    },
+    {
+      "id": "model_unsupported",
+      "category": "model",
+      "doc": "gpus-and-engines.md#engines",
+      "match": [
+        "unknown model architecture: '(?P<arch>[^']+)'",
+        "unknown pre-tokenizer type: '(?P<arch>[^']+)'",
+        "Model architectures \\['(?P<arch>[^']+)'\\] are not supported",
+        "has invalid ggml type \\d+"
+      ],
+      "text": {
+        "en": {
+          "cause": {"text": "This engine version does not support the model ({arch})", "generic": "This engine version does not support the model's format or architecture"},
+          "steps": [
+            "Update the engine: new model architectures need a recent llama.cpp release or vLLM version",
+            "Or use another build of the model (another quantization, or the GGUF from a different publisher)",
+            "llama.cpp loads GGUF files; vLLM loads Hugging Face model folders (safetensors)"
+          ]
+        },
+        "zh-CN": {
+          "cause": {"text": "当前引擎版本不支持该模型（{arch}）", "generic": "当前引擎版本不支持该模型的格式或架构"},
+          "steps": [
+            "升级引擎：新的模型架构需要较新的 llama.cpp 或 vLLM 版本",
+            "或换一个版本的模型（其他量化，或其他发布者的 GGUF）",
+            "llama.cpp 加载 GGUF 文件；vLLM 加载 Hugging Face 模型目录（safetensors）"
+          ]
+        }
+      }
+    },
+    {
+      "id": "model_file_missing",
+      "category": "model",
+      "doc": "faq.md",
+      "match": [
+        "failed to open GGUF file '(?P<path>[^']+)'",
+        "(?P<path>\\S+) does not appear to have a file named (?P<file>[\\w.-]+)",
+        "No such file or directory: '(?P<path>[^']+\\.(?:gguf|safetensors|bin))'",
+        "error loading model: llama_model_loader: failed to load model from (?P<path>\\S+)"
+      ],
+      "text": {
+        "en": {
+          "cause": {"text": "The model {path} is missing or cannot be opened", "generic": "The model file is missing or cannot be opened"},
+          "steps": [
+            "Check that the file still exists (it may have been moved, renamed or deleted) and scan the models folder again",
+            "Models on NFS/SMB: check that the share is mounted on this machine",
+            "vLLM: the folder must contain config.json and the weights"
+          ]
+        },
+        "zh-CN": {
+          "cause": {"text": "模型 {path} 不存在或无法打开", "generic": "模型文件不存在或无法打开"},
+          "steps": [
+            "确认文件仍然存在（可能已被移动、改名或删除），并重新扫描模型目录",
+            "模型在 NFS/SMB 上时：确认共享已挂载到本机",
+            "vLLM：目录中需要有 config.json 和权重文件"
+          ]
+        }
+      }
+    },
+    {
+      "id": "load_timeout",
+      "category": "engine",
+      "doc": "configuration.md#slotserve-settings",
+      "match": [
+        "model did not become ready within (?P<seconds>\\d+)s"
+      ],
+      "text": {
+        "en": {
+          "cause": {"text": "The model did not finish loading within {seconds} seconds", "generic": "The model did not finish loading in time"},
+          "steps": [
+            "Large models on slow disks or network storage take longer: raise SLOTSERVE_LOAD_TIMEOUT_SECONDS",
+            "Look at the end of the log: a server that hangs without progress usually has another error there",
+            "Copy the model to a local SSD for faster loading"
+          ]
+        },
+        "zh-CN": {
+          "cause": {"text": "模型在 {seconds} 秒内没有加载完成", "generic": "模型没有在规定时间内加载完成"},
+          "steps": [
+            "大模型放在慢盘或网络存储上加载更慢：调大 SLOTSERVE_LOAD_TIMEOUT_SECONDS",
+            "查看日志末尾：没有进展的卡住通常另有错误",
+            "把模型复制到本地 SSD 以加快加载"
+          ]
+        }
+      }
+    },
+    {
+      "id": "file_not_found",
+      "category": "file",
+      "doc": "faq.md",
+      "match": [
+        "No such file or directory(?::? '(?P<path>[^']+)')?",
+        "The system cannot find the (?:file|path) specified"
+      ],
+      "text": {
+        "en": {
+          "cause": {"text": "A file or folder that is needed does not exist: {path}", "generic": "A file or folder that is needed does not exist"},
+          "steps": [
+            "Check the path in the log: typos in launch arguments, moved model files or a folder that is not mounted",
+            "Paths inside Docker differ from the host: use the path as the container sees it",
+            "Retry after fixing the path"
+          ]
+        },
+        "zh-CN": {
+          "cause": {"text": "所需的文件或目录不存在：{path}", "generic": "所需的文件或目录不存在"},
+          "steps": [
+            "检查日志中的路径：启动参数拼写错误、模型文件被移动，或目录未挂载",
+            "Docker 内的路径与宿主机不同：使用容器内看到的路径",
+            "修正路径后重试"
+          ]
+        }
+      }
+    }
+  ],
+  "unknown": {
+    "en": {
+      "cause": {"text": "The process stopped with exit code {exit_code}; the cause was not recognized automatically", "generic": "The cause was not recognized automatically"},
+      "steps": [
+        "Read the last log lines below: the error is usually near the end",
+        "Copy the diagnostic information and ask for help, or search the FAQ for the error text"
+      ]
+    },
+    "zh-CN": {
+      "cause": {"text": "进程以退出码 {exit_code} 结束，未能自动识别原因", "generic": "未能自动识别原因"},
+      "steps": [
+        "查看下方日志的最后几行：错误通常在末尾",
+        "复制诊断信息求助，或在 FAQ 中搜索错误文本"
+      ]
+    }
+  }
+}

@@ -1,4 +1,9 @@
-"""In-memory throttle for failed sign-in and sign-up attempts."""
+"""In-memory throttle for failed sign-in and sign-up attempts.
+
+An account is locked per address (account + IP), so failures from elsewhere cannot lock its owner out; each
+address is also limited on its own. Behind a reverse proxy, ``SLOTSERVE_FORWARDED_ALLOW_IPS`` lets SlotServe
+see the real client address.
+"""
 
 import math
 import time
@@ -28,7 +33,7 @@ class AttemptLimiter:
     def _keys(username: str | None, ip: str | None) -> list[tuple[str, int]]:
         keys = []
         if username:
-            keys.append((f"u:{username.lower()}", MAX_PER_USERNAME))
+            keys.append((f"u:{username.lower()}@{ip or '?'}", MAX_PER_USERNAME))
         if ip:
             keys.append((f"ip:{ip}", MAX_PER_IP))
         return keys
@@ -52,5 +57,5 @@ class AttemptLimiter:
             for key in [k for k, q in self._failures.items() if not q or q[-1] <= now - self.window]:
                 del self._failures[key]
 
-    def success(self, *, username: str) -> None:
-        self._failures.pop(f"u:{username.lower()}", None)
+    def success(self, *, username: str, ip: str | None = None) -> None:
+        self._failures.pop(f"u:{username.lower()}@{ip or '?'}", None)

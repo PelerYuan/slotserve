@@ -12,6 +12,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
+from ..security import web_origin
 from . import devenv_web
 
 log = logging.getLogger(__name__)
@@ -22,6 +23,7 @@ def create_web_app(main_state) -> FastAPI:
     app.state.web_listener = True
     app.state.settings = main_state.settings
     app.state.devenv = main_state.devenv
+    app.add_middleware(_BaseHeaders)
     app.include_router(devenv_web.enter_router)
     app.include_router(devenv_web.router)
 
@@ -30,6 +32,34 @@ def create_web_app(main_state) -> FastAPI:
         return JSONResponse({"detail": "Not Found"}, status_code=404)
 
     return app
+
+
+class _BaseHeaders:
+    """Every response of the web listener (also sign-in redirects and errors) sends a Referer only to its own
+    origin and keeps no opener relation across origins; the proxy sets the same on the apps' responses."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                names = {k.lower() for k, _ in headers}
+                for name, value in (
+                    (b"referrer-policy", web_origin.REFERRER_POLICY),
+                    (b"cross-origin-opener-policy", web_origin.OPENER_POLICY),
+                ):
+                    if name not in names:
+                        headers.append((name, value.encode()))
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
 
 
 class _Embedded(uvicorn.Server):

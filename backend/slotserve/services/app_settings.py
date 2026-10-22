@@ -62,6 +62,7 @@ EDITABLE: dict[str, Editable] = {
     "devenv_public_port_limit": Editable(int, min=0, max=1000),
     "devenv_forwarder_image": Editable(str, min=1, max=255),
     "devenv_web_url": Editable(str, max=300),
+    "devenv_web_compat": Editable(bool),
     "invite_code": Editable(str, min=1, max=128, secret=True),
     "max_reservation_hours": Editable(int, min=1, max=24 * 7, unit="h"),
     "max_advance_days": Editable(int, min=1, max=365, unit="d"),
@@ -121,6 +122,9 @@ EDITABLE: dict[str, Editable] = {
     "usage_busy_percent": Editable(int, min=1, max=100, unit="%"),
     "audit_retention_days": Editable(int, min=0, max=3650, unit="d"),
     "backup_keep": Editable(int, min=0, max=100),
+    "playground_enabled": Editable(bool),
+    "playground_rate_per_minute": Editable(int, min=0, max=10_000, unit="/min"),
+    "playground_default_model_only": Editable(bool),
 }
 
 # Changing one of these restarts the Telegram bot.

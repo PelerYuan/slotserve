@@ -457,9 +457,11 @@ def test_handover_tokens():
         secret_key = "k"
 
     h = web_auth.Handovers()
-    token = h.issue(S, 1, 5, "/devenv/5/port/80/a")
-    assert h.redeem(S, token)["u"] == 1 and h.redeem(S, token) is None
-    assert h.redeem(S, h.issue(S, 1, 5, "/devenv/6/port/80/")) is None  # the path names another environment
-    assert h.redeem(S, h.issue(S, 1, 5, "https://evil/")) is None
+    kw = {"group": "user:1", "as_admin": False}
+    token = h.issue(S, 1, 5, "/devenv/5/port/80/a", **kw)
+    data = h.redeem(S, token)
+    assert data["u"] == 1 and data["g"] == "user:1" and data["a"] is False and h.redeem(S, token) is None
+    assert h.redeem(S, h.issue(S, 1, 5, "/devenv/6/port/80/", **kw)) is None  # the path names another environment
+    assert h.redeem(S, h.issue(S, 1, 5, "https://evil/", **kw)) is None
     assert h.redeem(S, "garbage") is None
-    assert json.loads(json.dumps(web_auth.cookie_user(S, {"slotserve_web_5": web_auth.cookie_value(S, 1, 5)}, 5))) == 1
+    assert json.loads(json.dumps(web_auth.cookie_user(S, f"slotserve_web_5={web_auth.cookie_value(S, 1, 5)}", 5))) == 1
