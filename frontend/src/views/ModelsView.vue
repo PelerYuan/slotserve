@@ -541,7 +541,7 @@ function eta(d: DownloadTask) {
             <NRadioButton v-for="e in ENGINE_OPTIONS" :key="e" :value="e">{{ engineLabel[e] }}</NRadioButton>
           </NRadioGroup>
         </NFormItem>
-        <NFormItem :label="t('models.path')" :feedback="t(`models.pathHint.${form.engine}`)">
+        <NFormItem :label="t('models.path')" :feedback="t(`models.pathHint.${form.engine.replace('.', '')}`)">
           <NInput v-model:value="form.path" class="mono-input" :placeholder="pathPlaceholder" />
         </NFormItem>
         <NFormItem :label="t('models.args')" :feedback="session.user?.is_admin ? t('models.argsHint') : `${t('models.argsHint')} ${t('argsGate.memberHint')}`">

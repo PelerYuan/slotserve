@@ -34,6 +34,11 @@ DEFAULT_PLACEHOLDERS = {
 DUPLICATE_NAME = re.compile(r"\b((?:GPU|lane|通道) ?[\w,.-]+) · \1(?![\w,])")
 EMPTY_GPUS = re.compile(r"\bgpus=(?=\s|$)")
 RAW_ACTION = re.compile(r"^[a-z_]+\.[a-z_]+$")
+# A translation key shown as is, e.g. "models.pathHint.llama.cpp" (a dot inside a key part breaks the lookup).
+RAW_KEY = re.compile(
+    r"\b(?:app|nav|common|auth|state|overview|schedule|models|catalog|keys|devenv|usage|settings|admin|errors|ph|naming)"
+    r"\.[a-z][A-Za-z_]+(?:\.[\w.]+)?"
+)
 
 PAGES = ["/", "/schedule", "/models", "/keys", "/devenv", "/usage", "/settings"]
 ADMIN_TABS = ["overview", "users", "lanes", "reservations", "requests", "keys", "channels", "storage", "runtime"]
@@ -210,6 +215,7 @@ def _problems(page: Page, where: str) -> list[str]:
     out += [f"{where}: name shown twice {m.group(0)!r}" for m in DUPLICATE_NAME.finditer(snap["text"])]
     out += [f"{where}: empty GPU list shown as 'gpus='" for _ in EMPTY_GPUS.finditer(snap["text"])]
     out += [f"{where}: untranslated audit action {a!r}" for a in snap["actions"] if RAW_ACTION.match(a)]
+    out += [f"{where}: translation key shown {m.group(0)!r}" for m in RAW_KEY.finditer(snap["text"])]
     return out
 
 
@@ -328,3 +334,5 @@ def test_copy_check_finds_what_it_looks_for():
     assert EMPTY_GPUS.search("lane GPU 1  gpus=")
     assert not EMPTY_GPUS.search("gpus=0 idle_mode=model")
     assert RAW_ACTION.match("storage.create") and not RAW_ACTION.match("Added storage")
+    assert RAW_KEY.search("Model models.pathHint.llama.cpp")
+    assert not RAW_KEY.search("/models/Qwen3-8B-Q4_K_M.gguf, see Admin → Settings.")

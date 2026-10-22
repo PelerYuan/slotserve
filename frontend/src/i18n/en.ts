@@ -189,7 +189,7 @@ export default {
     engine: 'Engine',
     path: 'Model',
     pathHint: {
-      'llama.cpp': 'Path to a .gguf file on the server.',
+      llamacpp: 'Path to a .gguf file on the server.',
       vllm: 'Hugging Face repository id or a model directory on the server.',
       sglang: 'Hugging Face repository id or a model directory on the server.',
       custom: "Whatever your custom command expects in {'{'}model{'}'}.",

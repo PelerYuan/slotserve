@@ -190,7 +190,7 @@ const zh: typeof en = {
     engine: '推理后端',
     path: '模型',
     pathHint: {
-      'llama.cpp': '服务器上 .gguf 文件的路径。',
+      llamacpp: '服务器上 .gguf 文件的路径。',
       vllm: 'Hugging Face 仓库名，或服务器上的模型目录。',
       sglang: 'Hugging Face 仓库名，或服务器上的模型目录。',
       custom: "自定义命令中 {'{'}model{'}'} 需要的内容。",
