@@ -1,0 +1,1 @@
+error while mounting volume '/var/lib/docker/volumes/slotserve-st4-scratch/_data': failed to mount local volume: mount :/srv/scratch:/var/lib/docker/volumes/slotserve-st4-scratch/_data, data: addr=192.168.1.21: connection refused

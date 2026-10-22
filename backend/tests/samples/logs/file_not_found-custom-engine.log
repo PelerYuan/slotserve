@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/opt/engines/serve.py", line 14, in <module>
+    with open(args.config) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/data/configs/engine.yaml'

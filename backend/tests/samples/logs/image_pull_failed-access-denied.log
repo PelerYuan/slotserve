@@ -1,0 +1,2 @@
+2026-10-20 13:12:07,331 WARNING slotserve.services.devenv: pulling slotserve/does-not-exist:latest failed
+pull access denied for slotserve/does-not-exist, repository does not exist or may require 'docker login': denied: requested access to the resource is denied

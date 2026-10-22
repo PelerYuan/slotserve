@@ -1,0 +1,34 @@
+===== 2026-10-20T09:20:44.310557+00:00 start: /opt/llama.cpp/build/bin/llama-server --model /models/Qwen3-32B-Q8_0.gguf --alias Qwen3-32B-Q8_0 --host 127.0.0.1 --port 8081 -ngl 99 -c 32768
+ggml_cuda_init: GGML_CUDA_FORCE_MMQ:    no
+ggml_cuda_init: GGML_CUDA_FORCE_CUBLAS: no
+ggml_cuda_init: found 1 CUDA devices:
+  Device 0: NVIDIA GeForce RTX 4090, compute capability 8.9, VMM: yes
+build: 5604 (3678b838) with cc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0 for x86_64-linux-gnu
+main: binding port with default address family
+main: HTTP server is listening, hostname: 127.0.0.1, port: 8081, http threads: 31
+main: loading model
+srv    load_model: loading model '/models/Qwen3-32B-Q8_0.gguf'
+llama_model_load_from_file_impl: using device CUDA0 (NVIDIA GeForce RTX 4090) - 23005 MiB free
+llama_model_loader: loaded meta data with 27 key-value pairs and 707 tensors from /models/Qwen3-32B-Q8_0.gguf (version GGUF V3 (latest))
+llama_model_loader: - type  f32:  257 tensors
+llama_model_loader: - type q8_0:  450 tensors
+print_info: file format = GGUF V3 (latest)
+print_info: file type   = Q8_0
+print_info: file size   = 32.42 GiB (8.50 BPW)
+load: special tokens cache size = 26
+load: token to piece cache size = 0.9311 MB
+print_info: arch             = qwen3
+print_info: n_ctx_train      = 40960
+print_info: n_layer          = 64
+load_tensors: loading model tensors, this can take a while... (mmap = true)
+load_tensors: offloading 64 repeating layers to GPU
+load_tensors: offloading output layer to GPU
+load_tensors: offloaded 65/65 layers to GPU
+ggml_backend_cuda_buffer_type_alloc_buffer: allocating 32431.27 MiB on device 0: cudaMalloc failed: out of memory
+alloc_tensor_range: failed to allocate CUDA0 buffer of size 34006417408
+llama_model_load: error loading model: unable to allocate CUDA0 buffer
+llama_model_load_from_file_impl: failed to load model
+common_init_from_params: failed to load model '/models/Qwen3-32B-Q8_0.gguf'
+srv    load_model: failed to load model, '/models/Qwen3-32B-Q8_0.gguf'
+srv   operator(): operator(): cleaning up before exit...
+main: exiting due to model loading error

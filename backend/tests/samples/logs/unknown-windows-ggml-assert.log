@@ -1,0 +1,4 @@
+===== 2026-10-20T12:41:09.512230+00:00 start: 'C:\llama.cpp\llama-server.exe' --model 'D:\models\phi-4-Q4_K_M.gguf' --alias phi-4-Q4_K_M --host 127.0.0.1 --port 8081 -ngl 99
+main: loading model
+load_tensors: offloaded 41/41 layers to GPU
+D:\a\llama.cpp\llama.cpp\ggml\src\ggml-cuda\mmq.cuh:3884: GGML_ASSERT(ne11 % 4 == 0) failed
