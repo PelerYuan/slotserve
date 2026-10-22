@@ -2,6 +2,7 @@ from conftest import INVITE
 
 
 async def test_register_requires_invite(make_client):
+    await make_client("root")  # the first account (the admin) signs up with the setup code instead
     c = await make_client()
     r = await c.post("/api/auth/register", json={"username": "alice", "password": "secret123", "invite_code": "nope"})
     assert r.status_code == 403

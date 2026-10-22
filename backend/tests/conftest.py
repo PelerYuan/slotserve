@@ -75,12 +75,16 @@ async def make_client(app):
     clients: list[httpx.AsyncClient] = []
 
     async def factory(username: str | None = None, password: str = "secret123") -> httpx.AsyncClient:
-        client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
+        # X-SlotServe: like the frontend's API client (CsrfGuard, security/csrf.py)
+        client = httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test", headers={"X-SlotServe": "1"}
+        )
         clients.append(client)
         if username:
-            r = await client.post(
-                "/api/auth/register", json={"username": username, "password": password, "invite_code": INVITE}
-            )
+            body = {"username": username, "password": password, "invite_code": INVITE}
+            # the first account is the admin and signs up with the setup code (security/setup_code.py)
+            body["setup_code"] = app.state.setup_code.current() or ""
+            r = await client.post("/api/auth/register", json=body)
             assert r.status_code == 201, r.text
         return client
 

@@ -3,6 +3,7 @@
 slotserve                         run the server (same as `slotserve serve`)
 slotserve reset-password <user>   set a new password (prompted)
 slotserve set-admin <user>        grant admin rights (--revoke to remove)
+slotserve setup-code              show the code for creating the first admin account
 """
 
 import argparse
@@ -69,10 +70,20 @@ def main() -> None:
     p_admin = sub.add_parser("set-admin", help="grant or revoke admin rights")
     p_admin.add_argument("username")
     p_admin.add_argument("--revoke", action="store_true")
+    sub.add_parser("setup-code", help="show the code for creating the first admin account")
     args = parser.parse_args()
 
     if args.command in (None, "serve"):
         serve()
+        return
+
+    if args.command == "setup-code":
+        from .security.setup_code import cli_setup_code
+
+        code = asyncio.run(cli_setup_code(get_settings()))
+        if code is None:
+            sys.exit("An admin account already exists; no setup code is needed.")
+        print(code)
         return
 
     if args.command == "reset-password":
