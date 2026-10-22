@@ -6,6 +6,7 @@ import re
 
 from sqlalchemy import select
 
+from ...containers.names import path_slug
 from ...orm import DevSession, User
 from ..docker_api import registry_of
 from .constants import FORBIDDEN_PATHS, IMAGE_RE, MAX_PERSIST_PATHS, PATH_RE, RESERVED_NAMES, DevEnvError
@@ -66,8 +67,7 @@ def dump_paths(paths: list[str]) -> str | None:
     return json.dumps(paths) if paths else None
 
 
-def _slug(path: str) -> str:
-    return re.sub(r"[^A-Za-z0-9_.-]", "_", path.strip("/").replace("/", "-"))[:60] or "root"
+_slug = path_slug
 
 
 def unix_names(users: list[User]) -> dict[int, str]:

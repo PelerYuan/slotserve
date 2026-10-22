@@ -2,14 +2,13 @@
 
 import re
 
+from ...containers.names import LABEL, MAX_AUTH_TRIES, UID_BASE, WEB_KINDS, network_name, project_network_name
+
 TICK_SECONDS = 3.0
 ACCOUNTS_REFRESH_SECONDS = 60.0
 HOUSEKEEPING_SECONDS = 3600.0
 OPEN_STATES = ("waiting", "pulling", "ready", "starting", "running", "stopping", "failed")
 GPU_STATES = ("starting", "running", "stopping")
-LABEL = "slotserve.devenv"
-UID_BASE = 20000  # Unix uid of a SlotServe user in shared environments: UID_BASE + user id
-MAX_AUTH_TRIES = 3
 KEY_TYPES = (
     "ssh-ed25519",
     "ssh-rsa",
@@ -20,7 +19,6 @@ KEY_TYPES = (
     "sk-ecdsa-sha2-nistp256@openssh.com",
 )
 IMAGE_RE = re.compile(r"^[a-z0-9][a-z0-9._\-/:@]{0,250}$", re.I)
-WEB_KINDS = ("desktop", "jupyter", "vscode", "http")
 PATH_RE = re.compile(r"^/[A-Za-z0-9._+@/-]{1,200}$")
 MAX_PERSIST_PATHS = 8
 # Paths that cannot be kept: system directories, SlotServe's own and the ones that are mounted anyway.
@@ -89,10 +87,23 @@ class DevEnvError(Exception):
         self.params = params
 
 
-def network_name(session_id: int) -> str:
-    return f"slotserve-devenv-{session_id}"
-
-
-def project_network_name(project_id: int) -> str:
-    """A kept environment's container keeps its network between bookings (until the project is deleted)."""
-    return f"slotserve-devenv-p{project_id}"
+__all__ = [
+    "ACCOUNTS_REFRESH_SECONDS",
+    "FORBIDDEN_PATHS",
+    "GPU_STATES",
+    "HOUSEKEEPING_SECONDS",
+    "IMAGE_RE",
+    "KEY_TYPES",
+    "LABEL",
+    "MAX_AUTH_TRIES",
+    "MAX_PERSIST_PATHS",
+    "OPEN_STATES",
+    "PATH_RE",
+    "RESERVED_NAMES",
+    "TICK_SECONDS",
+    "UID_BASE",
+    "WEB_KINDS",
+    "DevEnvError",
+    "network_name",
+    "project_network_name",
+]

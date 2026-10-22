@@ -55,3 +55,23 @@ class ContainerSpec:
     network_labels: dict[str, str] = field(default_factory=dict)
     accounts_digest: str | None = None
     web: dict = field(default_factory=dict)  # declared ports and token (see DevEnvManager._web_spec)
+
+
+GiB = 1024**3
+
+
+@dataclass(frozen=True)
+class NodePolicy:
+    """What the machine a container runs on allows. harden() reads it; it can only make a body stricter."""
+
+    host_memory: int | None = None  # bytes (Docker's MemTotal); None: unknown
+    pids_limit: int = 4096
+    memory_reserve: int = 4 * GiB  # kept free for the host and SlotServe: at least this ...
+    memory_reserve_fraction: float = 0.10  # ... or this share of the host's memory, whichever is more
+
+    def default_memory(self) -> int | None:
+        """A container's memory limit when nothing else sets one: the host's memory less the reserve."""
+        if not self.host_memory:
+            return None
+        reserve = max(self.memory_reserve, int(self.host_memory * self.memory_reserve_fraction))
+        return max(self.host_memory - reserve, min(self.host_memory, GiB) // 2)

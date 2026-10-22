@@ -30,6 +30,7 @@ from datetime import datetime
 import httpx
 from sqlalchemy import func, select
 
+from ..containers.contributors.cpu import cpu_ranges as cpu_ranges  # re-exported for api/devenv_cpu.py
 from ..db import SessionLocal, utcnow
 from ..orm import DevProject, DevSession, DevTemplate, Lane, Reservation, SshKey, UsageSample, User
 from .docker_api import DockerError
@@ -43,22 +44,6 @@ ACTIVE_STATES = ("waiting", "pulling", "ready", "starting", "running", "stopping
 POOL_SHARES = 512  # CPU weight of CPU-only environments (Docker's default is 1024): other work wins when contended
 STATS_SECONDS = 10.0
 HOST_INFO_SECONDS = 300.0
-
-
-def cpu_ranges(cores: list[int]) -> str:
-    """``[0, 1, 2, 5, 7, 8]`` -> ``"0-2,5,7-8"`` (Docker's cpuset format)."""
-    out: list[str] = []
-    for c in sorted(set(cores)):
-        if out and c == _last(out) + 1:
-            first = out[-1].split("-")[0]
-            out[-1] = f"{first}-{c}"
-        else:
-            out.append(str(c))
-    return ",".join(out)
-
-
-def _last(ranges: list[str]) -> int:
-    return int(ranges[-1].split("-")[-1])
 
 
 @dataclass
@@ -193,28 +178,20 @@ class CpuEnvs:
             return min(cores, pool) if pool else cores
         return float(pool) if pool else None
 
-    async def apply_resources(self, db, s: DevSession, lane: Lane | None, host_config: dict, env: dict) -> None:
-        """Called from ``DevEnvManager._plan``: CPU placement and limits of a new container."""
+    async def placement(self, db, s: DevSession, lane: Lane | None) -> dict:
+        """Called from ``DevEnvManager._context``: what ``CpuContributor`` needs (``containers/contributors/cpu.py``):
+        the lane's reserved cores, the shared pool and the core limit of a CPU-only environment."""
         layout = await self.layout(db)
         if s.kind != KIND:
             # a lane's containers (bookings, its shared idle environment) get the lane's reserved cores
             cores = layout.lanes.get(lane.id) if layout is not None and lane is not None else None
-            if cores:
-                host_config["CpusetCpus"] = cpu_ranges(cores)
-            return
-        host_config.pop("DeviceRequests", None)
-        # images that set NVIDIA_VISIBLE_DEVICES=all would get every GPU where nvidia is the default runtime
-        env["NVIDIA_VISIBLE_DEVICES"] = "void"
-        env["SLOTSERVE_GPU"] = "0"
-        for key in ("NanoCpus", "Memory"):
-            host_config.pop(key, None)
-        if layout is not None and layout.pool:
-            host_config["CpusetCpus"] = cpu_ranges(layout.pool)
-        if (limit := self.core_limit(layout)) is not None and self.settings.devenv_cpu_cores > 0:
-            host_config["NanoCpus"] = int(limit * 1e9)
-        if self.settings.devenv_cpu_memory_gb > 0:
-            host_config["Memory"] = int(self.settings.devenv_cpu_memory_gb * 1024**3)
-        host_config["CpuShares"] = POOL_SHARES
+            return {"lane_cores": tuple(cores) if cores else None}
+        limit = self.core_limit(layout) if self.settings.devenv_cpu_cores > 0 else None
+        return {
+            "pool": tuple(layout.pool) if layout is not None else (),
+            "cpu_core_limit": limit,
+            "pool_shares": POOL_SHARES,
+        }
 
     async def refresh_limits(self, container_id: str, host_config: dict) -> None:
         """Called before a kept container starts again: brings its CPU placement and limits up to date."""

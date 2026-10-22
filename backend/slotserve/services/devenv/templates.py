@@ -4,8 +4,11 @@ import json
 
 from sqlalchemy import select
 
+from ...containers.names import fill_placeholders as fill_placeholders
+from ...containers.names import load_web_ports as load_web_ports
+from ...containers.names import placeholder_values as placeholder_values
+from ...containers.names import web_base as web_base
 from ...orm import DevSession, DevTemplate, User
-from .constants import WEB_KINDS
 
 # The built-in templates (admins can change the image, disable them or add their own).
 BUILTINS = (
@@ -85,57 +88,12 @@ async def seed_templates(db) -> None:
     await db.commit()
 
 
-def web_base(session_id: int, port: int) -> str:
-    """The path one of a dev environment's container ports is served under."""
-    return f"/devenv/{session_id}/port/{port}/"
-
-
-def load_web_ports(raw: str | None) -> list[dict]:
-    """A template's declared web interfaces: [{name, port, kind, mode?}] (invalid entries are skipped)."""
-    try:
-        items = json.loads(raw) if raw else []
-    except ValueError:
-        return []
-    out, seen = [], set()
-    for item in items if isinstance(items, list) else []:
-        try:
-            port = int(item["port"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        if not 1 <= port <= 65535 or port in seen:
-            continue
-        seen.add(port)
-        kind = item.get("kind") if item.get("kind") in WEB_KINDS else "http"
-        entry = {"name": str(item.get("name") or port)[:32], "port": port, "kind": kind}
-        if item.get("mode") == "direct":  # direct ports: published on the host (services/devenv_ports.py)
-            entry["mode"] = "direct"
-        out.append(entry)
-    return out
-
-
-def placeholder_values(session_id: int, ports: list[dict], token: str) -> dict[str, str]:
-    """``{base_path}``/``{port}`` are the first declared port's, ``{base_path_<port>}`` any declared port's."""
-    values = {"session": str(session_id), "token": token, "base_path": "", "port": ""}
-    for i, p in enumerate(ports):
-        values[f"base_path_{p['port']}"] = web_base(session_id, p["port"])
-        if i == 0:
-            values.update(base_path=web_base(session_id, p["port"]), port=str(p["port"]))
-    return values
-
-
 def port_entry(web: dict | None, port: int) -> dict:
     """How the proxy treats a port: the declared entry, or a plain HTTP app that gets the prefix stripped."""
     for p in (web or {}).get("ports", []):
         if p["port"] == port:
             return p
     return {"name": str(port), "port": port, "kind": "http", "strip": True}
-
-
-def fill_placeholders(text: str, values: dict[str, str]) -> str:
-    """Replaces ``{base_path}``, ``{token}``, ``{port}`` and ``{session}``; other braces are left alone."""
-    for key, value in values.items():
-        text = text.replace("{" + key + "}", value)
-    return text
 
 
 def session_web(session: DevSession) -> dict | None:
