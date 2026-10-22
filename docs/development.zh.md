@@ -83,8 +83,10 @@ CodeQL 每周以及在 PR 上扫描 Python 和 TypeScript。Dependabot 每周为
 
 ## 发布流程
 
-1. 把 `CHANGELOG.md` 中 **Unreleased** 的内容移到新版本标题下，并更新 `backend/pyproject.toml`、`backend/slotserve/__init__.py`、`frontend/package.json` 中的版本号。
-2. 提交后打标签并推送：`git tag v0.5.0 && git push origin main v0.5.0`。
-3. `.github/workflows/release.yml` 会构建并推送 `ghcr.io/peleryuan/slotserve`（`0.5.0`、`0.5`、`latest`），并用 CHANGELOG 中对应的段落创建 GitHub Release。
+变更记录写在片段文件里（`changes/unreleased/*.md`，见 `changes/README.md`），发布时由 `tools/release_notes.py` 合并进 `CHANGELOG.md`。包括候选版在内的完整流程见[发版清单](release-checklist.md)（英文）。
+
+1. 更新 `backend/pyproject.toml`、`backend/slotserve/__init__.py`、`frontend/package.json` 中的版本号，并打候选版标签：`git tag v0.10.0-rc1 && git push origin v0.10.0-rc1`。工作流只推送 `0.10.0-rc1` 和 `rc`（不会推 `latest`），并创建 GitHub 预发布。
+2. 候选版验证通过后：`python tools/release_notes.py release 0.10.0`，提交，再 `git tag v0.10.0 && git push origin main v0.10.0`。
+3. `.github/workflows/release.yml` 会构建并推送 `ghcr.io/peleryuan/slotserve`（`0.10.0`、`0.10`、`latest`），并用 CHANGELOG 中对应的段落创建 GitHub Release。
 
 `main` 上的 `docs/` 或 `mkdocs.yml` 变化时，文档站会自动部署。

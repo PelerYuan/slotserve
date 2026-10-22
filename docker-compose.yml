@@ -8,9 +8,16 @@ services:
         CUDA_IMAGE: ${CUDA_IMAGE:-nvidia/cuda:12.8.1-runtime-ubuntu24.04}
     # `docker compose pull` uses the prebuilt image; `docker compose up -d --build` builds it locally
     # (needed when your llama.cpp was built against a CUDA major other than the default CUDA_IMAGE).
-    image: ${SLOTSERVE_IMAGE:-ghcr.io/peleryuan/slotserve:latest}
+    # The tag follows a minor version (`0.10` gets 0.10.x fixes); change it to upgrade to the next minor.
+    image: ${SLOTSERVE_IMAGE:-ghcr.io/peleryuan/slotserve:0.10}
     container_name: slotserve
     restart: unless-stopped
+    # Keep Docker's log of this container bounded: 5 files of 50 MB.
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     env_file: .env
     environment:
       # Container-side paths; the host paths are mapped in `volumes` below.

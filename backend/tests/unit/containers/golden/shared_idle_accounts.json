@@ -1,0 +1,125 @@
+{
+  "accounts_digest": "37eeb602b1ac88ff5b0cf3b9ffab410316f7ff4de3247ed5d570a8d97110e422",
+  "binds": [],
+  "config": {
+    "Cmd": [],
+    "Entrypoint": [
+      "/bin/sh",
+      "/opt/slotserve/start.sh"
+    ],
+    "Env": [
+      "SLOTSERVE_SHARED=1"
+    ],
+    "ExposedPorts": {
+      "22/tcp": {}
+    },
+    "HostConfig": {
+      "CpusetCpus": "16-23",
+      "DeviceRequests": [
+        {
+          "Capabilities": [
+            [
+              "gpu"
+            ]
+          ],
+          "DeviceIDs": [
+            "2"
+          ],
+          "Driver": "nvidia"
+        }
+      ],
+      "Init": true,
+      "Mounts": [
+        {
+          "Source": "slotserve-idle-home-l2",
+          "Target": "/home",
+          "Type": "volume"
+        },
+        {
+          "ReadOnly": true,
+          "Source": "/srv/models",
+          "Target": "/models",
+          "Type": "bind"
+        }
+      ],
+      "NetworkMode": "slotserve-devenv-11",
+      "PortBindings": {},
+      "RestartPolicy": {
+        "Name": "no"
+      },
+      "ShmSize": 8589934592
+    },
+    "Hostname": "lane-b-idle",
+    "Image": "pytorch/pytorch:latest",
+    "Labels": {
+      "slotserve.devenv": "1",
+      "slotserve.kind": "shared",
+      "slotserve.session": "11"
+    },
+    "User": "root",
+    "WorkingDir": "/"
+  },
+  "files": {
+    "opt/slotserve/accounts": {
+      "mode": "0o600",
+      "text": "alice:20001:$6$goldensalt$alicehash\nbob:20002:$6$goldensalt$bobhash\ncarol:20003:*\n"
+    },
+    "opt/slotserve/accounts.sh": {
+      "mode": "0o700",
+      "text": "#!/bin/sh\n# Written by SlotServe: one account per SlotServe user (name:uid:hash lines in /opt/slotserve/accounts).\nS=/opt/slotserve\n. $S/lib.sh\nif command -v useradd >/dev/null 2>&1; then\n  ADD=useradd\nelif command -v adduser >/dev/null 2>&1; then\n  ADD=adduser\nelse\n  echo \"slotserve: this image has neither useradd nor adduser, so it cannot host a shared environment\" >&2\n  exit 2\nfi\nSH=/bin/sh\n[ -x /bin/bash ] && SH=/bin/bash\nmkdir -p /home\nstatus=0\nwhile IFS=: read -r name uid hash; do\n  [ -n \"$name\" ] || continue\n  if id \"$name\" >/dev/null 2>&1; then\n    if [ \"$(id -u \"$name\")\" != \"$uid\" ]; then\n      echo \"slotserve: the image already has an account $name; skipped\" >&2\n      continue\n    fi\n  elif [ \"$ADD\" = useradd ]; then\n    useradd -M -d \"/home/$name\" -s \"$SH\" -u \"$uid\" \"$name\" || { status=1; continue; }\n  else\n    adduser -D -H -h \"/home/$name\" -s \"$SH\" -u \"$uid\" \"$name\" || { status=1; continue; }\n  fi\n  h=\"/home/$name\"\n  mkdir -p \"$h/.ssh\"\n  cat \"$S/keys/$name\" > \"$h/.ssh/authorized_keys\" 2>/dev/null || : > \"$h/.ssh/authorized_keys\"\n  chown \"$uid:$(id -g \"$name\")\" \"$h\" \"$h/.ssh\" \"$h/.ssh/authorized_keys\"\n  chmod 700 \"$h\" \"$h/.ssh\"\n  chmod 600 \"$h/.ssh/authorized_keys\"\n  set_hash \"$name\" \"$hash\" || status=1\ndone < $S/accounts\n# People who are no longer listed (disabled) lose access.\nif [ -f $S/accounts.done ]; then\n  for name in $(cat $S/accounts.done); do\n    if ! grep -q \"^$name:\" $S/accounts; then\n      rm -f \"/home/$name/.ssh/authorized_keys\"\n      set_hash \"$name\" '!' || true\n    fi\n  done\nfi\ncut -d: -f1 $S/accounts > $S/accounts.done\nrm -rf $S/accounts $S/keys\nexit $status\n"
+    },
+    "opt/slotserve/dropbearmulti": {
+      "mode": "0o755",
+      "text": "ELF golden dropbear"
+    },
+    "opt/slotserve/keys/alice": {
+      "mode": "0o600",
+      "text": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGoldenAliceKeyGoldenAliceKeyGoldenAlice alice@laptop\nssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQGoldenAliceRsa alice@desktop\n"
+    },
+    "opt/slotserve/keys/bob": {
+      "mode": "0o600",
+      "text": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGoldenBobKeyGoldenBobKeyGoldenBobKeyGo bob@box\n"
+    },
+    "opt/slotserve/keys/carol": {
+      "mode": "0o600",
+      "text": ""
+    },
+    "opt/slotserve/lib.sh": {
+      "mode": "0o644",
+      "text": "# SlotServe helpers\nset_hash() {\n  # $1 = account, $2 = SHA-512-crypt hash, \"*\" (no password) or \"!\" (locked)\n  if command -v chpasswd >/dev/null 2>&1 && printf '%s:%s\\n' \"$1\" \"$2\" | chpasswd -e >/dev/null 2>&1; then\n    return 0\n  fi\n  if command -v usermod >/dev/null 2>&1 && usermod -p \"$2\" \"$1\" >/dev/null 2>&1; then\n    return 0\n  fi\n  for f in /etc/shadow /etc/passwd; do\n    if [ -f \"$f\" ] && grep -q \"^$1:\" \"$f\"; then\n      awk -F: -v OFS=: -v u=\"$1\" -v h=\"$2\" '$1 == u { $2 = h } { print }' \"$f\" > \"$f.slotserve\" \\\n        && cat \"$f.slotserve\" > \"$f\"\n      rm -f \"$f.slotserve\"\n      return 0\n    fi\n  done\n  echo \"slotserve: could not set the password of $1\" >&2\n  return 1\n}\n"
+    },
+    "opt/slotserve/ssh.sh": {
+      "mode": "0o755",
+      "text": "#!/bin/sh\n# Started by SlotServe: sets up the logins, then runs the SSH server (Dropbear).\nS=/opt/slotserve\n. $S/lib.sh\nsetup() {\n  if ! /bin/sh $S/accounts.sh; then\n    echo \"slotserve: could not create the user accounts, see above\" >&2\n    return 1\n  fi\n}\ncase \"$1\" in\n  --setup) setup; exit $? ;;\n  --run) ;;\n  *) setup || exit 1 ;;\nesac\nexec $S/dropbearmulti dropbear -F -e -w -K 60 -T 3 -p 22 \\\n  -r $S/ssh_host_key -P /tmp/.slotserve-dropbear.pid\n"
+    },
+    "opt/slotserve/ssh_host_key": {
+      "mode": "0o600",
+      "text": "golden host key"
+    },
+    "opt/slotserve/start.sh": {
+      "mode": "0o755",
+      "text": "#!/bin/sh\n# Started by SlotServe: an SSH server (dropbear) next to the environment's own main process.\n/bin/sh /opt/slotserve/ssh.sh --setup || exit 1\n/bin/sh /opt/slotserve/ssh.sh --run &\n\nif [ \"$#\" -gt 0 ]; then exec \"$@\"; fi\nwhile :; do sleep 3600; done\n"
+    }
+  },
+  "keep_entrypoint": false,
+  "name": "slotserve-idle-2",
+  "network": "slotserve-devenv-11",
+  "network_labels": {
+    "slotserve.devenv": "1",
+    "slotserve.session": "11"
+  },
+  "storage": {
+    "extras": [],
+    "mounts": [],
+    "personal": null,
+    "preps": {},
+    "projects": null,
+    "signature": "",
+    "volumes": {}
+  },
+  "web": {
+    "base_session": 11,
+    "ports": [],
+    "token": "golden-web-token"
+  }
+}
