@@ -49,6 +49,7 @@ ADMIN_TABS += ["settings", "audit"]
 DIALOGS = {
     "en-US": [
         ("/schedule", "New booking"),
+        ("/devenv", "Book an environment"),
         ("/keys", "New key"),
         ("/models", "Add model"),
         ("/devenv", "New template"),
@@ -58,6 +59,7 @@ DIALOGS = {
     ],
     "zh-CN": [
         ("/schedule", "新建预约"),
+        ("/devenv", "预约开发环境"),
         ("/keys", "新建密钥"),
         ("/models", "添加模型"),
         ("/devenv", "新建模板"),
@@ -75,8 +77,8 @@ BOOKING_TITLES = {
     "zh-CN": {"model": "预约 GPU 运行模型", "exclusive": "预约整块 GPU", "devenv": "预约开发环境"},
 }
 KIND_BUTTONS = {
-    "en-US": {"exclusive": "Whole GPU", "devenv": "Dev environment"},
-    "zh-CN": {"exclusive": "整块 GPU", "devenv": "开发环境"},
+    "en-US": {"model": "Run a model", "exclusive": "Whole GPU", "devenv": "Dev environment"},
+    "zh-CN": {"model": "运行模型", "exclusive": "整块 GPU", "devenv": "开发环境"},
 }
 
 SNAPSHOT_JS = """() => {
@@ -261,10 +263,20 @@ def test_booking_dialog_title_follows_the_booking_type(browser: Browser, server:
     page.goto(f"{server}/schedule")
     _settle(page)
     page.get_by_role("button", name=DIALOGS[locale][0][1]).first.click()
-    dialog = page.get_by_role("dialog")
+    dialog = page.get_by_role("dialog")  # QuickBook
     titles = BOOKING_TITLES[locale]
-    expect(dialog.get_by_text(titles["model"], exact=True)).to_be_visible()
-    for kind in ("exclusive", "devenv"):
+    for kind in ("model", "exclusive", "devenv"):
+        dialog.locator(".n-radio-button", has_text=KIND_BUTTONS[locale][kind]).first.click()
+        expect(dialog.get_by_text(titles[kind], exact=True)).to_be_visible()
+        _settle(page)
+        problems = _problems(page, f"{locale} QuickBook ({kind})")
+        assert not problems, "\n".join(problems)
+    # "More options" opens the full dialog, keeping the kind
+    dialog.locator("[data-action=more-options]").click()
+    dialog = page.get_by_role("dialog")
+    expect(dialog.locator("[data-action=more-options]")).to_have_count(0)
+    expect(dialog.get_by_text(titles["devenv"], exact=True)).to_be_visible()
+    for kind in ("model", "exclusive", "devenv"):
         dialog.locator(".n-radio-button", has_text=KIND_BUTTONS[locale][kind]).first.click()
         expect(dialog.get_by_text(titles[kind], exact=True)).to_be_visible()
         problems = _problems(page, f"{locale} booking dialog ({kind})")
