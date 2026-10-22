@@ -39,6 +39,8 @@ slotserve = ["static/**/*", "resources/*.json", "services/diagnostics/*.json"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+# A test still running after this many seconds dumps every thread's stack, so a hang shows where it is stuck.
+faulthandler_timeout = 300
 # tests/unit/conftest.py applies these: CI runs `-m unit` (L1, < 5 s, no app) before `-m "not unit"`.
 markers = [
   "unit: L1 pure-logic test under tests/unit (no app, no network, the whole layer < 5 s)",
