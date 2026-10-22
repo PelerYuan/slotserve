@@ -10,12 +10,12 @@ from dataclasses import dataclass
 import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from ..db import SessionLocal, utcnow
 from ..orm import ApiKey, LlmModel, UsageLog, User
 from ..runtime.manager import LlamaRuntime, RuntimeState
-from ..security import hash_api_key
+from ..security import credentials
 from ..services import queries
 
 log = logging.getLogger(__name__)
@@ -44,12 +44,29 @@ class GatewayError(Exception):
     def __init__(self, response: JSONResponse):
         self.response = response
 
+    @property
+    def status_code(self) -> int:
+        return self.response.status_code
+
+    @property
+    def detail(self) -> tuple[str, str]:
+        """(code, message) of the OpenAI-style error body."""
+        err = json.loads(self.response.body).get("error", {})
+        return err.get("code") or "error", err.get("message") or ""
+
+
+# Where a gateway request came from (UsageLog.source).
+SOURCE_API = "api"
+SOURCE_ENV = "env"
+SOURCE_PLAYGROUND = "playground"
+
 
 @dataclass
 class Caller:
     user_id: int
     username: str
-    api_key_id: int
+    api_key_id: int | None
+    source: str = SOURCE_API
 
 
 @dataclass
@@ -68,24 +85,43 @@ def _bearer(request: Request) -> str | None:
     return request.headers.get("x-api-key")
 
 
+# ApiKey.last_used_at / last_ip are written at most once a minute per key (A14): {key: monotonic time}.
+LAST_USED_EVERY = 60.0
+_last_written: dict[str, float] = {}
+
+
+def _due(key_hash: str) -> bool:
+    now = time.monotonic()
+    last = _last_written.get(key_hash)
+    if last is not None and now - last < LAST_USED_EVERY:
+        return False
+    if len(_last_written) > 10_000:
+        _last_written.clear()
+    _last_written[key_hash] = now
+    return True
+
+
 async def authenticate(request: Request) -> Caller:
+    """The caller behind ``Authorization: Bearer <key>`` (or ``X-Api-Key``): an API key or a dev environment's
+    key with scope ``llm`` (security/credentials.py). The session cookie is never used here."""
     raw = _bearer(request)
     if not raw:
         raise GatewayError(openai_error(401, "Missing API key. Use 'Authorization: Bearer <key>'.", "missing_api_key"))
     async with SessionLocal() as db:
-        row = (
+        try:
+            key = await credentials.verify_api_key(db, raw, scope=credentials.SCOPE_LLM)
+        except credentials.CredentialError as exc:
+            status = 403 if exc.code == "insufficient_scope" else 401
+            raise GatewayError(openai_error(status, exc.message, exc.code)) from None
+        if _due(credentials.digest(raw)):
             await db.execute(
-                select(ApiKey, User.username)
-                .join(User, User.id == ApiKey.user_id)
-                .where(ApiKey.key_hash == hash_api_key(raw), ApiKey.revoked_at.is_(None), User.disabled_at.is_(None))
+                update(ApiKey)
+                .where(ApiKey.id == key.key_id)
+                .values(last_used_at=utcnow(), last_ip=request.client.host[:64] if request.client else None)
             )
-        ).first()
-        if row is None:
-            raise GatewayError(openai_error(401, "Invalid or revoked API key.", "invalid_api_key"))
-        key, username = row
-        key.last_used_at = utcnow()
-        await db.commit()
-        return Caller(user_id=key.user_id, username=username, api_key_id=key.id)
+            await db.commit()
+    source = SOURCE_ENV if key.kind == credentials.KIND_ENV else SOURCE_API
+    return Caller(user_id=key.user_id, username=key.username, api_key_id=key.key_id, source=source)
 
 
 def _reserved(owner: User | None, active) -> GatewayError:
@@ -224,6 +260,7 @@ def _record_usage(admission: Admission, endpoint: str, stream: bool, usage: dict
                         completion_tokens=int((usage or {}).get("completion_tokens") or 0),
                         duration_ms=int((time.monotonic() - started) * 1000),
                         status_code=status,
+                        source=admission.caller.source,
                     )
                 )
                 await db.commit()
@@ -306,7 +343,22 @@ async def proxy(path: str, request: Request):
         admission = await admit(request, caller, requested if isinstance(requested, str) else None)
     except GatewayError as e:
         return e.response
+    return await _run(request, path, body, raw, admission, started)
 
+
+async def playground_chat(request: Request, user: User, body: dict) -> Response:
+    """The Playground's way in (``POST /api/playground/chat``, api/playground.py): one chat completion as the
+    signed-in person, without any key. Admission and metering are those of ``/v1`` (``source=playground``): only
+    a model already serving on a lane the person may use right now (free, or their own booking) answers; nothing
+    is loaded, switched or taken from a booking. Raises GatewayError like ``admit``."""
+    started = time.monotonic()
+    caller = Caller(user_id=user.id, username=user.username, api_key_id=None, source=SOURCE_PLAYGROUND)
+    requested = body.get("model")
+    admission = await admit(request, caller, requested if isinstance(requested, str) else None)
+    return await _run(request, "chat/completions", body, json.dumps(body).encode(), admission, started)
+
+
+async def _run(request: Request, path: str, body, raw: bytes, admission: Admission, started: float) -> Response:
     runtime = admission.runtime
     runtime.begin_request()
     released = False

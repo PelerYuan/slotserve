@@ -8,7 +8,6 @@ from pathlib import Path
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
-from starlette.middleware.sessions import SessionMiddleware
 
 from . import __version__, db
 from .api import (
@@ -21,11 +20,13 @@ from .api import (
     devenv_cpu,
     devenv_ports,
     downloads,
+    invites,
     keys,
     lanes,
     metrics,
     models,
     notifications,
+    playground,
     reservations,
     runtime_admin,
     status,
@@ -39,6 +40,7 @@ from .gateway.devenv_web_auth import WebOriginGuard
 from .runtime.lanes import LaneManager, ensure_default_lane
 from .security import secret_key
 from .security.csrf import SESSION_COOKIE, CsrfGuard
+from .security.sessions import ServerSessionMiddleware
 from .security.setup_code import SetupCode
 from .services import app_settings
 from .services.catalog_deploy import Deployer
@@ -150,17 +152,11 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         redoc_url=None,
         openapi_url="/api/openapi.json",
     )
-    # [security] middleware, outermost last: CsrfGuard -> WebOriginGuard -> SessionMiddleware (tests/security)
+    # [security] middleware, outermost last: CsrfGuard -> WebOriginGuard -> ServerSessionMiddleware (tests/security)
     secret_key.resolve(settings)  # an unset or default key is replaced by the generated one in DATA_DIR
     app.state.setup_code = SetupCode(settings.data_dir)
-    app.add_middleware(
-        SessionMiddleware,
-        secret_key=settings.secret_key,
-        session_cookie=SESSION_COOKIE,
-        max_age=30 * 24 * 3600,
-        same_site="lax",
-        https_only=settings.cookie_secure,
-    )
+    # sessions live in the database; the cookie only holds a random token (security/sessions.py)
+    app.add_middleware(ServerSessionMiddleware, session_cookie=SESSION_COOKIE, https_only=settings.cookie_secure)
     app.add_middleware(WebOriginGuard, settings=settings)  # [web origin] pages there cannot change things here
     app.add_middleware(
         CsrfGuard,
@@ -187,6 +183,8 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
         runtime_admin,
         devenv,
         catalog,
+        invites,
+        playground,
     ):
         app.include_router(module.router)
     app.include_router(devenv.keys_router)
