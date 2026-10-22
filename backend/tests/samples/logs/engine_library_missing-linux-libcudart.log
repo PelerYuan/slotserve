@@ -1,0 +1,2 @@
+===== 2026-10-20T08:40:19.873410+00:00 start: /opt/llama.cpp/build/bin/llama-server --model /models/Llama-3.2-3B-Instruct-Q4_K_M.gguf --alias Llama-3.2-3B-Instruct-Q4_K_M --host 127.0.0.1 --port 8081 -ngl 99
+/opt/llama.cpp/build/bin/llama-server: error while loading shared libraries: libcudart.so.12: cannot open shared object file: No such file or directory
