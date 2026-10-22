@@ -1,0 +1,1262 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="预约 GPU 时段，通过 OpenAI 兼容网关使用模型。">
+      
+      
+      
+        <link rel="canonical" href="https://peleryuan.github.io/slotserve/zh/user-guide/">
+      
+      
+        <link rel="prev" href="../operations/">
+      
+      
+        <link rel="next" href="../model-catalog/">
+      
+      
+        
+          <link rel="alternate" href="../../user-guide/" hreflang="en">
+        
+          <link rel="alternate" href="./" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>使用指南 - SlotServe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../" title="SlotServe" class="md-header__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SlotServe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              使用指南
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="选择当前语言">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../user-guide/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PelerYuan/slotserve" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../" title="SlotServe" class="md-nav__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    SlotServe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PelerYuan/slotserve" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快速开始
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    配置参考
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维手册
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    使用指南
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    使用指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        预约 GPU
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="预约 GPU">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        预约类型
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        修改预约
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        候补
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        通道与审批
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        配额
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="模型">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型目录
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        下载模型
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API 密钥
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        用量
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        设置
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        管理
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    模型目录
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    通知与集成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gpus-and-engines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    多 GPU 与推理后端
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-environments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开发环境
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    存储
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    接口
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    调度原理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开发
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    常见问题
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        预约 GPU
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="预约 GPU">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        预约类型
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        修改预约
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        候补
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        通道与审批
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        配额
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="模型">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型目录
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        下载模型
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API 密钥
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        用量
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        设置
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        管理
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="_1">使用指南<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<h2 id="gpu">预约 GPU<a class="headerlink" href="#gpu" title="Permanent link">&para;</a></h2>
+<p>打开<strong>预约</strong>页面，在日历上拖选时段，或点击<strong>新建预约</strong>。选择预约类型、调整时间，可选填写备注。</p>
+<p><img alt="预约" src="../../assets/screenshots/schedule-zh.png" /></p>
+<ul>
+<li>预约按 30 分钟对齐（可配置），不能重叠。</li>
+<li>已经开始的时段仍可预约，从<em>现在</em>开始；对话框里的<strong>立即开始</strong>就是做这个。</li>
+<li>对话框会显示模型的<strong>预计加载时间</strong>。如果前一个预约正好在你开始时结束且使用不同模型，加载会占用你时段的开头，对话框会提示。</li>
+<li>预约期间只接受<strong>你的</strong> API 密钥。</li>
+<li>未开始的预约可<strong>取消</strong>；进行中的可<strong>提前结束</strong>，默认模型会立即恢复。</li>
+</ul>
+<h3 id="_2">预约类型<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>时段内会发生什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>运行模型</strong></td>
+<td>开始前加载你选的模型（可选它的某个<strong>参数预设</strong>），期间只接受你的 API 密钥。</td>
+</tr>
+<tr>
+<td><strong>整卡</strong></td>
+<td>开始前停止推理进程，整张 GPU 空出来跑训练或其他程序，期间接口返回 <code>503 gpu_exclusive</code>；结束后自动恢复默认模型。</td>
+</tr>
+<tr>
+<td><strong>开发环境</strong></td>
+<td>时段内运行一个带 GPU 和 SSH 的 Docker 容器，<code>/workspace</code> 一直保留。详见<a href="../dev-environments/">开发环境</a>。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_3">修改预约<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li>未开始的预约可以<strong>编辑</strong>：改时间、模型、参数预设或备注。</li>
+<li>进行中的预约可以<strong>延长</strong> 30 分钟、1 小时或 2 小时（前提是之后的时间空闲），也可以通过<strong>编辑</strong>缩短。</li>
+<li><strong>每周重复</strong>会在之后几周的同一时间创建预约：要么每周都能约上，要么一个都不建，并提示哪一周冲突。取消系列中的一次时，可选择只取消这一次或连同之后的全部取消。</li>
+<li>管理员可以编辑、取消任何人的预约，也可以<strong>替他人预约</strong>，当事人会在已绑定的聊天平台上收到通知。</li>
+</ul>
+<h3 id="_4">候补<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<p>想要的时段已被占用时，对话框会提供<strong>加入候补</strong>。该时段空出来后（有人取消或提前结束），SlotServe 会自动为你预约；如果取消勾选<strong>空出时自动预约</strong>，则只通知你。未结束的候补显示在<strong>我的预约</strong>下方。</p>
+<h3 id="_5">通道与审批<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<p>有多组 GPU（「通道」）时，日历上方按通道分页，预约弹窗里要选择通道。开启审批模式后，弹窗会提示你的预约是否需要管理员审批；提交后显示为<strong>待审批</strong>，审批结果会通知你。详见<a href="../gpus-and-engines/">多 GPU 与推理后端</a>。</p>
+<h3 id="_6">配额<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<p>管理员可以限制每人每周最多预约的小时数，以及同时持有的未结束预约数。管理员本人不受限制。</p>
+<h2 id="_7">模型<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<p><strong>模型</strong>页面列出所有登记的模型，包括推理后端、大小、预计加载时间和启动参数。</p>
+<p><img alt="模型" src="../../assets/screenshots/models-zh.png" /></p>
+<ul>
+<li><strong>扫描目录</strong>：把模型目录中新增的 <code>.gguf</code> 文件登记为 llama.cpp 模型。</li>
+<li><strong>添加模型</strong>：手动登记模型：选择推理后端（llama.cpp、vLLM、SGLang 或自定义），填写文件、目录或 Hugging Face 仓库名。</li>
+<li><strong>编辑</strong>：修改名称（客户端看到的 <code>model</code> id）、启动参数和说明。模型的添加者和管理员可以编辑或删除。</li>
+<li><strong>设为默认</strong>（管理员）：没人预约时使用的模型。有多个通道时，这里设置的是第一个通道的默认模型，其他通道在<strong>管理 → GPU 与通道</strong>中设置。</li>
+<li><strong>运行日志</strong>：显示推理进程输出的末尾部分，模型启动失败时先看这里。</li>
+<li><strong>参数预设</strong>（在<strong>编辑</strong>中）：为同一个文件保存其他参数组合，例如 <code>-c</code> 更大的长上下文版本。预约时可以选择预设，默认使用模型自己的参数。</li>
+</ul>
+<h3 id="_8">模型目录<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
+<p><strong>模型目录</strong>标签页列出热门开放模型，显示精确的下载大小、每个版本预计需要的显存以及能否在各通道运行。点<strong>部署</strong>会通过下方的下载队列下载该版本，并以合适的启动参数登记。详见<a href="../model-catalog/">模型目录</a>。</p>
+<h3 id="_9">下载模型<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
+<p>粘贴 <code>.gguf</code> 文件的直链并点击<strong>下载</strong>，例如：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>https://huggingface.co/&lt;用户&gt;/&lt;仓库&gt;/resolve/main/&lt;文件&gt;.gguf
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>https://hf-mirror.com/&lt;用户&gt;/&lt;仓库&gt;/resolve/main/&lt;文件&gt;.gguf
+</code></pre></div>
+<p>也可以切到 <strong>Hugging Face</strong> 标签页，输入仓库名（如 <code>Qwen/Qwen3-8B-GGUF</code>）并点<strong>列出文件</strong>，勾选需要的量化版本即可；分卷模型会自动归为一组并下载全部分卷。需要时在管理设置中填写 <strong>Hugging Face 地址</strong>（如 <code>https://hf-mirror.com</code>）和 <strong>Hugging Face Token</strong>。</p>
+<p>下载逐个进行，先写入 <code>&lt;文件&gt;.part</code>，重试时从中断处续传。完成的 <code>.gguf</code> 会自动登记。分片模型（<code>-00001-of-0000N.gguf</code>）请把每一片都添加进来，第一片会成为模型。</p>
+<h2 id="api">API 密钥<a class="headerlink" href="#api" title="Permanent link">&para;</a></h2>
+<p><strong>访问凭据 → 新建密钥</strong>会生成密钥并<strong>只显示一次</strong>，请保存到客户端或密钥管理工具中。吊销后立即失效。</p>
+<p>如果管理员开启了<strong>允许用户再次查看 API 密钥</strong>（<strong>管理 → 系统设置 → 账号</strong>），SlotServe 会为每个新密钥保存一份加密副本，所有者之后可以点<strong>查看</strong>再次显示。开关关闭期间创建的密钥无法查看；关闭开关会删除所有已保存的副本。副本用 <code>SLOTSERVE_SECRET_KEY</code> 加密，更换它之后副本将无法读取。客户端配置见<a href="../api/">接口</a>。</p>
+<p>开启<a href="../dev-environments/">开发环境</a>后，同一页面还可以管理你的 SSH 公钥和环境密码。</p>
+<h2 id="_10">用量<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
+<p><strong>用量</strong>页面以 GPU 时间为中心：预约了多少、GPU 实际工作了多少、耗了多少电。可选最近 7、30 或 90 天，以及<strong>所有人</strong>或<strong>只看我</strong>（每个人都能看到所有人的用量）。</p>
+<ul>
+<li><strong>概览卡片</strong>：预约 GPU 时（预约时长 × 通道的 GPU 数）、实际使用 GPU 时（利用率不低于繁忙阈值的时间，默认 10%）、GPU 被预约期间（或你的预约期间）的平均利用率、能耗与显存峰值、token 与请求数。</li>
+<li><strong>GPU 时趋势</strong>：按人（预约，来自日历）或按类型（实测）堆叠。类型包括模型预约、整卡预约、开发环境、无人预约时的共享使用（通道的空闲模型或共享环境）以及未使用。7 天以内按 6 小时显示，更长按天显示。</li>
+<li><strong>各通道利用率</strong>随时间的变化。</li>
+<li><strong>表格</strong>：按人（预约与使用 GPU 时、预约期间利用率、显存峰值、能耗、token）、按通道（含占用情况）、按类型、按 GPU、按模型。预约时间多但利用率低，说明 GPU 被预约却没在用。</li>
+</ul>
+<p>SlotServe 每分钟记录一次每块 GPU 的利用率、显存、功耗以及当时由谁、以什么方式占用。没有 GPU 指标（没有 <code>nvidia-smi</code>）的机器上仍会记录各通道的占用者，但使用时长、利用率、显存和能耗为空。按分钟的采样 30 天后合并为按小时汇总（<strong>管理 → 系统设置 → 维护</strong>）。<strong>导出 CSV</strong> 可下载按人汇总、按天/通道/GPU/类型/人的 GPU 时间、按天的请求汇总或逐条请求。</p>
+<h2 id="_11">设置<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>外观</strong>：语言，以及浅色、深色或跟随系统的主题。点左下角自己的名字也能切换，登录页右上角有浅色/深色按钮。</li>
+<li><strong>聊天通知</strong>：绑定 Telegram、飞书 / Lark、钉钉、企业微信或 QQ，并选择接收哪些通知，见<a href="../integrations/">通知与集成</a>。</li>
+<li><strong>日历订阅</strong>：在日历应用中查看预约的私有链接。</li>
+</ul>
+<p><img alt="用量" src="../../assets/screenshots/usage-zh.png" /></p>
+<h2 id="_12">管理<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
+<p>第一个账号（用<a href="../configuration/#初始化码与第一个管理员">初始化码</a>创建）是管理员。管理员的侧边栏里有<strong>管理</strong>入口。</p>
+<p><img alt="管理" src="../../assets/screenshots/admin-zh.png" /></p>
+<table>
+<thead>
+<tr>
+<th>标签页</th>
+<th>能做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>概览</td>
+<td>用户数、密钥数、未结束和待审批的预约、近 24 小时请求与 tokens；最近的模型加载记录（含失败原因）；重启某个通道的推理进程、查看日志；没人预约时可<strong>立即加载模型</strong>或<strong>卸载</strong>，持续指定时长或直到下一个预约</td>
+</tr>
+<tr>
+<td>运行监控</td>
+<td>每个通道的状态、模型、推理后端、GPU、端口、PID、进行中的请求和调度目标；加载进度（来自推理进程的输出，没有时按时间估算）；失败时显示错误、退出码、重试倒计时和最后几行输出；完整启动命令；可筛选、暂停、下载的实时输出；每次加载的命令和输出摘录</td>
+</tr>
+<tr>
+<td>GPU 与通道</td>
+<td>检测到的 GPU；新建、编辑、删除通道，设置每个通道的默认模型；修改通道当前模型的启动参数并重新加载</td>
+</tr>
+<tr>
+<td>用户</td>
+<td>新建用户（不需要邀请码）、重置密码、设置或取消管理员、停用、启用或删除账号</td>
+</tr>
+<tr>
+<td>预约</td>
+<td>所有人的预约，可按状态或用户筛选；通过或拒绝申请；编辑、取消或结束任何预约；替他人预约</td>
+</tr>
+<tr>
+<td>请求</td>
+<td>每一次接口请求的用户、密钥、模型、状态码、耗时和 tokens，可只看错误</td>
+</tr>
+<tr>
+<td>概览 → 备份</td>
+<td>每日数据库备份；可立即备份和下载</td>
+</tr>
+<tr>
+<td>API 密钥</td>
+<td>所有有效密钥及其所属用户、最近使用时间；可吊销任意密钥</td>
+</tr>
+<tr>
+<td>聊天渠道</td>
+<td>每个聊天机器人是否已连接、绑定人数、企业微信回调地址、群机器人测试和公告</td>
+</tr>
+<tr>
+<td>系统设置</td>
+<td>所有运行参数：注册、预约限制与配额、审批、预加载与超时、推理后端命令、下载、聊天平台与群机器人、数据保留与备份</td>
+</tr>
+<tr>
+<td>审计日志</td>
+<td>每一次管理操作：谁、在什么时间、做了什么</td>
+</tr>
+</tbody>
+</table>
+<p>保护规则：</p>
+<ul>
+<li>不能停用、降级或删除自己的账号，并且始终至少保留一位正常状态的管理员。</li>
+<li>停用账号会立即登出该用户、拒绝其 API 密钥并取消其未结束的预约；重新启用后密钥恢复可用。</li>
+<li>删除账号会一并删除其密钥、预约和用量记录。如需保留历史，请改用停用。</li>
+<li>系统设置立即生效，保存在数据库中并覆盖 <code>.env</code> 的值。</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 SlotServe contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

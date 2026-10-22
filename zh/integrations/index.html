@@ -1,0 +1,1364 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="预约 GPU 时段，通过 OpenAI 兼容网关使用模型。">
+      
+      
+      
+        <link rel="canonical" href="https://peleryuan.github.io/slotserve/zh/integrations/">
+      
+      
+        <link rel="prev" href="../model-catalog/">
+      
+      
+        <link rel="next" href="../gpus-and-engines/">
+      
+      
+        
+          <link rel="alternate" href="../../integrations/" hreflang="en">
+        
+          <link rel="alternate" href="./" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>通知与集成 - SlotServe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../" title="SlotServe" class="md-header__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SlotServe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              通知与集成
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="选择当前语言">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../integrations/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PelerYuan/slotserve" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../" title="SlotServe" class="md-nav__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    SlotServe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PelerYuan/slotserve" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快速开始
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    配置参考
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维手册
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    使用指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    模型目录
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    通知与集成
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    通知与集成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        聊天平台
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#telegram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telegram
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feishu-lark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        飞书 / Lark
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dingtalk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        钉钉
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wecom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        企业微信
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#qq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QQ
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-webhooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        群机器人 Webhook
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        日历订阅
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#csv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CSV 导出
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prometheus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prometheus
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gpus-and-engines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    多 GPU 与推理后端
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-environments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开发环境
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    存储
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    接口
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    调度原理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开发
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    常见问题
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        聊天平台
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#telegram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telegram
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feishu-lark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        飞书 / Lark
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dingtalk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        钉钉
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wecom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        企业微信
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#qq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QQ
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-webhooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        群机器人 Webhook
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        日历订阅
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#csv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CSV 导出
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prometheus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prometheus
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="_1">通知与集成<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<p>SlotServe 可以在 Telegram、飞书 / Lark、钉钉、企业微信和 QQ 上给大家发消息、响应命令，把告警和公告发到群里，把预约发布成日历订阅，把用量导出为 CSV，并提供 Prometheus 指标。这些都是可选功能，在<strong>管理 → 系统设置</strong>中配置；<strong>管理 → 聊天渠道</strong>显示每个机器人是否已连接。</p>
+<h2 id="_2">聊天平台<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>平台</th>
+<th>SlotServe 接收消息的方式</th>
+<th>是否需要公网地址</th>
+<th>按钮</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Telegram</td>
+<td>长轮询</td>
+<td>否</td>
+<td>内联按钮</td>
+</tr>
+<tr>
+<td>飞书 / Lark</td>
+<td>长连接（WebSocket）</td>
+<td>否</td>
+<td>消息卡片</td>
+</tr>
+<tr>
+<td>钉钉</td>
+<td>Stream 模式（WebSocket）</td>
+<td>否</td>
+<td>编号选项（点击即发送）</td>
+</tr>
+<tr>
+<td>企业微信</td>
+<td>回调地址</td>
+<td>仅接收命令时需要</td>
+<td>编号选项</td>
+</tr>
+<tr>
+<td>QQ</td>
+<td>WebSocket 网关</td>
+<td>否</td>
+<td>编号选项</td>
+</tr>
+</tbody>
+</table>
+<p>所有平台提供相同的命令和通知，可以同时开启多个。一个人在绑定过的每个平台上都会收到通知；收哪些通知只需设置一次，对所有平台生效。</p>
+<p><strong>绑定。</strong> 每个人在<strong>设置 → 聊天通知</strong>中点平台旁的<strong>绑定</strong>。Telegram 会打开机器人，点 <strong>Start</strong> 即完成绑定。其他平台会显示一条类似 <code>bind K7P2QX</code> 的消息，30 分钟内在私聊里发给 SlotServe 机器人即可（也可以发 <code>绑定 K7P2QX</code>）。绑定码只能用一次；一个平台账号只能绑定一个 SlotServe 账号。<strong>发送测试</strong>检查连接，<strong>通知</strong>开关可以暂停某个平台，<strong>解除绑定</strong>（或在聊天里发 <code>/unlink</code>）取消绑定。</p>
+<p>消息使用每个人界面的语言，时间按<strong>时区</strong>设置显示。群聊和尚未绑定的人收到的消息使用<strong>群聊语言</strong>。</p>
+<table>
+<thead>
+<tr>
+<th>通知</th>
+<th>接收人</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>预约 10 分钟后开始</td>
+<td>预约人</td>
+</tr>
+<tr>
+<td>模型已加载完成 / 整卡预约的 GPU 已空出</td>
+<td>预约人</td>
+</tr>
+<tr>
+<td>预约 10 分钟后结束，附<strong>延长 30 分钟</strong>、<strong>延长 1 小时</strong>、<strong>立即结束</strong>按钮</td>
+<td>预约人</td>
+</tr>
+<tr>
+<td>管理员替你预约、修改、取消或结束了你的预约</td>
+<td>预约人</td>
+</tr>
+<tr>
+<td>预约的模型加载失败，暂由默认模型提供服务</td>
+<td>预约人和管理员</td>
+</tr>
+<tr>
+<td>你的预约申请已通过、被拒绝（附理由）或已过期</td>
+<td>预约人</td>
+</tr>
+<tr>
+<td>开发环境已就绪（附 ssh 命令）或没能启动</td>
+<td>预约人</td>
+</tr>
+<tr>
+<td>候补的时段空出来了，或已自动为你预约</td>
+<td>候补人</td>
+</tr>
+<tr>
+<td>你发起的下载完成或失败</td>
+<td>下载发起人</td>
+</tr>
+<tr>
+<td>有预约需要审批，附<strong>通过</strong>和<strong>拒绝</strong>按钮</td>
+<td>管理员</td>
+</tr>
+<tr>
+<td>模型加载失败、有新用户注册、模型目录磁盘不足</td>
+<td>管理员</td>
+</tr>
+</tbody>
+</table>
+<p>命令（与机器人私聊）：</p>
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/status</code></td>
+<td>当前模型和谁在使用 GPU</td>
+</tr>
+<tr>
+<td><code>/book</code></td>
+<td>用按钮预约：通道、模型（或整卡）、日期、开始时间、时长，最后确认</td>
+</tr>
+<tr>
+<td><code>/free</code></td>
+<td>各通道今天和明天的空闲时段</td>
+</tr>
+<tr>
+<td><code>/cancel</code></td>
+<td>选择一个未开始的预约并取消</td>
+</tr>
+<tr>
+<td><code>/today</code></td>
+<td>未来 24 小时的预约</td>
+</tr>
+<tr>
+<td><code>/mine</code></td>
+<td>我接下来的预约</td>
+</tr>
+<tr>
+<td><code>/extend [分钟]</code></td>
+<td>延长我正在进行的预约（默认 30）</td>
+</tr>
+<tr>
+<td><code>/release</code></td>
+<td>立即结束我正在进行的预约</td>
+</tr>
+<tr>
+<td><code>/unlink</code></td>
+<td>解除与此聊天的绑定</td>
+</tr>
+</tbody>
+</table>
+<p>用 <code>/book</code> 预约和网页遵守完全相同的规则：冲突检查、单次最长时长、最多提前天数、配额和审批。机器人提供整点开始时间（以及「现在」），其他时间、参数预设和每周重复请在网页上操作。如果确认时这个时间刚被别人约走，机器人会提供「加入候补」。</p>
+<p>除 Telegram 外，命令也可以不带 <code>/</code>，或者用中文：<code>状态</code>、<code>预约</code>、<code>空闲</code>、<code>取消</code>、<code>今天</code>、<code>我的</code>、<code>延长</code>、<code>结束</code>、<code>解绑</code>。没有按钮的平台会把选项编号，回复编号即可；钉钉里的编号是链接，点一下就会发送。在群聊里（Telegram 除外），机器人只在被 @ 时回答 <code>/status</code>、<code>/free</code>、<code>/today</code> 和 <code>/help</code>；涉及个人预约的命令请在私聊里使用。</p>
+<h2 id="telegram">Telegram<a class="headerlink" href="#telegram" title="Permanent link">&para;</a></h2>
+<p>机器人使用长轮询，服务器只需要能访问 Telegram，不需要公网地址或开放端口。</p>
+<ol>
+<li>在 Telegram 里找 <a href="https://t.me/BotFather">@BotFather</a>，发送 <code>/newbot</code>，复制得到的 Token。</li>
+<li>粘贴到<strong>管理 → 系统设置 → Telegram 机器人 Token</strong> 并保存。如果网络无法直连 Telegram，同时填写 <strong>Telegram 代理</strong>（<code>http://…</code> 或 <code>socks5://…</code>）。</li>
+<li>大家在<strong>设置 → 聊天通知</strong>里点 Telegram 旁的<strong>绑定</strong>。在 Telegram 里输入 <code>/</code> 可以看到命令列表。</li>
+</ol>
+<h2 id="feishu-lark">飞书 / Lark<a class="headerlink" href="#feishu-lark" title="Permanent link">&para;</a></h2>
+<p>开启机器人能力的企业自建应用。事件和卡片按钮回调都通过 SlotServe 主动建立的长连接接收，不需要公网地址。</p>
+<ol>
+<li>在开发者后台（<a href="https://open.feishu.cn/app">open.feishu.cn/app</a>，Lark 为 <a href="https://open.larksuite.com/app">open.larksuite.com/app</a>）创建<strong>企业自建应用</strong>，添加<strong>机器人</strong>能力。</li>
+<li>在<strong>权限管理</strong>中开通：获取与发送单聊、群组消息（<code>im:message</code>）、以应用的身份发消息（<code>im:message:send_as_bot</code>）、读取用户发给机器人的单聊消息（<code>im:message.p2p_msg:readonly</code>）、获取群组中所有 @机器人 的消息（<code>im:message.group_at_msg:readonly</code>）。</li>
+<li>把<strong>凭证与基础信息</strong>里的 <strong>App ID</strong> 和 <strong>App Secret</strong> 填到<strong>管理 → 系统设置 → 飞书 / Lark 机器人</strong>，打开开关并保存。Lark 需要把<strong>开放平台地址</strong>改为 <code>https://open.larksuite.com</code>。等<strong>管理 → 聊天渠道</strong>显示<strong>已连接</strong>。</li>
+<li>在<strong>事件与回调</strong>中，事件和回调都选择<strong>使用长连接接收</strong>（只有 SlotServe 已连接时后台才能保存），然后添加事件 <code>im.message.receive_v1</code>（接收消息）和回调 <code>card.action.trigger</code>（卡片回传交互）。</li>
+<li>创建版本，可用范围包含要使用机器人的人，然后发布。</li>
+</ol>
+<h2 id="dingtalk">钉钉<a class="headerlink" href="#dingtalk" title="Permanent link">&para;</a></h2>
+<p>使用 Stream 模式的企业内部应用机器人：由 SlotServe 主动连接钉钉，不需要公网地址。</p>
+<ol>
+<li>在<a href="https://open-dev.dingtalk.com">开发者后台</a>创建<strong>企业内部应用</strong>，添加<strong>机器人</strong>能力，机器人的<strong>消息接收模式</strong>选择 <strong>Stream 模式</strong>。</li>
+<li>在<strong>权限管理</strong>中确认已开通企业内机器人发送消息权限（<code>qyapi_robot_sendmsg</code>），发送通知需要它。</li>
+<li>把<strong>凭证与基础信息</strong>里的 <strong>Client ID</strong>（AppKey）和 <strong>Client Secret</strong>（AppSecret）填到<strong>管理 → 系统设置 → 钉钉机器人</strong>，打开开关并保存。<strong>机器人 RobotCode</strong> 可以留空，默认使用 Client ID（企业内部应用通常如此）。</li>
+<li>发布应用版本并设置可见范围。大家按名字搜索机器人（或从应用中打开）并发送绑定消息。在群里使用时，把机器人加入群并 @ 它。</li>
+</ol>
+<p>钉钉机器人消息在没有卡片模板时无法带回调按钮，所以选项会编号；编号是链接，点一下就会把编号发回给机器人。</p>
+<h2 id="wecom">企业微信<a class="headerlink" href="#wecom" title="Permanent link">&para;</a></h2>
+<p>企业微信自建应用。发送消息使用企业微信服务端 API，不需要公网地址；<strong>接收命令（包括绑定消息）需要企业微信能通过互联网访问 SlotServe 的回调地址</strong>。</p>
+<ol>
+<li>在<a href="https://work.weixin.qq.com/wework_admin/frame">企业微信管理后台</a>的<strong>应用管理</strong>中创建自建应用，记下 <strong>AgentId</strong> 和 <strong>Secret</strong>，把可见范围设为要使用的人。</li>
+<li>在<strong>我的企业 → 企业信息</strong>复制<strong>企业 ID</strong>。</li>
+<li>在应用设置的<strong>企业可信 IP</strong> 中加入 SlotServe 服务器的公网出口 IP（较新的应用调用 API 时必须设置）。</li>
+<li>要接收消息，打开应用的<strong>接收消息 → 设置 API 接收</strong>，随机生成 <strong>Token</strong> 和 <strong>EncodingAESKey</strong>，先不要关闭页面。</li>
+<li>把企业 ID、AgentId、Secret、Token 和 EncodingAESKey 填到<strong>管理 → 系统设置 → 企业微信应用</strong>，打开开关并保存。</li>
+<li>回到企业微信，填写<strong>管理 → 聊天渠道</strong>里显示的<strong>回调地址</strong>（<code>https://&lt;你的服务器&gt;/api/channels/wecom/callback</code>）并保存，企业微信会立即校验。企业微信可能要求回调地址的域名是本企业已验证的域名。</li>
+</ol>
+<p>没有配置回调（第 4–6 步）时，企业微信机器人收不到绑定消息，大家就无法绑定；下面的群机器人不受影响。</p>
+<h2 id="qq">QQ<a class="headerlink" href="#qq" title="Permanent link">&para;</a></h2>
+<p><a href="https://q.qq.com">QQ 开放平台</a>的官方机器人。SlotServe 连接 QQ 的 WebSocket 网关，接收单聊（C2C）消息和群里 @机器人 的消息。</p>
+<ol>
+<li>在 QQ 开放平台创建机器人，从<strong>开发 → 开发设置</strong>复制 <strong>AppID</strong> 和 <strong>AppSecret</strong>。</li>
+<li>把 SlotServe 服务器的公网出口 IP 加入机器人的 <strong>IP 白名单</strong>。</li>
+<li>确认机器人可以在单聊和群聊中使用（单聊、群聊消息能力）。机器人上线前，在沙箱配置中添加测试用户和测试群，并在 SlotServe 中打开<strong>沙箱环境</strong>。</li>
+<li>把 AppID 和 AppSecret 填到<strong>管理 → 系统设置 → QQ 机器人</strong>，打开开关并保存。</li>
+</ol>
+<p>QQ 只允许机器人在一段时间内回复用户的消息，命令的回答就使用这种被动回复。通知属于主动消息，QQ 会根据机器人的权限限制或拒绝，因此在 QQ 上可能收不到通知。消息里的链接也可能被拦截，除非域名已在机器人处登记。</p>
+<h2 id="group-webhooks">群机器人 Webhook<a class="headerlink" href="#group-webhooks" title="Permanent link">&para;</a></h2>
+<p>群机器人把消息发到群聊里。它们只发送、不需要公网地址，在<strong>管理 → 系统设置 → 群机器人 Webhook</strong> 中配置：</p>
+<ul>
+<li><strong>飞书 / Lark</strong>：在群里打开<strong>设置 → 群机器人 → 添加机器人 → 自定义机器人</strong>，复制 Webhook 地址（<code>https://open.feishu.cn/open-apis/bot/v2/hook/…</code>）。如果开启了<strong>签名校验</strong>，同时填写签名密钥。</li>
+<li><strong>钉钉</strong>：在群里打开<strong>群设置 → 机器人 → 添加机器人 → 自定义</strong>，安全设置选择<strong>加签</strong>，把 <code>SEC</code> 开头的密钥和 Webhook 地址（<code>https://oapi.dingtalk.com/robot/send?access_token=…</code>）一起填入。（使用「自定义关键词」会拒收大部分 SlotServe 消息。）</li>
+<li><strong>企业微信</strong>：在群聊中<strong>添加群机器人</strong>，复制 Webhook 地址（<code>https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=…</code>），密钥包含在地址里。</li>
+</ul>
+<p><strong>发到群里</strong>决定群里收到什么：<strong>管理员告警</strong>（模型加载失败与回退、新用户注册、磁盘不足）、<strong>审批申请</strong>（纯文本；在网页或与机器人的私聊里审批）和<strong>公告</strong>。<strong>管理 → 聊天渠道</strong>中每个 Webhook 都有<strong>发送测试</strong>按钮，还可以在那里发布公告。</p>
+<h2 id="_3">日历订阅<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<p><strong>设置 → 日历订阅</strong>提供两个私有 iCalendar 链接：我的预约、所有人的预约。在 Apple 日历、Google 日历、Outlook 或 Thunderbird 中以「订阅日历 / 网络日历」方式添加，日历应用会定期刷新（通常 15 分钟到几小时）。</p>
+<p>拿到链接的人都能看到其中的预约。<strong>重新生成链接</strong>会让旧链接失效。如果大家访问 SlotServe 的地址与浏览器里显示的不同，请设置<strong>访问地址</strong>。</p>
+<h2 id="csv">CSV 导出<a class="headerlink" href="#csv" title="Permanent link">&para;</a></h2>
+<p><strong>用量 → 导出 CSV</strong> 按所选时间段和范围（所有人或只看我）下载：</p>
+<table>
+<thead>
+<tr>
+<th>导出</th>
+<th>列</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>按人汇总</td>
+<td>用户、预约次数、预约时长、预约 GPU 时、使用 GPU 时、预约期间平均利用率 %、显存峰值（MB）、能耗（Wh）、请求数、输入与输出 tokens</td>
+</tr>
+<tr>
+<td>GPU 时间</td>
+<td>日期、通道、GPU、类型、用户、GPU 时、使用 GPU 时、平均利用率 %、显存峰值（MB）、能耗（Wh），每天/通道/GPU/类型/用户一行</td>
+</tr>
+<tr>
+<td>按天汇总</td>
+<td>日期、用户、模型、请求数、输入与输出 tokens</td>
+</tr>
+<tr>
+<td>逐条请求</td>
+<td>时间、用户、API 密钥、模型、接口、是否流式、状态码、tokens、耗时</td>
+</tr>
+</tbody>
+</table>
+<p>类型为 <code>model</code>、<code>gpu</code>（整卡预约）、<code>devenv</code>、<code>idle_model</code> 和 <code>idle_devenv</code>（无人预约时的共享使用）以及 <code>free</code>。没有 GPU 指标的通道 GPU 列为空。也可以通过 <code>GET /api/usage/export?kind=people|compute|summary|requests&amp;days=30&amp;scope=all|mine</code> 获取。文件为带 BOM 的 UTF-8，Excel 可直接打开。</p>
+<h2 id="prometheus">Prometheus<a class="headerlink" href="#prometheus" title="Permanent link">&para;</a></h2>
+<p>设置<strong>监控 Token</strong> 后开启 <code>GET /metrics</code>，抓取时把它作为 Bearer Token：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">scrape_configs</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">job_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">slotserve</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">metrics_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/metrics</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">authorization</span><span class="p">:</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">credentials</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;监控 Token&gt;</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">static_configs</span><span class="p">:</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">targets</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"gpu-server:8000"</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>类型</th>
+<th>标签</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>slotserve_runtime_state</code></td>
+<td>gauge</td>
+<td><code>state</code></td>
+</tr>
+<tr>
+<td><code>slotserve_runtime_model_info</code></td>
+<td>gauge</td>
+<td><code>model</code>、<code>preset</code></td>
+</tr>
+<tr>
+<td><code>slotserve_reservation_active</code></td>
+<td>gauge</td>
+<td><code>user</code></td>
+</tr>
+<tr>
+<td><code>slotserve_reservations_upcoming</code></td>
+<td>gauge</td>
+<td></td>
+</tr>
+<tr>
+<td><code>slotserve_requests_total</code></td>
+<td>counter</td>
+<td><code>user</code>、<code>model</code>、<code>outcome</code>（<code>ok</code> / <code>error</code>）</td>
+</tr>
+<tr>
+<td><code>slotserve_tokens_total</code></td>
+<td>counter</td>
+<td><code>user</code>、<code>model</code>、<code>type</code></td>
+</tr>
+<tr>
+<td><code>slotserve_request_seconds_total</code></td>
+<td>counter</td>
+<td><code>user</code>、<code>model</code></td>
+</tr>
+<tr>
+<td><code>slotserve_model_loads_total</code></td>
+<td>counter</td>
+<td><code>model</code>、<code>result</code></td>
+</tr>
+<tr>
+<td><code>slotserve_model_load_seconds</code></td>
+<td>gauge</td>
+<td><code>model</code></td>
+</tr>
+<tr>
+<td><code>slotserve_downloads_pending</code></td>
+<td>gauge</td>
+<td></td>
+</tr>
+<tr>
+<td><code>slotserve_gpu_memory_used_bytes</code>、<code>…_total_bytes</code>、<code>slotserve_gpu_utilization_ratio</code>、<code>slotserve_gpu_temperature_celsius</code>、<code>slotserve_gpu_power_watts</code></td>
+<td>gauge</td>
+<td><code>gpu</code>、<code>name</code>、<code>lane</code></td>
+</tr>
+<tr>
+<td><code>slotserve_lane_occupant</code></td>
+<td>gauge</td>
+<td><code>lane</code>、<code>kind</code>、<code>user</code>（通道当前在做什么）</td>
+</tr>
+<tr>
+<td><code>slotserve_booked_gpu_hours_total</code></td>
+<td>counter</td>
+<td><code>user</code>、<code>lane</code>、<code>kind</code>（已过去的预约时长 × 通道 GPU 数）</td>
+</tr>
+<tr>
+<td><code>slotserve_gpu_seconds_total</code></td>
+<td>counter</td>
+<td><code>lane</code>、<code>gpu</code>、<code>kind</code>（已记录的 GPU 时间）</td>
+</tr>
+<tr>
+<td><code>slotserve_gpu_busy_seconds_total</code></td>
+<td>counter</td>
+<td><code>lane</code>、<code>gpu</code>、<code>kind</code>（利用率不低于繁忙阈值的时间）</td>
+</tr>
+<tr>
+<td><code>slotserve_gpu_energy_joules_total</code></td>
+<td>counter</td>
+<td><code>lane</code>、<code>gpu</code></td>
+</tr>
+<tr>
+<td><code>slotserve_user_gpu_busy_seconds_total</code></td>
+<td>counter</td>
+<td><code>user</code>、<code>kind</code></td>
+</tr>
+</tbody>
+</table>
+<p>未设置 Token 时该接口返回 404。</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 SlotServe contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

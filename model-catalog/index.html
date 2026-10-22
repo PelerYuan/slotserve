@@ -1,0 +1,1073 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Book GPU time slots and serve models behind an OpenAI-compatible gateway.">
+      
+      
+      
+        <link rel="canonical" href="https://peleryuan.github.io/slotserve/model-catalog/">
+      
+      
+        <link rel="prev" href="../user-guide/">
+      
+      
+        <link rel="next" href="../integrations/">
+      
+      
+        
+          <link rel="alternate" href="./" hreflang="en">
+        
+          <link rel="alternate" href="../zh/model-catalog/" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Model catalog - SlotServe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#model-catalog" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="SlotServe" class="md-header__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SlotServe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Model catalog
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="../zh/model-catalog/" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PelerYuan/slotserve" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="SlotServe" class="md-nav__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    SlotServe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PelerYuan/slotserve" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model catalog
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-in-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is in it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#will-it-fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Will it fit?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deploying" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploying
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#managing-the-catalog-admins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Managing the catalog (admins)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notifications & integrations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gpus-and-engines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GPUs, lanes & engines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-environments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How scheduling works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-in-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is in it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#will-it-fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Will it fit?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deploying" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploying
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#managing-the-catalog-admins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Managing the catalog (admins)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="model-catalog">Model catalog<a class="headerlink" href="#model-catalog" title="Permanent link">&para;</a></h1>
+<p><strong>Models → Catalog</strong> lists popular open models that run well on a single server, with one-click deployment. Every file in the built-in catalog was checked against the Hugging Face API, and the sizes shown are exact.</p>
+<h2 id="what-is-in-it">What is in it<a class="headerlink" href="#what-is-in-it" title="Permanent link">&para;</a></h2>
+<p>About 35 models in five groups, most of them in several sizes:</p>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Examples</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chat / instruct</td>
+<td>Qwen3 (4B–32B, 30B-A3B), Llama 3.1 8B / 3.2 3B, Gemma 3 (4B, 12B, 27B), Mistral Small 3.2, Phi-4, gpt-oss 20B / 120B</td>
+</tr>
+<tr>
+<td>Coding</td>
+<td>Qwen2.5 Coder (7B, 14B, 32B), Qwen3 Coder 30B-A3B, Devstral Small</td>
+</tr>
+<tr>
+<td>Reasoning</td>
+<td>DeepSeek R1 distills (7B, 14B, 32B, Qwen3 8B), QwQ 32B, Qwen3, Phi-4, gpt-oss</td>
+</tr>
+<tr>
+<td>Embeddings</td>
+<td>Qwen3 Embedding (0.6B, 4B, 8B), Nomic Embed Text v1.5, BGE-M3</td>
+</tr>
+<tr>
+<td>Vision-language</td>
+<td>Qwen2.5 VL (3B, 7B, 32B), Qwen3 VL (4B, 8B, 30B-A3B), Gemma 3, Mistral Small 3.2</td>
+</tr>
+</tbody>
+</table>
+<p>Each entry shows its publisher, licence, parameters (total and active for mixture-of-experts models), maximum context and a short description, plus one or more <strong>variants</strong>:</p>
+<ul>
+<li><strong>GGUF</strong> for llama.cpp: a quantization (Q4_K_M, Q8_0, ...), the exact files including split parts, and the vision projector (<code>mmproj</code>) for vision models.</li>
+<li><strong>safetensors</strong> for vLLM or SGLang: the original weights or an FP8 / AWQ / MXFP4 checkpoint. Only the files an engine needs are downloaded (config, tokenizer, weights) - not original checkpoints, other runtimes' formats or images.</li>
+</ul>
+<p>Variants marked <strong>Licence required</strong> come from gated repositories: accept the licence on the model's Hugging Face page and set a <strong>Hugging Face token</strong> in <strong>Admin → System settings</strong> before deploying them. Most popular gated models also have ungated GGUF variants.</p>
+<p>Filter by task, size, engine and <strong>fits on lane</strong>, or search names, publishers, tags and quantizations.</p>
+<h2 id="will-it-fit">Will it fit?<a class="headerlink" href="#will-it-fit" title="Permanent link">&para;</a></h2>
+<p>For every variant the catalog estimates the GPU memory needed to serve one request:</p>
+<ul>
+<li><strong>weights</strong>: the download size (plus the vision projector),</li>
+<li><strong>KV cache</strong> for the context: <code>2 × layers × KV heads × head size × context × 2 bytes</code> (16-bit cache; an upper bound for models with sliding-window layers),</li>
+<li><strong>overhead</strong>: about 0.5 GB + 3 % of the weights for llama.cpp, about 1.5 GB + 5 % for vLLM / SGLang (activations, CUDA graphs).</li>
+</ul>
+<p>The estimate is compared with the total memory of each lane's GPUs, as reported by <code>nvidia-smi</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Badge</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>fits</td>
+<td>Below 95 % of the lane's memory (90 % for vLLM / SGLang, which reserve a fixed share).</td>
+</tr>
+<tr>
+<td>tight</td>
+<td>Fits only just: use a shorter context or offload fewer layers.</td>
+</tr>
+<tr>
+<td>too large</td>
+<td>Needs more memory than the lane has. llama.cpp can still run it partly on the CPU, slowly.</td>
+</tr>
+<tr>
+<td>unknown</td>
+<td>No GPU information for the lane (no NVIDIA driver, or the lane's GPUs are not detected).</td>
+</tr>
+</tbody>
+</table>
+<p>Cards show, per lane, the largest variant that fits. Change the context in the deploy dialog to see how the KV cache grows; parallel requests (<code>--parallel</code> / <code>-np</code>) need more.</p>
+<h2 id="deploying">Deploying<a class="headerlink" href="#deploying" title="Permanent link">&para;</a></h2>
+<p>Press <strong>Deploy</strong> on a card or on a variant in <strong>Details</strong>, then choose:</p>
+<ul>
+<li>the <strong>variant</strong> and, for safetensors, the <strong>engine</strong> (vLLM or SGLang),</li>
+<li>the <strong>context length</strong> (default 8K tokens, less when the model supports less),</li>
+<li>the <strong>lane</strong> (used for the fit check and, for vLLM / SGLang on lanes with several GPUs, tensor parallelism),</li>
+<li>optionally a <strong>model name</strong> (default <code>&lt;entry&gt;-&lt;variant&gt;</code>, for example <code>qwen3-8b-q4_k_m</code>),</li>
+<li>(admins) <strong>make it the default model</strong> on that lane.</li>
+</ul>
+<p>SlotServe then queues the files in the normal download queue - so the configured Hugging Face endpoint and token are used, downloads resume after interruptions and appear under <strong>Downloads</strong> - after checking that the disk has room for all of them plus <strong>Keep free after downloads</strong>. GGUF files go into the models folder as with the Hugging Face tab; safetensors repositories go into a folder named <code>&lt;org&gt;--&lt;repo&gt;</code>. The catalog shows the progress of each deployment, and when the last file arrives the model is registered with default launch arguments:</p>
+<table>
+<thead>
+<tr>
+<th>Engine</th>
+<th>Arguments</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>llama.cpp</td>
+<td><code>-ngl 99 -c &lt;context&gt;</code>, plus <code>--mmproj &lt;file&gt;</code> for vision models and <code>--embedding --pooling ...</code> for embedding models</td>
+</tr>
+<tr>
+<td>vLLM</td>
+<td><code>--max-model-len &lt;context&gt;</code>, plus <code>--tensor-parallel-size &lt;GPUs&gt;</code> on multi-GPU lanes and <code>--runner pooling</code> for embedding models</td>
+</tr>
+<tr>
+<td>SGLang</td>
+<td><code>--context-length &lt;context&gt;</code>, plus <code>--tp-size &lt;GPUs&gt;</code> on multi-GPU lanes and <code>--is-embedding</code> for embedding models</td>
+</tr>
+</tbody>
+</table>
+<p>Some entries add more (for example <code>--jinja</code> for gpt-oss and the Mistral tokenizer options). Everything can be edited afterwards like any other model, and presets work as usual. Arguments for engine flags change between engine versions; if a model fails to start, check <strong>Server log</strong>.</p>
+<p>Deploying something that is already there does not download again: if the files are on disk the model is registered right away, and if it is registered already it is simply reused (and made the lane default if asked). If a download fails, retry it in <strong>Downloads</strong>; the deployment continues when every file has arrived. Removing a deployment from the catalog's list cancels its queued downloads.</p>
+<h2 id="managing-the-catalog-admins">Managing the catalog (admins)<a class="headerlink" href="#managing-the-catalog-admins" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Hide</strong> a built-in entry in its <strong>Details</strong> to remove it from everyone's catalog; <strong>Show hidden</strong> brings it back.</li>
+<li><strong>Add entry</strong> creates your own entry: name, tasks, parameters, context, descriptions, and variants given as a Hugging Face repository plus (for GGUF) a file name - the first part of split files is enough. SlotServe looks up the file sizes and split parts on Hugging Face, and reads <code>config.json</code> of the original repository for the KV-cache estimate. Your entries can be edited and deleted; deleting one keeps installed models.</li>
+</ul>
+<p>The built-in list lives in <code>backend/slotserve/resources/model_catalog.json</code>. To refresh it after editing (or to check it is still accurate), run from the repository root:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nv">PYTHONPATH</span><span class="o">=</span>backend<span class="w"> </span>python<span class="w"> </span>tools/update_model_catalog.py<span class="w">          </span><span class="c1"># verify and rewrite sizes</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nv">PYTHONPATH</span><span class="o">=</span>backend<span class="w"> </span>python<span class="w"> </span>tools/update_model_catalog.py<span class="w"> </span>--check<span class="w">  </span><span class="c1"># report only</span>
+</code></pre></div>
+<p>It fails on any repository or file that no longer exists. Set <code>HF_TOKEN</code> to read gated repositories and <code>HF_ENDPOINT</code> to use a mirror.</p>
+<h2 id="api">API<a class="headerlink" href="#api" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET</td>
+<td><code>/api/catalog?ctx=</code></td>
+<td>Entries with estimates and fit per lane (<code>ctx</code> overrides the context of every estimate)</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/catalog/{entry}?ctx=</code></td>
+<td>One entry</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/catalog/deploy</code></td>
+<td><code>{entry_id, variant_id, engine?, lane_id?, set_default?, ctx?, name?}</code></td>
+</tr>
+<tr>
+<td>GET / DELETE</td>
+<td><code>/api/catalog/deploys</code>, <code>/api/catalog/deploys/{id}</code></td>
+<td>Recent deployments with progress; remove (cancel) one</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/catalog/{entry}/hidden</code></td>
+<td>Admin: <code>{hidden}</code></td>
+</tr>
+<tr>
+<td>POST / PUT / DELETE</td>
+<td><code>/api/catalog/entries</code>, <code>/api/catalog/entries/{entry}</code></td>
+<td>Admin: own entries</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 SlotServe contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

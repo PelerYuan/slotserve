@@ -1,0 +1,1646 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="预约 GPU 时段，通过 OpenAI 兼容网关使用模型。">
+      
+      
+      
+        <link rel="canonical" href="https://peleryuan.github.io/slotserve/zh/dev-environments/">
+      
+      
+        <link rel="prev" href="../gpus-and-engines/">
+      
+      
+        <link rel="next" href="../storage/">
+      
+      
+        
+          <link rel="alternate" href="../../dev-environments/" hreflang="en">
+        
+          <link rel="alternate" href="./" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>开发环境 - SlotServe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../" title="SlotServe" class="md-header__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SlotServe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              开发环境
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="选择当前语言">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../dev-environments/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PelerYuan/slotserve" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../" title="SlotServe" class="md-nav__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    SlotServe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PelerYuan/slotserve" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快速开始
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    配置参考
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维手册
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    使用指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    模型目录
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    通知与集成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gpus-and-engines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    多 GPU 与推理后端
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开发环境
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开发环境
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#first-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第一个环境：浏览器里的 VS Code
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="第一个环境：浏览器里的 VS Code">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#with-a-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        带 GPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ssh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        从终端或本地 VS Code 连接：SSH
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setting-it-up-admin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        开启（管理员）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="开启（管理员）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker 访问
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模板
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#web-interfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        网页界面
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="网页界面">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#their-own-origin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        独立的源
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        端口
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#saving-an-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        保存环境
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inside-the-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        环境内的平台信息
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logging-in-ssh-keys-and-the-environment-password" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        登录方式：SSH 公钥和环境密码
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limits-and-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        资源上限与加固
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kept-environments-projects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        保留的环境（项目）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#without-a-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        无 GPU 模式
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="无 GPU 模式">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sharing-the-cpu-fairly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        公平地共享 CPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        用量
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cpu-what-admins-see" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        管理员能看到什么
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#idle-lanes-a-shared-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        空闲通道：共享环境
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        存储
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-admins-see" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        管理员能看到什么
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    存储
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    接口
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    调度原理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开发
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    常见问题
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#first-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第一个环境：浏览器里的 VS Code
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="第一个环境：浏览器里的 VS Code">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#with-a-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        带 GPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ssh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        从终端或本地 VS Code 连接：SSH
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setting-it-up-admin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        开启（管理员）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="开启（管理员）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker 访问
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模板
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#web-interfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        网页界面
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="网页界面">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#their-own-origin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        独立的源
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        端口
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#saving-an-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        保存环境
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inside-the-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        环境内的平台信息
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logging-in-ssh-keys-and-the-environment-password" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        登录方式：SSH 公钥和环境密码
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limits-and-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        资源上限与加固
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kept-environments-projects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        保留的环境（项目）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#without-a-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        无 GPU 模式
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="无 GPU 模式">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sharing-the-cpu-fairly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        公平地共享 CPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        用量
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cpu-what-admins-see" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        管理员能看到什么
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#idle-lanes-a-shared-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        空闲通道：共享环境
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        存储
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-admins-see" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        管理员能看到什么
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="_1">开发环境<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<p><strong>开发环境</strong>是你在服务器上的一个专属 Docker 容器：浏览器里的 VS Code、JupyterLab 或桌面，或者通过 SSH 使用的终端。<code>/workspace</code> 里的文件在不同环境之间一直保留。你可以随时<strong>不带 GPU</strong> 启动一个环境来写代码、装环境，需要时再<strong>预约 GPU</strong>；也可以把整个环境保留下来。通道还可以在无人预约时运行一个<strong>共享环境</strong>，所有加入的人都能登录。</p>
+<pre class="mermaid"><code>sequenceDiagram
+    participant U as 你
+    participant S as SlotServe
+    participant D as Docker
+    U-&gt;&gt;S: 打开：VS Code（浏览器），不要 GPU
+    S-&gt;&gt;D: 按需拉取镜像，创建网络和容器（/workspace、只读的 /models）
+    S--&gt;&gt;U: 就绪后卡片上出现「打开」（大约一分钟）
+    U-&gt;&gt;S: 打开
+    S--&gt;&gt;U: 跳转到网页端口（:8001）的一次性链接，VS Code 在新标签页中打开
+    Note over U,D: 之后：在预约的时间里带 GPU
+    S-&gt;&gt;S: 开始时：停止该通道的推理进程
+    S-&gt;&gt;D: 容器获得该通道的 GPU（添加了公钥时还有 SSH）
+    Note over S,D: 预约结束时
+    S-&gt;&gt;D: 删除容器（/workspace 保留；保留的环境只暂停）
+    S-&gt;&gt;S: 重新加载该通道的默认模型</code></pre>
+<h2 id="first-environment">第一个环境：浏览器里的 VS Code<a class="headerlink" href="#first-environment" title="Permanent link">&para;</a></h2>
+<ol>
+<li>打开<strong>开发环境</strong>。在<strong>打开一个环境</strong>下：<ul>
+<li><strong>选择工具</strong>：<strong>VS Code（浏览器）</strong>（或 JupyterLab、Ubuntu 桌面、终端、你保留的环境或其他模板）；</li>
+<li><strong>要 GPU 吗？</strong> 选<strong>先不用</strong>：推荐用来装环境、写代码，随时可以切到 GPU；</li>
+<li>点<strong>打开</strong>。</li>
+</ul>
+</li>
+<li>新环境的卡片会显示进度（第一次需要下载镜像）。大约一分钟后卡片上出现<strong>打开 VS Code</strong> 按钮：VS Code 在新的浏览器标签页中打开 <code>/workspace</code>。</li>
+<li>开始工作。文件请放在 <code>/workspace</code>：环境结束后它仍然保留，并且你所有的环境看到的都是同一个 <code>/workspace</code>。容器里的其他内容（在 <code>/workspace</code> 以外用 <code>apt</code> 或 <code>pip</code> 装的软件包）会在环境结束时删除，除非你保留这个环境或把它保存为镜像（见<a href="#kept-environments-projects">保留的环境</a>和<a href="#saving-an-environment">保存环境</a>）。</li>
+<li>VS Code 里有终端（<strong>Terminal → New Terminal</strong>）。你在容器里是 <code>root</code>，所以 <code>apt install</code> 不需要 <code>sudo</code>。共享模型在 <code>/models</code>（只读），<code>OPENAI_BASE_URL</code> / <code>OPENAI_API_KEY</code> 让代码可以直接调用 SlotServe 的模型（见<a href="#inside-the-environment">环境内的平台信息</a>）。</li>
+<li>用完后在卡片上点<strong>停止</strong>。不带 GPU 的环境会一直运行到你停止或暂停它，没有时间限制。</li>
+</ol>
+<p>浏览器里的工具不需要 SSH 密钥、密码或预约：你已经登录了 SlotServe，SlotServe 会替你登录应用。打开时会经过一个跳转到 SlotServe <strong>网页界面端口</strong>（8001）的一次性链接，这个端口把各环境的页面与 SlotServe 本身隔开（见<a href="#their-own-origin">独立的源</a>）。</p>
+<h3 id="with-a-gpu">带 GPU<a class="headerlink" href="#with-a-gpu" title="Permanent link">&para;</a></h3>
+<p>把<strong>先不用</strong>换成<strong>要 GPU</strong>，再选时间：SlotServe 会为你预约一块空闲的 GPU（和总览上一样的简短预约对话框；<strong>预约带 GPU 的环境</strong>会直接打开它）。也可以在任何预约对话框中选择「开发环境」。镜像会提前下载；预约开始时容器带着该通道的 GPU 启动，卡片上显示剩余时间、<strong>+1 小时</strong>（下一小时已被占用时会说明原因）、实时 GPU 使用情况和<strong>结束</strong>。预约结束时容器会被删除（<code>/workspace</code> 保留），保留的环境除外；结束前 10 分钟的提醒里有延长按钮。</p>
+<p>你在无 GPU 状态下使用过的保留环境，可以预约 GPU 后从上次离开的地方继续；见<a href="#without-a-gpu">无 GPU 模式</a>。</p>
+<h3 id="ssh">从终端或本地 VS Code 连接：SSH<a class="headerlink" href="#ssh" title="Permanent link">&para;</a></h3>
+<p>第二种方式是 SSH，适用于你自己的终端、VS Code <strong>Remote-SSH</strong>、<code>scp</code> 或端口转发。需要在 SlotServe 上添加 SSH 公钥（或设置环境密码）：</p>
+<ol>
+<li>工具选择<strong>终端 / SSH</strong>（其他工具也都带 SSH）。第一次时页面会直接要求你填写公钥：粘贴公钥、按页面给出的两条命令为你的系统生成一个，或者让浏览器生成密钥对（私钥只下载一次，只有公钥发送给 SlotServe）。见<a href="#logging-in-ssh-keys-and-the-environment-password">登录方式</a>。</li>
+<li>
+<p>环境运行后，卡片上会显示连接命令：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ssh<span class="w"> </span>-p<span class="w"> </span><span class="m">2201</span><span class="w"> </span>root@服务器
+</code></pre></div>
+</li>
+<li>
+<p><strong>VS Code Remote-SSH</strong>：把卡片上的配置片段加到 <code>~/.ssh/config</code>；每个环境都有自己的 Host 别名和主机密钥，连接那个别名即可。每次预约的端口可能不同。</p>
+</li>
+<li>自己启动的程序（TensorBoard、演示页面、API）可以在卡片的<strong>端口</strong>里用浏览器打开（见<a href="#ports">端口</a>），或用 SSH 端口转发访问，如 <code>ssh -p 2201 -L 8888:localhost:8888 root@服务器</code>。</li>
+</ol>
+<p>第一次 <code>ssh</code> 到某个环境时会询问是否信任它的主机密钥：请与卡片上的<strong>主机密钥</strong>对比指纹。</p>
+<h2 id="setting-it-up-admin">开启（管理员）<a class="headerlink" href="#setting-it-up-admin" title="Permanent link">&para;</a></h2>
+<h3 id="docker">Docker 访问<a class="headerlink" href="#docker" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p>把 Docker 套接字挂载进 SlotServe：在 <code>docker-compose.yml</code> 里取消注释</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+</code></pre></div>
+<p>然后执行 <code>docker compose up -d</code>。容器通过 <a href="https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html">NVIDIA Container Toolkit</a> 使用 GPU，SlotServe 本身已经依赖它。不在容器中运行 SlotServe 时，运行它的用户需要有访问套接字的权限（<code>docker</code> 组）。<code>SLOTSERVE_DOCKER_HOST</code> 可以指向别处（其他套接字、<code>tcp://</code>）。</p>
+</li>
+<li>
+<p>打开<strong>管理 → 系统设置 → 开发环境 → 开发环境</strong>。Docker 有响应时，设置进度中的<strong>开发环境</strong>和健康检查 <strong>docker</strong> 会打勾；否则该检查的详情会说明原因（"Cannot connect to the Docker daemon"、套接字权限不足）。</p>
+</li>
+<li>
+<p>在宿主机防火墙中放行需要的端口：浏览器工具用的<strong>网页界面端口</strong>（<code>SLOTSERVE_DEVENV_WEB_PORT</code>，默认 <code>8001</code>，<code>docker-compose.yml</code> 已发布）；<strong>SSH 端口范围</strong>（默认 <code>2200-2299</code>，每个运行中的环境占用其中一个端口）；如果允许用户直接发布端口（见<a href="#ports">端口</a>），还有<strong>直连端口范围</strong>（默认 <code>2300-2399</code>）。SSH 端口和直连端口由 Docker 自己发布，会绕过 <code>ufw</code>；见<a href="../operations/#firewall">端口与防火墙</a>。</p>
+</li>
+<li>
+<p>按需设置 <strong>SSH 主机名</strong>（用户在 <code>root@</code> 后面输入的地址）、CPU、内存、共享内存上限、允许的镜像仓库、是否允许<strong>密码登录</strong>、存放持久数据的<strong>存储目录</strong>，以及保留环境的限制。</p>
+</li>
+</ol>
+<p>在反向代理之后，还要设置<strong>网页界面地址</strong>（<code>SLOTSERVE_DEVENV_WEB_URL</code>）；见<a href="../operations/#reverse-proxy">反向代理</a>。</p>
+<div class="admonition warning">
+<p class="admonition-title">安全</p>
+<p>能控制 Docker 套接字就能控制宿主机。SlotServe 只启动经过加固、不带额外特权的容器（见<a href="#limits-and-hardening">资源上限与加固</a>），只挂载该通道的 GPU、用户自己的 <code>/workspace</code> 和只读的模型目录；但 SlotServe 的管理员从此可以在宿主机上运行容器。只在用户可信的服务器上开启开发环境。</p>
+<p><strong>Podman</strong> 提供与 Docker 兼容、不需要 root 守护进程的接口。把 <code>SLOTSERVE_DOCKER_HOST</code> 指向它的套接字（如 <code>unix:///run/podman/podman.sock</code>）即可改用 Podman，GPU 需要按 Podman 的 CDI 方式配置。</p>
+</div>
+<h3 id="templates">模板<a class="headerlink" href="#templates" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>模板</th>
+<th>镜像</th>
+<th>网页界面</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PyTorch</td>
+<td><code>pytorch/pytorch:2.14.1-cuda12.6-cudnn9-devel</code></td>
+<td></td>
+</tr>
+<tr>
+<td>JupyterLab + PyTorch</td>
+<td><code>quay.io/jupyter/pytorch-notebook:cuda12-pytorch-2.11.0</code></td>
+<td>JupyterLab</td>
+</tr>
+<tr>
+<td>TensorFlow</td>
+<td><code>tensorflow/tensorflow:2.21.0-gpu-jupyter</code></td>
+<td></td>
+</tr>
+<tr>
+<td>CUDA</td>
+<td><code>nvidia/cuda:12.9.2-cudnn-devel-ubuntu24.04</code></td>
+<td></td>
+</tr>
+<tr>
+<td>Ubuntu desktop</td>
+<td><code>linuxserver/webtop:ubuntu-xfce-388f14a2-ls7</code></td>
+<td>桌面（XFCE）</td>
+</tr>
+<tr>
+<td>VS Code</td>
+<td><code>codercom/code-server:4.141.0</code></td>
+<td>VS Code（code-server）</td>
+</tr>
+</tbody>
+</table>
+<p>内置模板使用 CUDA 12 版本，兼容的显卡和驱动范围更广。管理员可以更换镜像、停用模板或添加共享模板。</p>
+<p>每个人都可以用任意镜像新建<strong>自己的模板</strong>（除非管理员关闭了自定义镜像或限制了镜像仓库），可以指定主进程和环境变量。镜像需要包含 <code>/bin/sh</code>；SSH 不依赖镜像，SlotServe 会放入自带的小型静态 SSH 服务。</p>
+<h3 id="web-interfaces">网页界面<a class="headerlink" href="#web-interfaces" title="Permanent link">&para;</a></h3>
+<p>SlotServe 可以在浏览器里打开运行中环境的任意端口，地址是 <code>/devenv/&lt;会话&gt;/port/&lt;端口&gt;/</code>，由<strong>网页界面端口</strong>提供（见下文「独立的源」）。模板以端口列表的形式<strong>声明网页界面</strong>，每个端口有名称和类型（桌面、JupyterLab、VS Code 或其他网页应用）；环境运行时，卡片上每个端口都有一个<strong>打开…</strong>按钮（新标签页）。其他端口（比如自己在 6006 端口启动的 TensorBoard）可以在<strong>端口</strong>里添加，或在 SlotServe 地址后直接输入 <code>/devenv/&lt;会话&gt;/port/6006/</code> 打开。只有预约人和管理员能打开（不属于任何预约的环境对所有已登录用户开放），并且需要先登录 SlotServe。</p>
+<pre class="mermaid"><code>flowchart LR
+    B[浏览器] -- "服务器:8001/devenv/7/port/8888/（环境 Cookie）" --&gt; W[SlotServe 网页端口]
+    W -- "HTTP + WebSocket，附带令牌" --&gt; C["容器 slotserve-dev-7:8888"]
+    subgraph N["网络 slotserve-devenv-7"]
+        C
+    end</code></pre>
+<ul>
+<li><strong>隔离</strong>：每个环境运行在自己的 Docker 网络里。网页端口从不对外公开：SlotServe 运行在容器中时，会加入环境的网络，按容器名访问任意端口；直接运行在宿主机上时，Docker 把每个声明的端口绑定到 <code>127.0.0.1</code> 的随机端口，其他端口通过容器在其网络中的地址访问（Linux 宿主机）。环境停止时网络会被删除（保留环境会一直保留自己的网络和网页地址，直到它被删除），重启后会清理残留的网络。通道的共享环境也有自己的网络，它的网页界面对所有已登录用户开放。</li>
+<li><strong>代理</strong>：SlotServe 转发 HTTP（流式）和 WebSocket（Jupyter 内核、VS Code、桌面画面都需要），让重定向和 Cookie 保持在环境的路径下，并且不会把自己的会话 Cookie 转给应用。</li>
+<li><strong>令牌</strong>：每次启动生成一个随机令牌。JupyterLab 用它启动（<code>--IdentityProvider.token</code>），桌面用它作为密码，VS Code（code-server，<code>--auth password</code>）以它的 SHA-256 作为 <code>HASHED_PASSWORD</code>（占位符 <code>{token_sha256}</code>）；SlotServe 会在它信任的每个请求里替你登录（令牌请求头或 code-server 的会话 cookie），所以你不会看到密码页，而不经过 SlotServe 就无法使用这些应用。把这些应用开成<strong>直连端口</strong>会绕过这一点，因此需要确认。</li>
+<li><strong>基础路径</strong>：主进程和环境变量里可以使用占位符 <code>{base_path}</code> 和 <code>{port}</code>（第一个声明的端口，如 <code>/devenv/7/port/8888/</code> 和 <code>8888</code>）、<code>{base_path_&lt;端口&gt;}</code>（任一声明的端口，如 <code>{base_path_6006}</code>）、<code>{token}</code> 和 <code>{session}</code>。应用拿到自己基础路径的端口（Jupyter 的 <code>--ServerApp.base_url</code>、桌面的 <code>SUBFOLDER</code>）收到完整路径；其他端口（code-server、大多数简单应用、未声明的端口）由 SlotServe 去掉前缀后转发，这些应用应使用相对链接。另外还会设置 <code>SLOTSERVE_WEB_BASE</code>、<code>SLOTSERVE_WEB_PORT</code> 和 <code>SLOTSERVE_WEB_TOKEN</code> 环境变量（第一个声明的端口）。</li>
+<li><strong>保留镜像自带的入口程序</strong>：linuxserver 桌面这类镜像运行自己的 init 系统。打开这个选项后，SlotServe 保留镜像的入口程序和命令，并通过 <code>docker exec</code> 在旁边启动 SSH 服务，而不是使用自己的启动脚本。</li>
+</ul>
+<p>内置模板：<strong>JupyterLab + PyTorch</strong>（JupyterLab，端口 8888，文件在 <code>/workspace</code>）、<strong>Ubuntu desktop</strong>（XFCE 桌面串流到浏览器，端口 3000）和 <strong>VS Code</strong>（code-server，端口 8080，打开 <code>/workspace</code>；扩展来自 Open VSX）。SSH 照常可用。</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>桌面使用的浏览器视频接口需要安全上下文：请通过 HTTPS（或 <code>localhost</code>）访问 SlotServe。桌面里的硬件加速图形可能需要在模板环境变量中加入 <code>NVIDIA_DRIVER_CAPABILITIES=all</code>，取决于宿主机的驱动配置。</p>
+</div>
+<h4 id="their-own-origin">独立的源<a class="headerlink" href="#their-own-origin" title="Permanent link">&para;</a></h4>
+<p>环境里的应用由使用者自己编写。如果它们和 SlotServe 使用同一个地址，某人环境里的网页就能以打开者（比如管理员）的身份操作 SlotServe。因此网页界面使用<strong>单独的端口</strong>（<code>SLOTSERVE_DEVENV_WEB_PORT</code>，默认 <code>8001</code>）：浏览器把它当作不同的源，而且这个端口从不接受 SlotServe 的登录 Cookie。</p>
+<pre class="mermaid"><code>sequenceDiagram
+    participant B as 浏览器
+    participant S as SlotServe（:8000）
+    participant W as 网页端口（:8001）
+    B-&gt;&gt;S: /devenv/7/port/8888/（已登录）
+    S-&gt;&gt;S: 这个人能使用环境 7 吗？
+    S--&gt;&gt;B: 带一次性令牌（一分钟内有效）跳转到 :8001
+    B-&gt;&gt;W: 令牌
+    W--&gt;&gt;B: 只对 /devenv/7/ 有效的 Cookie，跳转到应用
+    B-&gt;&gt;W: /devenv/7/port/8888/（环境 Cookie）</code></pre>
+<ul>
+<li>环境卡片上的链接（以及 SlotServe 地址下旧的 <code>/devenv/…</code> 书签）都会先经过 SlotServe 完成登录和交接，用户无需任何设置。</li>
+<li>网页端口上的 Cookie 是 HttpOnly 的，只属于一个环境的路径，有效 12 小时，并且每次请求都会查数据库（账号停用或失去预约后立即失效）。</li>
+<li>SlotServe 拒绝网页端口上的页面发来的修改类请求（POST、PUT、PATCH、DELETE）；网页端口也拒绝一个环境的页面访问另一个环境的地址。</li>
+<li><strong>使用反向代理</strong>或把端口映射成其他号码时，请设置<strong>网页界面地址</strong>（<code>SLOTSERVE_DEVENV_WEB_URL</code>，如 <code>https://gpu-box:8443</code>），并把这个地址代理到 8001 端口（开启 WebSocket）。为了能跳回登录，<code>SLOTSERVE_PUBLIC_URL</code> 应设为 SlotServe 本身的地址。</li>
+<li>各个环境之间共用网页端口这个源。如果某个应用需要和其他环境的页面完全隔离，请把它发布为直连端口（见下文「端口」；每个宿主机端口都是独立的源）。</li>
+<li><code>SLOTSERVE_DEVENV_WEB_PORT=0</code> 会像旧版本一样在 SlotServe 自己的地址上提供网页界面，不推荐。</li>
+</ul>
+<p>code-server 以 <code>--auth password</code> 运行：SlotServe 用它的会话 cookie 替你登录，不经过 SlotServe 的请求（其他容器、宿主机上的其他人）只会看到它的登录页。</p>
+<h3 id="ports">端口<a class="headerlink" href="#ports" title="Permanent link">&para;</a></h3>
+<p>环境运行时，卡片上会列出它的<strong>端口</strong>：模板声明的端口和你添加的端口。每个端口显示名称、容器端口、访问方式、带<strong>打开</strong>和<strong>复制</strong>按钮的地址，以及是否有程序在监听（SlotServe 会查看容器里正在监听的套接字；「仅本机」表示应用只监听 <code>127.0.0.1</code>，需要改为监听 <code>0.0.0.0</code>）。正在监听但还没列出的端口会显示出来，一键即可添加。</p>
+<p>每个端口有两种访问方式，随时可以切换：</p>
+<table>
+<thead>
+<tr>
+<th>方式</th>
+<th>地址</th>
+<th>谁能使用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>SlotServe 登录</strong>（默认）</td>
+<td><code>http://服务器:8001/devenv/&lt;会话&gt;/port/&lt;端口&gt;/</code></td>
+<td>你和管理员，需登录 SlotServe。适合网页应用。</td>
+</tr>
+<tr>
+<td><strong>直连</strong></td>
+<td><code>http://服务器:&lt;宿主机端口&gt;</code></td>
+<td>局域网内任何人，不经过 SlotServe。任何应用或协议（HTTP、WebSocket、gRPC、数据库……）。</td>
+</tr>
+</tbody>
+</table>
+<p><strong>添加端口</strong>时填写容器端口、名称和访问方式。添加、切换和移除端口都不会重启环境。模板声明的端口（桌面、JupyterLab、VS Code……）默认需要登录，除非模板把它设为直连；对这些端口，「恢复默认」即回到模板的设置。</p>
+<ul>
+<li><strong>直连端口</strong>取自<strong>直连端口范围</strong>（默认 <code>2300-2399</code>，与 SSH 端口分开）。SlotServe 会在环境的网络里启动一个很小的转发容器（<code>socat</code>，镜像为<strong>端口转发镜像</strong>，默认 <code>alpine/socat:1.8.1.1</code>），由它发布宿主机端口并把连接转给环境。它只在环境运行时存在：端口被移除或改回登录方式、环境停止或暂停时都会删除。直连端口对所有能访问服务器的人开放；如有需要，请让应用自己加上密码或令牌。</li>
+<li><strong>端口号固定</strong>：保留环境的直连端口属于这个保留环境，暂停期间号码不变，继续使用时还是同一个号码；保留环境被删除（或因闲置被清理）时释放。其他环境的直连端口属于本次预约，预约结束时释放。</li>
+<li><strong>限制</strong>：管理员可以设置<strong>每人直连端口数</strong>（默认 5；管理员不受限制；<code>0</code> 表示只有管理员能发布），也可以关闭<strong>直连端口</strong>（转发容器停止，号码仍然保留）。</li>
+<li>空闲通道的<strong>共享环境</strong>只列出模板里的端口，任何人都不能添加。</li>
+<li>首次发布时如果宿主机端口已被其他程序占用，会自动换用下一个空闲号码；固定号码后来被占用时，卡片上会显示问题。</li>
+<li>开发环境页面的<strong>直连端口</strong>列出你的直连端口（包括暂停中的保留环境的端口），可以释放。管理员打开<strong>所有人</strong>可以看到所有人的直连端口并<strong>收回</strong>：宿主机端口回到池中，容器端口仍可在登录后访问。</li>
+</ul>
+<h3 id="saving-an-environment">保存环境<a class="headerlink" href="#saving-an-environment" title="Permanent link">&para;</a></h3>
+<p><strong>保存为镜像</strong>会把运行中的容器（装好的软件、<code>/workspace</code> 以外的文件）保存成你自己的新模板，下次预约直接从这里继续。<code>/workspace</code> 本来就会保留，不会打进镜像。新模板会带上环境的端口声明，包括你添加的端口以及每个端口是否直连。每人可保存的镜像数量有上限（默认 3 个）；删除已保存的模板会同时删除服务器上的镜像。</p>
+<p>保存之前（以及保留的环境做快照之前），SlotServe 会清空只属于本次环境、由它放进容器的内容：环境密钥、SSH 主机密钥和 root 的密码哈希；镜像里的 <code>SLOTSERVE_*</code>、<code>OPENAI_*</code> 和网页令牌变量会被置空，镜像自己的变量保持不变。下次启动时会重新写入。</p>
+<h2 id="inside-the-environment">环境内的平台信息<a class="headerlink" href="#inside-the-environment" title="Permanent link">&para;</a></h2>
+<p>每个新环境都知道自己在哪里、怎样调用模型（管理员设置：<strong>环境内的平台信息</strong>，默认开启）：</p>
+<ul>
+<li><strong>环境变量</strong>：<code>SLOTSERVE_USER</code>、<code>SLOTSERVE_END</code>（预约结束时间）、<code>SLOTSERVE_ENV_ID</code>、<code>SLOTSERVE_ENV</code>（模板或保留环境的名称）、<code>SLOTSERVE_LANE</code>、<code>SLOTSERVE_GPUS</code>、<code>SLOTSERVE_MACHINE</code>、<code>SLOTSERVE_CHECKPOINT_DIR</code>（<code>/workspace/.checkpoints</code>，供训练脚本约定使用）以及 <code>OPENAI_BASE_URL</code>。预约延长后，登录 shell 会读到新的结束时间（<code>/run/slotserve/env</code>）；容器自身的环境变量保留启动时的值。</li>
+<li><strong>LLM 接口</strong>：<code>OPENAI_BASE_URL</code> 为 <code>http://slotserve-gw:8002/v1</code>，这是 SlotServe 专门给环境用的小监听端口，只提供 <code>/v1</code> 接口（不提供网页界面和 <code>/api</code>）。请求与 SlotServe 自身端口上一样经过密钥校验、准入和用量记录。模板自己设置了 <code>OPENAI_BASE_URL</code> 时以模板为准。</li>
+<li><strong>环境密钥</strong>：预约的环境和无 GPU 环境会得到一把专属密钥（<code>sk-ss-env-...</code>，仅 <code>llm</code> 权限，以你的身份调用）。它写在 <code>/run/slotserve/llm-key</code>（仅 root 可读），在登录 shell 中导出为 <code>OPENAI_API_KEY</code>，因此无需任何配置即可运行 <code>python3 -c 'from openai import OpenAI; print(OpenAI().models.list())'</code>。它从不出现在容器的环境变量里（<code>docker inspect</code> 看不到），环境停止即吊销，每次最长有效 24 小时（环境运行期间自动顺延）。空闲 lane 的共享环境没有密钥，请在那里使用你自己的 API 密钥。管理员可以关闭（<strong>环境 LLM 密钥</strong>）。</li>
+<li><strong>登录提示</strong>：SSH 登录时最多显示三行：环境、GPU 与剩余时间；<code>/workspace</code> 用量；LLM 接口和一行示例。</li>
+</ul>
+<p>非登录 shell（某些网页终端）不会读取 <code>/etc/profile.d</code>，可在其中执行 <code>. /etc/profile.d/slotserve-platform.sh</code>。以非 root 用户运行（保留镜像自身入口）的镜像读不到密钥文件。</p>
+<p>监听位置：SlotServe 直接运行在主机上时，监听 Docker 默认网桥的地址（<code>docker0</code>，例如 <code>172.17.0.1</code>），环境通过 <code>/etc/hosts</code> 找到它，主机以外的网络访问不到；SlotServe 运行在容器中时，监听它自己的地址，并在每个环境的网络中以 <code>slotserve-gw</code> 的名字出现（端口不对外发布）。可用 <code>SLOTSERVE_DEVENV_GATEWAY_PORT</code>（默认 8002，0 表示关闭）和 <code>SLOTSERVE_DEVENV_GATEWAY_HOST</code> 调整。主机防火墙若丢弃容器到主机的流量，也会挡住它。Docker 在另一台机器上时，环境里没有 LLM 接口。</p>
+<h2 id="logging-in-ssh-keys-and-the-environment-password">登录方式：SSH 公钥和环境密码<a class="headerlink" href="#logging-in-ssh-keys-and-the-environment-password" title="Permanent link">&para;</a></h2>
+<p>登录凭据在<strong>访问凭据</strong>页面（与 API 密钥在一起）：</p>
+<ul>
+<li><strong>SSH 公钥</strong>：粘贴 <code>~/.ssh/id_ed25519.pub</code> 的内容（没有的话用 <code>ssh-keygen -t ed25519</code> 生成）。</li>
+<li><strong>环境密码</strong>：登录开发环境用的 SSH 密码，与 SlotServe 登录密码相互独立。SlotServe 只保存它的 SHA-512-crypt 哈希（即 <code>/etc/shadow</code> 的格式），并把哈希写进容器；不会保存密码本身。每个连接最多尝试三次。</li>
+</ul>
+<p>带网页界面的模板（JupyterLab、桌面、VS Code）无需任何凭据即可启动：在浏览器中使用，添加公钥之前 SSH 不允许任何人登录。其他模板需要 SSH 公钥；在<strong>密码登录</strong>开启时（默认开启），设置了环境密码也可以。管理员可以关闭密码登录，此后只能用公钥，SSH 服务会拒绝密码。修改后的密码会在正在运行的预约环境下次启动时生效。共享环境只接受公钥。</p>
+<p>每个环境都有自己的 SSH 主机密钥，环境卡片上会显示它的指纹。保留环境在暂停、更换 GPU 和快照之后保持同一把密钥。本版本之前创建的环境会在下次启动时获得自己的密钥，因此 <code>ssh</code> 会提示一次主机密钥已变化：从 <code>~/.ssh/known_hosts</code> 中删除旧记录（<code>ssh-keygen -R "[服务器]:端口"</code>）并核对新的指纹。</p>
+<h2 id="limits-and-hardening">资源上限与加固<a class="headerlink" href="#limits-and-hardening" title="Permanent link">&para;</a></h2>
+<p>SlotServe 创建的每个容器在交给 Docker 之前都要经过最后一个固定步骤：</p>
+<ul>
+<li><strong>禁止提权</strong>（<code>sudo</code> 等 setuid 程序无法获得权限），并去掉少数能力（<code>NET_RAW</code>、<code>MKNOD</code>、<code>SYS_CHROOT</code>、<code>AUDIT_WRITE</code>、<code>SETFCAP</code>；<code>ping</code> 不可用）。镜像需要 setuid 程序的模板（内置桌面：它的 init 系统）以<strong>兼容模式</strong>运行，不应用第一条；管理员按模板开启，模板上会标明。</li>
+<li><strong>进程数</strong>：最多 <code>SLOTSERVE_DEVENV_PIDS_LIMIT</code>（默认 4096），fork 炸弹只会影响它自己的容器。</li>
+<li><strong>内存</strong>：使用<strong>内存上限</strong>设置；设置为 0 时为主机内存减去 max(4 GB, 10%)。本版本之前 0 表示不限；现在内存耗尽的进程只会在自己的容器里被结束，而不会拖垮 SlotServe 和其他人。管理员可以在开发环境信息（<code>/api/devenv</code> 的 <code>hardening</code>）中看到实际生效的上限。</li>
+<li><strong>打开文件数</strong>：1048576。<strong>日志</strong>：每个容器最多 5 个 50 MB 的文件。</li>
+<li><strong>GPU</strong>：严格使用通道的 GPU。没有指定 GPU 的通道无法启动 GPU 环境（以前会得到机器上的全部 GPU）；请在「管理」中为通道指定 GPU。</li>
+<li>从不使用特权模式、宿主机的网络/进程/IPC 命名空间，也从不挂载 <code>/</code> 或 Docker socket。</li>
+</ul>
+<p>旧版本创建的保留环境会在下次启动时做一次快照并重新创建，因为这些设置无法加到已有的容器上。</p>
+<p>这些限制在环境里意味着什么（<code>sudo</code>、<code>ping</code>、任务被结束），以及何时使用兼容模式：见<a href="../operations/#hardening">容器加固与兼容模式</a>。</p>
+<h2 id="kept-environments-projects">保留的环境（项目）<a class="headerlink" href="#kept-environments-projects" title="Permanent link">&para;</a></h2>
+<p>通常预约结束时容器会被删除，只保留 <code>/workspace</code>。如果想保留装好的一切，在预约对话框中选择<strong>保留为新环境</strong>并起个名字。这个预约结束时容器只会被停止（暂停）。之后的预约可以选择<strong>继续使用</strong>：同一个容器会重新启动，并放入你当前的公钥和密码。</p>
+<ul>
+<li>如果下一次预约所在通道的 GPU 不同，SlotServe 会把容器保存为镜像（快照），再用新的 GPU 重新创建，保留的目录和设置不变。保留目录有变化或原来的 SSH 端口被占用时也会这样处理。</li>
+<li><strong>保留的目录</strong>：除 <code>/workspace</code> 外，模板或保留的环境还可以列出其他要保留的目录，例如 <code>/root</code> 或 <code>/opt/conda</code>（绝对路径；不允许 <code>/etc</code>、<code>/usr</code>、<code>/proc</code>、<code>/opt/slotserve</code> 等系统目录）。新目录一开始会带有镜像里的内容。修改列表会在下次创建容器时生效。</li>
+<li><strong>开发环境</strong>页面列出你保留的环境及其状态（已暂停、运行中、尚未启动、容器已丢失）、大小和上次使用时间。可以重命名、修改保留的目录或删除；删除会移除容器及其快照，并可选择同时删除保留的目录。<code>/workspace</code> 永远不会被删除。</li>
+<li>同一个保留的环境不能在同一时间被预约两次。管理员可以限制每人可保留的数量（<strong>每人可保留的环境数</strong>，默认 3 个），并可自动删除闲置一定天数的保留环境（<strong>自动删除闲置的保留环境</strong>；0 表示从不；数据会保留）。</li>
+</ul>
+<h2 id="without-a-gpu">无 GPU 模式<a class="headerlink" href="#without-a-gpu" title="Permanent link">&para;</a></h2>
+<p>不是所有事情都需要 GPU。写代码、搬数据、装软件包或跑 CPU 任务，可以随时在<strong>无 GPU</strong> 的开发环境里进行，无需预约：</p>
+<ul>
+<li>在<strong>开发环境</strong>页面的<strong>无 GPU 模式</strong>部分（或在模板、保留的环境上）点击<strong>不用 GPU 启动</strong>，选择一个模板或你保留的环境。它会立即在服务器的共享 CPU 核心上启动，SSH 登录、<code>/workspace</code>、保留的目录和网页界面都与预约的环境相同，只是没有 GPU。</li>
+<li>它会一直运行，直到你<strong>暂停</strong>（保留的环境保留容器）或<strong>停止</strong>（其他环境；<code>/workspace</code> 保留）。没有空闲超时，也没有结束时间。卡片上会显示它当前使用的 CPU 核数和内存。</li>
+<li>管理员可以限制每人同时运行的数量（<strong>每人无 GPU 环境数</strong>，默认 2 个）。</li>
+</ul>
+<p><strong>同一个保留的环境，两种模式。</strong> 保留的环境可以在两次预约之间以无 GPU 模式运行。它的预约开始时，SlotServe 会停止它，并带上预约通道的 GPU 继续运行：容器会保存为快照并带 GPU 重新创建，装好的东西都还在（与保留的环境换到其他 GPU 时一样）。预约结束时照常暂停；如果为这个保留的环境打开了<strong>预约结束后继续无 GPU 运行</strong>，它会改为继续以无 GPU 模式运行。你也可以随时再次以无 GPU 模式启动它。它的预约正在进行时，不能以无 GPU 模式启动。</p>
+<div class="admonition note">
+<p class="admonition-title">快照</p>
+<p>每次在 CPU 和预约的 GPU 之间切换，都会把容器保存为一层镜像。如果一个保留的环境长期频繁切换，请不时删除它并重新保留一个（或把它保存为镜像，再从该镜像开始保留环境），因为镜像的层数有上限。</p>
+</div>
+<h3 id="sharing-the-cpu-fairly">公平地共享 CPU<a class="headerlink" href="#sharing-the-cpu-fairly" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart LR
+    subgraph 主机 CPU 核心
+        A["通道 A：每块 GPU 的核心数 x GPU 数"]
+        B["通道 B：每块 GPU 的核心数 x GPU 数"]
+        P["共享池：其余所有核心"]
+    end
+    A --- BA["通道 A 上的预约 / 共享环境"]
+    B --- BB["通道 B 上的预约 / 共享环境"]
+    P --- C1["无 GPU 环境"]
+    P --- C2["无 GPU 环境"]</code></pre>
+<ul>
+<li>每个 GPU 通道为它的使用者<strong>保留 CPU 核心</strong>：<strong>每块 GPU 保留的 CPU 核心</strong>（默认 8）乘以它的 GPU 数（不限定 GPU 的通道按一块计）。它的预约容器和空闲时的共享环境只在这些核心上运行（Docker cpuset），因此 CPU 任务不会拖慢 GPU 预约。0 表示不保留。</li>
+<li>无 GPU 环境共享<strong>其余所有核心</strong>（共享池）。它们的 CPU 权重相同，空闲的核心谁都能用，繁忙时平均分配。此外每个环境还有硬上限：<strong>无 GPU 环境 CPU 上限</strong>（核数，默认 4；0 表示整个共享池）和<strong>无 GPU 环境内存上限</strong>（默认 16 GB；0 表示使用主机默认值，见<a href="#limits-and-hardening">资源上限与加固</a>）。</li>
+<li><strong>无 GPU 内存池</strong>限制所有无 GPU 环境合计可占用的内存：启动时会把所有运行中环境的内存上限相加，放不下的新环境会被拒绝，直到有环境暂停。0 表示不限总量。</li>
+<li>SlotServe 从 Docker 读取主机的核心数和内存。如果核心数少于各通道想要的数量，每个通道按比例分配，并且共享池至少保留一个核心。开发环境页面的这一部分会显示共享池和每个通道的核心。保留的核心按逻辑 CPU 编号、按通道顺序分配。</li>
+</ul>
+<p>修改这些设置只对之后创建的容器生效；保留的容器会在下次启动时获得新的 CPU 分配和上限。</p>
+<h3 id="usage">用量<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h3>
+<p>每个无 GPU 环境的 CPU 时间和内存每隔几秒从 Docker 读取一次，并每分钟记到它的使用者名下（类型为“纯 CPU 环境”）。<strong>用量</strong>页面会按人显示 <strong>CPU 核时</strong>。</p>
+<h3 id="cpu-what-admins-see">管理员能看到什么<a class="headerlink" href="#cpu-what-admins-see" title="Permanent link">&para;</a></h3>
+<p><strong>无 GPU 模式</strong>部分会列出所有正在运行的无 GPU 环境，包括使用者、状态、正在使用的 CPU 核数和内存，以及<strong>暂停</strong> / <strong>停止</strong>按钮（会记入审计日志）。相关设置在<strong>管理 → 系统设置 → 开发环境</strong>中。</p>
+<h2 id="idle-lanes-a-shared-environment">空闲通道：共享环境<a class="headerlink" href="#idle-lanes-a-shared-environment" title="Permanent link">&para;</a></h2>
+<p>管理员可以为每个通道选择无人预约时运行什么（<strong>管理 → GPU 与通道 → 未被预约时</strong>）：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>通道未被预约时</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>运行默认模型</td>
+<td>加载该通道的默认模型（与以前相同）。</td>
+</tr>
+<tr>
+<td>共享开发环境</td>
+<td>用所选模板运行一个使用该通道 GPU 的容器，加入了它的人都可以登录。</td>
+</tr>
+<tr>
+<td>什么都不运行</td>
+<td>不运行推理服务也不运行容器，GPU 保持空闲。</td>
+</tr>
+</tbody>
+</table>
+<p>共享环境会在下一个预约开始前停止（与模型预加载或整卡预约的提前量相同），通道空闲后再重新启动；在共享环境释放 GPU 之前，模型不会开始加载。总览和通道页面会显示空闲通道正在做什么。</p>
+<p>在共享环境里，每个<strong>加入</strong>了该通道共享环境的人（在开发环境页面加入，需要 SSH 公钥）都有自己的账号（用户名转为小写，字母、数字、<code>_</code> 和 <code>-</code> 以外的字符会被替换），<code>~/.ssh/authorized_keys</code> 中是他的 SSH 公钥。这里不允许密码登录，因此不会把任何密码哈希放进容器。升级到本版本时已有 SSH 公钥的人会自动加入所有通道。主目录位于每个通道独立的卷上，会一直保留。<code>root</code> 不能登录。<strong>开发环境</strong>页面会显示每个空闲通道的共享环境以及你自己的登录命令：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>ssh<span class="w"> </span>-p<span class="w"> </span><span class="m">2205</span><span class="w"> </span>alice@服务器
+</code></pre></div>
+<p>账号在容器启动时创建，并在有人加入、离开或修改公钥时（以及每分钟一次）更新。镜像需要带有 <code>useradd</code> 或 <code>adduser</code>；两者都没有时环境会启动失败并给出明确的提示。只能使用面向所有人的模板（内置模板或管理员共享的模板）。</p>
+<h2 id="storage">存储<a class="headerlink" href="#storage" title="Permanent link">&para;</a></h2>
+<p>管理员可以在<strong>管理 → 存储</strong>中添加主机目录、NFS 导出和 SMB 共享，用作共享数据、个人空间（<code>/workspace</code>）、项目数据和模型库，详见<a href="../storage/">存储</a>。下面说明的是没有添加存储时的情况。</p>
+<p>默认情况下，持久数据保存在 Docker 命名卷中：<code>/workspace</code> 使用 <code>slotserve-workspace-u&lt;用户 ID&gt;</code>，保留环境的目录使用 <code>slotserve-project&lt;ID&gt;-&lt;路径&gt;</code>，模板的保留目录使用 <code>slotserve-u&lt;用户&gt;-t&lt;模板&gt;-&lt;路径&gt;</code>，通道共享环境的主目录使用 <code>slotserve-idle-home-l&lt;通道&gt;</code>。</p>
+<p>把<strong>存储目录</strong>设为 Docker 主机上的某个目录（例如 <code>/srv/slotserve</code>）后，改用绑定挂载：</p>
+<table>
+<thead>
+<tr>
+<th>数据</th>
+<th>目录</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/workspace</code></td>
+<td><code>&lt;存储目录&gt;/users/u&lt;用户 ID&gt;/workspace</code></td>
+</tr>
+<tr>
+<td>模板的保留目录</td>
+<td><code>&lt;存储目录&gt;/users/u&lt;用户 ID&gt;/t&lt;模板 ID&gt;/&lt;路径&gt;</code></td>
+</tr>
+<tr>
+<td>保留环境的目录</td>
+<td><code>&lt;存储目录&gt;/projects/p&lt;ID&gt;/&lt;路径&gt;</code></td>
+</tr>
+<tr>
+<td>共享环境的主目录</td>
+<td><code>&lt;存储目录&gt;/lanes/l&lt;通道 ID&gt;/home</code></td>
+</tr>
+</tbody>
+</table>
+<p>这里填写的是 Docker 主机上的路径，而不是 SlotServe 容器内的路径。缺少的目录会由一个使用 SlotServe 自己的辅助镜像（<code>SLOTSERVE_STORAGE_HELPER_IMAGE</code>，默认 <code>busybox:1.37</code>）、用完即删的辅助容器创建，它只挂载要处理的目录的上一级，因此 SlotServe 本身不需要访问该目录。新目录会像新卷一样填入环境镜像中的内容：内容通过 Docker 的归档 API 从镜像中复制出来，环境镜像本身不会为此运行。</p>
+<h2 id="what-admins-see">管理员能看到什么<a class="headerlink" href="#what-admins-see" title="Permanent link">&para;</a></h2>
+<ul>
+<li>在<strong>开发环境</strong>页面打开<strong>所有人</strong>，可以看到每个环境的状态、镜像、端口和错误；<strong>日志</strong>显示容器输出。</li>
+<li>启动失败的环境（镜像不存在、容器退出、没有空闲端口）会显示原因，可以点<strong>重试</strong>重新启动，预约人也会收到通知。</li>
+<li>SlotServe 重启后会保留仍在运行的环境，停止预约已结束的保留环境，并清理残留的容器和网络。仍在运行的环境的端口转发容器会重新创建。</li>
+<li>打开<strong>所有人</strong>后，<strong>直连端口</strong>列出所有已发布的宿主机端口及其所有者和环境；点<strong>收回</strong>即可释放。</li>
+<li>共享环境：只有管理员可以重启它、查看它的日志和错误（例如账号更新失败）。</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 SlotServe contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

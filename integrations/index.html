@@ -1,0 +1,1364 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Book GPU time slots and serve models behind an OpenAI-compatible gateway.">
+      
+      
+      
+        <link rel="canonical" href="https://peleryuan.github.io/slotserve/integrations/">
+      
+      
+        <link rel="prev" href="../model-catalog/">
+      
+      
+        <link rel="next" href="../gpus-and-engines/">
+      
+      
+        
+          <link rel="alternate" href="./" hreflang="en">
+        
+          <link rel="alternate" href="../zh/integrations/" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Notifications & integrations - SlotServe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#notifications-integrations" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="SlotServe" class="md-header__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SlotServe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Notifications & integrations
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="../zh/integrations/" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PelerYuan/slotserve" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="SlotServe" class="md-nav__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    SlotServe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PelerYuan/slotserve" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notifications & integrations
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notifications & integrations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#chat-platforms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chat platforms
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#telegram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telegram
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feishu-lark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feishu / Lark
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dingtalk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DingTalk
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wecom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WeCom
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#qq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QQ
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-webhooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group webhooks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calendar-subscription" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calendar subscription
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#csv-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CSV export
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prometheus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prometheus
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gpus-and-engines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GPUs, lanes & engines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-environments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How scheduling works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#chat-platforms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chat platforms
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#telegram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telegram
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feishu-lark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feishu / Lark
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dingtalk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DingTalk
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wecom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WeCom
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#qq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QQ
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-webhooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group webhooks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calendar-subscription" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calendar subscription
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#csv-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CSV export
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prometheus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prometheus
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="notifications-integrations">Notifications &amp; integrations<a class="headerlink" href="#notifications-integrations" title="Permanent link">&para;</a></h1>
+<p>SlotServe can message people and answer commands on Telegram, Feishu / Lark, DingTalk, WeCom and QQ, post alerts and announcements to group chats, publish bookings as calendar feeds, export usage as CSV and expose Prometheus metrics. Everything here is optional and configured in <strong>Admin → System settings</strong>; <strong>Admin → Chat channels</strong> shows whether each bot is connected.</p>
+<h2 id="chat-platforms">Chat platforms<a class="headerlink" href="#chat-platforms" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>How SlotServe receives messages</th>
+<th>Public URL needed</th>
+<th>Buttons</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Telegram</td>
+<td>Long polling</td>
+<td>No</td>
+<td>Inline buttons</td>
+</tr>
+<tr>
+<td>Feishu / Lark</td>
+<td>Long connection (WebSocket)</td>
+<td>No</td>
+<td>Interactive cards</td>
+</tr>
+<tr>
+<td>DingTalk</td>
+<td>Stream mode (WebSocket)</td>
+<td>No</td>
+<td>Numbered choices (tap to send)</td>
+</tr>
+<tr>
+<td>WeCom</td>
+<td>Callback URL</td>
+<td>Only to receive commands</td>
+<td>Numbered choices</td>
+</tr>
+<tr>
+<td>QQ</td>
+<td>WebSocket gateway</td>
+<td>No</td>
+<td>Numbered choices</td>
+</tr>
+</tbody>
+</table>
+<p>Every platform offers the same commands and notifications. Turn on as many as you like: a person gets each notification on every platform they linked, and which notifications they get is chosen once for all platforms.</p>
+<p><strong>Linking.</strong> Each person opens <strong>Settings → Chat notifications</strong> and presses <strong>Link</strong> next to a platform. Telegram opens the bot and pressing <strong>Start</strong> links the account. On the other platforms SlotServe shows a message like <code>bind K7P2QX</code>; send it to the SlotServe bot in a private chat within 30 minutes (<code>绑定 K7P2QX</code> works too). A code works once; one platform account belongs to one SlotServe account. <strong>Send test</strong> checks the connection, the <strong>Notify</strong> switch pauses one platform, and <strong>Unlink</strong> (or <code>/unlink</code> in the chat) removes it.</p>
+<p>Messages are sent in each person's interface language. Times use the <strong>Time zone</strong> setting. Group chats and people who have not linked yet get the <strong>Group chat language</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Notification</th>
+<th>Who gets it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Booking starts in 10 minutes</td>
+<td>Booker</td>
+</tr>
+<tr>
+<td>Model loaded and ready / GPU free for an exclusive booking</td>
+<td>Booker</td>
+</tr>
+<tr>
+<td>Booking ends in 10 minutes, with <strong>+30 min</strong>, <strong>+1 hour</strong> and <strong>End now</strong> buttons</td>
+<td>Booker</td>
+</tr>
+<tr>
+<td>An admin booked, changed, cancelled or ended your booking</td>
+<td>Booker</td>
+</tr>
+<tr>
+<td>The booked model failed to load and the default model is serving instead</td>
+<td>Booker and admins</td>
+</tr>
+<tr>
+<td>Your booking request was approved, rejected (with the reason) or expired</td>
+<td>Booker</td>
+</tr>
+<tr>
+<td>Your dev environment is ready (with the ssh command) or could not start</td>
+<td>Booker</td>
+</tr>
+<tr>
+<td>Time you waited for is free, or was booked for you</td>
+<td>Waitlisted person</td>
+</tr>
+<tr>
+<td>Your download finished or failed</td>
+<td>Person who started it</td>
+</tr>
+<tr>
+<td>A booking needs approval, with <strong>Approve</strong> and <strong>Reject</strong> buttons</td>
+<td>Admins</td>
+</tr>
+<tr>
+<td>A model failed to load, a new account was created, the models disk is low</td>
+<td>Admins</td>
+</tr>
+</tbody>
+</table>
+<p>Commands (private chat with the bot):</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/status</code></td>
+<td>Loaded model and who has the GPU</td>
+</tr>
+<tr>
+<td><code>/book</code></td>
+<td>Book GPU time with buttons: lane, model (or whole GPU), day, start, length, confirm</td>
+</tr>
+<tr>
+<td><code>/free</code></td>
+<td>Free time today and tomorrow, per lane</td>
+</tr>
+<tr>
+<td><code>/cancel</code></td>
+<td>Pick one of your upcoming bookings and cancel it</td>
+</tr>
+<tr>
+<td><code>/today</code></td>
+<td>Bookings in the next 24 hours</td>
+</tr>
+<tr>
+<td><code>/mine</code></td>
+<td>Your upcoming bookings</td>
+</tr>
+<tr>
+<td><code>/extend [minutes]</code></td>
+<td>Extend your running booking (default 30)</td>
+</tr>
+<tr>
+<td><code>/release</code></td>
+<td>End your running booking now</td>
+</tr>
+<tr>
+<td><code>/unlink</code></td>
+<td>Stop notifications to this chat</td>
+</tr>
+</tbody>
+</table>
+<p>Bookings made with <code>/book</code> follow exactly the same rules as the web: conflicts, the longest booking, how far ahead, quotas and approval. The bot offers whole-hour start times (and <strong>Now</strong>); use the web for other times, presets or weekly repeats. If the time is taken by the moment you confirm, the bot offers to put you on the waitlist.</p>
+<p>Outside Telegram, commands also work without the <code>/</code> and in Chinese (<code>状态</code>, <code>预约</code>, <code>空闲</code>, <code>取消</code>, <code>今天</code>, <code>我的</code>, <code>延长</code>, <code>结束</code>, <code>解绑</code>). Where a platform has no buttons, the choices are numbered and you reply with the number; on DingTalk the numbers are links that send themselves. In a group chat (not on Telegram) the bot only answers <code>/status</code>, <code>/free</code>, <code>/today</code> and <code>/help</code> when it is @mentioned; everything that touches one person's bookings works in the private chat.</p>
+<h2 id="telegram">Telegram<a class="headerlink" href="#telegram" title="Permanent link">&para;</a></h2>
+<p>The bot uses long polling, so the server needs outbound access to Telegram but no public address or open port.</p>
+<ol>
+<li>In Telegram, talk to <a href="https://t.me/BotFather">@BotFather</a>, send <code>/newbot</code> and copy the token.</li>
+<li>Paste it into <strong>Admin → System settings → Telegram bot token</strong> and save. If Telegram is blocked on your network, also set <strong>Telegram proxy</strong> (<code>http://…</code> or <code>socks5://…</code>).</li>
+<li>People link with <strong>Settings → Chat notifications → Link</strong> next to Telegram. Typing <code>/</code> in Telegram shows the command list.</li>
+</ol>
+<h2 id="feishu-lark">Feishu / Lark<a class="headerlink" href="#feishu-lark" title="Permanent link">&para;</a></h2>
+<p>A self-built app with the bot ability. Events and card button presses arrive over the long connection that SlotServe opens, so no public address is needed.</p>
+<ol>
+<li>In the developer console (<a href="https://open.feishu.cn/app">open.feishu.cn/app</a>, for Lark <a href="https://open.larksuite.com/app">open.larksuite.com/app</a>) create a <strong>custom app</strong> (self-built app) and add the <strong>Bot</strong> ability.</li>
+<li>Under <strong>Permissions &amp; Scopes</strong> add: read and send messages in private and group chats (<code>im:message</code>), send messages as the app (<code>im:message:send_as_bot</code>), receive private messages (<code>im:message.p2p_msg:readonly</code>) and receive group messages that mention the bot (<code>im:message.group_at_msg:readonly</code>).</li>
+<li>Copy <strong>App ID</strong> and <strong>App Secret</strong> from <strong>Credentials &amp; Basic Info</strong> into <strong>Admin → System settings → Feishu / Lark bot</strong>, switch it on and save. For Lark set <strong>Open platform address</strong> to <code>https://open.larksuite.com</code>. Wait until <strong>Admin → Chat channels</strong> shows <strong>Connected</strong>.</li>
+<li>Under <strong>Events &amp; Callbacks</strong>, choose <strong>Receive events through persistent connection</strong> for both events and callbacks (the console only saves this while SlotServe is connected), then add the event <code>im.message.receive_v1</code> (Receive messages) and the callback <code>card.action.trigger</code> (Card action).</li>
+<li>Create a version, include the people who should use the bot in its availability, and publish it.</li>
+</ol>
+<h2 id="dingtalk">DingTalk<a class="headerlink" href="#dingtalk" title="Permanent link">&para;</a></h2>
+<p>An internal app robot in Stream mode: SlotServe opens a WebSocket to DingTalk, so no public address is needed.</p>
+<ol>
+<li>In the <a href="https://open-dev.dingtalk.com">developer console</a> create an <strong>internal app</strong> (H5 micro app or app with a robot) and add the <strong>Robot</strong> capability. Set the robot's <strong>message receiving mode</strong> to <strong>Stream mode</strong>.</li>
+<li>Under <strong>Permissions</strong> make sure the app may send robot messages to people in the organisation (<code>qyapi_robot_sendmsg</code>), which notifications need.</li>
+<li>Copy <strong>Client ID</strong> (AppKey) and <strong>Client Secret</strong> (AppSecret) from <strong>Credentials &amp; Basic Info</strong> into <strong>Admin → System settings → DingTalk bot</strong>, switch it on and save. <strong>Robot code</strong> can stay empty: it defaults to the Client ID, as for most internal apps.</li>
+<li>Publish the app version with the right visibility. People find the robot by name (or open it from the app) and send their bind message. In a group, add the robot to the group and @mention it.</li>
+</ol>
+<p>DingTalk robot messages cannot carry callback buttons without a card template, so choices are numbered; the numbers are links that send themselves back to the robot.</p>
+<h2 id="wecom">WeCom<a class="headerlink" href="#wecom" title="Permanent link">&para;</a></h2>
+<p>A self-built app. Sending uses WeCom's server API and needs no public address. <strong>Receiving commands, including the bind message, needs WeCom to reach SlotServe's callback URL</strong> over the internet.</p>
+<ol>
+<li>In the <a href="https://work.weixin.qq.com/wework_admin/frame">WeCom admin console</a> create a self-built app under <strong>App Management</strong>. Note its <strong>AgentId</strong> and <strong>Secret</strong>, and set its visibility to the people who should use it.</li>
+<li>Copy the <strong>Corp ID</strong> from <strong>My Enterprise → Enterprise Information</strong>.</li>
+<li>In the app's settings add the SlotServe server's public outbound IP under <strong>Trusted IP</strong> (required for newer apps calling the API).</li>
+<li>To receive messages, open the app's <strong>Receive messages → Set API receiving</strong>, generate a <strong>Token</strong> and an <strong>EncodingAESKey</strong>, and keep the page open.</li>
+<li>Paste Corp ID, AgentId, Secret, Token and EncodingAESKey into <strong>Admin → System settings → WeCom app</strong>, switch it on and save.</li>
+<li>Back in WeCom, enter the <strong>callback URL</strong> shown in <strong>Admin → Chat channels</strong> (<code>https://&lt;your server&gt;/api/channels/wecom/callback</code>) and save; WeCom checks it right away. WeCom may require the URL's domain to be a domain verified for your organisation.</li>
+</ol>
+<p>Without the callback (step 4–6) the WeCom bot cannot receive the bind message, so people cannot link it; group webhooks (below) still work.</p>
+<h2 id="qq">QQ<a class="headerlink" href="#qq" title="Permanent link">&para;</a></h2>
+<p>An official bot from the <a href="https://q.qq.com">QQ open platform</a>. SlotServe connects to QQ's WebSocket gateway and receives private (C2C) messages and group messages that @mention the bot.</p>
+<ol>
+<li>Create a bot on the QQ open platform and copy <strong>AppID</strong> and <strong>AppSecret</strong> from <strong>Development → Development settings</strong>.</li>
+<li>Add the SlotServe server's public outbound IP to the bot's <strong>IP whitelist</strong>.</li>
+<li>Make sure the bot may be used in private chats and groups (message capabilities for single chat and group). While the bot is not published, add test users and groups in the sandbox configuration and switch on <strong>Sandbox</strong> in SlotServe.</li>
+<li>Paste AppID and AppSecret into <strong>Admin → System settings → QQ bot</strong>, switch it on and save.</li>
+</ol>
+<p>QQ only lets bots reply to a message for a limited time; answers to commands use that. Notifications are proactive messages, which QQ limits or refuses depending on the bot's permissions, so on QQ they may not arrive. QQ may also block links in messages unless the domain is registered with the bot.</p>
+<h2 id="group-webhooks">Group webhooks<a class="headerlink" href="#group-webhooks" title="Permanent link">&para;</a></h2>
+<p>Group robots post into a group chat. They only send, need no public address, and are configured under <strong>Admin → System settings → Group webhooks</strong>:</p>
+<ul>
+<li><strong>Feishu / Lark</strong>: in the group, <strong>Settings → Bots → Add Bot → Custom Bot</strong>. Copy the webhook (<code>https://open.feishu.cn/open-apis/bot/v2/hook/…</code>). If you turn on <strong>Signature verification</strong>, also paste its secret.</li>
+<li><strong>DingTalk</strong>: in the group, <strong>Group settings → Bots → Add Robot → Custom</strong>. Choose the security setting <strong>Additional signature</strong> and paste its <code>SEC…</code> secret together with the webhook (<code>https://oapi.dingtalk.com/robot/send?access_token=…</code>). (Keyword security would reject most SlotServe messages.)</li>
+<li><strong>WeCom</strong>: in the group chat, <strong>Add group robot</strong>, then copy its webhook (<code>https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=…</code>). Its key is in the URL.</li>
+</ul>
+<p><strong>Send to groups</strong> chooses what the groups get: <strong>Admin alerts</strong> (load failures and fallbacks, new accounts, low disk), <strong>Approval requests</strong> (as text; approve on the web or in a private chat with the bot) and <strong>Announcements</strong>. <strong>Admin → Chat channels</strong> has a <strong>Send test</strong> button per webhook and a box to post an announcement.</p>
+<h2 id="calendar-subscription">Calendar subscription<a class="headerlink" href="#calendar-subscription" title="Permanent link">&para;</a></h2>
+<p><strong>Settings → Calendar subscription</strong> shows two private iCalendar links: your own bookings, and everyone's. Add them as a <em>subscribed</em> or <em>internet</em> calendar in Apple Calendar, Google Calendar, Outlook or Thunderbird. Calendar apps refresh them periodically (usually every 15 minutes to a few hours).</p>
+<p>Anyone with a link can read the bookings in it. <strong>New link</strong> invalidates the old ones. Set <strong>Public URL</strong> if people reach SlotServe through an address different from the one the browser shows.</p>
+<h2 id="csv-export">CSV export<a class="headerlink" href="#csv-export" title="Permanent link">&para;</a></h2>
+<p><strong>Usage → Export CSV</strong> downloads, for the selected period and scope (everyone or just you):</p>
+<table>
+<thead>
+<tr>
+<th>Export</th>
+<th>Columns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Per person</td>
+<td>person, bookings, booked hours, booked GPU-hours, used GPU-hours, average utilization % while booked, peak memory (MB), energy (Wh), requests, prompt and completion tokens</td>
+</tr>
+<tr>
+<td>GPU time</td>
+<td>date, lane, GPU, kind, person, GPU-hours, used GPU-hours, average utilization %, peak memory (MB), energy (Wh); one row per day, lane, GPU, kind and person</td>
+</tr>
+<tr>
+<td>Daily summary</td>
+<td>date, person, model, requests, prompt and completion tokens</td>
+</tr>
+<tr>
+<td>Every request</td>
+<td>time, person, API key, model, endpoint, stream, status, tokens, duration</td>
+</tr>
+</tbody>
+</table>
+<p>Kinds are <code>model</code>, <code>gpu</code> (whole-GPU booking), <code>devenv</code>, <code>idle_model</code> and <code>idle_devenv</code> (shared use while nobody books the lane) and <code>free</code>. The GPU column is empty for a lane without GPU metrics. The same files are available at <code>GET /api/usage/export?kind=people|compute|summary|requests&amp;days=30&amp;scope=all|mine</code>. Files are UTF-8 with a BOM so Excel opens them correctly.</p>
+<h2 id="prometheus">Prometheus<a class="headerlink" href="#prometheus" title="Permanent link">&para;</a></h2>
+<p>Set <strong>Metrics token</strong> to enable <code>GET /metrics</code>. Scrape it with the token as a bearer token:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">scrape_configs</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">job_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">slotserve</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">metrics_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/metrics</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">authorization</span><span class="p">:</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">credentials</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;metrics token&gt;</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">static_configs</span><span class="p">:</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">targets</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"gpu-server:8000"</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Type</th>
+<th>Labels</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>slotserve_runtime_state</code></td>
+<td>gauge</td>
+<td><code>state</code></td>
+</tr>
+<tr>
+<td><code>slotserve_runtime_model_info</code></td>
+<td>gauge</td>
+<td><code>model</code>, <code>preset</code></td>
+</tr>
+<tr>
+<td><code>slotserve_reservation_active</code></td>
+<td>gauge</td>
+<td><code>user</code></td>
+</tr>
+<tr>
+<td><code>slotserve_reservations_upcoming</code></td>
+<td>gauge</td>
+<td></td>
+</tr>
+<tr>
+<td><code>slotserve_requests_total</code></td>
+<td>counter</td>
+<td><code>user</code>, <code>model</code>, <code>outcome</code> (<code>ok</code> / <code>error</code>)</td>
+</tr>
+<tr>
+<td><code>slotserve_tokens_total</code></td>
+<td>counter</td>
+<td><code>user</code>, <code>model</code>, <code>type</code></td>
+</tr>
+<tr>
+<td><code>slotserve_request_seconds_total</code></td>
+<td>counter</td>
+<td><code>user</code>, <code>model</code></td>
+</tr>
+<tr>
+<td><code>slotserve_model_loads_total</code></td>
+<td>counter</td>
+<td><code>model</code>, <code>result</code></td>
+</tr>
+<tr>
+<td><code>slotserve_model_load_seconds</code></td>
+<td>gauge</td>
+<td><code>model</code></td>
+</tr>
+<tr>
+<td><code>slotserve_downloads_pending</code></td>
+<td>gauge</td>
+<td></td>
+</tr>
+<tr>
+<td><code>slotserve_gpu_memory_used_bytes</code>, <code>…_total_bytes</code>, <code>slotserve_gpu_utilization_ratio</code>, <code>slotserve_gpu_temperature_celsius</code>, <code>slotserve_gpu_power_watts</code></td>
+<td>gauge</td>
+<td><code>gpu</code>, <code>name</code>, <code>lane</code></td>
+</tr>
+<tr>
+<td><code>slotserve_lane_occupant</code></td>
+<td>gauge</td>
+<td><code>lane</code>, <code>kind</code>, <code>user</code> (what the lane is doing now)</td>
+</tr>
+<tr>
+<td><code>slotserve_booked_gpu_hours_total</code></td>
+<td>counter</td>
+<td><code>user</code>, <code>lane</code>, <code>kind</code> (elapsed booked time × GPUs of the lane)</td>
+</tr>
+<tr>
+<td><code>slotserve_gpu_seconds_total</code></td>
+<td>counter</td>
+<td><code>lane</code>, <code>gpu</code>, <code>kind</code> (recorded GPU time)</td>
+</tr>
+<tr>
+<td><code>slotserve_gpu_busy_seconds_total</code></td>
+<td>counter</td>
+<td><code>lane</code>, <code>gpu</code>, <code>kind</code> (time at or above the busy threshold)</td>
+</tr>
+<tr>
+<td><code>slotserve_gpu_energy_joules_total</code></td>
+<td>counter</td>
+<td><code>lane</code>, <code>gpu</code></td>
+</tr>
+<tr>
+<td><code>slotserve_user_gpu_busy_seconds_total</code></td>
+<td>counter</td>
+<td><code>user</code>, <code>kind</code></td>
+</tr>
+</tbody>
+</table>
+<p>Without a token the endpoint returns 404.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 SlotServe contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

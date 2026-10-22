@@ -1,0 +1,1260 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="预约 GPU 时段，通过 OpenAI 兼容网关使用模型。">
+      
+      
+      
+        <link rel="canonical" href="https://peleryuan.github.io/slotserve/zh/getting-started/">
+      
+      
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../configuration/">
+      
+      
+        
+          <link rel="alternate" href="../../getting-started/" hreflang="en">
+        
+          <link rel="alternate" href="./" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>快速开始 - SlotServe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../" title="SlotServe" class="md-header__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SlotServe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              快速开始
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="选择当前语言">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../getting-started/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PelerYuan/slotserve" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../" title="SlotServe" class="md-nav__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    SlotServe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PelerYuan/slotserve" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快速开始
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快速开始
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        环境要求
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-build-llamacpp-skip-if-you-already-have-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 编译 llama.cpp（已有可跳过）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-configure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 配置
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 启动
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-admin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 创建管理员账号
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 跟着设置清单走
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#three-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 试试这三件事
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. 试试这三件事">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#call-a-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        在 Playground 中调用大模型
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#open-vs-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        在浏览器里打开 VS Code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#book-a-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        预约 GPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#updating" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        升级
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-without-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        不使用 Docker
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    配置参考
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维手册
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    使用指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    模型目录
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    通知与集成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gpus-and-engines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    多 GPU 与推理后端
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-environments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开发环境
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    存储
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    接口
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    调度原理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开发
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    常见问题
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        环境要求
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-build-llamacpp-skip-if-you-already-have-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 编译 llama.cpp（已有可跳过）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-configure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 配置
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 启动
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-admin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 创建管理员账号
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 跟着设置清单走
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#three-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 试试这三件事
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. 试试这三件事">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#call-a-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        在 Playground 中调用大模型
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#open-vs-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        在浏览器里打开 VS Code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#book-a-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        预约 GPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#updating" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        升级
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-without-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        不使用 Docker
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="_1">快速开始<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<p>SlotServe 以一个 Docker 镜像发布，<strong>不内置</strong> llama.cpp：你把已经为自己 GPU 编译好的 <code>llama-server</code> 挂载进容器即可，因此适用于任何 CUDA 架构和 llama.cpp 版本。</p>
+<p>在命令行上安装只需四步。之后你只要在网页上<strong>跟着设置清单走</strong>：功能真正可用时它会自动打勾，并告诉你下一步做什么。</p>
+<h2 id="requirements">环境要求<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
+<ul>
+<li>带 NVIDIA GPU 和驱动的 Linux 主机</li>
+<li><a href="https://docs.docker.com/engine/install/">Docker</a> 及 Compose v2</li>
+<li><a href="https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html">NVIDIA Container Toolkit</a></li>
+<li>启用 CUDA 编译的 llama.cpp（<code>llama-server</code>），或 vLLM / SGLang，见<a href="../gpus-and-engines/">多 GPU 与推理后端</a></li>
+</ul>
+<div class="admonition tip">
+<p class="admonition-title">CUDA 版本保持一致</p>
+<p>SlotServe 的 <code>CUDA_IMAGE</code> 的 CUDA 主版本必须与编译 <code>llama-server</code> 时使用的一致，并且该 CUDA 版本要支持你的 GPU。见<a href="../configuration/">配置参考</a>。</p>
+</div>
+<h2 id="1-build-llamacpp-skip-if-you-already-have-it">1. 编译 llama.cpp（已有可跳过）<a class="headerlink" href="#1-build-llamacpp-skip-if-you-already-have-it" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/ggml-org/llama.cpp
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>llama.cpp
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>cmake<span class="w"> </span>-B<span class="w"> </span>build<span class="w"> </span>-DGGML_CUDA<span class="o">=</span>ON
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>cmake<span class="w"> </span>--build<span class="w"> </span>build<span class="w"> </span>--config<span class="w"> </span>Release<span class="w"> </span>-j<span class="w"> </span>--target<span class="w"> </span>llama-server
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>ls<span class="w"> </span>build/bin/llama-server
+</code></pre></div>
+<p>需要挂载进容器的是包含 <code>llama-server</code>（动态库编译时还有 <code>lib*.so</code>）的目录，通常是 <code>llama.cpp/build/bin</code>。</p>
+<h2 id="2-configure">2. 配置<a class="headerlink" href="#2-configure" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/PelerYuan/slotserve
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>slotserve
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>cp<span class="w"> </span>.env.example<span class="w"> </span>.env
+</code></pre></div>
+<p>编辑 <code>.env</code>，重要的几项：</p>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>示例</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LLAMA_CPP_DIR</code></td>
+<td><code>/opt/llama.cpp/build/bin</code></td>
+<td>宿主机上 <code>llama-server</code> 所在目录</td>
+</tr>
+<tr>
+<td><code>MODELS_DIR</code></td>
+<td><code>/mnt/ssd/models</code></td>
+<td>宿主机上存放 <code>.gguf</code> 的目录（建议 SSD）；容器必须能读取</td>
+</tr>
+<tr>
+<td><code>DATA_DIR</code></td>
+<td><code>./data</code></td>
+<td>数据库、日志、备份和自动生成的会话密钥</td>
+</tr>
+<tr>
+<td><code>PORT</code></td>
+<td><code>8000</code></td>
+<td>网页与接口端口</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_INVITE_CODE</code></td>
+<td><em>你的邀请码</em></td>
+<td>注册时需要填写（未设置前只有第一个管理员能注册）；邀请链接不需要它</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_SECRET_KEY</code></td>
+<td><em>留空</em></td>
+<td>保持留空：SlotServe 会自动生成并保存在 <code>DATA_DIR/secret_key</code>（见<a href="../operations/#secret-key">会话密钥</a>）</td>
+</tr>
+</tbody>
+</table>
+<p>如果放在反向代理之后，还要设置 <code>SLOTSERVE_PUBLIC_URL</code> 并阅读<a href="../operations/#reverse-proxy">反向代理</a>。其余配置见<a href="../configuration/">配置参考</a>。</p>
+<h2 id="3-start">3. 启动<a class="headerlink" href="#3-start" title="Permanent link">&para;</a></h2>
+<p>如果 llama.cpp 目前以 systemd 服务运行，请先停掉，避免两个进程抢显存：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>disable<span class="w"> </span>--now<span class="w"> </span>llama-server.service<span class="w">   </span><span class="c1"># 换成你的服务名</span>
+</code></pre></div>
+<p>然后：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>pull<span class="w">          </span><span class="c1"># 使用发布的镜像；或：docker compose up -d --build</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>-f
+</code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">预构建镜像还是自己构建</p>
+<p>发布的镜像自带 CUDA 12.8 运行库，兼容用任意 CUDA 12.x 编译的 llama.cpp。<code>docker-compose.yml</code> 跟随次版本号（<code>ghcr.io/peleryuan/slotserve:0.10</code>），所以 <code>docker compose pull</code> 会带来修复，但不会升级到新的次版本。如果你的 llama.cpp 需要其他 CUDA 主版本，请在本地构建（<code>docker compose up -d --build</code>）。</p>
+</div>
+<p>浏览器打开 <code>http://&lt;服务器&gt;:8000</code>。如果其他机器也要访问，请按<a href="../operations/#firewall">端口与防火墙</a>开放端口。</p>
+<h2 id="first-admin">4. 创建管理员账号<a class="headerlink" href="#first-admin" title="Permanent link">&para;</a></h2>
+<p>第一个账号需要一个一次性的<strong>初始化码</strong>，在还没有管理员时会打印在日志中：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>slotserve<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-A4<span class="w"> </span><span class="s2">"No admin account"</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>setup-code<span class="w">          </span><span class="c1"># 或直接获取</span>
+</code></pre></div>
+<p>在注册表单中填写初始化码，该账号即成为管理员，初始化码随即失效。详见<a href="../operations/#setup-code">初始化码与第一个管理员</a>。</p>
+<h2 id="setup-checklist">5. 跟着设置清单走<a class="headerlink" href="#setup-checklist" title="Permanent link">&para;</a></h2>
+<p>登录后，<strong>总览</strong>最上方是<strong>完成 SlotServe 的设置</strong>，<strong>管理 → 概览</strong>中是完整的<strong>设置进度</strong>。每一项在功能真正可用时自动打勾（而不是填完表单就算），未完成的项也不影响 SlotServe 的使用：</p>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>何时打勾</th>
+<th>怎么做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>推理引擎</strong></td>
+<td>找到了 <code>llama-server</code>（或你的推理引擎）</td>
+<td>检查 <code>.env</code> 中的 <code>LLAMA_CPP_DIR</code>；vLLM 见<a href="../gpus-and-engines/#engines">多 GPU 与推理后端</a>。</td>
+</tr>
+<tr>
+<td><strong>GPU</strong></td>
+<td><code>nvidia-smi</code> 能看到你的 GPU</td>
+<td>需要 NVIDIA Container Toolkit；看不到时见<a href="../operations/#gpu-gone">GPU 不见了</a>。有多张 GPU 时，在<strong>管理 → GPU 与通道</strong>中决定如何划分通道。</td>
+</tr>
+<tr>
+<td><strong>模型与空闲默认模型</strong></td>
+<td>已登记模型，并且每个通道都有默认模型</td>
+<td><strong>模型 → 扫描目录</strong>会登记 <code>MODELS_DIR</code> 中的每个 <code>.gguf</code>（或从<a href="../model-catalog/">模型目录</a>一键部署），然后<strong>设为默认</strong>。GPU 没有被预约时，默认模型供所有人使用。</td>
+</tr>
+<tr>
+<td><strong>邀请成员</strong></td>
+<td>设置了邀请码（如果你只发邀请链接，也可以忽略这一项）</td>
+<td><strong>生成邀请链接</strong>：会过期、统计注册人数、可以撤销，并附带可直接转发的群消息（管理 → 用户）。也可以在管理 → 系统设置中设置<strong>邀请码</strong>。</td>
+</tr>
+<tr>
+<td><em>可选：</em> <strong>开发环境</strong></td>
+<td>Docker 可以访问，并且开发环境已开启</td>
+<td>挂载 Docker 套接字并开启：见<a href="../dev-environments/#setting-it-up-admin">开发环境</a>。</td>
+</tr>
+<tr>
+<td><em>可选：</em> <strong>聊天通知</strong></td>
+<td>已连接一个聊天平台</td>
+<td>见<a href="../integrations/">通知与集成</a>。不接聊天平台时，所有消息也都在收件箱里。</td>
+</tr>
+<tr>
+<td><em>可选：</em> <strong>备份异地保存</strong></td>
+<td>已有备份复制到本机以外</td>
+<td>设置<strong>备份复制到</strong>：见<a href="../operations/#backup-target">备份</a>。</td>
+</tr>
+</tbody>
+</table>
+<p>清单下面的<strong>系统健康</strong>表列出 SlotServe 运行的所有检查，出问题时附带操作按钮和诊断；每一项的含义见<a href="../operations/#health">健康检查</a>。</p>
+<h2 id="three-paths">6. 试试这三件事<a class="headerlink" href="#three-paths" title="Permanent link">&para;</a></h2>
+<p>每个人第一次登录时，总览上都有<strong>从这里开始</strong>，给出同样的三条路径。邀请大家之前，先自己试一遍。</p>
+<h3 id="call-a-model">在 Playground 中调用大模型<a class="headerlink" href="#call-a-model" title="Permanent link">&para;</a></h3>
+<p>在总览上点<strong>在这里试试</strong>（或在<strong>模型</strong>页面打开一个模型）。<strong>Playground</strong> 在登录状态下直接与正在运行的模型对话，无需 API 密钥；旁边给出同一个请求的 Python、cURL 和 JavaScript 写法。<strong>复制代码在本地调用</strong>会按需创建一个名为 <code>playground</code> 的密钥（有效期 90 天）并填进代码：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>curl<span class="w"> </span>http://&lt;服务器&gt;:8000/v1/chat/completions<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer sk-ss-..."</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"messages": [{"role": "user", "content": "你好"}]}'</span>
+</code></pre></div>
+<p>任何 OpenAI 兼容客户端都可以使用 <code>http://&lt;服务器&gt;:8000/v1</code> 和<strong>访问凭据</strong>中的密钥。模型旁的标记会说明它<strong>现在可直接调用</strong>、<strong>预约后可用</strong>，还是正被某人使用。</p>
+<h3 id="open-vs-code">在浏览器里打开 VS Code<a class="headerlink" href="#open-vs-code" title="Permanent link">&para;</a></h3>
+<p>需要先开启开发环境（见上面的清单项）。在<strong>开发环境</strong>页面：选择 <strong>VS Code（浏览器）</strong>，<strong>要 GPU 吗？</strong> 选<strong>先不用</strong>，点<strong>打开</strong>。大约一分钟后 VS Code 会在新标签页中打开你的 <code>/workspace</code>，关掉之后文件也会保留。不需要 SSH 密钥，也不需要预约；环境运行在没有被 GPU 通道预留的 CPU 核心上。详见<a href="../dev-environments/#first-environment">开发环境</a>。</p>
+<h3 id="book-a-gpu">预约 GPU<a class="headerlink" href="#book-a-gpu" title="Permanent link">&para;</a></h3>
+<p>在总览上点<strong>预约 GPU</strong>（或<strong>预约时段</strong>、<strong>预约 → 新建预约</strong>），会打开一个简短的对话框：做什么（一个模型、带 GPU 的开发环境，或整块 GPU 给你自己的进程）、什么时候（<strong>现在 · 1 小时</strong>、到某个时间，或之后的某个时间），SlotServe 会自动挑选一块空闲的 GPU。无法预约时，对话框会说明原因（配额、谁在用）并给出下一个空闲时间。预约期间 GPU 由你独占；详见<a href="../user-guide/">使用指南</a>。</p>
+<h2 id="updating">升级<a class="headerlink" href="#updating" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>git<span class="w"> </span>pull
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>pull<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d<span class="w">     </span><span class="c1"># 或：docker compose up -d --build</span>
+</code></pre></div>
+<p>修改数据库之前，SlotServe 会在 <code>DATA_DIR/backups/</code> 中保存一份快照，并以「全部成功或全部不做」的方式升级。请先阅读该版本的不兼容变更；从 v0.8 升级到 v0.10 请按<a href="../operations/#upgrade">从 v0.8 升级</a>操作。</p>
+<h2 id="running-without-docker">不使用 Docker<a class="headerlink" href="#running-without-docker" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>.<span class="w"> </span>.venv/bin/activate
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>pip<span class="w"> </span>install<span class="w"> </span>./backend
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="o">(</span><span class="nb">cd</span><span class="w"> </span>frontend<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>npm<span class="w"> </span>ci<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>npm<span class="w"> </span>run<span class="w"> </span>build<span class="o">)</span><span class="w">      </span><span class="c1"># 输出到 backend/slotserve/static</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="nb">export</span><span class="w"> </span><span class="nv">SLOTSERVE_LLAMA_SERVER_CMD</span><span class="o">=</span>/opt/llama.cpp/build/bin/llama-server
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="nb">export</span><span class="w"> </span><span class="nv">SLOTSERVE_MODELS_DIR</span><span class="o">=</span>/mnt/ssd/models
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="nb">export</span><span class="w"> </span><span class="nv">SLOTSERVE_STATIC_DIR</span><span class="o">=</span><span class="nv">$PWD</span>/backend/slotserve/static
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>slotserve
+</code></pre></div>
+<p>SlotServe 自身的 systemd 服务示例：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">[Unit]</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="na">Description</span><span class="o">=</span><span class="s">SlotServe</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="na">After</span><span class="o">=</span><span class="s">network-online.target</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="k">[Service]</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="na">WorkingDirectory</span><span class="o">=</span><span class="s">/opt/slotserve</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="na">EnvironmentFile</span><span class="o">=</span><span class="s">/opt/slotserve/.env</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="na">ExecStart</span><span class="o">=</span><span class="s">/opt/slotserve/.venv/bin/slotserve</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="na">Restart</span><span class="o">=</span><span class="s">on-failure</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="k">[Install]</span>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="na">WantedBy</span><span class="o">=</span><span class="s">multi-user.target</span>
+</code></pre></div>
+<p>此时管理命令（<code>slotserve setup-code</code>、<code>reset-password</code>、<code>doctor</code>、<code>restore</code>）直接运行即可，使用相同的用户和相同的环境变量。</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 SlotServe contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

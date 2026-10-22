@@ -1,0 +1,2172 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="预约 GPU 时段，通过 OpenAI 兼容网关使用模型。">
+      
+      
+      
+        <link rel="canonical" href="https://peleryuan.github.io/slotserve/zh/operations/">
+      
+      
+        <link rel="prev" href="../configuration/">
+      
+      
+        <link rel="next" href="../user-guide/">
+      
+      
+        
+          <link rel="alternate" href="../../operations/" hreflang="en">
+        
+          <link rel="alternate" href="./" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>运维手册 - SlotServe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../" title="SlotServe" class="md-header__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SlotServe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              运维手册
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="选择当前语言">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../operations/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PelerYuan/slotserve" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../" title="SlotServe" class="md-nav__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    SlotServe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PelerYuan/slotserve" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快速开始
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    配置参考
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维手册
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维手册
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#upgrade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        从 v0.8 升级
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="从 v0.8 升级">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-before" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        升级之前
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        升级
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-after" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        大家会注意到什么
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        检查升级结果
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        升级失败：回滚
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        备份
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="备份">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#backup-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        备份里有什么
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backup-target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        在别处保留一份
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backup-alerts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        备份失败时
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#secret-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        会话密钥
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="会话密钥">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#secret-key-lost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        会话密钥丢失或被更换
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        从备份恢复
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="从备份恢复">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reconcile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        核对报告
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-machine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        迁移到新机器
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        初始化码与第一个管理员
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reverse-proxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反向代理
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        健康检查与 slotserve doctor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alerts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        收件箱与告警
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        容器加固与兼容模式
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#firewall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        端口与防火墙
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runbooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        问题手册
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="问题手册">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#admin-password" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        忘记管理员密码或被锁定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disk-full" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        磁盘满
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#devenv-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        开发环境启动失败
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-gone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        驱动或 Docker 升级后 GPU 不见了
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#leak" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        怀疑账号或密钥泄露
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        在真实硬件上验证
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    使用指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    模型目录
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    通知与集成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gpus-and-engines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    多 GPU 与推理后端
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-environments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开发环境
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    存储
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    接口
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    调度原理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开发
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    常见问题
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#upgrade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        从 v0.8 升级
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="从 v0.8 升级">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-before" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        升级之前
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        升级
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-after" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        大家会注意到什么
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        检查升级结果
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        升级失败：回滚
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        备份
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="备份">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#backup-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        备份里有什么
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backup-target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        在别处保留一份
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backup-alerts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        备份失败时
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#secret-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        会话密钥
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="会话密钥">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#secret-key-lost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        会话密钥丢失或被更换
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        从备份恢复
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="从备份恢复">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reconcile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        核对报告
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-machine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        迁移到新机器
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        初始化码与第一个管理员
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reverse-proxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反向代理
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        健康检查与 slotserve doctor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alerts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        收件箱与告警
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        容器加固与兼容模式
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#firewall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        端口与防火墙
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runbooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        问题手册
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="问题手册">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#admin-password" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        忘记管理员密码或被锁定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disk-full" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        磁盘满
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#devenv-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        开发环境启动失败
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-gone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        驱动或 Docker 升级后 GPU 不见了
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#leak" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        怀疑账号或密钥泄露
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        在真实硬件上验证
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="_1">运维手册<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<p>写给维护 SlotServe 的人：升级、备份与恢复、第一个管理员、反向代理、健康检查与告警、容器加固、防火墙端口，以及在真实硬件上验证安装。每篇问题手册都按<strong>症状 → 判断 → 处理 → 预防</strong>来写。</p>
+<p>下面的命令假定你按<a href="../getting-started/">快速开始</a>用 Docker Compose 安装，并在 <code>docker-compose.yml</code> 所在目录执行。不使用 Docker 时，去掉 <code>docker compose exec slotserve</code> 前缀，以运行 SlotServe 的用户、在相同的环境（<code>.env</code>）下直接执行 <code>slotserve ...</code>。</p>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>看这里</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>从 v0.8 升级到 v0.10</td>
+<td><a href="#upgrade">从 v0.8 升级</a></td>
+</tr>
+<tr>
+<td>升级出了问题</td>
+<td><a href="#rollback">升级失败：回滚</a></td>
+</tr>
+<tr>
+<td>设置或检查备份</td>
+<td><a href="#backups">备份</a>、<a href="#secret-key">会话密钥</a></td>
+</tr>
+<tr>
+<td>从备份恢复、迁移到另一台机器</td>
+<td><a href="#restore">从备份恢复</a>、<a href="#new-machine">迁移到新机器</a></td>
+</tr>
+<tr>
+<td>没有人能以管理员身份登录</td>
+<td><a href="#setup-code">初始化码与第一个管理员</a>、<a href="#admin-password">忘记管理员密码</a></td>
+</tr>
+<tr>
+<td>放在 nginx、Caddy 或 Traefik 后面</td>
+<td><a href="#reverse-proxy">反向代理</a></td>
+</tr>
+<tr>
+<td>管理 → 概览里有红色项</td>
+<td><a href="#health">健康检查与 <code>slotserve doctor</code></a>、<a href="#alerts">收件箱与告警</a></td>
+</tr>
+<tr>
+<td>环境里 <code>sudo</code> 或某个应用不能用</td>
+<td><a href="#hardening">容器加固与兼容模式</a></td>
+</tr>
+<tr>
+<td>需要开放哪些端口</td>
+<td><a href="#firewall">端口与防火墙</a></td>
+</tr>
+<tr>
+<td>磁盘满、GPU 不见了、环境起不来、密码泄露</td>
+<td><a href="#runbooks">问题手册</a></td>
+</tr>
+<tr>
+<td>让大家用之前先检查一遍</td>
+<td><a href="#verify">在真实硬件上验证</a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="upgrade">从 v0.8 升级<a class="headerlink" href="#upgrade" title="Permanent link">&para;</a></h2>
+<p>v0.10 改变了登录方式、开发环境的隔离方式和备份方式。大部分不需要你做什么；本节列出大家会注意到的变化和需要检查的地方。完整列表见 <code>CHANGELOG.md</code> 中的 <strong>Breaking changes</strong>。</p>
+<h3 id="upgrade-before">升级之前<a class="headerlink" href="#upgrade-before" title="Permanent link">&para;</a></h3>
+<ol>
+<li>阅读该版本的 <strong>Breaking changes</strong>。</li>
+<li>做一份找得到的备份：<strong>管理 → 概览 → 备份 → 立即备份</strong>，或者停止 SlotServe 后复制整个数据目录（<code>DATA_DIR</code>，默认 <code>./data</code>）。升级时还会自动做一份快照（见下文）。</li>
+<li>留意镜像标签。<code>docker-compose.yml</code> 现在跟随次版本号（<code>ghcr.io/peleryuan/slotserve:0.10</code>，会收到 0.10.x 修复），不再使用 <code>latest</code>。如果你在 <code>.env</code> 里设置了 <code>SLOTSERVE_IMAGE</code>，请改成新版本。</li>
+<li>提前告诉大家下面的「需要重新登录一次」和 SSH 主机密钥警告。SlotServe 重启期间，正在运行的开发环境会继续运行；新的容器设置在它们下次启动时生效。</li>
+</ol>
+<h3 id="upgrade-steps">升级<a class="headerlink" href="#upgrade-steps" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>pull<span class="w">                      </span><span class="c1"># 新的 docker-compose.yml 和文档</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>pull<span class="w">           </span><span class="c1"># 或：docker compose up -d --build</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>-f<span class="w"> </span>slotserve
+</code></pre></div>
+<p>首次启动时，服务会：</p>
+<ul>
+<li>在修改数据库之前保存一份<strong>快照</strong>：<code>data/backups/slotserve-v&lt;旧版本&gt;-to-v&lt;新版本&gt;-&lt;时间&gt;/</code>，内含数据库、<code>secret_key</code> 和开发环境的 SSH 主机密钥。快照永远不会被自动删除；</li>
+<li><strong>要么全部成功、要么全部不做</strong>地执行编号的数据库迁移（失败会回滚，服务不会启动；见<a href="#rollback">回滚</a>），并写出 <code>data/migration_report.json</code>；</li>
+<li>如果 <code>SLOTSERVE_SECRET_KEY</code> 未设置或仍是 <code>change-me</code>，在 <code>data/secret_key</code> 生成一个随机密钥（见<a href="#secret-key">会话密钥</a>）。</li>
+</ul>
+<p>数据库还需要升级时，<code>reset-password</code> 和 <code>set-admin</code> 会拒绝执行：请先启动一次服务。</p>
+<h3 id="upgrade-after">大家会注意到什么<a class="headerlink" href="#upgrade-after" title="Permanent link">&para;</a></h3>
+<p><strong>每个人都要重新登录一次。</strong> 浏览器登录现在保存在服务端，旧的登录状态都会随升级失效。API 密钥照常可用。修改密码现在会让你的其他浏览器退出登录。</p>
+<p><strong>SSH 会提示主机密钥变了，每个环境一次。</strong> 现在每个开发环境都有自己的 SSH 主机密钥（以前所有环境共用一把，任何人在自己的容器里都能读到）。已有的环境在下次启动时获得自己的密钥，之后第一次 <code>ssh</code> 会以 <code>REMOTE HOST IDENTIFICATION HAS CHANGED</code> 中止。这只会发生一次，属于正常现象。请大家：</p>
+<ol>
+<li>把 <code>ssh</code> 打印的指纹与环境卡片上显示的<strong>主机密钥</strong>（开发环境页面）对比；</li>
+<li>
+<p>删除旧记录后重新连接：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>ssh-keygen<span class="w"> </span>-R<span class="w"> </span><span class="s2">"[server]:2201"</span><span class="w">     </span><span class="c1"># 环境 ssh 命令里的主机和端口</span>
+</code></pre></div>
+</li>
+</ol>
+<p>如果在这第一次<strong>之后</strong>又出现警告，而卡片上的主机密钥并没有变，那就是真正的警告，不要忽略。由旧版本创建的保留环境会在下次启动时先做快照、再重建一次（这次启动会慢一些），因为新的设置无法加到已有的容器上。</p>
+<p><strong>空闲通道的共享环境需要「加入」。</strong> 共享环境只接受 SSH 密钥，并且只有加入的人才有账号（开发环境 → <strong>加入</strong>）。升级时已有 SSH 公钥的人会被自动加入所有通道。</p>
+<p><strong>容器做了加固。</strong> 开发环境里 <code>sudo</code> 等 setuid 程序不再起作用，<code>ping</code> 不可用，fork 炸弹或内存耗尽的任务只会影响它自己的容器。内存上限设为 0 现在表示「宿主机内存减去 max(4 GB, 10%)」，而不是「不限」。没有指定 GPU 的通道不能再启动 GPU 环境：请在<strong>管理 → GPU 与通道</strong>中为通道指定 GPU。确实需要 <code>sudo</code> 或自带 init 系统的模板以兼容模式运行；见<a href="#hardening">容器加固</a>。</p>
+<p><strong>注册。</strong> 已经有管理员的安装不会要求初始化码。邀请码仍为 <code>change-me</code> 时，任何人都无法注册：请设置邀请码或发放邀请链接（管理 → 用户）。</p>
+<p><strong>在反向代理之后</strong>，在代理转发 <code>Host</code> 头或设置 <code>SLOTSERVE_PUBLIC_URL</code> 之前，网页上的修改可能被拒绝（提示「不是从 SlotServe 页面发出的」）；登录限速需要设置 <code>SLOTSERVE_FORWARDED_ALLOW_IPS</code>。见<a href="#reverse-proxy">反向代理</a>。</p>
+<p><strong>防火墙。</strong> 开发环境的网页界面（VS Code、JupyterLab、桌面）使用单独的端口，默认 8001。如果大家要用，请开放它；见<a href="#firewall">端口与防火墙</a>。</p>
+<h3 id="upgrade-check">检查升级结果<a class="headerlink" href="#upgrade-check" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>管理 → 概览</strong>：设置进度和系统健康表。每一项都应为正常，或是你理解的提示；见<a href="#health">健康检查</a>。</li>
+<li><code>docker compose exec slotserve slotserve doctor</code> 在命令行给出同样的列表。</li>
+<li><code>data/migration_report.json</code> 列出每一步迁移；如果升级时有数据行无法保留，健康检查 <strong>migration</strong> 会给出警告。</li>
+<li>登录，在浏览器里打开一个开发环境，在 Playground 里调用一次模型。</li>
+</ol>
+<h3 id="rollback">升级失败：回滚<a class="headerlink" href="#rollback" title="Permanent link">&para;</a></h3>
+<p><strong>症状。</strong> 升级后服务起不来，或者能运行但你依赖的某个功能坏了。</p>
+<p><strong>判断。</strong></p>
+<ul>
+<li><code>docker compose logs slotserve</code> 会说明原因。迁移失败时日志写着 <code>database upgrade failed and was rolled back; the snapshot is in ...</code>：数据库没有被改动，仍是旧版本的。</li>
+<li>在升级过的数据库上启动旧版本时，它会拒绝启动并提示 <code>... was used by a newer SlotServe</code>。这是在保护你的数据，本身不是问题所在。</li>
+</ul>
+<p><strong>处理。</strong> 要重新运行之前的版本：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>stop<span class="w"> </span>slotserve
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>ls<span class="w"> </span>-d<span class="w"> </span>data/backups/slotserve-v*-to-v*<span class="w">          </span><span class="c1"># 最新的那个就是这次升级的快照</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nv">SNAP</span><span class="o">=</span>data/backups/slotserve-v...-to-v...-&lt;时间&gt;<span class="w">   </span><span class="c1"># ls 显示的目录名</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>cp<span class="w"> </span><span class="s2">"</span><span class="nv">$SNAP</span><span class="s2">/slotserve.db"</span><span class="w"> </span>data/slotserve.db
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>rm<span class="w"> </span>-f<span class="w"> </span>data/slotserve.db-wal<span class="w"> </span>data/slotserve.db-shm
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="o">[</span><span class="w"> </span>-f<span class="w"> </span><span class="s2">"</span><span class="nv">$SNAP</span><span class="s2">/secret_key"</span><span class="w"> </span><span class="o">]</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cp<span class="w"> </span><span class="s2">"</span><span class="nv">$SNAP</span><span class="s2">/secret_key"</span><span class="w"> </span>data/secret_key
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="o">[</span><span class="w"> </span>-d<span class="w"> </span><span class="s2">"</span><span class="nv">$SNAP</span><span class="s2">/devenv"</span><span class="w"> </span><span class="o">]</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cp<span class="w"> </span>-r<span class="w"> </span><span class="s2">"</span><span class="nv">$SNAP</span><span class="s2">/devenv"</span><span class="w"> </span>data/
+</code></pre></div>
+<p>然后在 <code>.env</code> 中固定旧版本并启动：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"SLOTSERVE_IMAGE=ghcr.io/peleryuan/slotserve:0.8.0"</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>.env
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+<p>升级之后到回滚之前发生的一切（预约、密钥、设置）会随新数据库一起丢失；如果可能还需要，覆盖前先把 <code>data/slotserve.db</code> 另存一份。如果是迁移本身失败（数据库没有被改动），只需固定旧版本即可。</p>
+<p><strong>预防。</strong> 先在数据目录的副本上演练升级（另一个目录作为 <code>DATA_DIR</code>、另一个 <code>PORT</code>、关闭开发环境）。镜像固定在一个次版本上，有计划地升级。迁移失败时，带上 <code>data/migration_report.json</code> 和日志反馈问题。</p>
+<h2 id="backups">备份<a class="headerlink" href="#backups" title="Permanent link">&para;</a></h2>
+<h3 id="backup-contents">备份里有什么<a class="headerlink" href="#backup-contents" title="Permanent link">&para;</a></h3>
+<p>每天在 <code>backup_hour</code>（默认为 SlotServe 时区的 3:00；<code>-1</code> 表示距上一次每 24 小时一次），SlotServe 写出一个<strong>备份包</strong>，即目录 <code>data/backups/slotserve-daily-&lt;日期&gt;-&lt;时间&gt;/</code>，内含：</p>
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>slotserve.db</code></td>
+<td>数据库的一致副本（SQLite 在线备份，服务运行中也安全）</td>
+</tr>
+<tr>
+<td><code>secret_key</code></td>
+<td>自动生成的<a href="#secret-key">会话密钥</a>；密钥来自 <code>SLOTSERVE_SECRET_KEY</code> 时没有此文件</td>
+</tr>
+<tr>
+<td><code>devenv/</code></td>
+<td>开发环境的 SSH 主机密钥</td>
+</tr>
+<tr>
+<td><code>manifest.json</code></td>
+<td>版本、数据库结构版本、密钥指纹（从不包含密钥本身）、大小、校验和、行数、存储与保留的环境，以及备份包<strong>不包含</strong>的内容</td>
+</tr>
+</tbody>
+</table>
+<p><strong>管理 → 概览 → 备份</strong>列出所有备份包，可以随时手动备份（<strong>立即备份</strong>，生成 <code>manual</code> 备份包），也可以下载数据库文件。最新的 <code>backup_keep</code> 份（默认 7）每日和手动备份会保留；升级快照和 <code>prerestore</code> 备份包永远不会被自动删除。<code>backup_keep</code> 为 0 时关闭自动备份。</p>
+<p><strong>不在备份里</strong>：<code>/workspace</code> 和其他保留目录、保留环境的容器、保存的环境镜像、模型，以及托管存储上的数据。请在它们所在的地方另行备份：</p>
+<ul>
+<li><strong>存储</strong>（管理 → 存储：主机目录、NFS、SMB）：随那台服务器或那个目录的备份一起做。</li>
+<li>
+<p><strong>Docker 卷</strong>（没有设置存储也没有设置存储目录时），例如某个人的 <code>/workspace</code>：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-v<span class="w"> </span>slotserve-workspace-u3:/v:ro<span class="w"> </span>-v<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span>:/out<span class="w"> </span>busybox:1.37<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>tar<span class="w"> </span>czf<span class="w"> </span>/out/workspace-u3.tgz<span class="w"> </span>-C<span class="w"> </span>/v<span class="w"> </span>.
+</code></pre></div>
+</li>
+<li>
+<p><strong>模型</strong>：通常可以重新下载，或连同模型目录一起复制。</p>
+</li>
+<li><strong>保存的镜像</strong>：对需要的镜像执行 <code>docker save</code>。</li>
+</ul>
+<h3 id="backup-target">在别处保留一份<a class="headerlink" href="#backup-target" title="Permanent link">&para;</a></h3>
+<p>和数据在同一块盘上的备份扛不住这块盘坏掉。设置<strong>备份复制到</strong>（<code>backup_target</code>，管理 → 系统设置）后，每个每日备份包写好后都会复制到那里的 <code>slotserve-backups/</code> 目录中，同样保留最新的 <code>backup_keep</code> 份：</p>
+<ul>
+<li>
+<p><strong>绝对路径</strong>，SlotServe 能写入，通常是挂载的 NAS 共享。使用 Docker 时这是<strong>容器内</strong>的路径：先把共享挂载进容器，例如在 <code>docker-compose.yml</code> 的 <code>volumes</code> 下添加：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/mnt/nas/slotserve:/backup-target</span>
+</code></pre></div>
+<p>再把 <code>backup_target</code> 设为 <code>/backup-target</code>。
+- <strong><code>storage:&lt;id&gt;</code></strong>：<strong>管理 → 存储</strong>中的某个存储（列表中有它的 id）。SlotServe 通过一个短时运行的辅助容器写入，所以不需要把共享挂载进 SlotServe。</p>
+</li>
+</ul>
+<p>备份包复制成功一次后，设置进度中的<strong>备份异地保存</strong>会自动打勾。</p>
+<h3 id="backup-alerts">备份失败时<a class="headerlink" href="#backup-alerts" title="Permanent link">&para;</a></h3>
+<p>健康检查 <strong>backup</strong> 和 <strong>backup_age</strong> 盯着备份，以下情况会通知管理员（先进收件箱，再发到聊天平台）：</p>
+<ul>
+<li>最近一次备份失败（详情里有错误信息；<strong>重试</strong>会重新备份一次）；</li>
+<li>复制到备份目标失败，或备份目标无效；</li>
+<li>最新的备份超过 36 小时（服务停过，或备份任务卡住了）。</li>
+</ul>
+<p>在设置备份目标之前，会一直显示「备份只保存在本机磁盘上」的警告（可以填写原因后忽略）。<code>/metrics</code> 提供 <code>slotserve_backup_age_seconds</code>，可供外部监控使用。</p>
+<h3 id="secret-key">会话密钥<a class="headerlink" href="#secret-key" title="Permanent link">&para;</a></h3>
+<p>会话密钥（secret key）用于签名浏览器会话，并加密 SlotServe 保存的密文：存储的密码（SMB）以及 API 密钥的可查看副本（开启<strong>允许用户再次查看 API 密钥</strong>时）。API 密钥本身（只保存哈希）和用户密码（同样是哈希）不依赖它。</p>
+<ul>
+<li><code>SLOTSERVE_SECRET_KEY</code> <strong>未设置、为空或为 <code>change-me</code></strong> 时，SlotServe 在首次启动时生成随机密钥，保存在 <code>data/secret_key</code>（只有属主可读）。每个备份包都包含它。</li>
+<li><code>SLOTSERVE_SECRET_KEY</code> <strong>设置为其他值</strong>时，使用该值，并且它<strong>不会</strong>写进备份：请和其他机密一起保管（例如密码管理器），与 <code>.env</code> 放在一起。</li>
+</ul>
+<p><strong>需要备份什么</strong>：备份包（复制到本机以外），再加上 <code>.env</code>，以及你自行设置的会话密钥。在 SlotServe 停止时复制整个数据目录，也是 SlotServe 自身状态的完整备份。</p>
+<h4 id="secret-key-lost">会话密钥丢失或被更换<a class="headerlink" href="#secret-key-lost" title="Permanent link">&para;</a></h4>
+<p><strong>症状。</strong> 重启或迁移后所有人都被退出登录；健康检查 <strong>secrets</strong> 提示「N 项已保存的密钥无法用当前的会话密钥解密」；SMB 存储挂载失败；API 密钥的可查看副本无法显示。</p>
+<p><strong>判断。</strong> 该检查的详情列出了无法解密的项目，<code>slotserve doctor</code> 也会显示。对比更换前后两个备份包 <code>manifest.json</code> 中的密钥指纹（<code>secret_key.fingerprint</code>）。</p>
+<p><strong>处理。</strong></p>
+<ul>
+<li>如果还有旧密钥，<strong>把它放回去</strong>：更换之前某个备份包里的 <code>secret_key</code> 文件（停止 SlotServe，复制到 <code>data/secret_key</code>，再启动），或者 <code>.env</code> 中 <code>SLOTSERVE_SECRET_KEY</code> 的旧值。显式设置的 <code>SLOTSERVE_SECRET_KEY</code> 总是优先于 <code>data/secret_key</code>：想用文件里的密钥，就从 <code>.env</code> 中删除它。</li>
+<li><strong>没有旧密钥</strong>时，重新填写列出的密文：在<strong>管理 → 存储</strong>中重新输入每个 SMB 存储的密码；API 密钥的可查看副本无法恢复（密钥本身仍然可用，持有人可以新建）。大家重新登录。</li>
+</ul>
+<p><strong>主动更换密钥</strong>（密钥泄露时）：停止 SlotServe，设置新的 <code>SLOTSERVE_SECRET_KEY</code>（<code>openssl rand -hex 32</code>），或删除 <code>data/secret_key</code> 让它重新生成，启动后按上面的方法重新填写密文。所有人都会被退出登录。</p>
+<p><strong>预防。</strong> 把备份保存到本机以外；如果密钥是你自己设置的，把它保存在服务器以外的地方。</p>
+<h2 id="restore">从备份恢复<a class="headerlink" href="#restore" title="Permanent link">&para;</a></h2>
+<p><code>slotserve restore</code> 把一个备份包放回去。执行时服务必须是停止的。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>stop<span class="w"> </span>slotserve
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>--no-deps<span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>restore<span class="w"> </span>slotserve-daily-20261020-030000
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+<ul>
+<li>参数是 <code>data/backups/</code> 中备份包的目录名，或者命令能看到的路径（在容器里：先把 NAS 上的备份包放进 <code>DATA_DIR/backups/</code>）。</li>
+<li>它会要求你输入 <code>restore</code> 确认（<code>--yes</code> 跳过）。它会拒绝来自更新版本 SlotServe 的备份，以及未通过 SQLite 完整性检查的备份。</li>
+<li>替换任何东西之前，当前状态会先保存为 <code>slotserve-prerestore-&lt;时间&gt;</code> 备份包，所以恢复本身也可以用同样的方法撤销。</li>
+<li>它放回数据库、会话密钥（<code>--keep-key</code> 保留当前密钥；这样备份里的密文就无法解密）和 SSH 主机密钥。来自旧版本的备份会在下次启动时升级（升级前同样会做快照）。命令会打印你必须处理的警告，例如 <code>.env</code> 中的 <code>SLOTSERVE_SECRET_KEY</code> 会覆盖恢复的密钥。</li>
+</ul>
+<p>旧的单文件备份（<code>slotserve-daily-&lt;时间&gt;.db</code>）和升级快照也可以用同样的方法恢复。</p>
+<h3 id="reconcile">核对报告<a class="headerlink" href="#reconcile" title="Permanent link">&para;</a></h3>
+<p>恢复的数据库描述的是备份那一刻的状态，而 Docker 和磁盘已经变了。下次启动时 SlotServe 会把两者做比较，结果显示在<strong>管理 → 概览</strong>的健康检查 <strong>restore</strong> 中（也写入 <code>data/restore_report.json</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>发现</th>
+<th>含义</th>
+<th>怎么做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>环境缺失</td>
+<td>数据库期望的容器在 Docker 中不存在（备份之后被删除，或换了新机器）</td>
+<td>对保留的环境来说，装好的软件已经没了；它的保留目录不受影响。结束或删除它，再从模板重新启动。</td>
+</tr>
+<tr>
+<td>未知容器</td>
+<td>数据库不认识的 SlotServe 容器（备份之后创建的）</td>
+<td>先保存其中重要的内容（<code>docker cp</code>，或让它的主人把文件拷出来），再用 <code>docker rm -f &lt;名称&gt;</code> 删除。</td>
+</tr>
+<tr>
+<td>模型文件缺失</td>
+<td>模型文件不在数据库记录的位置</td>
+<td>把文件拷回来，或重新扫描模型目录并删除过期的记录。</td>
+</tr>
+<tr>
+<td>存储</td>
+<td>列出来供重新检查</td>
+<td>在<strong>管理 → 存储</strong>中逐个点<strong>检查</strong>。</td>
+</tr>
+</tbody>
+</table>
+<p>卷和端口不做比较。Docker 无法连接时，该检查会等待（「等待 Docker 可用后核对」），Docker 恢复后再执行。</p>
+<p><strong>在管理员忽略 restore 检查之前，SlotServe 不会删除任何数据库不认识的东西</strong>（不清理未知的容器、网络或卷）。阅读报告，逐条处理，然后填写原因<strong>忽略</strong>它；之后恢复正常清理。</p>
+<h3 id="new-machine">迁移到新机器<a class="headerlink" href="#new-machine" title="Permanent link">&para;</a></h3>
+<ol>
+<li>按<a href="../getting-started/">快速开始</a>在新机器上安装<strong>相同或更新</strong>版本的 SlotServe，并复制 <code>.env</code>（如果你设置了 <code>SLOTSERVE_SECRET_KEY</code>，它就在里面）。先不要启动。</li>
+<li>
+<p>把最新的备份包复制到新的 <code>DATA_DIR/backups/</code> 并恢复：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>--no-deps<span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>restore<span class="w"> </span>--yes<span class="w"> </span>slotserve-daily-20261020-030000
+</code></pre></div>
+</li>
+<li>
+<p>复制备份包以外的内容：模型目录、存放 <code>/workspace</code> 与保留目录的 Docker 卷或存储目录、保存的镜像（<code>docker save</code> / <code>docker load</code>）。NAS 上的存储只需新机器能访问（NFS 导出允许它的地址；安装 <code>nfs-common</code> / <code>cifs-utils</code>）。</p>
+</li>
+<li>启动（<code>docker compose up -d</code>），阅读<a href="#reconcile">核对报告</a>：旧机器上的环境会显示为缺失。</li>
+<li>让大家使用新地址（<code>SLOTSERVE_PUBLIC_URL</code>、DNS）。地址变了，大家 <code>known_hosts</code> 中的记录也要更新；主机密钥本身随备份包一起迁移过来了。</li>
+</ol>
+<h2 id="setup-code">初始化码与第一个管理员<a class="headerlink" href="#setup-code" title="Permanent link">&para;</a></h2>
+<p>新安装没有管理员。在出现第一个管理员之前，SlotServe 每次启动都会在日志里打印一个一次性的<strong>初始化码</strong>；注册表单会要求填写它（代替邀请码），该账号即成为管理员：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>slotserve<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-A4<span class="w"> </span><span class="s2">"No admin account"</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>setup-code
+</code></pre></div>
+<p>一旦有了管理员，初始化码立即失效；已有管理员的安装永远不会要求它。邀请码仍为 <code>change-me</code> 时，其他人都无法注册：在管理 → 系统设置中设置<strong>邀请码</strong>，或在管理 → 用户中生成<strong>邀请链接</strong>（会过期、统计注册人数、可以撤销，也可以要求管理员批准；链接里从不包含邀请码）。</p>
+<p>增加管理员：<strong>管理 → 用户</strong>，或 <code>docker compose exec slotserve slotserve set-admin &lt;用户名&gt;</code>（<code>--revoke</code> 取消）。至少保留两位管理员，以便互相帮忙。</p>
+<h2 id="reverse-proxy">反向代理<a class="headerlink" href="#reverse-proxy" title="Permanent link">&para;</a></h2>
+<p>为了 HTTPS 或更好记的地址，可以把 SlotServe 放在反向代理之后。有三点要注意。</p>
+<p><strong>1. 地址：<code>Host</code> 或 <code>SLOTSERVE_PUBLIC_URL</code>。</strong> 对来自浏览器的修改类请求（POST、PUT、PATCH、DELETE），SlotServe 要求 <code>Origin</code> 是它自己的地址：请求发往的主机（<code>Host</code> 或 <code>X-Forwarded-Host</code>），或 <code>SLOTSERVE_PUBLIC_URL</code> 的源。如果代理把 <code>Host</code> 改写成 <code>127.0.0.1:8000</code>，网页上的所有修改都会失败，提示「不是从 SlotServe 页面发出的」。请转发原始主机名，并把 <code>SLOTSERVE_PUBLIC_URL</code> 设为大家输入的地址（SlotServe 发出的链接也用它）：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nv">SLOTSERVE_PUBLIC_URL</span><span class="o">=</span>https://gpu.example.org
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nv">SLOTSERVE_COOKIE_SECURE</span><span class="o">=</span><span class="nb">true</span><span class="w">                 </span><span class="c1"># cookie 只通过 HTTPS 发送</span>
+</code></pre></div>
+<p><strong>2. 客户端地址：<code>SLOTSERVE_FORWARDED_ALLOW_IPS</code>。</strong> 登录限速按地址锁定账号（账号 + IP），审计日志记录地址，API 密钥会显示最近一次使用的地址。SlotServe 只相信 <code>SLOTSERVE_FORWARDED_ALLOW_IPS</code> 中列出的代理（默认 <code>127.0.0.1</code>）发来的 <code>X-Forwarded-For</code>。使用 Docker 时，代理的连接来自 Docker 网桥的地址（例如 <code>172.18.0.1</code>），而不是 <code>127.0.0.1</code>：登录一次，在<strong>管理 → 审计日志</strong>中查看这次登录的地址，如果那是代理的地址而不是你自己的，就把它填进去：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nv">SLOTSERVE_FORWARDED_ALLOW_IPS</span><span class="o">=</span><span class="m">172</span>.18.0.1<span class="w">     </span><span class="c1"># 逗号分隔；只有当 8000 端口仅代理可访问时才用 "*"</span>
+</code></pre></div>
+<p>不设置的话，所有人共用代理的地址，一个人的登录失败可能拖累其他人。</p>
+<p><strong>3. 流式输出和第二个端口。</strong> 关闭缓冲以便模型回答能流式输出，允许长时间的请求，并转发 WebSocket。开发环境的网页界面使用 8001 端口，需要一个单独的地址（它必须与 SlotServe 保持不同的源）：另一个 <code>server</code> 块或另一个主机名，并把 <code>SLOTSERVE_DEVENV_WEB_URL</code> 设为它。</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">server</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">    </span><span class="kn">listen</span><span class="w"> </span><span class="mi">443</span><span class="w"> </span><span class="s">ssl</span><span class="p">;</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span><span class="kn">server_name</span><span class="w"> </span><span class="s">gpu.example.org</span><span class="p">;</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="c1"># ssl_certificate ...;</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="s">/</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">        </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://127.0.0.1:8000</span><span class="p">;</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Host</span><span class="w"> </span><span class="nv">$host</span><span class="p">;</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">X-Forwarded-For</span><span class="w"> </span><span class="nv">$proxy_add_x_forwarded_for</span><span class="p">;</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">X-Forwarded-Proto</span><span class="w"> </span><span class="nv">$scheme</span><span class="p">;</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">        </span><span class="kn">proxy_http_version</span><span class="w"> </span><span class="mi">1</span><span class="s">.1</span><span class="p">;</span>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Upgrade</span><span class="w"> </span><span class="nv">$http_upgrade</span><span class="p">;</span>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Connection</span><span class="w"> </span><span class="s">"upgrade"</span><span class="p">;</span>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="w">        </span><span class="kn">proxy_buffering</span><span class="w"> </span><span class="no">off</span><span class="p">;</span>
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">        </span><span class="kn">proxy_read_timeout</span><span class="w"> </span><span class="s">1h</span><span class="p">;</span>
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">        </span><span class="kn">client_max_body_size</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="p">}</span>
+<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>
+<a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="k">server</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a><span class="w">    </span><span class="kn">listen</span><span class="w"> </span><span class="mi">8443</span><span class="w"> </span><span class="s">ssl</span><span class="p">;</span><span class="w">                            </span><span class="c1"># 或 443 上的另一个 server_name</span>
+<a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a><span class="w">    </span><span class="kn">server_name</span><span class="w"> </span><span class="s">gpu.example.org</span><span class="p">;</span>
+<a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a><span class="w">    </span><span class="c1"># ssl_certificate ...;</span>
+<a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a><span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="s">/</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a><span class="w">        </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://127.0.0.1:8001</span><span class="p">;</span>
+<a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Host</span><span class="w"> </span><span class="nv">$host</span><span class="p">;</span>
+<a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">X-Forwarded-For</span><span class="w"> </span><span class="nv">$proxy_add_x_forwarded_for</span><span class="p">;</span>
+<a id="__codelineno-11-27" name="__codelineno-11-27" href="#__codelineno-11-27"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">X-Forwarded-Proto</span><span class="w"> </span><span class="nv">$scheme</span><span class="p">;</span>
+<a id="__codelineno-11-28" name="__codelineno-11-28" href="#__codelineno-11-28"></a><span class="w">        </span><span class="kn">proxy_http_version</span><span class="w"> </span><span class="mi">1</span><span class="s">.1</span><span class="p">;</span>
+<a id="__codelineno-11-29" name="__codelineno-11-29" href="#__codelineno-11-29"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Upgrade</span><span class="w"> </span><span class="nv">$http_upgrade</span><span class="p">;</span>
+<a id="__codelineno-11-30" name="__codelineno-11-30" href="#__codelineno-11-30"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Connection</span><span class="w"> </span><span class="s">"upgrade"</span><span class="p">;</span>
+<a id="__codelineno-11-31" name="__codelineno-11-31" href="#__codelineno-11-31"></a><span class="w">        </span><span class="kn">proxy_buffering</span><span class="w"> </span><span class="no">off</span><span class="p">;</span>
+<a id="__codelineno-11-32" name="__codelineno-11-32" href="#__codelineno-11-32"></a><span class="w">        </span><span class="kn">proxy_read_timeout</span><span class="w"> </span><span class="s">1h</span><span class="p">;</span>
+<a id="__codelineno-11-33" name="__codelineno-11-33" href="#__codelineno-11-33"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-11-34" name="__codelineno-11-34" href="#__codelineno-11-34"></a><span class="p">}</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nv">SLOTSERVE_DEVENV_WEB_URL</span><span class="o">=</span>https://gpu.example.org:8443
+</code></pre></div>
+<p>OpenAI 兼容接口（<code>/v1</code>）也通过同一个代理访问，客户端使用 <code>https://gpu.example.org/v1</code>。开发环境的 SSH 和直连端口不经过代理（见<a href="#firewall">端口与防火墙</a>）。</p>
+<h2 id="health">健康检查与 <code>slotserve doctor</code><a class="headerlink" href="#health" title="Permanent link">&para;</a></h2>
+<p>所有查看 SlotServe 健康状况的地方都来自同一组检查：</p>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>内容</th>
+<th>谁能看</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>管理 → 概览</strong></td>
+<td>设置进度，然后是<strong>系统健康</strong>表：每项检查的详情、操作按钮、已识别错误的诊断，以及填写原因后忽略</td>
+<td>管理员</td>
+</tr>
+<tr>
+<td><code>GET /healthz</code></td>
+<td>浅检查：进程能响应（Docker 的 <code>HEALTHCHECK</code> 用它）</td>
+<td>任何人</td>
+</tr>
+<tr>
+<td><code>GET /api/health</code></td>
+<td>所有检查的 JSON（<code>checks[]</code>，<code>status: ok / degraded / down</code>）；<code>?strict=true</code> 在有检查失败时返回 503，适合可用性监控</td>
+<td>管理员会话或监控令牌（<code>Authorization: Bearer &lt;SLOTSERVE_METRICS_TOKEN&gt;</code>）</td>
+</tr>
+<tr>
+<td><code>GET /metrics</code></td>
+<td>Prometheus：<code>slotserve_check_status</code>、<code>slotserve_backup_age_seconds</code>，以及 GPU 和用量指标</td>
+<td>监控令牌</td>
+</tr>
+<tr>
+<td><code>slotserve doctor</code></td>
+<td>在命令行运行同样的检查</td>
+<td>服务器上的 shell</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>doctor<span class="w">          </span><span class="c1"># 服务运行时</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>--no-deps<span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>doctor<span class="w">   </span><span class="c1"># 服务起不来时</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>slotserve<span class="w"> </span>doctor<span class="w"> </span>--json<span class="w">                                 </span><span class="c1"># 机器可读，已去除密文</span>
+</code></pre></div>
+<p><code>doctor</code> 每项检查打印一行（<code>ok</code>、<code>info</code>、<code>WARN</code>、<code>ERROR</code>），并附上警告和错误的详情；有检查处于错误级别时退出码为 1。它在自己的进程里运行，所以与运行中服务内部状态有关的检查（通道、后台任务）只在网页和 <code>/api/health</code> 中显示。</p>
+<table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>检查什么</th>
+<th>不正常时</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>database</td>
+<td>数据库可以写入</td>
+<td>磁盘满或只读、文件权限</td>
+</tr>
+<tr>
+<td>disk</td>
+<td>数据和模型所在位置以及各存储的剩余空间</td>
+<td><a href="#disk-full">磁盘满</a></td>
+</tr>
+<tr>
+<td>engine</td>
+<td>推理引擎程序存在</td>
+<td>修正 <code>LLAMA_CPP_DIR</code> / <code>SLOTSERVE_LLAMA_SERVER_CMD</code>；见<a href="../configuration/#llama-server">配置参考</a></td>
+</tr>
+<tr>
+<td>lanes</td>
+<td>每个通道的推理进程</td>
+<td>加载失败，附带诊断；见<a href="../faq/#diagnosis">常见问题：诊断</a></td>
+</tr>
+<tr>
+<td>models</td>
+<td>至少一个模型，每个通道有空闲默认模型</td>
+<td>添加模型、设置默认模型（管理 → GPU 与通道）</td>
+</tr>
+<tr>
+<td>gpu</td>
+<td><code>nvidia-smi</code> 能看到 GPU</td>
+<td><a href="#gpu-gone">GPU 不见了</a></td>
+</tr>
+<tr>
+<td>docker</td>
+<td>Docker 可以访问（开启开发环境时）</td>
+<td><a href="../dev-environments/#docker">开发环境：Docker</a></td>
+</tr>
+<tr>
+<td>storage</td>
+<td>每个存储都能挂载并写入</td>
+<td><a href="../storage/#types">存储</a>，以及该检查上的诊断</td>
+</tr>
+<tr>
+<td>chat</td>
+<td>聊天平台已连接</td>
+<td>管理 → 聊天渠道</td>
+</tr>
+<tr>
+<td>backup</td>
+<td>最近一次备份及其异地副本</td>
+<td><a href="#backups">备份</a></td>
+</tr>
+<tr>
+<td>backup_age</td>
+<td>最新的备份不超过 36 小时</td>
+<td><a href="#backup-alerts">备份失败时</a></td>
+</tr>
+<tr>
+<td>restore</td>
+<td>恢复后等待核对</td>
+<td><a href="#reconcile">核对报告</a></td>
+</tr>
+<tr>
+<td>migration</td>
+<td>最近一次升级保留了所有数据行</td>
+<td><code>data/migration_report.json</code></td>
+</tr>
+<tr>
+<td>tasks</td>
+<td>后台任务在运行并按时回报</td>
+<td>重启 SlotServe；附上详情反馈问题</td>
+</tr>
+<tr>
+<td>secrets</td>
+<td>已保存的密文都能解密</td>
+<td><a href="#secret-key-lost">会话密钥丢失</a></td>
+</tr>
+<tr>
+<td>security</td>
+<td>管理员人数；开启开发环境意味着拥有宿主机 root 权限</td>
+<td>读一遍即可的提示</td>
+</tr>
+<tr>
+<td>invite</td>
+<td>邀请码不是 <code>change-me</code></td>
+<td>设置邀请码或使用邀请链接</td>
+</tr>
+</tbody>
+</table>
+<p>有些结果只是提示而不是问题（有意不接聊天平台、没有 GPU 的机器）：填写原因后<strong>忽略…</strong>。被忽略的检查仍留在表中，但不再算作问题，原因记入审计日志；它的级别变化时会自动恢复显示。</p>
+<h2 id="alerts">收件箱与告警<a class="headerlink" href="#alerts" title="Permanent link">&para;</a></h2>
+<p>所有通知都先进入应用内的<strong>收件箱</strong>（页头的铃铛），再发到个人绑定的聊天平台。普通成员收到与自己工作相关的消息（审批结果、提醒、环境已就绪或启动失败）。管理员还会收到管理消息：待审批的预约、等待批准的注册、模型加载失败、存储不可用、敏感设置的修改，以及健康告警。</p>
+<ul>
+<li>某项检查达到告警级别（错误；部分检查为警告，部分要持续一段时间）时，会给所有管理员发送<strong>一次</strong>告警，恢复时再发一次。不会重复发送，重启后也不会。被忽略的检查不会告警。</li>
+<li>群机器人（飞书 / Lark、钉钉、企业微信）也可以接收管理告警：<strong>管理 → 聊天渠道</strong>。</li>
+<li>即使没有接入任何聊天平台也不会漏消息：收件箱里都有。「管理」菜单项会显示未读的管理消息数。</li>
+<li>外部监控可以轮询 <code>/api/health?strict=true</code> 或抓取 <code>/metrics</code>（<code>slotserve_check_status</code>）。</li>
+</ul>
+<h2 id="hardening">容器加固与兼容模式<a class="headerlink" href="#hardening" title="Permanent link">&para;</a></h2>
+<p>SlotServe 为开发环境启动的每个容器，都会经过一个固定的最后加固步骤：</p>
+<ul>
+<li><strong>no new privileges</strong>：<code>sudo</code> 等 setuid 程序无法提升权限；</li>
+<li>去掉 <code>NET_RAW</code>、<code>MKNOD</code>、<code>SYS_CHROOT</code>、<code>AUDIT_WRITE</code> 和 <code>SETFCAP</code> 能力（<code>ping</code> 不可用）；</li>
+<li>进程数最多 <code>SLOTSERVE_DEVENV_PIDS_LIMIT</code>（默认 4096），fork 炸弹只影响它自己的容器；</li>
+<li>内存上限（<strong>内存上限</strong>设置；为 0 时为宿主机内存减去 max(4 GB, 10%)），内存耗尽的任务会在自己的容器里被结束，而不会拖垮 SlotServe；</li>
+<li>日志大小有上限，GPU 恰好是通道的 GPU；从不使用特权模式，从不使用宿主机的网络或进程命名空间，从不挂载 Docker 套接字。</li>
+</ul>
+<p>大家在容器里是 <code>root</code>，所以 <code>apt install</code> 不需要 <code>sudo</code>。会有这些变化：</p>
+<table>
+<thead>
+<tr>
+<th>环境里的症状</th>
+<th>原因</th>
+<th>怎么做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sudo: effective uid is not 0</code> 或 setuid 程序失败</td>
+<td>no new privileges</td>
+<td>直接以 root 运行，不用 <code>sudo</code>。对于必须使用 setuid 的镜像（自带 init 系统、切换用户），由管理员在该模板的设置中打开<strong>兼容模式</strong>（开发环境页面，仅管理员；内置桌面已经使用）。隔离较弱：只用于可信的镜像。</td>
+</tr>
+<tr>
+<td><code>ping: permission denied</code></td>
+<td>去掉了 <code>NET_RAW</code></td>
+<td>用 <code>curl</code> 或 <code>nc</code> 测试连接。</td>
+</tr>
+<tr>
+<td><code>fork: Resource temporarily unavailable</code></td>
+<td>进程数上限</td>
+<td>减少并行进程，或调高 <code>SLOTSERVE_DEVENV_PIDS_LIMIT</code>。</td>
+</tr>
+<tr>
+<td>任务被 <code>Killed</code></td>
+<td>内存上限</td>
+<td>减小批量，或调高<strong>内存上限</strong>。管理员可以在 <code>/api/devenv</code>（<code>hardening</code>）中看到实际生效的上限。</td>
+</tr>
+</tbody>
+</table>
+<p><strong>网页界面兼容模式</strong>（管理 → 系统设置，<code>SLOTSERVE_DEVENV_WEB_COMPAT</code>）是另一个开关：它放宽了「同一浏览器中一个环境的页面不能在另一个环境里操作」的规则（在网页端口 8001 上）。只有当某个应用在环境的网页界面里无法工作、且别无他法时才打开；它只会削弱环境之间的隔离，不影响其他方面。</p>
+<h2 id="firewall">端口与防火墙<a class="headerlink" href="#firewall" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>端口</th>
+<th>用途</th>
+<th>谁需要访问</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>8000</strong>（<code>PORT</code>）</td>
+<td>网页、<code>/api</code>、OpenAI 兼容的 <code>/v1</code>、<code>/metrics</code></td>
+<td>所有人（或只有反向代理）</td>
+</tr>
+<tr>
+<td><strong>8001</strong>（<code>DEVENV_WEB_PORT</code>、<code>SLOTSERVE_DEVENV_WEB_PORT</code>）</td>
+<td>开发环境的网页界面（VS Code、JupyterLab、桌面、你自己的网页应用）</td>
+<td>使用它们的人（或只有反向代理）</td>
+</tr>
+<tr>
+<td><strong>8002</strong>（<code>SLOTSERVE_DEVENV_GATEWAY_PORT</code>）</td>
+<td>容器侧网关：只提供 <code>/v1</code>，供开发环境里的代码使用</td>
+<td>只有开发环境容器；不要对网络开放</td>
+</tr>
+<tr>
+<td><strong>2200-2299</strong>（SSH 端口）</td>
+<td>登录开发环境的 SSH，每个运行中的环境一个端口</td>
+<td>使用 SSH 的人</td>
+</tr>
+<tr>
+<td><strong>2300-2399</strong>（直连端口范围）</td>
+<td>大家从环境中直接发布的端口</td>
+<td>使用它们的人；直连端口没有 SlotServe 登录保护</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>端口范围是设置项（<strong>SSH 端口范围</strong>、<strong>直连端口范围</strong>）；它们之间、以及与宿主机已用的端口之间不要重叠。</li>
+<li>
+<p><strong>SSH 端口和直连端口由 Docker 自己发布</strong>，通过它自己的 iptables 规则，会绕过宿主机上 <code>ufw</code> 和 <code>firewalld</code> 的规则。要限制谁能访问，请使用 <code>DOCKER-USER</code> 链或机器前面的防火墙，例如：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># 只允许 10.0.0.0/8 网段访问开发环境的 SSH 和直连端口</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>iptables<span class="w"> </span>-I<span class="w"> </span>DOCKER-USER<span class="w"> </span>-p<span class="w"> </span>tcp<span class="w"> </span>-m<span class="w"> </span>multiport<span class="w"> </span>--dports<span class="w"> </span><span class="m">2200</span>:2399<span class="w"> </span>!<span class="w"> </span>-s<span class="w"> </span><span class="m">10</span>.0.0.0/8<span class="w"> </span>-j<span class="w"> </span>DROP
+</code></pre></div>
+</li>
+<li>
+<p>SlotServe 运行在 Docker 中时，<strong>8002 端口</strong>无需任何设置：网关就在 SlotServe 的容器里，在每个环境的网络中以 <code>slotserve-gw</code> 的名字访问。SlotServe 直接运行在宿主机上时，它监听 Docker 网桥（<code>docker0</code>）的地址；如果宿主机防火墙会丢弃容器到宿主机的流量，需要放行来自 Docker 网络（默认在 <code>172.16.0.0/12</code> 和 <code>192.168.0.0/16</code> 之内）的 TCP 8002，例如 <code>ufw allow from 172.16.0.0/12 to any port 8002 proto tcp</code>。</p>
+</li>
+<li>在反向代理之后，可以把 8000 和 8001 绑定到 <code>127.0.0.1</code>（<code>ports: - "127.0.0.1:8000:8000"</code>），只让代理访问。</li>
+</ul>
+<h2 id="runbooks">问题手册<a class="headerlink" href="#runbooks" title="Permanent link">&para;</a></h2>
+<h3 id="admin-password">忘记管理员密码或被锁定<a class="headerlink" href="#admin-password" title="Permanent link">&para;</a></h3>
+<p><strong>症状。</strong> 管理员无法登录；或提示尝试次数过多。</p>
+<p><strong>判断。</strong> 登录失败会把账号在失败来源的地址上锁定 15 分钟（每个账号加地址 10 次，每个地址 30 次）；其他地址不受影响。在没有设置 <code>SLOTSERVE_FORWARDED_ALLOW_IPS</code> 的代理之后，所有人共用一个地址（见<a href="#reverse-proxy">反向代理</a>）。</p>
+<p><strong>处理。</strong></p>
+<ul>
+<li>由另一位管理员在<strong>管理 → 用户</strong>中重置密码。</li>
+<li>
+<p>在服务器上：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>reset-password<span class="w"> </span>&lt;用户名&gt;<span class="w">    </span><span class="c1"># 会提示输入新密码</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>set-admin<span class="w"> </span>&lt;用户名&gt;<span class="w">         </span><span class="c1"># 已经没有管理员时</span>
+</code></pre></div>
+<p>重置后该账号在所有地方都会退出登录。锁定状态保存在内存中：<code>docker compose restart slotserve</code> 会清除它。
+- 已经完全没有管理员账号：见<a href="#setup-code">初始化码</a>。</p>
+</li>
+</ul>
+<p><strong>预防。</strong> 两位管理员；密码保存在密码管理器中。</p>
+<h3 id="disk-full">磁盘满<a class="headerlink" href="#disk-full" title="Permanent link">&para;</a></h3>
+<p><strong>症状。</strong> 健康检查 <strong>disk</strong> 警告或报错；备份、下载或模型加载失败并提示 "No space left on device"；数据库无法写入。</p>
+<p><strong>判断。</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>df<span class="w"> </span>-h<span class="w">                                  </span><span class="c1"># 哪个文件系统</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>du<span class="w"> </span>-sh<span class="w"> </span>data/*<span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-h<span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w">         </span><span class="c1"># SlotServe 的数据目录</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>docker<span class="w"> </span>system<span class="w"> </span>df<span class="w">                       </span><span class="c1"># 镜像、容器、卷、构建缓存</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>du<span class="w"> </span>-sh<span class="w"> </span><span class="s2">"</span><span class="nv">$MODELS_DIR</span><span class="s2">"</span>
+</code></pre></div>
+<p>常见的占用者：模型、Docker 镜像（环境模板、保存的镜像、保留环境的快照）、<code>/workspace</code> 卷、<code>data/backups/</code> 中的旧备份和升级快照、日志。</p>
+<p><strong>处理。</strong></p>
+<ul>
+<li>没人用的模型：在<strong>模型</strong>中删除（会删除文件）。</li>
+<li>Docker：<code>docker image prune</code>（未使用的镜像），以及大家不再需要的保存镜像（删除保存的模板会删除其镜像）。不要盲目执行 <code>docker volume prune</code>：卷里存着大家的 <code>/workspace</code>。</li>
+<li>备份：升级快照和 <code>prerestore</code> 备份包不会被自动删除；不再需要时手动删除旧的。必要时调低 <code>backup_keep</code>。</li>
+<li>日志：推理进程日志在 20 MB 时轮转，SlotServe 容器的 Docker 日志上限为 5 × 50 MB，开发环境容器也有同样的限制。</li>
+<li>请求记录在 <code>SLOTSERVE_USAGE_RETENTION_DAYS</code> 后汇总；审计日志保留 <code>SLOTSERVE_AUDIT_RETENTION_DAYS</code>。</li>
+</ul>
+<p><strong>预防。</strong> 模型和 Docker 数据目录放在系统盘以外的磁盘上；设置备份目标；为个人存储设置软上限；留意磁盘检查的警告（从下载最小剩余空间的两倍、至少 5 GB 开始警告）。</p>
+<h3 id="devenv-start">开发环境启动失败<a class="headerlink" href="#devenv-start" title="Permanent link">&para;</a></h3>
+<p><strong>症状。</strong> 环境卡片显示没有启动成功；本人已收到通知。</p>
+<p><strong>判断。</strong> 以管理员身份打开<strong>开发环境 → 所有人</strong>，查看该环境的错误和<strong>日志</strong>。已识别的错误会附带诊断（原因和下一步）；见<a href="../faq/#diagnosis">常见问题：诊断</a>。再按原因处理：</p>
+<table>
+<thead>
+<tr>
+<th>原因</th>
+<th>典型错误</th>
+<th>处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>拉取镜像</td>
+<td><code>pull access denied</code>、<code>manifest unknown</code>、<code>toomanyrequests</code></td>
+<td>检查镜像名和标签；Docker 主机能否访问镜像仓库（代理、镜像源）；私有镜像或 Docker Hub 限流时在主机上 <code>docker login</code>；或先手动拉取一次。</td>
+</tr>
+<tr>
+<td>端口冲突</td>
+<td><code>port is already allocated</code>、<code>address already in use</code></td>
+<td>宿主机上有别的程序占用了 SSH 或直连端口范围内的端口：调整端口范围（设置）或那个程序。</td>
+</tr>
+<tr>
+<td>挂载</td>
+<td><code>failed to mount local volume</code>、<code>mount error(13)</code>、<code>access denied by server</code></td>
+<td>存储：在管理 → 存储中<strong>检查</strong>；在 Docker 主机上安装 <code>nfs-common</code> / <code>cifs-utils</code>；NFS 导出必须允许该主机。存储目录：必须是 Docker 主机上的路径。</td>
+</tr>
+<tr>
+<td>CPU 绑定</td>
+<td><code>Requested CPUs are not available</code>、<code>cpuset</code></td>
+<td>CPU 核心数少于各通道预留的数量：调低<strong>每块 GPU 保留的 CPU 核心</strong>；CPU 变化后重启 SlotServe，让它重新读取宿主机信息。</td>
+</tr>
+<tr>
+<td>GPU</td>
+<td><code>could not select device driver "nvidia"</code></td>
+<td><a href="#gpu-gone">GPU 不见了</a></td>
+</tr>
+<tr>
+<td>通道没有 GPU</td>
+<td><code>devenv_lane_no_gpus</code></td>
+<td>在管理 → GPU 与通道中为通道指定 GPU。</td>
+</tr>
+<tr>
+<td>Docker</td>
+<td><code>Cannot connect to the Docker daemon</code></td>
+<td>Docker 在运行吗？套接字挂载了吗？见<a href="../dev-environments/#docker">开发环境：Docker</a>。</td>
+</tr>
+</tbody>
+</table>
+<p><strong>处理。</strong> 解决原因后，在该环境上点<strong>重试</strong>。</p>
+<p><strong>预防。</strong> 修改 Docker、驱动或模板后运行 <code>python -m tools.verify</code>（见<a href="#verify">验证</a>）；重要的模板尽量使用你能控制的镜像仓库。</p>
+<h3 id="gpu-gone">驱动或 Docker 升级后 GPU 不见了<a class="headerlink" href="#gpu-gone" title="Permanent link">&para;</a></h3>
+<p><strong>症状。</strong> 健康检查 <strong>gpu</strong> 提示「没有检测到 GPU」；模型加载报 CUDA 错误；开发环境报 <code>could not select device driver "nvidia"</code>。</p>
+<p><strong>判断。</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>nvidia-smi<span class="w">                                                  </span><span class="c1"># 宿主机上：驱动正常吗？</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>--gpus<span class="w"> </span>all<span class="w"> </span>ubuntu<span class="w"> </span>nvidia-smi<span class="w">                </span><span class="c1"># Docker 能给容器分配 GPU 吗？</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>nvidia-smi<span class="w">                    </span><span class="c1"># SlotServe 的容器能看到 GPU 吗？</span>
+</code></pre></div>
+<p><strong>处理。</strong></p>
+<ul>
+<li>宿主机上 <code>nvidia-smi</code> 失败：内核模块与新驱动不匹配；重启，或为当前内核重新安装驱动。</li>
+<li>
+<p>只有 Docker 失败：重新配置 NVIDIA Container Toolkit 并重启 Docker：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>sudo<span class="w"> </span>nvidia-ctk<span class="w"> </span>runtime<span class="w"> </span>configure<span class="w"> </span>--runtime<span class="o">=</span>docker
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>docker
+</code></pre></div>
+</li>
+<li>
+<p>模型报 "CUDA driver version is insufficient"：推理引擎需要更新的驱动，或按已安装的 CUDA 重新编译；使用 Docker 时 <code>CUDA_IMAGE</code> 的 CUDA 主版本必须与 <code>llama-server</code> 编译时一致。</p>
+</li>
+<li>然后执行 <code>docker compose up -d</code>（重启 Docker 会停止 SlotServe，除非 <code>restart: unless-stopped</code> 把它拉起来）。</li>
+</ul>
+<p><strong>预防。</strong> 固定驱动软件包版本（<code>apt-mark hold</code>），在维护窗口内升级驱动和 Docker，之后运行 <code>slotserve doctor</code> 和 <code>tools/verify</code>。</p>
+<h3 id="leak">怀疑账号或密钥泄露<a class="headerlink" href="#leak" title="Permanent link">&para;</a></h3>
+<p><strong>症状。</strong> 陌生的登录、没人认得的 API 用量、密钥或密码被贴到了别处。</p>
+<p><strong>判断。</strong></p>
+<ul>
+<li><strong>管理 → 审计日志</strong>：按人、按操作（登录和登录失败用 <code>auth.*</code>，API 密钥用 <code>key.*</code>）和日期筛选；日志记录了地址（要看到真实地址见<a href="#reverse-proxy">反向代理</a>）。把筛选结果导出为 CSV 留档。</li>
+<li><strong>管理 → 请求日志</strong>：按人、密钥和来源（API 密钥、环境密钥、Playground）查看请求；每个 API 密钥都会显示最近一次使用的地址。</li>
+</ul>
+<p><strong>处理。</strong></p>
+<ol>
+<li>账号被盗用时<strong>停用账号</strong>（管理 → 用户）：它会在所有地方退出登录，进行中的预约随之结束。</li>
+<li><strong>吊销 API 密钥</strong>（管理 → API 密钥，或本人在<strong>访问凭据</strong>中操作）。环境密钥随环境结束而失效。</li>
+<li><strong>在所有设备上退出登录</strong>：本人在<strong>设置 → 已登录的设备 → 退出其他所有设备</strong>；修改密码或管理员重置密码也有同样效果。</li>
+<li>删除本人不认识的 SSH 公钥（访问凭据），并设置新的环境密码。</li>
+<li>如果泄露的是管理员账号或服务器的 <code>.env</code>，还要<a href="#secret-key-lost">更换会话密钥</a>，并更换邀请码、聊天平台令牌和 <code>SLOTSERVE_METRICS_TOKEN</code>。</li>
+</ol>
+<p><strong>预防。</strong> 给密钥设置有效期，用邀请链接代替共享的邀请码，管理员尽量少，并定期看看审计日志。</p>
+<h2 id="verify">在真实硬件上验证<a class="headerlink" href="#verify" title="Permanent link">&para;</a></h2>
+<p><code>tools/verify</code> 通过公开的 API、以大家实际使用的方式，端到端地检查一个运行中的安装：一次 GPU 预约和一次 OpenAI 风格的请求，每个内置开发环境模板的 SSH（密钥和密码）及网页界面，一个无 GPU 环境，一个存储，容器加固和安全防护。它会创建一个临时账号并在结束时删除；它不修改任何设置（关闭的功能记为跳过）。请在安装之后、升级 SlotServe、驱动或 Docker 之后，以及每个发布候选版本上运行它。</p>
+<p>在能访问服务器的机器上，从 SlotServe 仓库的源码目录运行（Python 3.11+ 和 <code>httpx</code>、OpenSSH 客户端；密码登录还需要 <code>sshpass</code>）：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>python<span class="w"> </span>-m<span class="w"> </span>tools.verify<span class="w"> </span>--url<span class="w"> </span>http://gpu-server:8000<span class="w"> </span>--admin<span class="w"> </span>&lt;管理员账号&gt;<span class="w"> </span>--out<span class="w"> </span>reports/
+</code></pre></div>
+<p>管理员密码会提示输入（或使用 <code>SLOTSERVE_VERIFY_PASSWORD</code>）。常用选项：<code>--lane</code>、<code>--model</code>、<code>--templates pytorch,vscode</code>（只测一部分）、<code>--storage-id</code> 或 <code>--storage-host-path</code>、<code>--no-ssh</code>、<code>--no-web</code>、<code>--save-image</code>、<code>--destructive</code>（还会在无 GPU 环境里运行 fork 炸弹）、<code>--keep</code>（保留测试账号以便排查）、<code>--insecure</code>（自签名 TLS）。第一次拉取所有模板镜像需要一些时间。</p>
+<p>它会写出 <code>verify-report-&lt;主机&gt;-&lt;版本&gt;.md</code> 和 <code>.json</code>。结果分为 <strong>pass</strong>、<strong>fail</strong>、<strong>skip</strong>（功能关闭或缺少工具）、<strong>pending</strong> 和 <strong>manual</strong>：manual 是工具无法完成的浏览器检查（报告旁会生成一个 CSRF 验证页面，以及两个环境网页之间的隔离检查），报告中附有操作说明。退出码 0 表示没有失败，1 表示有检查失败，2 表示无法访问服务器或无法登录。把报告附在发版 PR 上（见发版检查清单）。</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 SlotServe contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

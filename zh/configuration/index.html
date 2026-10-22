@@ -1,0 +1,2349 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="预约 GPU 时段，通过 OpenAI 兼容网关使用模型。">
+      
+      
+      
+        <link rel="canonical" href="https://peleryuan.github.io/slotserve/zh/configuration/">
+      
+      
+        <link rel="prev" href="../getting-started/">
+      
+      
+        <link rel="next" href="../operations/">
+      
+      
+        
+          <link rel="alternate" href="../../configuration/" hreflang="en">
+        
+          <link rel="alternate" href="./" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>配置参考 - SlotServe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../" title="SlotServe" class="md-header__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SlotServe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              配置参考
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="选择当前语言">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../configuration/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PelerYuan/slotserve" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../" title="SlotServe" class="md-nav__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    SlotServe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PelerYuan/slotserve" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快速开始
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    配置参考
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    配置参考
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#compose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compose 变量
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Compose 变量">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#llama-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        llama-server
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#slotserve-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SlotServe 设置
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SlotServe 设置">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        注册与访问
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        预约与公平使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        通知与时间
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        开发环境
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型与下载
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型加载
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        推理后端
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        飞书 / Lark
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        钉钉
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        企业微信
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QQ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#webhook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        群机器人 Webhook
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        监控
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        清理与备份
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        部署参数（重启后生效）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        每个模型的启动参数
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backups-and-restore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        备份与恢复
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#初始化码与第一个管理员" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        初始化码与第一个管理员
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        来自其他页面的请求
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        管理员命令行
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    运维手册
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    使用指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    模型目录
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    通知与集成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gpus-and-engines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    多 GPU 与推理后端
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-environments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开发环境
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    存储
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    接口
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    调度原理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开发
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    常见问题
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#compose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compose 变量
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Compose 变量">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#llama-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        llama-server
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#slotserve-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SlotServe 设置
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SlotServe 设置">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        注册与访问
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        预约与公平使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        通知与时间
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        开发环境
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型与下载
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型加载
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        推理后端
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        飞书 / Lark
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        钉钉
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        企业微信
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QQ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#webhook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        群机器人 Webhook
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        监控
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        清理与备份
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        部署参数（重启后生效）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        每个模型的启动参数
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backups-and-restore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        备份与恢复
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#初始化码与第一个管理员" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        初始化码与第一个管理员
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        来自其他页面的请求
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        管理员命令行
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="_1">配置参考<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<p>SlotServe 读取 <code>SLOTSERVE_*</code> 环境变量，或工作目录下的 <code>.env</code> 文件。Docker Compose 会自动加载 <code>.env</code>。</p>
+<h2 id="compose">Compose 变量<a class="headerlink" href="#compose" title="Permanent link">&para;</a></h2>
+<p>这些变量只在 <code>docker-compose.yml</code> 中使用，描述的是<strong>宿主机</strong>。</p>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LLAMA_CPP_DIR</code></td>
+<td><em>必填</em></td>
+<td><code>llama-server</code> 所在目录，只读挂载到 <code>/opt/llama.cpp</code></td>
+</tr>
+<tr>
+<td><code>MODELS_DIR</code></td>
+<td><em>必填</em></td>
+<td><code>.gguf</code> 模型目录，挂载到 <code>/models</code></td>
+</tr>
+<tr>
+<td><code>DATA_DIR</code></td>
+<td><code>./data</code></td>
+<td>SQLite 数据库与日志，挂载到 <code>/data</code></td>
+</tr>
+<tr>
+<td><code>PORT</code></td>
+<td><code>8000</code></td>
+<td>对外端口</td>
+</tr>
+<tr>
+<td><code>CUDA_IMAGE</code></td>
+<td><code>nvidia/cuda:12.8.1-runtime-ubuntu24.04</code></td>
+<td>基础镜像；CUDA 主版本需与 llama.cpp 编译时一致</td>
+</tr>
+</tbody>
+</table>
+<h3 id="llama-server">llama-server<a class="headerlink" href="#llama-server" title="Permanent link">&para;</a></h3>
+<p>对于 llama.cpp 模型，SlotServe 运行 <code>SLOTSERVE_LLAMA_SERVER_CMD</code>；在 Docker 中它是 <code>/opt/llama.cpp/llama-server</code>，即 <code>LLAMA_CPP_DIR</code> 中的 <code>llama-server</code>。健康检查 <strong>engine</strong>（以及设置进度中的<strong>推理引擎</strong>）会显示是否找到了它。找不到时：<code>LLAMA_CPP_DIR</code> 必须是直接包含 <code>llama-server</code> 的目录（通常是 <code>llama.cpp/build/bin</code>），该文件必须可执行并且是为本机构建的，动态库构建还需要把 <code>lib*.so</code> 放在它旁边。不使用 Docker 时，把 <code>SLOTSERVE_LLAMA_SERVER_CMD</code> 设为完整路径。</p>
+<h2 id="slotserve-settings">SlotServe 设置<a class="headerlink" href="#slotserve-settings" title="Permanent link">&para;</a></h2>
+<!-- settings:start (generated by tools/gen_settings_doc.py from the settings registry; do not edit) -->
+
+<p>除部署参数外，所有设置都可由管理员在<strong>管理 → 系统设置</strong>中直接修改，无需重启：修改保存在数据库中，优先于 <code>.env</code>；点<strong>恢复默认</strong>即可取消覆盖。每次修改都会以修改前后的值记入审计日志（密钥只记录指纹），并且可以撤销。<em>层级</em>表示设置出现的位置：<em>常用</em>在策略卡片上，<em>进阶</em>在完整列表中，<em>专家</em>默认折叠。标有 ⚠️ 的设置可以在宿主机上以 root 身份执行命令（推理后端命令、挂载目录、转发镜像）：修改会记为敏感修改并通知所有管理员（之后的版本还会要求再次输入密码）。部署参数在启动时读取：请在 <code>.env</code> 中修改并重启。</p>
+<h3 id="_2">注册与访问<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>默认值</th>
+<th>层级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_REGISTRATION_OPEN</code></td>
+<td><code>true</code></td>
+<td>常用</td>
+<td>是否允许凭邀请码注册</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_INVITE_CODE</code></td>
+<td><code>change-me</code></td>
+<td>常用</td>
+<td>注册所需邀请码；为 <code>change-me</code>（或为空）时只有第一个管理员能注册（使用<a href="#初始化码与第一个管理员">初始化码</a>）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_APPROVAL_MODE</code></td>
+<td><code>off</code></td>
+<td>常用</td>
+<td><code>off</code>、<code>long</code> 或 <code>all</code>：哪些预约需要管理员审批</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_APPROVAL_HOURS</code></td>
+<td><code>4</code></td>
+<td>进阶</td>
+<td><code>long</code> 模式下，超过这个时长的预约需要审批</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_API_KEY_REVEAL</code></td>
+<td><code>false</code></td>
+<td>进阶</td>
+<td>为新建的 API 密钥保存加密副本，所有者之后可以再次查看</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_3">预约与公平使用<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>默认值</th>
+<th>层级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_QUOTA_WEEKLY_HOURS</code></td>
+<td><code>0</code></td>
+<td>常用</td>
+<td>每人每周可预约小时数（0 不限，管理员不受限；管理员可为个人临时增加额度）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_MAX_RESERVATION_HOURS</code></td>
+<td><code>8</code></td>
+<td>常用</td>
+<td>单次预约最长时长</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_MAX_ADVANCE_DAYS</code></td>
+<td><code>30</code></td>
+<td>常用</td>
+<td>最多可提前几天预约</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_QUOTA_UPCOMING</code></td>
+<td><code>0</code></td>
+<td>进阶</td>
+<td>每人可持有的未结束预约数（0 不限）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_SLOT_MINUTES</code></td>
+<td><code>30</code></td>
+<td>进阶</td>
+<td>日历时间粒度</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_REMINDER_MINUTES</code></td>
+<td><code>10</code></td>
+<td>进阶</td>
+<td>开始和结束提醒的提前量（分钟）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_4">通知与时间<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>默认值</th>
+<th>层级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_TIMEZONE</code></td>
+<td><code>UTC</code></td>
+<td>常用</td>
+<td>IANA 时区，用于通知和每周配额</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_PUBLIC_URL</code></td>
+<td><em>空</em></td>
+<td>常用</td>
+<td>大家访问 SlotServe 的地址，用于链接及识别 SlotServe 自己的页面</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_CHAT_DEFAULT_LOCALE</code></td>
+<td><code>en</code></td>
+<td>进阶</td>
+<td><code>en</code> 或 <code>zh-CN</code>：群机器人 Webhook、群聊和尚未绑定的聊天使用的语言</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_TELEGRAM_BOT_TOKEN</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>Telegram 机器人 Token，留空则不启用</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_TELEGRAM_PROXY</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>连接 Telegram 的 <code>http://</code> 或 <code>socks5://</code> 代理</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_5">开发环境<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>默认值</th>
+<th>层级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_DEVENV_ENABLED</code></td>
+<td><code>false</code></td>
+<td>常用</td>
+<td>开发环境：把 GPU 时段预约成带 SSH 的 Docker 容器</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_CPU_ENABLED</code></td>
+<td><code>true</code></td>
+<td>进阶</td>
+<td>允许以无 GPU 模式启动开发环境（无需预约）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_CPU_PER_USER</code></td>
+<td><code>2</code></td>
+<td>常用</td>
+<td>每人同时可运行的无 GPU 环境数</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_CPU_CORES</code></td>
+<td><code>4</code></td>
+<td>常用</td>
+<td>单个无 GPU 环境可用的 CPU 核心数（0 表示整个共享池）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_CPU_MEMORY_GB</code></td>
+<td><code>16</code></td>
+<td>常用</td>
+<td>单个无 GPU 环境可用的内存（0 表示主机内存减去 max(4 GB, 10%)）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_CPU_MEMORY_POOL_GB</code></td>
+<td><code>0</code></td>
+<td>专家</td>
+<td>所有无 GPU 环境合计可占用的内存（0 表示不限）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_CPU_CORES_PER_GPU</code></td>
+<td><code>8</code></td>
+<td>专家</td>
+<td>每个通道按每块 GPU 为其预约保留的 CPU 核心数（cpuset）；0 表示不保留</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_SSH_HOST</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>ssh 命令中显示的主机名；留空则使用浏览器访问的地址</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_SSH_PORTS</code></td>
+<td><code>2200-2299</code></td>
+<td>进阶</td>
+<td>分配给开发环境的宿主机端口</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PASSWORD_LOGIN</code></td>
+<td><code>true</code></td>
+<td>进阶</td>
+<td>除公钥外也允许用环境密码 SSH 登录</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_CPUS</code></td>
+<td><code>0</code></td>
+<td>进阶</td>
+<td>单个 GPU 环境的 CPU 上限（0 表示不限）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_MEMORY_GB</code></td>
+<td><code>0</code></td>
+<td>进阶</td>
+<td>单个 GPU 环境的内存上限（0 表示主机内存减去 max(4 GB, 10%)）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PIDS_LIMIT</code></td>
+<td><code>4096</code></td>
+<td>专家</td>
+<td>单个开发环境可同时运行的进程数（fork 炸弹只影响它自己的容器）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_SHM_GB</code></td>
+<td><code>8</code></td>
+<td>进阶</td>
+<td>单个环境的共享内存（<code>/dev/shm</code>）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_CUSTOM_IMAGES</code></td>
+<td><code>true</code></td>
+<td>进阶</td>
+<td>允许用户用任意镜像新建模板</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_ALLOWED_REGISTRIES</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>允许的镜像仓库，逗号分隔；留空表示不限</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_SAVED_IMAGES</code></td>
+<td><code>3</code></td>
+<td>进阶</td>
+<td>每人可保存的环境镜像数</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PULL_MINUTES</code></td>
+<td><code>60</code></td>
+<td>专家</td>
+<td>预约开始前多久下载镜像</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PROJECTS</code></td>
+<td><code>3</code></td>
+<td>进阶</td>
+<td>每人可保留（暂停）的环境数；0 表示不允许</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PROJECT_DAYS</code></td>
+<td><code>0</code></td>
+<td>进阶</td>
+<td>自动删除闲置这么多天的保留环境（0 表示从不）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PUBLIC_PORTS_ENABLED</code></td>
+<td><code>true</code></td>
+<td>进阶</td>
+<td>允许用户把容器端口直接发布到宿主机端口（无需登录 SlotServe）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PUBLIC_PORTS</code></td>
+<td><code>2300-2399</code></td>
+<td>进阶</td>
+<td>直连端口使用的宿主机端口（与 SSH 端口分开）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PUBLIC_PORT_LIMIT</code></td>
+<td><code>5</code></td>
+<td>进阶</td>
+<td>每人直连端口数；管理员不受限制；0 表示只有管理员</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_WEB_URL</code></td>
+<td><em>空</em></td>
+<td>专家</td>
+<td>浏览器访问开发环境网页端口的地址，例如经过反向代理时；留空则为同一主机的 <code>DEVENV_WEB_PORT</code></td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_WEB_COMPAT</code></td>
+<td><code>false</code></td>
+<td>专家</td>
+<td>兼容模式：用于在共享网页源的环境隔离规则下无法正常工作的网页应用（会削弱环境之间的隔离）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PLATFORM_CONTEXT</code></td>
+<td><code>true</code></td>
+<td>进阶</td>
+<td>新环境内提供 <code>SLOTSERVE_*</code> 变量、登录提示（剩余时间、<code>/workspace</code>、如何调用模型）以及指向容器侧网关的 <code>OPENAI_BASE_URL</code></td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_LLM_KEY</code></td>
+<td><code>true</code></td>
+<td>专家</td>
+<td>为每个个人环境发放专属 LLM 密钥（<code>llm</code> 权限，环境停止即吊销；以 0600 文件提供，登录 shell 中导出为 <code>OPENAI_API_KEY</code>，从不放进容器环境变量；共享环境不发放）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_FORWARDER_IMAGE</code></td>
+<td><code>alpine/socat:1.8.1.1</code></td>
+<td>专家</td>
+<td>⚠️ <strong>以 root 身份在宿主机上执行。</strong> 每个端口的转发容器所用镜像（PATH 中需要有 <code>socat</code>）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_STORAGE_DIR</code></td>
+<td><em>空</em></td>
+<td>专家</td>
+<td>⚠️ <strong>以 root 身份在宿主机上执行。</strong> Docker 主机上存放持久数据的目录（绑定挂载）；留空则使用 Docker 命名卷。系统目录（<code>/etc</code>、<code>/root</code>、<code>/var/lib/docker</code>、<code>/proc</code>、<code>/sys</code>、<code>/boot</code>、<code>/usr</code>、<code>/bin</code>、<code>/lib*</code>、<code>/var/run</code> 等）会被拒绝</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_6">模型与下载<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>默认值</th>
+<th>层级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_DEFAULT_LLAMA_ARGS</code></td>
+<td><code>-ngl 99 -c 8192</code></td>
+<td>常用</td>
+<td>新登记模型的默认启动参数</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_HF_ENDPOINT</code></td>
+<td><code>https://huggingface.co</code></td>
+<td>常用</td>
+<td>Hugging Face 地址或镜像</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_HF_TOKEN</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>受限或私有仓库所需的 Token</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DOWNLOAD_MIN_FREE_GB</code></td>
+<td><code>2</code></td>
+<td>进阶</td>
+<td>下载完成后磁盘至少保留的空间</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_PLAYGROUND_ENABLED</code></td>
+<td><code>true</code></td>
+<td>进阶</td>
+<td>网页上与模型对话的试用页（使用浏览器会话，不使用密钥）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_PLAYGROUND_RATE_PER_MINUTE</code></td>
+<td><code>20</code></td>
+<td>进阶</td>
+<td>每人每分钟的试用请求数；0 表示不限</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_PLAYGROUND_DEFAULT_MODEL_ONLY</code></td>
+<td><code>false</code></td>
+<td>进阶</td>
+<td>试用页只使用默认模型，不使用其他已加载的模型</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_7">模型加载<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>默认值</th>
+<th>层级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_PRELOAD_MIN_MINUTES</code></td>
+<td><code>3</code></td>
+<td>进阶</td>
+<td>预约的模型至少提前多少分钟开始加载</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_LOAD_TIMEOUT_SECONDS</code></td>
+<td><code>1800</code></td>
+<td>进阶</td>
+<td>超过此时间仍未就绪则判定加载失败</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DRAIN_SECONDS</code></td>
+<td><code>30</code></td>
+<td>进阶</td>
+<td>切换模型前等待进行中请求完成的最长时间</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_PRELOAD_BUFFER_SECONDS</code></td>
+<td><code>60</code></td>
+<td>专家</td>
+<td>预加载时额外预留的时间</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_STOP_TIMEOUT_SECONDS</code></td>
+<td><code>20</code></td>
+<td>专家</td>
+<td>强制结束推理进程前的等待时间</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DISK_READ_MBPS</code></td>
+<td><code>150</code></td>
+<td>专家</td>
+<td>模型首次加载前用于估算加载时间</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_SCHEDULER_INTERVAL_SECONDS</code></td>
+<td><code>5</code></td>
+<td>专家</td>
+<td>调度器重新评估的间隔</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_8">推理后端<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>默认值</th>
+<th>层级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_VLLM_CMD</code></td>
+<td><code>vllm serve</code></td>
+<td>专家</td>
+<td>⚠️ <strong>以 root 身份在宿主机上执行。</strong> vLLM 后端的启动命令</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_SGLANG_CMD</code></td>
+<td><code>python -m sglang.launch_server</code></td>
+<td>专家</td>
+<td>⚠️ <strong>以 root 身份在宿主机上执行。</strong> SGLang 后端的启动命令</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_CUSTOM_ENGINE_CMD</code></td>
+<td><em>空</em></td>
+<td>专家</td>
+<td>⚠️ <strong>以 root 身份在宿主机上执行。</strong> 自定义后端命令模板：<code>{model}</code> <code>{host}</code> <code>{port}</code> <code>{name}</code></td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_CUSTOM_ENGINE_HEALTH</code></td>
+<td><code>/health</code></td>
+<td>专家</td>
+<td>轮询判断自定义后端就绪的路径</td>
+</tr>
+</tbody>
+</table>
+<h3 id="lark">飞书 / Lark<a class="headerlink" href="#lark" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>默认值</th>
+<th>层级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_FEISHU_ENABLED</code></td>
+<td><code>false</code></td>
+<td>进阶</td>
+<td>飞书 / Lark 机器人（<a href="../integrations/#feishu-lark">配置方法</a>）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_FEISHU_APP_ID</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>飞书应用的 App ID</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_FEISHU_APP_SECRET</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>飞书应用的 App Secret</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_FEISHU_DOMAIN</code></td>
+<td><code>https://open.feishu.cn</code></td>
+<td>专家</td>
+<td>开放平台地址；Lark 使用 <code>https://open.larksuite.com</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="_9">钉钉<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>默认值</th>
+<th>层级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_DINGTALK_ENABLED</code></td>
+<td><code>false</code></td>
+<td>进阶</td>
+<td>钉钉 Stream 模式机器人</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DINGTALK_CLIENT_ID</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>钉钉应用的 Client ID（AppKey）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DINGTALK_CLIENT_SECRET</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>钉钉应用的 Client Secret（AppSecret）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DINGTALK_ROBOT_CODE</code></td>
+<td><em>空</em></td>
+<td>专家</td>
+<td>RobotCode；留空即 Client ID</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_10">企业微信<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>默认值</th>
+<th>层级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_WECOM_ENABLED</code></td>
+<td><code>false</code></td>
+<td>进阶</td>
+<td>企业微信自建应用</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_WECOM_CORP_ID</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>企业 ID（CorpID）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_WECOM_AGENT_ID</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>应用的 AgentId</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_WECOM_SECRET</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>应用的 Secret</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_WECOM_TOKEN</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>回调 Token；只在接收命令时需要</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_WECOM_AES_KEY</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>回调 EncodingAESKey（43 位）；只在接收命令时需要</td>
+</tr>
+</tbody>
+</table>
+<h3 id="qq">QQ<a class="headerlink" href="#qq" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>默认值</th>
+<th>层级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_QQ_ENABLED</code></td>
+<td><code>false</code></td>
+<td>进阶</td>
+<td>QQ 官方机器人</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_QQ_APP_ID</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>QQ 机器人的 AppID</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_QQ_APP_SECRET</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>QQ 机器人的 AppSecret</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_QQ_SANDBOX</code></td>
+<td><code>false</code></td>
+<td>专家</td>
+<td>使用 QQ 沙箱环境</td>
+</tr>
+</tbody>
+</table>
+<h3 id="webhook">群机器人 Webhook<a class="headerlink" href="#webhook" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>默认值</th>
+<th>层级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_GROUP_EVENTS</code></td>
+<td><code>admin_alerts,announcements</code></td>
+<td>进阶</td>
+<td>发到群里的内容：<code>admin_alerts</code>、<code>approvals</code>、<code>announcements</code></td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_FEISHU_WEBHOOK_URL</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>飞书 / Lark 群机器人 Webhook</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_FEISHU_WEBHOOK_SECRET</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>飞书 / Lark 群机器人的签名密钥</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DINGTALK_WEBHOOK_URL</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>钉钉群机器人 Webhook</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DINGTALK_WEBHOOK_SECRET</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>钉钉群机器人的加签密钥</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_WECOM_WEBHOOK_URL</code></td>
+<td><em>空</em></td>
+<td>进阶</td>
+<td>企业微信群机器人 Webhook</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_11">监控<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>默认值</th>
+<th>层级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_METRICS_TOKEN</code></td>
+<td><em>空</em></td>
+<td>专家</td>
+<td><code>/metrics</code> 的 Bearer Token，留空则关闭</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_USAGE_BUSY_PERCENT</code></td>
+<td><code>10</code></td>
+<td>专家</td>
+<td>某一分钟内 GPU 利用率不低于此值时计为“使用中”（对新采样生效）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_12">清理与备份<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>默认值</th>
+<th>层级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_USAGE_RETENTION_DAYS</code></td>
+<td><code>365</code></td>
+<td>进阶</td>
+<td>逐条请求记录保留天数，之后合并为按天汇总（0 表示永久；否则至少 90）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_USAGE_SAMPLE_DAYS</code></td>
+<td><code>30</code></td>
+<td>专家</td>
+<td>按分钟的 GPU 使用采样保留天数，之后合并为按小时汇总（0 表示不合并）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_AUDIT_RETENTION_DAYS</code></td>
+<td><code>730</code></td>
+<td>进阶</td>
+<td>审计日志保留天数（0 表示永久）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_BACKUP_KEEP</code></td>
+<td><code>7</code></td>
+<td>进阶</td>
+<td>保留的每日备份包份数（0 表示关闭自动备份）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_BACKUP_TARGET</code></td>
+<td><em>空</em></td>
+<td>常用</td>
+<td>每个备份包另外复制到哪里：绝对路径或 <code>storage:&lt;id&gt;</code>（留空表示不复制到本机以外）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_BACKUP_HOUR</code></td>
+<td><code>3</code></td>
+<td>进阶</td>
+<td>每日备份的本地时间（小时；-1 表示从启动起每 24 小时一次）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_13">部署参数（重启后生效）<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>默认值</th>
+<th>层级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_DEVENV_GATEWAY_PORT</code></td>
+<td><code>8002</code></td>
+<td>专家</td>
+<td>容器侧网关的端口：只提供 <code>/v1</code> 接口，供开发环境使用（<code>http://slotserve-gw:&lt;端口&gt;/v1</code>）；0 表示关闭</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_GATEWAY_HOST</code></td>
+<td><em>空</em></td>
+<td>专家</td>
+<td>容器侧网关监听的地址；留空时，SlotServe 直接运行在主机上则为 Docker 网桥地址（<code>docker0</code>），运行在容器中则为所有地址</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_SECRET_KEY</code></td>
+<td><em>自动生成</em></td>
+<td>专家</td>
+<td>会话 Cookie 签名与已存密钥加密所用的密钥。未设置、为空或为 <code>change-me</code> 时，SlotServe 首次启动会生成随机密钥并保存在 <code>DATA_DIR/secret_key</code>（仅属主可读）。显式设置的值始终优先</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_HOST</code></td>
+<td><code>0.0.0.0</code></td>
+<td>专家</td>
+<td>监听地址</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_PORT</code></td>
+<td><code>8000</code></td>
+<td>专家</td>
+<td>监听端口</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_COOKIE_SECURE</code></td>
+<td><code>false</code></td>
+<td>专家</td>
+<td>Cookie 加 <code>Secure</code> 标记；在 HTTPS 后面时设为 <code>true</code></td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_FORWARDED_ALLOW_IPS</code></td>
+<td><code>127.0.0.1</code></td>
+<td>专家</td>
+<td>信任其 <code>X-Forwarded-For</code> 的反向代理地址（逗号分隔，<code>*</code> 表示任意），以便登录限速和日志看到真实客户端地址</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DATA_DIR</code></td>
+<td><code>data</code></td>
+<td>专家</td>
+<td>数据库与日志目录</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_MODELS_DIR</code></td>
+<td><code>models</code></td>
+<td>专家</td>
+<td>模型目录（扫描及下载目标）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_STATIC_DIR</code></td>
+<td><em>内置</em></td>
+<td>专家</td>
+<td>前端构建产物目录</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_LLAMA_SERVER_CMD</code></td>
+<td><code>llama-server</code></td>
+<td>专家</td>
+<td>⚠️ <strong>以 root 身份在宿主机上执行。</strong> 启动 llama-server 的命令，可带前缀，如 <code>taskset -c 0-15 llama-server</code></td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_LLAMA_HOST</code></td>
+<td><code>127.0.0.1</code></td>
+<td>专家</td>
+<td>推理进程监听地址（请保持本地）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_LLAMA_PORT</code></td>
+<td><code>8081</code></td>
+<td>专家</td>
+<td>第一个通道推理进程的端口；第 <em>N</em> 个通道为此值 + <em>N</em> - 1</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DOCKER_HOST</code></td>
+<td><code>unix:///var/run/docker.sock</code></td>
+<td>专家</td>
+<td>⚠️ <strong>以 root 身份在宿主机上执行。</strong> 开发环境使用的 Docker（或 Podman）接口</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DROPBEAR_PATH</code></td>
+<td><code>/opt/slotserve/bin/dropbearmulti</code></td>
+<td>专家</td>
+<td>复制进每个开发环境的静态 Dropbear（<code>dropbearmulti</code>）；镜像中已自带</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_WEB_PORT</code></td>
+<td><code>8001</code></td>
+<td>专家</td>
+<td>开发环境网页界面的端口，作为独立的源（0 表示在 <code>PORT</code> 上提供，不推荐）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_STORAGE_HELPER_IMAGE</code></td>
+<td><code>busybox:1.37</code></td>
+<td>专家</td>
+<td>检查存储并在其中创建目录的临时辅助容器所用的镜像（从不使用个人的镜像；缺少时自动拉取）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_STORAGE_CHECK_MINUTES</code></td>
+<td><code>30</code></td>
+<td>专家</td>
+<td>多久检查一次存储（可用空间、每人用量）；0 表示只在手动检查时</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_TELEGRAM_API_BASE</code></td>
+<td><code>https://api.telegram.org</code></td>
+<td>专家</td>
+<td>Telegram Bot API 地址，用于自建的 Bot API 服务</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DINGTALK_API_BASE</code></td>
+<td><code>https://api.dingtalk.com</code></td>
+<td>专家</td>
+<td>钉钉 API 地址（仅用于代理或测试）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_WECOM_API_BASE</code></td>
+<td><code>https://qyapi.weixin.qq.com</code></td>
+<td>专家</td>
+<td>企业微信 API 地址（仅用于代理或测试）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_QQ_API_BASE</code></td>
+<td><code>https://api.sgroup.qq.com</code></td>
+<td>专家</td>
+<td>QQ 机器人 API 地址（仅用于代理或测试）</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_QQ_TOKEN_URL</code></td>
+<td><code>https://bots.qq.com/app/getAppAccessToken</code></td>
+<td>专家</td>
+<td>QQ 机器人 Token 地址（仅用于代理或测试）</td>
+</tr>
+</tbody>
+</table>
+<!-- settings:end -->
+
+<h2 id="_14">每个模型的启动参数<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>
+<p>每个模型有一行自由填写的参数，会追加到命令末尾。llama.cpp 模型的命令为：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>&lt;SLOTSERVE_LLAMA_SERVER_CMD&gt; -m &lt;文件&gt; --host 127.0.0.1 --port 8081 --alias &lt;名称&gt; &lt;你的参数&gt;
+</code></pre></div>
+<p>vLLM、SGLang 和自定义后端以同样方式拼接命令，见<a href="../gpus-and-engines/#engines">多 GPU 与推理后端</a>。</p>
+<p><code>-m</code>、<code>--host</code>、<code>--port</code>、<code>--alias</code> 始终由 SlotServe 设置，你参数里的同名项会被忽略。常用参数：</p>
+<table>
+<thead>
+<tr>
+<th>目的</th>
+<th>参数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>全部层放到 GPU</td>
+<td><code>-ngl 99</code></td>
+</tr>
+<tr>
+<td>上下文长度</td>
+<td><code>-c 16384</code></td>
+</tr>
+<tr>
+<td>并发请求</td>
+<td><code>-np 4</code>（上下文在各 slot 间平分）</td>
+</tr>
+<tr>
+<td>Flash Attention</td>
+<td><code>--flash-attn on</code></td>
+</tr>
+<tr>
+<td>视觉模型</td>
+<td><code>--mmproj /models/mmproj-model-f16.gguf</code></td>
+</tr>
+<tr>
+<td>向量模型</td>
+<td><code>--embedding --pooling mean</code></td>
+</tr>
+<tr>
+<td>KV 缓存量化</td>
+<td><code>-ctk q8_0 -ctv q8_0</code></td>
+</tr>
+</tbody>
+</table>
+<p>完整列表见 <code>llama-server --help</code>。修改了当前已加载模型的参数后，在总览页点击<strong>重新加载模型</strong>即可生效。</p>
+<h2 id="backups-and-restore">备份与恢复<a class="headerlink" href="#backups-and-restore" title="Permanent link">&para;</a></h2>
+<p>SlotServe 每天在 <code>SLOTSERVE_BACKUP_HOUR</code> 向 <code>data/backups/</code> 写出一个备份包（数据库、自动生成的会话密钥、SSH 主机密钥、清单），保留最新的 <code>SLOTSERVE_BACKUP_KEEP</code> 份；设置了 <code>SLOTSERVE_BACKUP_TARGET</code>（挂载的路径或 <code>storage:&lt;id&gt;</code>）时，每个备份包还会复制到那里。<strong>管理 → 概览 → 备份</strong>中可以查看和立即备份。每次数据库升级前也会做一份快照，这类快照不会被自动删除。<code>slotserve restore &lt;备份包&gt;</code> 可以把备份放回去（需先停止服务），下次启动时会显示核对报告。</p>
+<p>workspace、保留环境的数据、保存的镜像和模型不在备份内。详细说明、异地副本和恢复步骤见<a href="../operations/#backups">备份</a>和<a href="../operations/#restore">从备份恢复</a>。</p>
+<h2 id="初始化码与第一个管理员">初始化码与第一个管理员<a class="headerlink" href="#初始化码与第一个管理员" title="Permanent link">&para;</a></h2>
+<p>还没有管理员账号时，SlotServe 每次启动都会在日志中打印一个一次性的<strong>初始化码</strong>：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>slotserve<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-A4<span class="w"> </span><span class="s2">"No admin account"</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>setup-code<span class="w">     </span><span class="c1"># 或直接查询</span>
+</code></pre></div>
+<p>打开 SlotServe，注册表单会要求填写初始化码（而不是邀请码），注册的账号即成为管理员。一旦存在管理员，初始化码立即失效；已经有管理员的安装不会要求填写。其他人用邀请码注册（或由管理员在<strong>管理 → 用户</strong>中创建）。</p>
+<h2 id="_15">来自其他页面的请求<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h2>
+<p>SlotServe 拒绝不是由自己页面发出的修改类请求（POST、PUT、PATCH、DELETE）：<code>Origin</code> 必须是 SlotServe 自己的地址（浏览器访问用的主机，或 <code>SLOTSERVE_PUBLIC_URL</code>），<code>Origin: null</code> 一律拒绝；带会话 Cookie 但没有 <code>Origin</code> 的请求必须带 <code>X-SlotServe: 1</code> 请求头（网页界面会自动带上）。这样开发环境端口上的页面或其他网站无法冒用已登录用户的身份。API 客户端不受影响：使用 API 密钥的 <code>/v1</code>、<code>/metrics</code>、聊天平台回调，以及不带会话 Cookie 的脚本。</p>
+<p>在反向代理之后，请转发原始主机名（nginx：<code>proxy_set_header Host $host;</code>）或设置 <code>SLOTSERVE_PUBLIC_URL</code>，否则在网页上的修改会被拒绝（提示“不是从 SlotServe 页面发出的”）。</p>
+<h2 id="_16">管理员命令行<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h2>
+<p>日常的账号管理在<strong>管理 → 用户</strong>中完成。命令行用于没有管理员能登录的情况：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>setup-code<span class="w">               </span><span class="c1"># 创建第一个管理员所需的初始化码</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>reset-password<span class="w"> </span>&lt;用户名&gt;
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>set-admin<span class="w"> </span>&lt;用户名&gt;
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>set-admin<span class="w"> </span>&lt;用户名&gt;<span class="w"> </span>--revoke
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>doctor<span class="w">                   </span><span class="c1"># 运行健康检查（有错误时退出码为 1）</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>--no-deps<span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>restore<span class="w"> </span>&lt;备份包&gt;<span class="w">   </span><span class="c1"># 需先停止服务</span>
+</code></pre></div>
+<p>什么时候用哪个命令，见<a href="../operations/">运维手册</a>。</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 SlotServe contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

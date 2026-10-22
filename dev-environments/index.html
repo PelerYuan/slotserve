@@ -1,0 +1,1646 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Book GPU time slots and serve models behind an OpenAI-compatible gateway.">
+      
+      
+      
+        <link rel="canonical" href="https://peleryuan.github.io/slotserve/dev-environments/">
+      
+      
+        <link rel="prev" href="../gpus-and-engines/">
+      
+      
+        <link rel="next" href="../storage/">
+      
+      
+        
+          <link rel="alternate" href="./" hreflang="en">
+        
+          <link rel="alternate" href="../zh/dev-environments/" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Dev environments - SlotServe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#dev-environments" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="SlotServe" class="md-header__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SlotServe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Dev environments
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="../zh/dev-environments/" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PelerYuan/slotserve" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="SlotServe" class="md-nav__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    SlotServe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PelerYuan/slotserve" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notifications & integrations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gpus-and-engines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GPUs, lanes & engines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev environments
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#first-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your first environment: VS Code in the browser
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Your first environment: VS Code in the browser">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#with-a-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        With a GPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ssh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From a terminal or local VS Code: SSH
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setting-it-up-admin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setting it up (admin)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setting it up (admin)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker access
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Templates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#web-interfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Web interfaces
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Web interfaces">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#their-own-origin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Their own origin
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#saving-an-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saving an environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inside-the-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inside the environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logging-in-ssh-keys-and-the-environment-password" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging in: SSH keys and the environment password
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limits-and-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limits and hardening
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kept-environments-projects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kept environments (projects)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#without-a-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Without a GPU
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Without a GPU">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sharing-the-cpu-fairly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sharing the CPU fairly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cpu-what-admins-see" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What admins see
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#idle-lanes-a-shared-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Idle lanes: a shared environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-admins-see" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What admins see
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How scheduling works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#first-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your first environment: VS Code in the browser
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Your first environment: VS Code in the browser">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#with-a-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        With a GPU
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ssh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From a terminal or local VS Code: SSH
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setting-it-up-admin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setting it up (admin)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Setting it up (admin)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker access
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Templates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#web-interfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Web interfaces
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Web interfaces">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#their-own-origin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Their own origin
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#saving-an-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saving an environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inside-the-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inside the environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logging-in-ssh-keys-and-the-environment-password" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging in: SSH keys and the environment password
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limits-and-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limits and hardening
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kept-environments-projects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kept environments (projects)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#without-a-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Without a GPU
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Without a GPU">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sharing-the-cpu-fairly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sharing the CPU fairly
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cpu-what-admins-see" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What admins see
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#idle-lanes-a-shared-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Idle lanes: a shared environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-admins-see" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What admins see
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="dev-environments">Dev environments<a class="headerlink" href="#dev-environments" title="Permanent link">&para;</a></h1>
+<p>A <strong>dev environment</strong> is a Docker container of your own on the server: VS Code, JupyterLab or a desktop in the browser, or a terminal over SSH. Your files in <code>/workspace</code> are kept between environments. Start one <strong>without a GPU</strong> at any time to write code and set things up, and <strong>book a GPU</strong> when you need it; you can keep the whole environment too. Lanes can also run a <strong>shared environment</strong> everyone who joined can log into while nobody has them booked.</p>
+<pre class="mermaid"><code>sequenceDiagram
+    participant U as You
+    participant S as SlotServe
+    participant D as Docker
+    U-&gt;&gt;S: Open: VS Code (browser), no GPU
+    S-&gt;&gt;D: pull the image if needed, create a network and the container (/workspace, /models read-only)
+    S--&gt;&gt;U: the card shows Open when it is ready (about a minute)
+    U-&gt;&gt;S: Open
+    S--&gt;&gt;U: one-time link to the web port (:8001), VS Code opens in a new tab
+    Note over U,D: later: with a GPU for a booked time
+    S-&gt;&gt;S: at the start: stop the lane's model server
+    S-&gt;&gt;D: the container gets the lane's GPUs (and SSH, when you added a key)
+    Note over S,D: when the booking ends
+    S-&gt;&gt;D: remove the container (/workspace stays; a kept environment is only paused)
+    S-&gt;&gt;S: load the lane's default model again</code></pre>
+<h2 id="first-environment">Your first environment: VS Code in the browser<a class="headerlink" href="#first-environment" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Open <strong>Dev environments</strong>. Under <strong>Open an environment</strong>:<ul>
+<li><strong>Choose a tool</strong>: <strong>VS Code (browser)</strong> (or JupyterLab, the Ubuntu desktop, a terminal, one of your kept environments or another template);</li>
+<li><strong>Do you need a GPU?</strong> <strong>Not now</strong> - recommended for setting up and writing code; you can move to a GPU any time;</li>
+<li>press <strong>Open</strong>.</li>
+</ul>
+</li>
+<li>The new environment's card shows its progress (the image is downloaded the first time). After about a minute it has an <strong>Open VS Code</strong> button: VS Code opens in a new browser tab, on <code>/workspace</code>.</li>
+<li>Work. Your files belong in <code>/workspace</code>, which is kept after the environment ends and is the same in every environment of yours. Everything else in the container (packages installed with <code>apt</code> or <code>pip</code> outside <code>/workspace</code>) is removed when it ends, unless you keep the environment or save it as an image (see <a href="#kept-environments-projects">Kept environments</a> and <a href="#saving-an-environment">Saving an environment</a>).</li>
+<li>A terminal is inside VS Code (<strong>Terminal → New Terminal</strong>). You are <code>root</code> in the container, so <code>apt install</code> works without <code>sudo</code>. The shared models are at <code>/models</code> (read-only), and <code>OPENAI_BASE_URL</code> / <code>OPENAI_API_KEY</code> let code call SlotServe's models right away (see <a href="#inside-the-environment">Inside the environment</a>).</li>
+<li>When you are done, <strong>Stop</strong> it on its card. An environment without a GPU runs until you stop or pause it; there is no time limit.</li>
+</ol>
+<p>No SSH key, no password and no booking are needed for the browser tools: you are signed in to SlotServe, and SlotServe signs you in to the app. Opening it goes through a one-time link to SlotServe's <strong>web interface port</strong> (8001), which keeps environments' pages apart from SlotServe itself (see <a href="#their-own-origin">Their own origin</a>).</p>
+<h3 id="with-a-gpu">With a GPU<a class="headerlink" href="#with-a-gpu" title="Permanent link">&para;</a></h3>
+<p>Choose <strong>Yes, with a GPU</strong> instead of <strong>Not now</strong>, and pick a time: SlotServe books a free GPU for you (the same short booking dialog as on the Overview; <strong>Book with a GPU</strong> opens it directly). Or choose <strong>Dev environment</strong> in any booking dialog. The image is downloaded ahead of time; at the start of the booking the container starts with the lane's GPUs, and the card shows the time left, <strong>+1 h</strong> (it says why when the next hour is taken), live GPU use and <strong>End</strong>. When the booking ends the container is removed (<code>/workspace</code> stays) unless it is a kept environment; the reminder 10 minutes before the end has buttons to extend.</p>
+<p>A kept environment you used without a GPU can be booked with a GPU and continues where you left it; see <a href="#without-a-gpu">Without a GPU</a>.</p>
+<h3 id="ssh">From a terminal or local VS Code: SSH<a class="headerlink" href="#ssh" title="Permanent link">&para;</a></h3>
+<p>The second way in is SSH, for your own terminal, VS Code <strong>Remote-SSH</strong>, <code>scp</code> or port forwarding. It needs an SSH public key (or the environment password) on SlotServe:</p>
+<ol>
+<li>Choose <strong>Terminal / SSH</strong> as the tool (or any other: they all have SSH). The page asks for your public key inline the first time: paste it, use the two commands it shows for your system to make one, or let the browser make a key pair (the private key is downloaded once, only the public key is sent). See <a href="#logging-in-ssh-keys-and-the-environment-password">Logging in</a>.</li>
+<li>
+<p>When the environment runs, its card shows the command:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ssh<span class="w"> </span>-p<span class="w"> </span><span class="m">2201</span><span class="w"> </span>root@server
+</code></pre></div>
+</li>
+<li>
+<p><strong>VS Code Remote-SSH</strong>: add the snippet from the card to <code>~/.ssh/config</code>; each environment has its own Host alias and host key, so connect to that alias. The port can change between bookings.</p>
+</li>
+<li>Anything you start yourself (TensorBoard, a demo, an API) can be opened in the browser under <strong>Ports</strong> on the card (see <a href="#ports">Ports</a>), or with SSH port forwarding, e.g. <code>ssh -p 2201 -L 8888:localhost:8888 root@server</code>.</li>
+</ol>
+<p>The first <code>ssh</code> to an environment asks to trust its host key: compare the fingerprint with the <strong>Host key</strong> on the card.</p>
+<h2 id="setting-it-up-admin">Setting it up (admin)<a class="headerlink" href="#setting-it-up-admin" title="Permanent link">&para;</a></h2>
+<h3 id="docker">Docker access<a class="headerlink" href="#docker" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p>Mount the Docker socket into SlotServe. In <code>docker-compose.yml</code> uncomment</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+</code></pre></div>
+<p>and run <code>docker compose up -d</code>. Containers need GPU access through the <a href="https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html">NVIDIA Container Toolkit</a>, which the SlotServe container already uses. Without Docker in a container, the user running SlotServe needs access to the socket (the <code>docker</code> group). <code>SLOTSERVE_DOCKER_HOST</code> points elsewhere (another socket, <code>tcp://</code>).</p>
+</li>
+<li>
+<p>Turn on <strong>Admin → System settings → Dev environments → Dev environments</strong>. The setup checklist item <strong>Dev environments</strong> and the health check <strong>docker</strong> tick when Docker answers; if not, the check's evidence says why ("Cannot connect to the Docker daemon", permission denied on the socket).</p>
+</li>
+<li>
+<p>Open the ports people need in the host firewall: the <strong>web interface port</strong> (<code>SLOTSERVE_DEVENV_WEB_PORT</code>, default <code>8001</code>, published by <code>docker-compose.yml</code>) for the browser tools, the <strong>SSH ports</strong> range (default <code>2200-2299</code>; each running environment gets one port from it), and the <strong>Direct port range</strong> (default <code>2300-2399</code>) if people may publish ports directly (see <a href="#ports">Ports</a>). Docker publishes the SSH and direct ports itself, past <code>ufw</code>; see <a href="../operations/#firewall">Ports and firewall</a>.</p>
+</li>
+<li>
+<p>Optionally set <strong>SSH host name</strong> (what people should type after <code>root@</code>), CPU, memory and shared-memory limits, which image registries are allowed, whether <strong>Password logins</strong> are allowed, a <strong>Storage directory</strong> for persistent data, and the limits for kept environments.</p>
+</li>
+</ol>
+<p>Behind a reverse proxy, also set <strong>Web interface address</strong> (<code>SLOTSERVE_DEVENV_WEB_URL</code>); see <a href="../operations/#reverse-proxy">Reverse proxy</a>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Security</p>
+<p>Whoever controls the Docker socket controls the host. SlotServe only starts hardened containers without extra privileges (see <a href="#limits-and-hardening">Limits and hardening</a>), with the lane's GPUs, the person's <code>/workspace</code> and the models directory read-only, but anyone with admin rights in SlotServe can now run containers on the host. Only enable dev environments on a server whose users you trust.</p>
+<p><strong>Podman</strong> provides a Docker-compatible API without a root daemon. Point <code>SLOTSERVE_DOCKER_HOST</code> at its socket (for example <code>unix:///run/podman/podman.sock</code>) to use it instead; GPU access then needs Podman's CDI setup.</p>
+</div>
+<h3 id="templates">Templates<a class="headerlink" href="#templates" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Template</th>
+<th>Image</th>
+<th>Web interface</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PyTorch</td>
+<td><code>pytorch/pytorch:2.14.1-cuda12.6-cudnn9-devel</code></td>
+<td></td>
+</tr>
+<tr>
+<td>JupyterLab + PyTorch</td>
+<td><code>quay.io/jupyter/pytorch-notebook:cuda12-pytorch-2.11.0</code></td>
+<td>JupyterLab</td>
+</tr>
+<tr>
+<td>TensorFlow</td>
+<td><code>tensorflow/tensorflow:2.21.0-gpu-jupyter</code></td>
+<td></td>
+</tr>
+<tr>
+<td>CUDA</td>
+<td><code>nvidia/cuda:12.9.2-cudnn-devel-ubuntu24.04</code></td>
+<td></td>
+</tr>
+<tr>
+<td>Ubuntu desktop</td>
+<td><code>linuxserver/webtop:ubuntu-xfce-388f14a2-ls7</code></td>
+<td>Desktop (XFCE)</td>
+</tr>
+<tr>
+<td>VS Code</td>
+<td><code>codercom/code-server:4.141.0</code></td>
+<td>VS Code (code-server)</td>
+</tr>
+</tbody>
+</table>
+<p>The built-in templates use CUDA 12 builds, which run on a wide range of GPUs and drivers. Admins can change their images, switch them off or add shared templates.</p>
+<p>Anyone can add <strong>their own template</strong> from any image (unless an admin turned custom images off or limited the registries), with an optional main process and environment variables. The image needs <code>/bin/sh</code>; SSH works in any image because SlotServe brings its own small static SSH server.</p>
+<h3 id="web-interfaces">Web interfaces<a class="headerlink" href="#web-interfaces" title="Permanent link">&para;</a></h3>
+<p>SlotServe opens any port of a running environment in the browser at <code>/devenv/&lt;session&gt;/port/&lt;port&gt;/</code>, served on the <strong>web interface port</strong> (see <a href="#their-own-origin">Their own origin</a>). A template <strong>declares its web interfaces</strong> as a list of ports, each with a name and a kind (desktop, JupyterLab, VS Code or any other web app); while the environment runs, its card has an <strong>Open …</strong> button for each of them (new tab). Other ports, e.g. a TensorBoard you start yourself on port 6006, can be added under <strong>Ports</strong> or opened by typing <code>/devenv/&lt;session&gt;/port/6006/</code> on the SlotServe address. Only the person who booked the environment and admins can open its ports (environments that belong to no booking are open to everyone signed in); you need to be signed in to SlotServe.</p>
+<pre class="mermaid"><code>flowchart LR
+    B[Browser] -- "server:8001/devenv/7/port/8888/ (environment cookie)" --&gt; W[SlotServe web port]
+    W -- "HTTP + WebSocket, token added" --&gt; C["container slotserve-dev-7:8888"]
+    subgraph N["network slotserve-devenv-7"]
+        C
+    end</code></pre>
+<ul>
+<li><strong>Isolation</strong>: every environment runs on its own Docker network. Web ports are never published: when SlotServe runs in a container it joins the environment's network and reaches any port by container name; when it runs directly on the host, Docker binds each declared port to a random port on <code>127.0.0.1</code>, and other ports are reached on the container's address in its network (on Linux hosts). The network is removed when the environment stops (a kept environment keeps its network, and its web addresses, until it is deleted), and leftovers are cleaned up after a restart. A lane's shared environment gets a network too; its web interfaces are open to everyone signed in.</li>
+<li><strong>Proxy</strong>: SlotServe forwards HTTP (streamed) and WebSockets (Jupyter kernels, VS Code, desktop streaming), keeps redirects and cookies under the environment's path and never passes its own session cookie on.</li>
+<li><strong>Token</strong>: each start gets a random token. JupyterLab is started with it (<code>--IdentityProvider.token</code>), the desktop uses it as its password and VS Code (code-server, <code>--auth password</code>) gets its SHA-256 as <code>HASHED_PASSWORD</code> (placeholder <code>{token_sha256}</code>); SlotServe signs you in on every request it trusts (a token header, or code-server's session cookie), so you never see a password page while nobody can use these apps without going through SlotServe. Opening one of these apps as a <strong>direct port</strong> bypasses that, so it has to be confirmed.</li>
+<li><strong>Base path</strong>: the main process and environment variables can use the placeholders <code>{base_path}</code> and <code>{port}</code> (the first declared port, e.g. <code>/devenv/7/port/8888/</code> and <code>8888</code>), <code>{base_path_&lt;port&gt;}</code> (any declared port, e.g. <code>{base_path_6006}</code>), <code>{token}</code>, <code>{token_sha256}</code> and <code>{session}</code>. Ports whose app is given its base path (Jupyter <code>--ServerApp.base_url</code>, the desktop's <code>SUBFOLDER</code>) receive the full path; for all other ports (code-server, most simple apps, ports that are not declared) SlotServe strips the prefix, so those apps should use relative links. The variables <code>SLOTSERVE_WEB_BASE</code>, <code>SLOTSERVE_WEB_PORT</code> and <code>SLOTSERVE_WEB_TOKEN</code> (first declared port) are set as well.</li>
+<li><strong>Keep the image's entrypoint</strong>: images such as the linuxserver desktop run their own init system. With this option SlotServe keeps the image's entrypoint and command and starts the SSH server next to it with <code>docker exec</code>, instead of using its own start script.</li>
+</ul>
+<p>The built-ins: <strong>JupyterLab + PyTorch</strong> (JupyterLab on port 8888, files in <code>/workspace</code>), <strong>Ubuntu desktop</strong> (an XFCE desktop streamed to the browser, port 3000) and <strong>VS Code</strong> (code-server on port 8080, opened on <code>/workspace</code>; extensions come from Open VSX). SSH works in all of them as before.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The desktop streams video with modern browser APIs that need a secure context: open SlotServe over HTTPS (or on <code>localhost</code>). Hardware-accelerated graphics in the desktop may need <code>NVIDIA_DRIVER_CAPABILITIES=all</code> in the template's environment variables, depending on the host's driver setup.</p>
+</div>
+<h4 id="their-own-origin">Their own origin<a class="headerlink" href="#their-own-origin" title="Permanent link">&para;</a></h4>
+<p>Apps in environments are written by whoever uses them. If they were served on SlotServe's own address, a page in someone's environment could use SlotServe with the rights of whoever opens it (an admin, for example). So the web interfaces are served on a <strong>port of their own</strong> (<code>SLOTSERVE_DEVENV_WEB_PORT</code>, default <code>8001</code>): browsers treat it as a different site origin, and it never accepts SlotServe's login cookie.</p>
+<pre class="mermaid"><code>sequenceDiagram
+    participant B as Browser
+    participant S as SlotServe (:8000)
+    participant W as Web port (:8001)
+    B-&gt;&gt;S: /devenv/7/port/8888/ (signed in)
+    S-&gt;&gt;S: may this person use environment 7?
+    S--&gt;&gt;B: redirect to :8001 with a one-time token (valid one minute)
+    B-&gt;&gt;W: token
+    W--&gt;&gt;B: cookie for /devenv/7/ only, redirect to the app
+    B-&gt;&gt;W: /devenv/7/port/8888/ (environment cookie)</code></pre>
+<ul>
+<li>The links on the environment cards (and old bookmarks of <code>/devenv/…</code> on SlotServe's address) go through SlotServe, which signs you in and hands you over; there is nothing to set up for users.</li>
+<li>The cookie on the web port is HttpOnly, belongs to one environment's path, lasts 12 hours and is checked against the database on every request (a disabled account or a lost booking ends access at once).</li>
+<li>SlotServe refuses changing requests (POST, PUT, PATCH, DELETE) sent by pages on the web port, and the web port refuses requests from a page of one environment to another one's address.</li>
+<li><strong>Behind a reverse proxy</strong> or when the port is published on another number, set <strong>Web interface address</strong> (<code>SLOTSERVE_DEVENV_WEB_URL</code>, e.g. <code>https://gpu-box:8443</code>) and proxy that address to port 8001 with WebSockets enabled. For the way back to the sign-in, <code>SLOTSERVE_PUBLIC_URL</code> should be SlotServe's own address.</li>
+<li>Environments share the web port's origin among themselves. When an app must be fully isolated from other environments' pages, publish it as a <a href="#ports">direct port</a> (each host port is an origin of its own).</li>
+<li><code>SLOTSERVE_DEVENV_WEB_PORT=0</code> serves web interfaces on SlotServe's own address again, as in earlier versions. Not recommended.</li>
+</ul>
+<p>code-server runs with <code>--auth password</code>: SlotServe signs you in with its session cookie, so a request that does not come through SlotServe (another container, someone on the host) gets its login page.</p>
+<h3 id="ports">Ports<a class="headerlink" href="#ports" title="Permanent link">&para;</a></h3>
+<p>While an environment runs, its card lists its <strong>ports</strong>: the ones its template declares and any you add. For each port you see its name, the container port, how it is opened, its address with <strong>Open</strong> and <strong>Copy</strong> buttons, and whether something listens on it (SlotServe looks at the container's listening sockets; <em>Localhost only</em> means the app listens on <code>127.0.0.1</code> and must be told to listen on <code>0.0.0.0</code>). Ports that something listens on but that are not listed yet are offered for adding with one click.</p>
+<p>Each port is opened one of two ways, which you can switch at any time:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Address</th>
+<th>Who can use it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>SlotServe login</strong> (default)</td>
+<td><code>http://server:8001/devenv/&lt;session&gt;/port/&lt;port&gt;/</code></td>
+<td>You and admins, signed in to SlotServe. For web apps.</td>
+</tr>
+<tr>
+<td><strong>Direct</strong></td>
+<td><code>http://server:&lt;host port&gt;</code></td>
+<td>Anyone on the network, without SlotServe. Any app or protocol (HTTP, WebSocket, gRPC, databases, …).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Add port</strong> asks for the container port, a name and the mode. Adding, switching and removing ports never restarts the environment. Ports declared by a template (desktop, JupyterLab, VS Code, …) are behind the login unless the template sets them to direct; for those, removing means going back to the template's setting.</p>
+<ul>
+<li><strong>Direct ports</strong> come from the <strong>Direct port range</strong> (default <code>2300-2399</code>, separate from the SSH ports). SlotServe starts a tiny forwarder container (<code>socat</code>, image <strong>Port forwarder image</strong>, default <code>alpine/socat:1.8.1.1</code>) on the environment's network that publishes the host port and passes connections to the environment. It runs only while the environment runs: it is removed when the port is removed or switched to the login, and when the environment stops or is paused. Direct ports are open to everyone who can reach the server; protect the app itself (a password, a token) if it matters.</li>
+<li><strong>Fixed numbers</strong>: a kept environment's direct port belongs to the kept environment. Its number stays while the environment is paused and is the same when it is continued; it is released when the kept environment is deleted (or removed for being unused). Any other environment's direct port belongs to its booking and is released when the booking ends.</li>
+<li><strong>Limits</strong>: admins set <strong>Direct ports per person</strong> (default 5; admins have no limit; <code>0</code> lets only admins publish ports) and can switch <strong>Direct ports</strong> off (forwarders stop, the numbers stay assigned).</li>
+<li><strong>Shared environments</strong> of idle lanes list only their template's ports; nobody can add ports to them.</li>
+<li>A port that the host already uses is skipped when it is first published (the next free number is taken). If a fixed port is taken later, the card shows the problem.</li>
+<li><strong>Direct ports</strong> on the Dev environments page lists your direct ports, including those of paused kept environments, and lets you release one. Admins see everyone's with <strong>Everyone</strong> and can <strong>reclaim</strong> any: the host port goes back to the pool and the container port stays reachable behind the login.</li>
+</ul>
+<h3 id="saving-an-environment">Saving an environment<a class="headerlink" href="#saving-an-environment" title="Permanent link">&para;</a></h3>
+<p><strong>Save as image</strong> stores the running container (installed packages, files outside <code>/workspace</code>) as a new template of yours, so the next booking starts exactly where you left off. <code>/workspace</code> is kept anyway and is not part of the image. The new template declares the environment's ports, including the ones you added and whether each is direct. The number of saved images per person is limited (default 3); deleting a saved template removes the image from the server.</p>
+<p>Before saving (and before a kept environment is snapshotted) SlotServe empties what it copied in for this environment only: the environment key, the SSH host key and root's password hash; the <code>SLOTSERVE_*</code>, <code>OPENAI_*</code> and web token variables are emptied in the image, which keeps its own variables. The next start fills them in again.</p>
+<h2 id="inside-the-environment">Inside the environment<a class="headerlink" href="#inside-the-environment" title="Permanent link">&para;</a></h2>
+<p>Every new environment knows where it is and how to call a model (admins: <strong>Platform context in environments</strong>, on by default):</p>
+<ul>
+<li><strong>Variables</strong>: <code>SLOTSERVE_USER</code>, <code>SLOTSERVE_END</code> (the booking's end), <code>SLOTSERVE_ENV_ID</code>, <code>SLOTSERVE_ENV</code> (the template's or kept environment's name), <code>SLOTSERVE_LANE</code>, <code>SLOTSERVE_GPUS</code>, <code>SLOTSERVE_MACHINE</code>, <code>SLOTSERVE_CHECKPOINT_DIR</code> (<code>/workspace/.checkpoints</code>, a convention for training scripts) and <code>OPENAI_BASE_URL</code>. When a booking is extended, login shells see the new end (<code>/run/slotserve/env</code>); the container's own environment keeps the end it started with.</li>
+<li><strong>The LLM endpoint</strong>: <code>OPENAI_BASE_URL</code> is <code>http://slotserve-gw:8002/v1</code>, a small listener of SlotServe that serves only the <code>/v1</code> API to the environments (not the web UI or <code>/api</code>). Requests go through the same keys, admission and usage records as on SlotServe's own port. A template that sets its own <code>OPENAI_BASE_URL</code> keeps it.</li>
+<li><strong>The environment key</strong>: a booked or CPU-only environment gets its own key (<code>sk-ss-env-...</code>, <code>llm</code> scope only, acting as you). It is written to <code>/run/slotserve/llm-key</code> (readable by root only) and exported as <code>OPENAI_API_KEY</code> in login shells, so <code>python3 -c 'from openai import OpenAI; print(OpenAI().models.list())'</code> works without any setup. It is never in the container's environment (<code>docker inspect</code> does not show it), is revoked when the environment stops and lives at most 24 hours at a time (moved on while the environment runs). Shared environments of idle lanes get no key: use your own API key there. Admins can switch keys off (<strong>Environment LLM key</strong>).</li>
+<li><strong>Login banner</strong>: SSH logins show at most three lines: the environment, its GPUs and the time left; <code>/workspace</code> usage; the LLM endpoint with a one-line example.</li>
+</ul>
+<p>Shells that are not login shells (some web terminals) do not read <code>/etc/profile.d</code>; run <code>. /etc/profile.d/slotserve-platform.sh</code> there. Images that run as another user than root (their own entrypoint) cannot read the key file.</p>
+<p>Where the listener is: when SlotServe runs on the host, on the address of Docker's default bridge (<code>docker0</code>, e.g. <code>172.17.0.1</code>) - environments find it through <code>/etc/hosts</code>, and nothing outside the machine reaches it. When SlotServe runs in a container, on its own addresses, as <code>slotserve-gw</code> on each environment's network (the port is not published). <code>SLOTSERVE_DEVENV_GATEWAY_PORT</code> (default 8002, 0 = off) and <code>SLOTSERVE_DEVENV_GATEWAY_HOST</code> change it. A host firewall that drops traffic from containers to the host blocks it too. With Docker on another machine, environments get no LLM endpoint.</p>
+<h2 id="logging-in-ssh-keys-and-the-environment-password">Logging in: SSH keys and the environment password<a class="headerlink" href="#logging-in-ssh-keys-and-the-environment-password" title="Permanent link">&para;</a></h2>
+<p>Your credentials are on the <strong>Access credentials</strong> page (next to your API keys):</p>
+<ul>
+<li><strong>SSH public keys</strong>: paste the content of <code>~/.ssh/id_ed25519.pub</code> (create one with <code>ssh-keygen -t ed25519</code>).</li>
+<li><strong>Environment password</strong>: an SSH password for dev environments, separate from your SlotServe password. SlotServe stores only its SHA-512-crypt hash (the <code>/etc/shadow</code> format) and writes that hash into the container; the password itself is never stored. Each connection gets three tries.</li>
+</ul>
+<p>A template with a web interface (JupyterLab, the desktop, VS Code) starts without any credentials: you use it in the browser, and SSH simply lets nobody in until you add a key. Any other template needs an SSH key, or an environment password while <strong>Password logins</strong> is on (the default). Admins can switch password logins off; then only keys work and SSH servers reject passwords. A new password reaches a running booked environment the next time it starts. Shared environments only accept keys.</p>
+<p>Every environment has its own SSH host key; its fingerprint is shown with the environment. A kept environment keeps its key across pauses, GPU changes and snapshots. Environments created before this version get their own key the next time they start, so <code>ssh</code> warns about a changed host key once: remove the old line from <code>~/.ssh/known_hosts</code> (<code>ssh-keygen -R "[server]:port"</code>) and check the new fingerprint.</p>
+<h2 id="limits-and-hardening">Limits and hardening<a class="headerlink" href="#limits-and-hardening" title="Permanent link">&para;</a></h2>
+<p>Every container SlotServe creates goes through one last, fixed step before Docker sees it:</p>
+<ul>
+<li><strong>No new privileges</strong> (setuid programs such as <code>sudo</code> cannot gain rights) and a few capabilities dropped (<code>NET_RAW</code>, <code>MKNOD</code>, <code>SYS_CHROOT</code>, <code>AUDIT_WRITE</code>, <code>SETFCAP</code>; <code>ping</code> does not work). Templates whose image needs setuid programs (the built-in desktop: its init system) run in <strong>compatibility mode</strong> without the first rule; admins switch it per template and the template shows it.</li>
+<li><strong>Processes</strong>: at most <code>SLOTSERVE_DEVENV_PIDS_LIMIT</code> (default 4096), so a fork bomb stays inside its container.</li>
+<li><strong>Memory</strong>: the <strong>Memory limit</strong> setting, or - when it is 0 - the host's memory less max(4 GB, 10 %). Before this version 0 meant "no limit"; now an out-of-memory process is killed inside its container instead of taking SlotServe and everyone else with it. Admins see the limit that applies on the Dev environments information (<code>/api/devenv</code>, <code>hardening</code>).</li>
+<li><strong>Open files</strong>: 1048576. <strong>Logs</strong>: at most 5 files of 50 MB per container.</li>
+<li><strong>GPUs</strong>: exactly the lane's GPUs. A lane that names no GPUs cannot start a GPU environment (it used to get every GPU of the machine); give the lane its GPUs under Admin.</li>
+<li>Never privileged, never the host's network, process or IPC namespace, never a bind of <code>/</code> or of the Docker socket.</li>
+</ul>
+<p>Kept environments created by an older version are snapshotted and recreated once on their next start, because these settings cannot be added to an existing container.</p>
+<p>What this means inside an environment (<code>sudo</code>, <code>ping</code>, killed jobs) and when to use compatibility mode: <a href="../operations/#hardening">Container hardening and compatibility mode</a>.</p>
+<h2 id="kept-environments-projects">Kept environments (projects)<a class="headerlink" href="#kept-environments-projects" title="Permanent link">&para;</a></h2>
+<p>Normally the container is removed when the booking ends and only <code>/workspace</code> stays. To keep everything you installed, choose <strong>Keep as new</strong> in the booking dialog and give the environment a name. When that booking ends the container is only stopped (paused). A later booking can <strong>Continue</strong> it: the same container starts again, with your current keys and password copied in.</p>
+<ul>
+<li>If the next booking is on a lane with different GPUs, SlotServe saves the container as an image (a snapshot) and recreates it on the new GPUs, keeping its kept directories and settings. The same happens when its kept directories changed or its old SSH port is taken.</li>
+<li><strong>Kept directories</strong>: besides <code>/workspace</code>, a template or kept environment can list more directories to keep, e.g. <code>/root</code> or <code>/opt/conda</code> (absolute paths; system directories such as <code>/etc</code>, <code>/usr</code>, <code>/proc</code> or <code>/opt/slotserve</code> are not allowed). A new directory starts with the image's content. Changing the list takes effect the next time the container is created.</li>
+<li>The <strong>Dev environments</strong> page lists your kept environments with their state (paused, running, not started yet, container missing), size and last use. You can rename them, change their kept directories and delete them; deleting removes the container and its snapshot, and optionally its kept directories. <code>/workspace</code> is never deleted.</li>
+<li>One kept environment cannot be booked twice at the same time. Admins limit how many each person may keep (<strong>Kept environments per person</strong>, default 3) and can remove kept environments unused for a number of days (<strong>Remove unused kept environments after</strong>; 0 = never; their data stays).</li>
+</ul>
+<h2 id="without-a-gpu">Without a GPU<a class="headerlink" href="#without-a-gpu" title="Permanent link">&para;</a></h2>
+<p>Not everything needs a GPU. Editing code, moving data, installing packages or a CPU job can run in a dev environment <strong>without a GPU</strong>, at any time and without a booking:</p>
+<ul>
+<li>On the <strong>Dev environments</strong> page, press <strong>Start without GPU</strong> in the <strong>Without a GPU</strong> section (or on a template or kept environment) and pick a template or one of your kept environments. It starts right away on the server's shared CPU cores, with the same SSH login, <code>/workspace</code>, kept directories and web interfaces as a booked environment, but no GPU.</li>
+<li>It runs until you <strong>Pause</strong> it (a kept environment keeps its container) or <strong>Stop</strong> it (any other environment; <code>/workspace</code> stays). There is no idle timeout and no end time. Its card shows the CPU cores and memory it uses right now.</li>
+<li>Admins limit how many each person may run at once (<strong>Without-GPU environments per person</strong>, default 2).</li>
+</ul>
+<p><strong>One kept environment, two modes.</strong> A kept environment can run without a GPU between its bookings. When a booking of it starts, SlotServe stops it and continues it with the booked lane's GPUs: the container is saved as a snapshot and recreated with the GPUs, so everything installed stays (as when a kept environment moves to other GPUs). When the booking ends it is paused as usual; with <strong>Continue without GPU after bookings</strong> switched on for that kept environment it goes on running without a GPU instead. You can also start it without a GPU again at any time. While a booking of it runs, it cannot be started without a GPU.</p>
+<div class="admonition note">
+<p class="admonition-title">Snapshots</p>
+<p>Each switch between the CPU and a booking's GPUs saves the container as an image layer. If a kept environment switches very often over a long time, delete it and keep a fresh one now and then (or save it as an image and start a kept environment from that), because images have a limit on the number of layers.</p>
+</div>
+<h3 id="sharing-the-cpu-fairly">Sharing the CPU fairly<a class="headerlink" href="#sharing-the-cpu-fairly" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart LR
+    subgraph Host CPU cores
+        A["Lane A: cores per GPU x its GPUs"]
+        B["Lane B: cores per GPU x its GPUs"]
+        P["Shared pool: all other cores"]
+    end
+    A --- BA["Booking / shared environment on lane A"]
+    B --- BB["Booking / shared environment on lane B"]
+    P --- C1["Environment without GPU"]
+    P --- C2["Environment without GPU"]</code></pre>
+<ul>
+<li>Every GPU lane <strong>reserves CPU cores</strong> for whoever uses it: <strong>CPU cores reserved per GPU</strong> (default 8) times its number of GPUs (a lane that does not restrict its GPUs counts as one). Its booking containers and its shared idle environment run on exactly those cores (Docker cpuset), so CPU-only work cannot slow a GPU booking down. 0 reserves nothing.</li>
+<li>Environments without a GPU share <strong>all other cores</strong> (the pool). They all get the same CPU weight, so an idle core can be used by anyone and a busy pool is split evenly. On top of that each has a hard limit: <strong>CPU limit without GPU</strong> (cores, default 4; 0 = the whole pool) and <strong>Memory limit without GPU</strong> (default 16 GB; 0 = the host default, see <a href="#limits-and-hardening">Limits</a>).</li>
+<li><strong>Memory pool without GPU</strong> caps how much memory all environments without a GPU may claim together: when one starts, the memory limits of all running ones are added up, and a new one that would not fit is refused until another is paused. 0 = no total.</li>
+<li>SlotServe reads the number of cores and the memory of the host from Docker. If there are fewer cores than the lanes want, each lane gets its share and at least one core stays in the pool. The section on the Dev environments page shows the pool and each lane's cores. Reserved cores are assigned by logical CPU number, in lane order.</li>
+</ul>
+<p>Changing these settings applies to containers created afterwards; a kept container gets its new CPU placement and limits the next time it starts.</p>
+<h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h3>
+<p>The CPU time and memory of every environment without a GPU are read from Docker every few seconds and recorded each minute for its owner (kind "CPU-only environments"). The <strong>Usage</strong> page then shows <strong>CPU core-hours</strong> per person.</p>
+<h3 id="cpu-what-admins-see">What admins see<a class="headerlink" href="#cpu-what-admins-see" title="Permanent link">&para;</a></h3>
+<p>The <strong>Without a GPU</strong> section lists every running environment without a GPU with its owner, state, CPU cores and memory in use, and a <strong>Pause</strong> / <strong>Stop</strong> button (logged in the audit log). Admins find the settings in <strong>Admin → System settings → Dev environments</strong>.</p>
+<h2 id="idle-lanes-a-shared-environment">Idle lanes: a shared environment<a class="headerlink" href="#idle-lanes-a-shared-environment" title="Permanent link">&para;</a></h2>
+<p>Admins choose per lane what runs while nobody has it booked (<strong>Admin → GPUs &amp; lanes → When not booked</strong>):</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>While the lane is not booked</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Run the default model</td>
+<td>The lane's default model is loaded (as before).</td>
+</tr>
+<tr>
+<td>Shared dev environment</td>
+<td>One container from a chosen template runs with the lane's GPUs. Everyone who joined it can log in.</td>
+</tr>
+<tr>
+<td>Nothing</td>
+<td>No model server and no container; the GPUs stay free.</td>
+</tr>
+</tbody>
+</table>
+<p>The shared environment is stopped ahead of the next booking (like a model preload, or a whole-GPU booking's lead time) and starts again when the lane is idle; a model does not start loading until the shared environment has let go of the GPUs. The overview and the lanes page show what an idle lane is doing.</p>
+<p>Inside, everyone who <strong>joined</strong> the lane's shared environment (on the Dev environments page; an SSH key is needed) has their own account (their user name in lower case, with characters other than letters, digits, <code>_</code> and <code>-</code> replaced) and their SSH keys in <code>~/.ssh/authorized_keys</code>. Password logins are off there, so no password hashes are copied into it. People who had an SSH key when SlotServe was upgraded to this version were joined to every lane. Home directories live on a volume per lane and are kept. <code>root</code> cannot log in. The <strong>Dev environments</strong> page shows the shared environment of each idle lane with your own command:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>ssh<span class="w"> </span>-p<span class="w"> </span><span class="m">2205</span><span class="w"> </span>alice@server
+</code></pre></div>
+<p>Accounts are created when the container starts and refreshed when someone joins, leaves or changes their keys (and once a minute). The image needs <code>useradd</code> or <code>adduser</code>; if it has neither the environment fails with a clear message. Only templates offered to everyone (built-in or shared by an admin) can be used.</p>
+<h2 id="storage">Storage<a class="headerlink" href="#storage" title="Permanent link">&para;</a></h2>
+<p>Admins can add host directories, NFS exports and SMB shares in <strong>Admin → Storage</strong> for shared data, personal spaces (<code>/workspace</code>), project data and model libraries; see <a href="../storage/">Storage</a>. What follows is what happens without them.</p>
+<p>By default persistent data lives in Docker named volumes: <code>slotserve-workspace-u&lt;user id&gt;</code> for <code>/workspace</code>, <code>slotserve-project&lt;id&gt;-&lt;path&gt;</code> for a kept environment's directories, <code>slotserve-u&lt;user&gt;-t&lt;template&gt;-&lt;path&gt;</code> for a template's kept directories and <code>slotserve-idle-home-l&lt;lane&gt;</code> for the homes of a lane's shared environment.</p>
+<p>With <strong>Storage directory</strong> set to a directory on the Docker host (for example <code>/srv/slotserve</code>), bind mounts are used instead:</p>
+<table>
+<thead>
+<tr>
+<th>Data</th>
+<th>Directory</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/workspace</code></td>
+<td><code>&lt;storage&gt;/users/u&lt;user id&gt;/workspace</code></td>
+</tr>
+<tr>
+<td>A template's kept directory</td>
+<td><code>&lt;storage&gt;/users/u&lt;user id&gt;/t&lt;template id&gt;/&lt;path&gt;</code></td>
+</tr>
+<tr>
+<td>A kept environment's directory</td>
+<td><code>&lt;storage&gt;/projects/p&lt;id&gt;/&lt;path&gt;</code></td>
+</tr>
+<tr>
+<td>Homes of a shared environment</td>
+<td><code>&lt;storage&gt;/lanes/l&lt;lane id&gt;/home</code></td>
+</tr>
+</tbody>
+</table>
+<p>The path is a path on the Docker host, not inside the SlotServe container. Missing directories are created by a short-lived helper container of SlotServe's own helper image (<code>SLOTSERVE_STORAGE_HELPER_IMAGE</code>, default <code>busybox:1.37</code>) that mounts only the parent folders it works in, so SlotServe does not need access to the directory itself. A new directory is filled from the environment's image, like a new volume: the content is copied out of the image with Docker's archive API, the image itself never runs for this.</p>
+<h2 id="what-admins-see">What admins see<a class="headerlink" href="#what-admins-see" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Dev environments</strong> with <strong>Everyone</strong> switched on lists every environment with its state, image, port and errors; <strong>Logs</strong> shows the container output.</li>
+<li>A failed environment (image not found, container exited, no free port) shows the reason and can be started again with <strong>Try again</strong>. The person is notified.</li>
+<li>On restart SlotServe keeps environments that are still running, stops kept environments whose booking is over and removes leftover containers and networks. Port forwarders are recreated for the environments that still run.</li>
+<li><strong>Direct ports</strong> with <strong>Everyone</strong> lists every published host port with its owner and environment; <strong>Reclaim</strong> frees one.</li>
+<li>Shared environments: only admins can restart them or read their logs and errors (for example a failed account refresh).</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 SlotServe contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

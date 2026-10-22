@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/api/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/api/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/api/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/configuration/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/configuration/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/configuration/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/dev-environments/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/dev-environments/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/dev-environments/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/development/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/development/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/development/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/faq/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/faq/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/faq/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/getting-started/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/getting-started/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/getting-started/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/gpus-and-engines/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/gpus-and-engines/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/gpus-and-engines/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/integrations/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/integrations/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/integrations/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/model-catalog/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/model-catalog/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/model-catalog/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/operations/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/operations/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/operations/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/release-checklist/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/release-checklist/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/release-checklist/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/scheduling/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/scheduling/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/scheduling/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/storage/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/storage/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/storage/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/user-guide/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/user-guide/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/user-guide/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/zh/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/zh/api/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/api/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/api/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/zh/configuration/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/configuration/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/configuration/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/zh/dev-environments/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/dev-environments/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/dev-environments/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/zh/development/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/development/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/development/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/zh/faq/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/faq/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/faq/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/zh/getting-started/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/getting-started/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/getting-started/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/zh/gpus-and-engines/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/gpus-and-engines/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/gpus-and-engines/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/zh/integrations/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/integrations/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/integrations/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/zh/model-catalog/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/model-catalog/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/model-catalog/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/zh/operations/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/operations/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/operations/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/zh/release-checklist/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/release-checklist/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/release-checklist/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/zh/scheduling/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/scheduling/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/scheduling/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/zh/storage/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/storage/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/storage/"/>
+    </url>
+    <url>
+        <loc>https://peleryuan.github.io/slotserve/zh/user-guide/</loc>
+        <lastmod>2026-10-22</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://peleryuan.github.io/slotserve/zh/user-guide/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://peleryuan.github.io/slotserve/user-guide/"/>
+    </url>
+</urlset>

@@ -1,0 +1,2327 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Book GPU time slots and serve models behind an OpenAI-compatible gateway.">
+      
+      
+      
+        <link rel="canonical" href="https://peleryuan.github.io/slotserve/operations/">
+      
+      
+        <link rel="prev" href="../configuration/">
+      
+      
+        <link rel="next" href="../user-guide/">
+      
+      
+        
+          <link rel="alternate" href="./" hreflang="en">
+        
+          <link rel="alternate" href="../zh/operations/" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Operations - SlotServe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#operations" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="SlotServe" class="md-header__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SlotServe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Operations
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="../zh/operations/" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PelerYuan/slotserve" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="SlotServe" class="md-nav__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    SlotServe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PelerYuan/slotserve" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#upgrade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrade from v0.8
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Upgrade from v0.8">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-before" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you upgrade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-after" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What people notice
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check the upgrade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrade failed: roll back
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backups
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Backups">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#backup-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a backup contains
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backup-target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keep a copy off the machine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backup-alerts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When a backup fails
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#secret-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The secret key
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The secret key">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#secret-key-lost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Secret key lost or changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restore from a backup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Restore from a backup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reconcile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The reconciliation report
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-machine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Move to a new machine
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First admin and setup code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reverse-proxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reverse proxy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health checks and slotserve doctor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alerts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inbox and alerts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Container hardening and compatibility mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#firewall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ports and firewall
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runbooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runbooks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runbooks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#admin-password" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Forgotten admin password or locked out
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disk-full" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disk full
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#devenv-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dev environment does not start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-gone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPUs gone after a driver or Docker upgrade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#leak" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suspected account or key leak
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify on real hardware
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notifications & integrations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gpus-and-engines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GPUs, lanes & engines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-environments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How scheduling works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#upgrade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrade from v0.8
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Upgrade from v0.8">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-before" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you upgrade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-after" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What people notice
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upgrade-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check the upgrade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrade failed: roll back
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backups
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Backups">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#backup-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a backup contains
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backup-target" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keep a copy off the machine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backup-alerts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When a backup fails
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#secret-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The secret key
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The secret key">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#secret-key-lost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Secret key lost or changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restore from a backup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Restore from a backup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reconcile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The reconciliation report
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-machine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Move to a new machine
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First admin and setup code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reverse-proxy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reverse proxy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health checks and slotserve doctor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alerts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inbox and alerts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Container hardening and compatibility mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#firewall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ports and firewall
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runbooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runbooks
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runbooks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#admin-password" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Forgotten admin password or locked out
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disk-full" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disk full
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#devenv-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dev environment does not start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-gone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPUs gone after a driver or Docker upgrade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#leak" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suspected account or key leak
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verify" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify on real hardware
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">&para;</a></h1>
+<p>Runbooks for the people who keep a SlotServe installation running: upgrading, backups and restore, the first admin,
+reverse proxies, health checks and alerts, container hardening, firewall ports and checking an installation on real
+hardware. Each problem runbook reads <strong>symptom → diagnose → fix → prevent</strong>.</p>
+<p>The commands assume the Docker Compose installation from <a href="../getting-started/">Getting started</a>, run in the folder
+with <code>docker-compose.yml</code>. Without Docker, drop the <code>docker compose exec slotserve</code> prefix and run <code>slotserve ...</code>
+as the user that runs SlotServe, with the same environment (<code>.env</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Go to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Moving from v0.8 to v0.10</td>
+<td><a href="#upgrade">Upgrade from v0.8</a></td>
+</tr>
+<tr>
+<td>An upgrade went wrong</td>
+<td><a href="#rollback">Upgrade failed: roll back</a></td>
+</tr>
+<tr>
+<td>Setting up or checking backups</td>
+<td><a href="#backups">Backups</a>, <a href="#secret-key">The secret key</a></td>
+</tr>
+<tr>
+<td>Putting a backup back, moving to another machine</td>
+<td><a href="#restore">Restore from a backup</a>, <a href="#new-machine">Move to a new machine</a></td>
+</tr>
+<tr>
+<td>Nobody can sign in as admin</td>
+<td><a href="#setup-code">First admin and setup code</a>, <a href="#admin-password">Forgotten admin password</a></td>
+</tr>
+<tr>
+<td>Running behind nginx, Caddy or Traefik</td>
+<td><a href="#reverse-proxy">Reverse proxy</a></td>
+</tr>
+<tr>
+<td>Something is red on Admin → Overview</td>
+<td><a href="#health">Health checks and <code>slotserve doctor</code></a>, <a href="#alerts">Inbox and alerts</a></td>
+</tr>
+<tr>
+<td><code>sudo</code> or an app does not work in an environment</td>
+<td><a href="#hardening">Container hardening and compatibility mode</a></td>
+</tr>
+<tr>
+<td>Which ports to open</td>
+<td><a href="#firewall">Ports and firewall</a></td>
+</tr>
+<tr>
+<td>Disk full, GPUs gone, environments do not start, a leaked password</td>
+<td><a href="#runbooks">Runbooks</a></td>
+</tr>
+<tr>
+<td>Checking an installation before people use it</td>
+<td><a href="#verify">Verify on real hardware</a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="upgrade">Upgrade from v0.8<a class="headerlink" href="#upgrade" title="Permanent link">&para;</a></h2>
+<p>v0.10 changes how people sign in, how dev environments are isolated and how data is backed up. Most of it needs
+nothing from you; this section lists what people will notice and what to check. The full list is under <strong>Breaking
+changes</strong> in <code>CHANGELOG.md</code>.</p>
+<h3 id="upgrade-before">Before you upgrade<a class="headerlink" href="#upgrade-before" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Read the <strong>Breaking changes</strong> of the release.</li>
+<li>Make a backup you can find again: <strong>Admin → Overview → Backups → Back up now</strong>, or stop SlotServe and copy the
+   whole data directory (<code>DATA_DIR</code>, default <code>./data</code>). The upgrade also takes its own snapshot (below).</li>
+<li>Note your image tag. <code>docker-compose.yml</code> now follows a minor version (<code>ghcr.io/peleryuan/slotserve:0.10</code>, which
+   gets 0.10.x fixes) instead of <code>latest</code>. If your <code>.env</code> sets <code>SLOTSERVE_IMAGE</code>, change it to the new version.</li>
+<li>Tell people about the one-time sign-in and the SSH host key warning below. Running dev environments keep running
+   while SlotServe restarts; the new container settings apply on their next start.</li>
+</ol>
+<h3 id="upgrade-steps">Upgrade<a class="headerlink" href="#upgrade-steps" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>pull<span class="w">                      </span><span class="c1"># the new docker-compose.yml and docs</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>pull<span class="w">           </span><span class="c1"># or: docker compose up -d --build</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>-f<span class="w"> </span>slotserve
+</code></pre></div>
+<p>On the first start the server:</p>
+<ul>
+<li>saves a <strong>snapshot</strong> before it changes the database: <code>data/backups/slotserve-v&lt;old&gt;-to-v&lt;new&gt;-&lt;time&gt;/</code> with the
+  database, <code>secret_key</code> and the dev environment SSH host keys. Snapshots are never deleted automatically;</li>
+<li>applies the numbered database migrations <strong>all or nothing</strong> (a failure rolls back and the server does not start;
+  see <a href="#rollback">Roll back</a>) and writes <code>data/migration_report.json</code>;</li>
+<li>generates a secret key in <code>data/secret_key</code> if <code>SLOTSERVE_SECRET_KEY</code> is unset or still <code>change-me</code> (see
+  <a href="#secret-key">The secret key</a>).</li>
+</ul>
+<p><code>reset-password</code> and <code>set-admin</code> refuse to run on a database that still needs upgrading: start the server once
+first.</p>
+<h3 id="upgrade-after">What people notice<a class="headerlink" href="#upgrade-after" title="Permanent link">&para;</a></h3>
+<p><strong>Everyone signs in once more.</strong> Browser sign-ins are now stored on the server, so all old sign-ins end with the
+upgrade. API keys keep working unchanged. Changing your password now signs out your other browsers.</p>
+<p><strong>SSH warns about a changed host key, once per environment.</strong> Every dev environment now has its own SSH host key
+(before, all environments shared one that anyone could read inside their container). Existing environments get
+their key on their next start, and the first <code>ssh</code> afterwards stops with <code>REMOTE HOST IDENTIFICATION HAS CHANGED</code>.
+That is expected exactly once. Tell people to:</p>
+<ol>
+<li>compare the fingerprint <code>ssh</code> prints with the <strong>Host key</strong> shown on the environment's card (Dev environments);</li>
+<li>
+<p>remove the old entry and connect again:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>ssh-keygen<span class="w"> </span>-R<span class="w"> </span><span class="s2">"[server]:2201"</span><span class="w">     </span><span class="c1"># the host and port of the environment's ssh command</span>
+</code></pre></div>
+</li>
+</ol>
+<p>A warning <strong>after</strong> that first time, for an environment whose key has not changed on its card, is a real warning:
+do not ignore it. Kept environments created by an older version are snapshotted and recreated once on their next
+start (that start takes longer), because the new settings cannot be added to an existing container.</p>
+<p><strong>Shared environments of idle lanes need Join.</strong> They accept SSH keys only, and only people who joined them get
+an account (Dev environments → <strong>Join</strong>). Everyone who had an SSH key at the upgrade was joined to every lane.</p>
+<p><strong>Containers are hardened.</strong> <code>sudo</code> and other setuid programs stop working inside dev environments, <code>ping</code> does
+not work, and a fork bomb or out-of-memory job stays inside its container. A memory limit of 0 now means "the
+host's memory less max(4 GB, 10 %)" instead of "no limit". A lane that names no GPUs cannot start a GPU
+environment any more: give the lane its GPUs in <strong>Admin → GPUs &amp; lanes</strong>. Templates that really need <code>sudo</code> or
+their own init system run in compatibility mode; see <a href="#hardening">Container hardening</a>.</p>
+<p><strong>Sign-ups.</strong> Installations that already have an admin are not asked for a setup code. While the invite code is
+still <code>change-me</code>, nobody can sign up: set an invite code or hand out invite links (Admin → Users).</p>
+<p><strong>Behind a reverse proxy</strong>, changes in the web UI may be refused with "did not come from a SlotServe page" until
+the proxy passes the <code>Host</code> header or <code>SLOTSERVE_PUBLIC_URL</code> is set, and sign-in throttling needs
+<code>SLOTSERVE_FORWARDED_ALLOW_IPS</code>. See <a href="#reverse-proxy">Reverse proxy</a>.</p>
+<p><strong>Firewall.</strong> Dev environment web interfaces (VS Code, JupyterLab, the desktop) are served on their own port,
+8001 by default. Open it if people use them; see <a href="#firewall">Ports and firewall</a>.</p>
+<h3 id="upgrade-check">Check the upgrade<a class="headerlink" href="#upgrade-check" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Admin → Overview</strong>: the setup checklist and the system health table. Every check should be OK or a note you
+   understand; see <a href="#health">Health checks</a>.</li>
+<li><code>docker compose exec slotserve slotserve doctor</code> gives the same list on the command line.</li>
+<li><code>data/migration_report.json</code> lists every migration step; the health check <strong>migration</strong> warns when an upgrade
+   could not keep some rows.</li>
+<li>Sign in, open a dev environment in the browser, call a model in the Playground.</li>
+</ol>
+<h3 id="rollback">Upgrade failed: roll back<a class="headerlink" href="#rollback" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom.</strong> The server does not come up after an upgrade, or it runs but something you rely on is broken.</p>
+<p><strong>Diagnose.</strong></p>
+<ul>
+<li><code>docker compose logs slotserve</code> shows why. A failed migration says <code>database upgrade failed and was rolled back;
+  the snapshot is in ...</code>: the database is unchanged and still the old version's.</li>
+<li>An older version started on an upgraded database refuses to start with <code>... was used by a newer SlotServe</code>.
+  This protects your data; it is not the problem itself.</li>
+</ul>
+<p><strong>Fix.</strong> To run the previous version again:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>stop<span class="w"> </span>slotserve
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>ls<span class="w"> </span>-d<span class="w"> </span>data/backups/slotserve-v*-to-v*<span class="w">          </span><span class="c1"># the newest is the snapshot of this upgrade</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nv">SNAP</span><span class="o">=</span>data/backups/slotserve-v...-to-v...-&lt;time&gt;<span class="w">   </span><span class="c1"># the folder name from ls</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>cp<span class="w"> </span><span class="s2">"</span><span class="nv">$SNAP</span><span class="s2">/slotserve.db"</span><span class="w"> </span>data/slotserve.db
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>rm<span class="w"> </span>-f<span class="w"> </span>data/slotserve.db-wal<span class="w"> </span>data/slotserve.db-shm
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="o">[</span><span class="w"> </span>-f<span class="w"> </span><span class="s2">"</span><span class="nv">$SNAP</span><span class="s2">/secret_key"</span><span class="w"> </span><span class="o">]</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cp<span class="w"> </span><span class="s2">"</span><span class="nv">$SNAP</span><span class="s2">/secret_key"</span><span class="w"> </span>data/secret_key
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="o">[</span><span class="w"> </span>-d<span class="w"> </span><span class="s2">"</span><span class="nv">$SNAP</span><span class="s2">/devenv"</span><span class="w"> </span><span class="o">]</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cp<span class="w"> </span>-r<span class="w"> </span><span class="s2">"</span><span class="nv">$SNAP</span><span class="s2">/devenv"</span><span class="w"> </span>data/
+</code></pre></div>
+<p>Then pin the old version in <code>.env</code> and start it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"SLOTSERVE_IMAGE=ghcr.io/peleryuan/slotserve:0.8.0"</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>.env
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+<p>Everything that happened between the upgrade and the rollback (bookings, keys, settings) is lost with the newer
+database; keep <code>data/slotserve.db</code> somewhere before overwriting it if you may need it. When the migration itself
+failed (the database was not changed), only pinning the old version is needed.</p>
+<p><strong>Prevent.</strong> Rehearse the upgrade on a copy of the data directory first (another folder as <code>DATA_DIR</code>, another
+<code>PORT</code>, dev environments off). Keep the image pinned to a minor version and upgrade on purpose. Report a failed
+migration with <code>data/migration_report.json</code> and the log.</p>
+<h2 id="backups">Backups<a class="headerlink" href="#backups" title="Permanent link">&para;</a></h2>
+<h3 id="backup-contents">What a backup contains<a class="headerlink" href="#backup-contents" title="Permanent link">&para;</a></h3>
+<p>Every day at <code>backup_hour</code> (default 3:00 in the SlotServe time zone; <code>-1</code> = every 24 hours from the last one)
+SlotServe writes a <strong>bundle</strong>, a folder <code>data/backups/slotserve-daily-&lt;date&gt;-&lt;time&gt;/</code> with:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>slotserve.db</code></td>
+<td>A consistent copy of the database (SQLite's online backup, safe while the server runs)</td>
+</tr>
+<tr>
+<td><code>secret_key</code></td>
+<td>The generated <a href="#secret-key">secret key</a>; absent when the key comes from <code>SLOTSERVE_SECRET_KEY</code></td>
+</tr>
+<tr>
+<td><code>devenv/</code></td>
+<td>The dev environments' SSH host keys</td>
+</tr>
+<tr>
+<td><code>manifest.json</code></td>
+<td>Version, schema, the key's fingerprint (never the key), sizes, checksums, row counts, the storages and kept environments, and what the bundle does not contain</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Admin → Overview → Backups</strong> lists the bundles, makes one on demand (<strong>Back up now</strong>, a <code>manual</code> bundle) and
+downloads the database file. The newest <code>backup_keep</code> (default 7) daily and manual bundles are kept; upgrade
+snapshots and <code>prerestore</code> bundles are never removed automatically. <code>backup_keep</code> 0 switches automatic backups off.</p>
+<p><strong>Not in a backup</strong>: <code>/workspace</code> and other kept directories, kept environments' containers, saved environment
+images, models, and the data on managed storages. Back those up separately where they live:</p>
+<ul>
+<li><strong>Storages</strong> (Admin → Storage: host folders, NFS, SMB): with the backup of that server or folder.</li>
+<li>
+<p><strong>Docker volumes</strong> (when no storage and no storage directory is set), e.g. one person's <code>/workspace</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-v<span class="w"> </span>slotserve-workspace-u3:/v:ro<span class="w"> </span>-v<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span>:/out<span class="w"> </span>busybox:1.37<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>tar<span class="w"> </span>czf<span class="w"> </span>/out/workspace-u3.tgz<span class="w"> </span>-C<span class="w"> </span>/v<span class="w"> </span>.
+</code></pre></div>
+</li>
+<li>
+<p><strong>Models</strong>: usually downloaded again, or copied with the models folder.</p>
+</li>
+<li><strong>Saved images</strong>: <code>docker save</code> the images you care about.</li>
+</ul>
+<h3 id="backup-target">Keep a copy off the machine<a class="headerlink" href="#backup-target" title="Permanent link">&para;</a></h3>
+<p>A backup on the same disk does not survive the disk. Set <strong>Copy backups to</strong> (<code>backup_target</code>, Admin → System
+settings) and every daily bundle is copied there after it is written, into a folder <code>slotserve-backups/</code>, keeping
+the newest <code>backup_keep</code> copies:</p>
+<ul>
+<li>
+<p><strong>An absolute path</strong> SlotServe can write, typically a mounted NAS share. With Docker this is a path <strong>inside the
+  container</strong>: mount the share into it first, e.g. in <code>docker-compose.yml</code> under <code>volumes</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/mnt/nas/slotserve:/backup-target</span>
+</code></pre></div>
+<p>and set <code>backup_target</code> to <code>/backup-target</code>.
+- <strong><code>storage:&lt;id&gt;</code></strong>: a storage from <strong>Admin → Storage</strong> (its id is in the list). SlotServe writes the bundle
+  through a short-lived helper container, so the share does not need to be mounted into SlotServe.</p>
+</li>
+</ul>
+<p>The setup checklist item <strong>Backups kept elsewhere</strong> ticks once a bundle has been copied.</p>
+<h3 id="backup-alerts">When a backup fails<a class="headerlink" href="#backup-alerts" title="Permanent link">&para;</a></h3>
+<p>The health checks <strong>backup</strong> and <strong>backup_age</strong> watch the backups, and admins are alerted (inbox, then chat
+platforms) when:</p>
+<ul>
+<li>the last backup failed (the evidence has the error; <strong>Try again</strong> makes a new one);</li>
+<li>the copy to the backup target failed or the target is not valid;</li>
+<li>the newest backup is older than 36 hours (the server was down, or the backup task is stuck).</li>
+</ul>
+<p>A warning "Backups are only on this machine's disk" stays until a backup target is set (it can be dismissed with a
+reason). <code>/metrics</code> exports <code>slotserve_backup_age_seconds</code> for external monitoring.</p>
+<h3 id="secret-key">The secret key<a class="headerlink" href="#secret-key" title="Permanent link">&para;</a></h3>
+<p>The secret key signs browser sessions and encrypts the secrets SlotServe stores: storage passwords (SMB) and the
+viewable copies of API keys (when <strong>Let people view their API keys again</strong> is on). It does not protect the API keys themselves (they are
+stored as hashes) or passwords (also hashes).</p>
+<ul>
+<li>When <code>SLOTSERVE_SECRET_KEY</code> is <strong>unset, empty or <code>change-me</code></strong>, SlotServe generates a random key on the first
+  start and keeps it in <code>data/secret_key</code> (readable by its owner only). Every backup bundle includes it.</li>
+<li>When <code>SLOTSERVE_SECRET_KEY</code> is <strong>set</strong> to anything else, that value is used and is <strong>not</strong> written into backups:
+  keep it with your other secrets (a password manager), next to the <code>.env</code>.</li>
+</ul>
+<p><strong>What to back up</strong>: the backup bundles (copied off the machine), plus <code>.env</code> and, if you set it, the secret key.
+Copying the whole data directory while SlotServe is stopped is also a complete backup of SlotServe's own state.</p>
+<h4 id="secret-key-lost">Secret key lost or changed<a class="headerlink" href="#secret-key-lost" title="Permanent link">&para;</a></h4>
+<p><strong>Symptom.</strong> After a restart or a move everyone is signed out; the health check <strong>secrets</strong> says "N stored
+secret(s) cannot be decrypted with the current secret key"; SMB storages fail to mount; viewable API key copies
+cannot be shown.</p>
+<p><strong>Diagnose.</strong> The check's evidence lists what cannot be decrypted. <code>slotserve doctor</code> shows the same. Compare the
+key's fingerprint in a bundle's <code>manifest.json</code> (<code>secret_key.fingerprint</code>) between a bundle from before and one
+from after the change.</p>
+<p><strong>Fix.</strong></p>
+<ul>
+<li><strong>Put the old key back</strong> if you have it: the <code>secret_key</code> file of a bundle from before the change (stop
+  SlotServe, copy it to <code>data/secret_key</code>, start), or the old value of <code>SLOTSERVE_SECRET_KEY</code> in <code>.env</code>. An
+  explicitly set <code>SLOTSERVE_SECRET_KEY</code> always wins over <code>data/secret_key</code>: remove it from <code>.env</code> if you want the
+  file to be used.</li>
+<li><strong>Without the old key</strong>, enter the listed secrets again: the password of each SMB storage in <strong>Admin →
+  Storage</strong>; viewable API key copies cannot be recovered (the keys themselves keep working; their owners can make
+  new ones). People sign in again.</li>
+</ul>
+<p><strong>Rotating the key on purpose</strong> (it leaked): stop SlotServe, set a new <code>SLOTSERVE_SECRET_KEY</code> (<code>openssl rand -hex
+32</code>) or delete <code>data/secret_key</code> to have a new one generated, start, then re-enter the secrets as above. Everyone is
+signed out.</p>
+<p><strong>Prevent.</strong> Keep backups off the machine; if you set the key yourself, store it outside the server.</p>
+<h2 id="restore">Restore from a backup<a class="headerlink" href="#restore" title="Permanent link">&para;</a></h2>
+<p><code>slotserve restore</code> puts a bundle back. The server must be stopped.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>stop<span class="w"> </span>slotserve
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>--no-deps<span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>restore<span class="w"> </span>slotserve-daily-20261020-030000
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+<ul>
+<li>The argument is a bundle folder name in <code>data/backups/</code> or a path the command can see (inside the container: put
+  a bundle from the NAS into <code>DATA_DIR/backups/</code> first).</li>
+<li>It asks you to type <code>restore</code> (<code>--yes</code> skips the question). It refuses a backup from a newer SlotServe and one
+  that fails SQLite's integrity check.</li>
+<li>Before it replaces anything, the current state is saved as a <code>slotserve-prerestore-&lt;time&gt;</code> bundle, so a restore
+  can itself be undone the same way.</li>
+<li>It puts back the database, the secret key (<code>--keep-key</code> keeps the current one; secrets of the backup then cannot
+  be decrypted) and the SSH host keys. A backup from an older version is upgraded on the next start, after its own
+  snapshot. The command prints warnings you must act on, for example that <code>SLOTSERVE_SECRET_KEY</code> in <code>.env</code>
+  overrides the restored key.</li>
+</ul>
+<p>Older single-file backups (<code>slotserve-daily-&lt;time&gt;.db</code>) and upgrade snapshots can be restored the same way.</p>
+<h3 id="reconcile">The reconciliation report<a class="headerlink" href="#reconcile" title="Permanent link">&para;</a></h3>
+<p>The restored database describes the moment of the backup, while Docker and the disk have moved on. On the next
+start SlotServe compares them and shows the result as the health check <strong>restore</strong> on <strong>Admin → Overview</strong> (also
+in <code>data/restore_report.json</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Finding</th>
+<th>Meaning</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Environment missing</td>
+<td>The database expects a container that Docker does not have (removed after the backup, or a new machine)</td>
+<td>For a kept environment, its installed software is gone; its kept directories are not affected. End or delete it, and start it again from its template.</td>
+</tr>
+<tr>
+<td>Unknown container</td>
+<td>A SlotServe container the database does not know (created after the backup)</td>
+<td>Save what matters from it (<code>docker cp</code>, or let its owner copy files out), then remove it with <code>docker rm -f &lt;name&gt;</code>.</td>
+</tr>
+<tr>
+<td>Model file missing</td>
+<td>A model whose file is not where the database says</td>
+<td>Copy the file back, or scan the models folder and remove the stale entry.</td>
+</tr>
+<tr>
+<td>Storages</td>
+<td>Listed for a re-check</td>
+<td>Press <strong>Check</strong> for each in <strong>Admin → Storage</strong>.</td>
+</tr>
+</tbody>
+</table>
+<p>Volumes and ports are not compared. When Docker is not reachable the check waits ("waiting for Docker to
+compare") and runs once Docker is back.</p>
+<p><strong>Until an admin dismisses the restore check, SlotServe removes nothing the database does not know</strong> (no cleanup
+of unknown containers, networks or volumes). Read the report, deal with each line, then <strong>Dismiss</strong> it with a
+reason; normal cleanup resumes.</p>
+<h3 id="new-machine">Move to a new machine<a class="headerlink" href="#new-machine" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Install SlotServe on the new machine as in <a href="../getting-started/">Getting started</a>, with the <strong>same or a newer</strong>
+   version, and copy <code>.env</code> (it holds <code>SLOTSERVE_SECRET_KEY</code> if you set one). Do not start it yet.</li>
+<li>
+<p>Copy the newest bundle into the new <code>DATA_DIR/backups/</code> and restore it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>--no-deps<span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>restore<span class="w"> </span>--yes<span class="w"> </span>slotserve-daily-20261020-030000
+</code></pre></div>
+</li>
+<li>
+<p>Copy what is not in the bundle: the models folder, Docker volumes or the storage directory with <code>/workspace</code>
+   and kept directories, saved images (<code>docker save</code> / <code>docker load</code>). Storages on a NAS only need the new machine
+   to reach them (NFS exports allow its address; <code>nfs-common</code> / <code>cifs-utils</code> installed).</p>
+</li>
+<li>Start (<code>docker compose up -d</code>) and read the <a href="#reconcile">reconciliation report</a>: environments of the old machine
+   are listed as missing.</li>
+<li>Point people at the new address (<code>SLOTSERVE_PUBLIC_URL</code>, DNS). Everyone's SSH known_hosts entries change with
+   the address; the host keys themselves came with the bundle.</li>
+</ol>
+<h2 id="setup-code">First admin and setup code<a class="headerlink" href="#setup-code" title="Permanent link">&para;</a></h2>
+<p>A new installation has no admin. Until one exists, SlotServe prints a one-time <strong>setup code</strong> in its log at every
+start; the sign-up form asks for it instead of the invite code, and that account becomes the admin:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>slotserve<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-A4<span class="w"> </span><span class="s2">"No admin account"</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>setup-code
+</code></pre></div>
+<p>The code stops working as soon as an admin exists, and installations that already have an admin never ask for it.
+While the invite code is still <code>change-me</code>, nobody else can sign up: set <strong>Invite code</strong> in Admin → System
+settings, or create <strong>invite links</strong> in Admin → Users (they expire, count their sign-ups, can be revoked and can
+ask for an admin's approval; they never contain the invite code).</p>
+<p>More admins: <strong>Admin → Users</strong>, or <code>docker compose exec slotserve slotserve set-admin &lt;username&gt;</code> (<code>--revoke</code> to
+remove). Keep at least two admins so one can help the other.</p>
+<h2 id="reverse-proxy">Reverse proxy<a class="headerlink" href="#reverse-proxy" title="Permanent link">&para;</a></h2>
+<p>Put SlotServe behind a reverse proxy for HTTPS or a nicer address. Three things matter.</p>
+<p><strong>1. The address: <code>Host</code> or <code>SLOTSERVE_PUBLIC_URL</code>.</strong> SlotServe refuses changing requests (POST, PUT, PATCH,
+DELETE) from a browser unless their <code>Origin</code> is SlotServe's own address: the host the request was sent to (<code>Host</code>,
+or <code>X-Forwarded-Host</code>) or the origin of <code>SLOTSERVE_PUBLIC_URL</code>. A proxy that rewrites <code>Host</code> to <code>127.0.0.1:8000</code>
+makes every change in the web UI fail with "did not come from a SlotServe page". Pass the original host, and set
+<code>SLOTSERVE_PUBLIC_URL</code> to the address people type (it is also used in links SlotServe sends):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nv">SLOTSERVE_PUBLIC_URL</span><span class="o">=</span>https://gpu.example.org
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nv">SLOTSERVE_COOKIE_SECURE</span><span class="o">=</span><span class="nb">true</span><span class="w">                 </span><span class="c1"># cookies only over HTTPS</span>
+</code></pre></div>
+<p><strong>2. Client addresses: <code>SLOTSERVE_FORWARDED_ALLOW_IPS</code>.</strong> Sign-in throttling locks an account per address
+(account + IP), the audit log records addresses and API keys show where they were last used. SlotServe only
+believes <code>X-Forwarded-For</code> from the proxies listed in <code>SLOTSERVE_FORWARDED_ALLOW_IPS</code> (default <code>127.0.0.1</code>).
+With Docker, the proxy's connections arrive from Docker's bridge address (for example <code>172.18.0.1</code>), not
+<code>127.0.0.1</code>: sign in once, look at the address of your sign-in in <strong>Admin → Audit log</strong>, and if it is the proxy's
+rather than your own, put that address in:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nv">SLOTSERVE_FORWARDED_ALLOW_IPS</span><span class="o">=</span><span class="m">172</span>.18.0.1<span class="w">     </span><span class="c1"># comma separated; "*" only if port 8000 is reachable from the proxy alone</span>
+</code></pre></div>
+<p>Without it, everybody shares the proxy's address and failed sign-ins from one person can slow down others.</p>
+<p><strong>3. Streaming and the second port.</strong> Turn off buffering so model answers stream, allow long requests, and pass
+WebSockets. Dev environment web interfaces use port 8001 and need an address of their own (they must stay a
+different origin from SlotServe): a second <code>server</code> block or a second host name, with <code>SLOTSERVE_DEVENV_WEB_URL</code>
+set to it.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">server</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">    </span><span class="kn">listen</span><span class="w"> </span><span class="mi">443</span><span class="w"> </span><span class="s">ssl</span><span class="p">;</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span><span class="kn">server_name</span><span class="w"> </span><span class="s">gpu.example.org</span><span class="p">;</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="c1"># ssl_certificate ...;</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="s">/</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">        </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://127.0.0.1:8000</span><span class="p">;</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Host</span><span class="w"> </span><span class="nv">$host</span><span class="p">;</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">X-Forwarded-For</span><span class="w"> </span><span class="nv">$proxy_add_x_forwarded_for</span><span class="p">;</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">X-Forwarded-Proto</span><span class="w"> </span><span class="nv">$scheme</span><span class="p">;</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">        </span><span class="kn">proxy_http_version</span><span class="w"> </span><span class="mi">1</span><span class="s">.1</span><span class="p">;</span>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Upgrade</span><span class="w"> </span><span class="nv">$http_upgrade</span><span class="p">;</span>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Connection</span><span class="w"> </span><span class="s">"upgrade"</span><span class="p">;</span>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="w">        </span><span class="kn">proxy_buffering</span><span class="w"> </span><span class="no">off</span><span class="p">;</span>
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">        </span><span class="kn">proxy_read_timeout</span><span class="w"> </span><span class="s">1h</span><span class="p">;</span>
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">        </span><span class="kn">client_max_body_size</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="p">}</span>
+<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>
+<a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="k">server</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a><span class="w">    </span><span class="kn">listen</span><span class="w"> </span><span class="mi">8443</span><span class="w"> </span><span class="s">ssl</span><span class="p">;</span><span class="w">                            </span><span class="c1"># or another server_name on 443</span>
+<a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a><span class="w">    </span><span class="kn">server_name</span><span class="w"> </span><span class="s">gpu.example.org</span><span class="p">;</span>
+<a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a><span class="w">    </span><span class="c1"># ssl_certificate ...;</span>
+<a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a><span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="s">/</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a><span class="w">        </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://127.0.0.1:8001</span><span class="p">;</span>
+<a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Host</span><span class="w"> </span><span class="nv">$host</span><span class="p">;</span>
+<a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">X-Forwarded-For</span><span class="w"> </span><span class="nv">$proxy_add_x_forwarded_for</span><span class="p">;</span>
+<a id="__codelineno-11-27" name="__codelineno-11-27" href="#__codelineno-11-27"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">X-Forwarded-Proto</span><span class="w"> </span><span class="nv">$scheme</span><span class="p">;</span>
+<a id="__codelineno-11-28" name="__codelineno-11-28" href="#__codelineno-11-28"></a><span class="w">        </span><span class="kn">proxy_http_version</span><span class="w"> </span><span class="mi">1</span><span class="s">.1</span><span class="p">;</span>
+<a id="__codelineno-11-29" name="__codelineno-11-29" href="#__codelineno-11-29"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Upgrade</span><span class="w"> </span><span class="nv">$http_upgrade</span><span class="p">;</span>
+<a id="__codelineno-11-30" name="__codelineno-11-30" href="#__codelineno-11-30"></a><span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Connection</span><span class="w"> </span><span class="s">"upgrade"</span><span class="p">;</span>
+<a id="__codelineno-11-31" name="__codelineno-11-31" href="#__codelineno-11-31"></a><span class="w">        </span><span class="kn">proxy_buffering</span><span class="w"> </span><span class="no">off</span><span class="p">;</span>
+<a id="__codelineno-11-32" name="__codelineno-11-32" href="#__codelineno-11-32"></a><span class="w">        </span><span class="kn">proxy_read_timeout</span><span class="w"> </span><span class="s">1h</span><span class="p">;</span>
+<a id="__codelineno-11-33" name="__codelineno-11-33" href="#__codelineno-11-33"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-11-34" name="__codelineno-11-34" href="#__codelineno-11-34"></a><span class="p">}</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nv">SLOTSERVE_DEVENV_WEB_URL</span><span class="o">=</span>https://gpu.example.org:8443
+</code></pre></div>
+<p>The OpenAI-compatible API (<code>/v1</code>) works through the same proxy; clients use <code>https://gpu.example.org/v1</code>. SSH and
+direct ports of dev environments do not go through the proxy (see <a href="#firewall">Ports and firewall</a>).</p>
+<h2 id="health">Health checks and <code>slotserve doctor</code><a class="headerlink" href="#health" title="Permanent link">&para;</a></h2>
+<p>One set of checks feeds every view of SlotServe's health:</p>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>What</th>
+<th>Who</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Admin → Overview</strong></td>
+<td>Setup checklist, then the <strong>System health</strong> table: every check with its evidence, buttons, a diagnosis for recognised errors, and dismissing with a reason</td>
+<td>Admins</td>
+</tr>
+<tr>
+<td><code>GET /healthz</code></td>
+<td>Shallow: the process answers (Docker's <code>HEALTHCHECK</code> uses it)</td>
+<td>Anyone</td>
+</tr>
+<tr>
+<td><code>GET /api/health</code></td>
+<td>Every check as JSON (<code>checks[]</code>, <code>status: ok / degraded / down</code>); <code>?strict=true</code> answers 503 while a check fails, for uptime monitors</td>
+<td>Admin session or the metrics token (<code>Authorization: Bearer &lt;SLOTSERVE_METRICS_TOKEN&gt;</code>)</td>
+</tr>
+<tr>
+<td><code>GET /metrics</code></td>
+<td>Prometheus: <code>slotserve_check_status</code>, <code>slotserve_backup_age_seconds</code> and the GPU and usage metrics</td>
+<td>Metrics token</td>
+</tr>
+<tr>
+<td><code>slotserve doctor</code></td>
+<td>The same checks from the command line</td>
+<td>Shell on the server</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>doctor<span class="w">          </span><span class="c1"># while the server runs</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>--no-deps<span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>doctor<span class="w">   </span><span class="c1"># when it does not start</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>slotserve<span class="w"> </span>doctor<span class="w"> </span>--json<span class="w">                                 </span><span class="c1"># machine-readable, secrets removed</span>
+</code></pre></div>
+<p><code>doctor</code> prints one line per check (<code>ok</code>, <code>info</code>, <code>WARN</code>, <code>ERROR</code>) with the evidence of warnings and errors, and
+exits with code 1 when a check is at level error. It runs in its own process, so checks of the running server's
+internals (lanes, background tasks) are only in the web UI and <code>/api/health</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>What it looks at</th>
+<th>When it is not OK</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>database</td>
+<td>The database can be written</td>
+<td>Disk full or read-only, file permissions</td>
+</tr>
+<tr>
+<td>disk</td>
+<td>Free space where data and models live, and on storages</td>
+<td><a href="#disk-full">Disk full</a></td>
+</tr>
+<tr>
+<td>engine</td>
+<td>The inference engine program exists</td>
+<td>Fix <code>LLAMA_CPP_DIR</code> / <code>SLOTSERVE_LLAMA_SERVER_CMD</code>; see <a href="../configuration/#llama-server">Configuration</a></td>
+</tr>
+<tr>
+<td>lanes</td>
+<td>Every lane's model server</td>
+<td>A failed load, with its diagnosis; <a href="../faq/#diagnosis">FAQ: diagnoses</a></td>
+</tr>
+<tr>
+<td>models</td>
+<td>At least one model, an idle default per lane</td>
+<td>Add a model, set a default (Admin → GPUs &amp; lanes)</td>
+</tr>
+<tr>
+<td>gpu</td>
+<td><code>nvidia-smi</code> sees GPUs</td>
+<td><a href="#gpu-gone">GPUs gone</a></td>
+</tr>
+<tr>
+<td>docker</td>
+<td>Docker is reachable (dev environments on)</td>
+<td><a href="../dev-environments/#docker">Dev environments: Docker</a></td>
+</tr>
+<tr>
+<td>storage</td>
+<td>Every storage mounts and is writable</td>
+<td><a href="../storage/#types">Storage</a>, the diagnosis on the check</td>
+</tr>
+<tr>
+<td>chat</td>
+<td>Chat platforms are connected</td>
+<td>Admin → Chat channels</td>
+</tr>
+<tr>
+<td>backup</td>
+<td>The last backup and its copy off the machine</td>
+<td><a href="#backups">Backups</a></td>
+</tr>
+<tr>
+<td>backup_age</td>
+<td>The newest backup is younger than 36 hours</td>
+<td><a href="#backup-alerts">When a backup fails</a></td>
+</tr>
+<tr>
+<td>restore</td>
+<td>A restore waits for its reconciliation</td>
+<td><a href="#reconcile">The reconciliation report</a></td>
+</tr>
+<tr>
+<td>migration</td>
+<td>The last upgrade kept every row</td>
+<td><code>data/migration_report.json</code></td>
+</tr>
+<tr>
+<td>tasks</td>
+<td>Background tasks run and report back</td>
+<td>Restart SlotServe; report the evidence</td>
+</tr>
+<tr>
+<td>secrets</td>
+<td>Stored secrets can be decrypted</td>
+<td><a href="#secret-key-lost">Secret key lost</a></td>
+</tr>
+<tr>
+<td>security</td>
+<td>Number of admins; dev environments mean root on the host</td>
+<td>A note to read once</td>
+</tr>
+<tr>
+<td>invite</td>
+<td>The invite code is not <code>change-me</code></td>
+<td>Set an invite code or use invite links</td>
+</tr>
+</tbody>
+</table>
+<p>Some results are notes rather than problems (no chat platform on purpose, a machine without GPU): <strong>Dismiss…</strong>
+them with a reason. A dismissed check stays in the table, no longer counts as a problem, and the reason is in the
+audit log; it comes back on its own when its level changes.</p>
+<h2 id="alerts">Inbox and alerts<a class="headerlink" href="#alerts" title="Permanent link">&para;</a></h2>
+<p>Every notification goes into the in-app <strong>inbox</strong> first (the bell in the header) and then to the chat platforms
+the person linked. Members get the news about their own work (approvals, reminders, environments that are ready or
+failed). Admins also get the admin messages: approvals to give, sign-ups waiting, failed model loads, storages
+that stop working, sensitive settings changes, and the health alerts.</p>
+<ul>
+<li>A check that reaches its alert level (an error, for some checks a warning, some only after a while) sends <strong>one</strong>
+  alert to all admins, and one more when it recovers. There are no repeats, also not across restarts. Dismissed
+  checks do not alert.</li>
+<li>Group webhooks (Feishu / Lark, DingTalk, WeCom) can get admin alerts too: <strong>Admin → Chat channels</strong>.</li>
+<li>Without any chat platform nothing is lost: the inbox has everything. The Admin menu item shows how many admin
+  messages are unread.</li>
+<li>For monitoring from outside, poll <code>/api/health?strict=true</code> or scrape <code>/metrics</code> (<code>slotserve_check_status</code>).</li>
+</ul>
+<h2 id="hardening">Container hardening and compatibility mode<a class="headerlink" href="#hardening" title="Permanent link">&para;</a></h2>
+<p>Every container SlotServe starts for a dev environment is hardened in one fixed last step:</p>
+<ul>
+<li><strong>no new privileges</strong>: setuid programs such as <code>sudo</code> cannot gain rights;</li>
+<li>capabilities <code>NET_RAW</code>, <code>MKNOD</code>, <code>SYS_CHROOT</code>, <code>AUDIT_WRITE</code> and <code>SETFCAP</code> are dropped (<code>ping</code> does not work);</li>
+<li>at most <code>SLOTSERVE_DEVENV_PIDS_LIMIT</code> processes (default 4096), so a fork bomb stays inside its container;</li>
+<li>a memory limit (the <strong>Memory limit</strong> setting, or with 0 the host's memory less max(4 GB, 10 %)), so an
+  out-of-memory job is killed inside its container instead of taking SlotServe down;</li>
+<li>bounded logs, exactly the lane's GPUs, never privileged, never the host's network or process namespace, never
+  the Docker socket.</li>
+</ul>
+<p>People are <code>root</code> inside their container, so <code>apt install</code> works without <code>sudo</code>. What changes:</p>
+<table>
+<thead>
+<tr>
+<th>Symptom inside an environment</th>
+<th>Why</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sudo: effective uid is not 0</code> or a setuid program fails</td>
+<td>No new privileges</td>
+<td>Run as root without <code>sudo</code>. For an image that must use setuid (its own init system, a user switch), an admin turns on <strong>Compatibility mode</strong> in that template's settings (Dev environments, admins only; the built-in desktop already uses it). Less isolated: only for images you trust.</td>
+</tr>
+<tr>
+<td><code>ping: permission denied</code></td>
+<td><code>NET_RAW</code> is dropped</td>
+<td>Use <code>curl</code> or <code>nc</code> to test connections.</td>
+</tr>
+<tr>
+<td><code>fork: Resource temporarily unavailable</code></td>
+<td>The process limit</td>
+<td>Fewer parallel workers, or raise <code>SLOTSERVE_DEVENV_PIDS_LIMIT</code>.</td>
+</tr>
+<tr>
+<td>A job is <code>Killed</code></td>
+<td>The memory limit</td>
+<td>A smaller batch, or a higher <strong>Memory limit</strong>. Admins see the limit that applies in <code>/api/devenv</code> (<code>hardening</code>).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Web interface compatibility mode</strong> (Admin → System settings, <code>SLOTSERVE_DEVENV_WEB_COMPAT</code>) is a different
+switch: it relaxes the rules that keep the pages of one environment from acting in another one opened in the same
+browser (on the web port 8001). Turn it on only when an app in an environment's web interface does not work and
+nothing else helps; it weakens the isolation between environments and nothing else.</p>
+<h2 id="firewall">Ports and firewall<a class="headerlink" href="#firewall" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Port</th>
+<th>What</th>
+<th>Who needs to reach it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>8000</strong> (<code>PORT</code>)</td>
+<td>Web UI, <code>/api</code>, the OpenAI-compatible <code>/v1</code>, <code>/metrics</code></td>
+<td>Everyone (or only the reverse proxy)</td>
+</tr>
+<tr>
+<td><strong>8001</strong> (<code>DEVENV_WEB_PORT</code>, <code>SLOTSERVE_DEVENV_WEB_PORT</code>)</td>
+<td>Dev environment web interfaces (VS Code, JupyterLab, desktop, your own web apps)</td>
+<td>Everyone who uses them (or only the reverse proxy)</td>
+</tr>
+<tr>
+<td><strong>8002</strong> (<code>SLOTSERVE_DEVENV_GATEWAY_PORT</code>)</td>
+<td>The container-side gateway: only <code>/v1</code>, for code inside dev environments</td>
+<td>Only the dev environment containers; never open it to the network</td>
+</tr>
+<tr>
+<td><strong>2200-2299</strong> (SSH ports)</td>
+<td>SSH into dev environments, one port per running environment</td>
+<td>Everyone who uses SSH</td>
+</tr>
+<tr>
+<td><strong>2300-2399</strong> (Direct port range)</td>
+<td>Ports people publish directly from their environments</td>
+<td>Everyone who uses them; a direct port has no SlotServe login</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>The ranges are settings (<strong>SSH ports</strong>, <strong>Direct port range</strong>); keep them apart from each other and from ports
+  the host uses.</li>
+<li>
+<p><strong>Docker publishes the SSH and direct ports itself</strong>, through its own iptables rules, which bypass <code>ufw</code> and
+  <code>firewalld</code> rules on the host. To restrict who can reach them, use the <code>DOCKER-USER</code> chain or a firewall in front
+  of the machine, for example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># only the 10.0.0.0/8 network may reach the SSH and direct ports of dev environments</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>iptables<span class="w"> </span>-I<span class="w"> </span>DOCKER-USER<span class="w"> </span>-p<span class="w"> </span>tcp<span class="w"> </span>-m<span class="w"> </span>multiport<span class="w"> </span>--dports<span class="w"> </span><span class="m">2200</span>:2399<span class="w"> </span>!<span class="w"> </span>-s<span class="w"> </span><span class="m">10</span>.0.0.0/8<span class="w"> </span>-j<span class="w"> </span>DROP
+</code></pre></div>
+</li>
+<li>
+<p><strong>Port 8002</strong> needs nothing when SlotServe runs in Docker: the gateway lives inside SlotServe's container and is
+  reached as <code>slotserve-gw</code> on each environment's network. When SlotServe runs directly on the host, it listens on
+  Docker's bridge address (<code>docker0</code>); a host firewall that drops traffic from containers to the host must allow
+  TCP 8002 from Docker's networks (by default inside <code>172.16.0.0/12</code> and <code>192.168.0.0/16</code>), for example
+  <code>ufw allow from 172.16.0.0/12 to any port 8002 proto tcp</code>.</p>
+</li>
+<li>Behind a reverse proxy, 8000 and 8001 can be bound to <code>127.0.0.1</code> (<code>ports: - "127.0.0.1:8000:8000"</code>) so that
+  only the proxy reaches them.</li>
+</ul>
+<h2 id="runbooks">Runbooks<a class="headerlink" href="#runbooks" title="Permanent link">&para;</a></h2>
+<h3 id="admin-password">Forgotten admin password or locked out<a class="headerlink" href="#admin-password" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom.</strong> An admin cannot sign in; or "too many attempts".</p>
+<p><strong>Diagnose.</strong> Failed sign-ins lock an account for 15 minutes from the address they came from (10 failures per
+account and address, 30 per address); other addresses are not affected. Behind a proxy without
+<code>SLOTSERVE_FORWARDED_ALLOW_IPS</code>, everyone shares one address (<a href="#reverse-proxy">Reverse proxy</a>).</p>
+<p><strong>Fix.</strong></p>
+<ul>
+<li>Another admin resets the password in <strong>Admin → Users</strong>.</li>
+<li>
+<p>On the server:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>reset-password<span class="w"> </span>&lt;username&gt;<span class="w">    </span><span class="c1"># asks for the new password</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>set-admin<span class="w"> </span>&lt;username&gt;<span class="w">         </span><span class="c1"># if no admin is left</span>
+</code></pre></div>
+<p>The reset signs that account out everywhere. The lock is held in memory: <code>docker compose restart slotserve</code>
+clears it.
+- No admin account at all any more: <a href="#setup-code">setup code</a>.</p>
+</li>
+</ul>
+<p><strong>Prevent.</strong> Two admins; passwords in a password manager.</p>
+<h3 id="disk-full">Disk full<a class="headerlink" href="#disk-full" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom.</strong> The health check <strong>disk</strong> warns or errors; backups, downloads or model loads fail with "No space left
+on device"; the database cannot be written.</p>
+<p><strong>Diagnose.</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>df<span class="w"> </span>-h<span class="w">                                  </span><span class="c1"># which file system</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>du<span class="w"> </span>-sh<span class="w"> </span>data/*<span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-h<span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w">         </span><span class="c1"># SlotServe's data directory</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>docker<span class="w"> </span>system<span class="w"> </span>df<span class="w">                       </span><span class="c1"># images, containers, volumes, build cache</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>du<span class="w"> </span>-sh<span class="w"> </span><span class="s2">"</span><span class="nv">$MODELS_DIR</span><span class="s2">"</span>
+</code></pre></div>
+<p>Usual culprits: models, Docker images (environment templates, saved images, kept environments' snapshots),
+<code>/workspace</code> volumes, old backups and upgrade snapshots in <code>data/backups/</code>, logs.</p>
+<p><strong>Fix.</strong></p>
+<ul>
+<li>Models no one uses: delete them in <strong>Models</strong> (removes the file).</li>
+<li>Docker: <code>docker image prune</code> (unused images), and saved environment images people no longer need (deleting the
+  saved template removes its image). Do not <code>docker volume prune</code> blindly: volumes hold people's <code>/workspace</code>.</li>
+<li>Backups: upgrade snapshots and <code>prerestore</code> bundles are never removed automatically; delete old ones by hand
+  once you no longer need them. Lower <code>backup_keep</code> if needed.</li>
+<li>Logs: model server logs rotate at 20 MB, the SlotServe container's Docker log at 5 × 50 MB. Containers of dev
+  environments are limited the same way.</li>
+<li>Usage records are folded after <code>SLOTSERVE_USAGE_RETENTION_DAYS</code>; the audit log is kept for
+  <code>SLOTSERVE_AUDIT_RETENTION_DAYS</code>.</li>
+</ul>
+<p><strong>Prevent.</strong> Models and Docker's data root on a different disk than the system; a backup target; set a soft limit
+on personal storages; watch the disk check's warning (it starts at twice the download free-space minimum, at least
+5 GB).</p>
+<h3 id="devenv-start">Dev environment does not start<a class="headerlink" href="#devenv-start" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom.</strong> An environment's card says it did not start; the person was notified.</p>
+<p><strong>Diagnose.</strong> As admin, <strong>Dev environments → Everyone</strong>, open the environment: its error and <strong>Logs</strong>. Recognised
+errors come with a diagnosis (cause and next steps); see <a href="../faq/#diagnosis">FAQ: diagnoses</a>. Then by cause:</p>
+<table>
+<thead>
+<tr>
+<th>Cause</th>
+<th>Typical error</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Image pull</td>
+<td><code>pull access denied</code>, <code>manifest unknown</code>, <code>toomanyrequests</code></td>
+<td>Check the image name and tag; the Docker host's access to the registry (proxy, mirror); <code>docker login</code> on the host for private images or Docker Hub limits; pull it once by hand.</td>
+</tr>
+<tr>
+<td>Port conflict</td>
+<td><code>port is already allocated</code>, <code>address already in use</code></td>
+<td>Something else on the host uses a port of the SSH or direct range: move the range (settings) or the other program.</td>
+</tr>
+<tr>
+<td>Mounts</td>
+<td><code>failed to mount local volume</code>, <code>mount error(13)</code>, <code>access denied by server</code></td>
+<td>Storage: <strong>Check</strong> it in Admin → Storage; install <code>nfs-common</code> / <code>cifs-utils</code> on the Docker host; NFS exports must allow the host. Storage directory: must be a path on the Docker host.</td>
+</tr>
+<tr>
+<td>CPU set</td>
+<td><code>Requested CPUs are not available</code>, <code>cpuset</code></td>
+<td>Fewer cores than lanes reserve: lower <strong>CPU cores reserved per GPU</strong>; after a CPU change restart SlotServe so it reads the host again.</td>
+</tr>
+<tr>
+<td>GPU</td>
+<td><code>could not select device driver "nvidia"</code></td>
+<td><a href="#gpu-gone">GPUs gone</a></td>
+</tr>
+<tr>
+<td>Lane without GPUs</td>
+<td><code>devenv_lane_no_gpus</code></td>
+<td>Give the lane its GPUs in Admin → GPUs &amp; lanes.</td>
+</tr>
+<tr>
+<td>Docker</td>
+<td><code>Cannot connect to the Docker daemon</code></td>
+<td>Docker running? Socket mounted? See <a href="../dev-environments/#docker">Dev environments: Docker</a>.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Fix.</strong> Fix the cause, then <strong>Try again</strong> on the environment.</p>
+<p><strong>Prevent.</strong> Run <code>python -m tools.verify</code> after changes to Docker, drivers or templates (<a href="#verify">Verify</a>);
+prefer images from registries you control for important templates.</p>
+<h3 id="gpu-gone">GPUs gone after a driver or Docker upgrade<a class="headerlink" href="#gpu-gone" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom.</strong> The health check <strong>gpu</strong> says "No GPU detected"; models fail with CUDA errors; dev environments fail
+with <code>could not select device driver "nvidia"</code>.</p>
+<p><strong>Diagnose.</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>nvidia-smi<span class="w">                                                  </span><span class="c1"># on the host: does the driver work?</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>--gpus<span class="w"> </span>all<span class="w"> </span>ubuntu<span class="w"> </span>nvidia-smi<span class="w">                </span><span class="c1"># can Docker give containers a GPU?</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>nvidia-smi<span class="w">                    </span><span class="c1"># does SlotServe's container see them?</span>
+</code></pre></div>
+<p><strong>Fix.</strong></p>
+<ul>
+<li><code>nvidia-smi</code> fails on the host: the kernel module does not match the new driver; reboot, or reinstall the driver
+  for the running kernel.</li>
+<li>
+<p>Only Docker fails: reconfigure the NVIDIA Container Toolkit and restart Docker:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>sudo<span class="w"> </span>nvidia-ctk<span class="w"> </span>runtime<span class="w"> </span>configure<span class="w"> </span>--runtime<span class="o">=</span>docker
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>docker
+</code></pre></div>
+</li>
+<li>
+<p>Models fail with "CUDA driver version is insufficient": the engine needs a newer driver, or rebuild it for the
+  installed CUDA; with Docker the CUDA major of <code>CUDA_IMAGE</code> must match your <code>llama-server</code> build.</p>
+</li>
+<li>Then <code>docker compose up -d</code> (a Docker restart stops SlotServe unless <code>restart: unless-stopped</code> brings it back).</li>
+</ul>
+<p><strong>Prevent.</strong> Pin the driver packages (<code>apt-mark hold</code>), upgrade drivers and Docker in a maintenance window, and run
+<code>slotserve doctor</code> and <code>tools/verify</code> afterwards.</p>
+<h3 id="leak">Suspected account or key leak<a class="headerlink" href="#leak" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom.</strong> Unknown sign-ins, API usage nobody recognises, a key or password posted somewhere.</p>
+<p><strong>Diagnose.</strong></p>
+<ul>
+<li><strong>Admin → Audit log</strong>: filter by the person, by action (<code>auth.*</code> for sign-ins and failed sign-ins, <code>key.*</code> for
+  API keys) and dates; addresses are recorded (see <a href="#reverse-proxy">Reverse proxy</a> for real addresses). Export the
+  selection as CSV for the record.</li>
+<li><strong>Admin → Request log</strong>: requests by person, key and source (API key, environment key, Playground); each API key
+  shows the address it was last used from.</li>
+</ul>
+<p><strong>Fix.</strong></p>
+<ol>
+<li><strong>Disable the account</strong> (Admin → Users) if it is compromised: it is signed out everywhere and its bookings end.</li>
+<li><strong>Revoke API keys</strong> (Admin → API keys, or the person under <strong>Access credentials</strong>). Environment keys end with
+   their environment.</li>
+<li><strong>Sign out everywhere</strong>: the person uses <strong>Settings → Signed-in devices → Sign out all other devices</strong>; a
+   password change or an admin's reset does the same.</li>
+<li>Remove SSH keys the person does not recognise (Access credentials) and set a new environment password.</li>
+<li>If an admin account or the server's <code>.env</code> leaked, also <a href="#secret-key-lost">rotate the secret key</a> and change
+   the invite code, chat platform tokens and <code>SLOTSERVE_METRICS_TOKEN</code>.</li>
+</ol>
+<p><strong>Prevent.</strong> Keys with an expiry, invite links instead of a shared invite code, few admins, and review the audit
+log now and then.</p>
+<h2 id="verify">Verify on real hardware<a class="headerlink" href="#verify" title="Permanent link">&para;</a></h2>
+<p><code>tools/verify</code> checks a running installation end to end, through its public API, the way people use it: a GPU
+booking and an OpenAI-style request, every built-in dev environment template with SSH (key and password) and its
+web interface, an environment without GPU, a storage, the container hardening and the security protections. It
+creates a throw-away account and removes it again; it changes no settings (a feature that is off is reported as
+skipped). Run it after installing, after upgrades of SlotServe, drivers or Docker, and for every release candidate.</p>
+<p>From a checkout of the SlotServe repository on a machine that reaches the server (Python 3.11+ with <code>httpx</code>, an
+OpenSSH client; <code>sshpass</code> for the password logins):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>python<span class="w"> </span>-m<span class="w"> </span>tools.verify<span class="w"> </span>--url<span class="w"> </span>http://gpu-server:8000<span class="w"> </span>--admin<span class="w"> </span>&lt;admin<span class="w"> </span>account&gt;<span class="w"> </span>--out<span class="w"> </span>reports/
+</code></pre></div>
+<p>The admin password is asked for (or <code>SLOTSERVE_VERIFY_PASSWORD</code>). Useful options: <code>--lane</code>, <code>--model</code>,
+<code>--templates pytorch,vscode</code> (a subset), <code>--storage-id</code> or <code>--storage-host-path</code>, <code>--no-ssh</code>, <code>--no-web</code>,
+<code>--save-image</code>, <code>--destructive</code> (also a fork bomb in an environment without GPU), <code>--keep</code> (keep the test account
+for debugging), <code>--insecure</code> (self-signed TLS). Pulling every template image takes a while the first time.</p>
+<p>It writes <code>verify-report-&lt;host&gt;-&lt;version&gt;.md</code> and <code>.json</code>. Results are <strong>pass</strong>, <strong>fail</strong>, <strong>skip</strong> (a feature is
+off or a tool is missing), <strong>pending</strong> or <strong>manual</strong>: the manual ones are browser checks the tool cannot do (a
+CSRF proof-of-concept page written next to the report, and the isolation of two environments' web pages), with
+instructions in the report. Exit code 0 means nothing failed, 1 that a check failed, 2 that the server could not be
+reached or signed in to. Attach the report to the release pull request (see the release checklist).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 SlotServe contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

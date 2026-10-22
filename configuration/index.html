@@ -1,0 +1,2349 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Book GPU time slots and serve models behind an OpenAI-compatible gateway.">
+      
+      
+      
+        <link rel="canonical" href="https://peleryuan.github.io/slotserve/configuration/">
+      
+      
+        <link rel="prev" href="../getting-started/">
+      
+      
+        <link rel="next" href="../operations/">
+      
+      
+        
+          <link rel="alternate" href="./" hreflang="en">
+        
+          <link rel="alternate" href="../zh/configuration/" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Configuration - SlotServe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#configuration" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="SlotServe" class="md-header__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SlotServe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Configuration
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="../zh/configuration/" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PelerYuan/slotserve" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="SlotServe" class="md-nav__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    SlotServe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PelerYuan/slotserve" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#compose-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compose variables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Compose variables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#llama-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        llama-server
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#slotserve-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SlotServe settings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SlotServe settings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sign-up-and-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sign-up and access
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#booking-and-fair-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Booking and fair use
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notifications-and-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notifications and time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dev-environments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dev environments
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#models-and-downloads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Models and downloads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model-loading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model loading
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#engines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Engines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feishu-lark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feishu / Lark
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dingtalk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DingTalk
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wecom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WeCom
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QQ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#group-webhooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group webhooks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monitoring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#housekeeping-and-backups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Housekeeping and backups
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deployment-restart-to-apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment (restart to apply)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#per-model-launch-arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-model launch arguments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backups-and-restore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backups and restore
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-admin-and-setup-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First admin and setup code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#requests-from-other-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requests from other pages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#admin-command-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admin command line
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notifications & integrations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gpus-and-engines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GPUs, lanes & engines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-environments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How scheduling works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#compose-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compose variables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Compose variables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#llama-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        llama-server
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#slotserve-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SlotServe settings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SlotServe settings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sign-up-and-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sign-up and access
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#booking-and-fair-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Booking and fair use
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notifications-and-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notifications and time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dev-environments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dev environments
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#models-and-downloads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Models and downloads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model-loading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model loading
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#engines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Engines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feishu-lark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feishu / Lark
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dingtalk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DingTalk
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wecom" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WeCom
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QQ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#group-webhooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group webhooks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monitoring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#housekeeping-and-backups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Housekeeping and backups
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deployment-restart-to-apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment (restart to apply)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#per-model-launch-arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-model launch arguments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backups-and-restore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backups and restore
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-admin-and-setup-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First admin and setup code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#requests-from-other-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requests from other pages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#admin-command-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admin command line
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h1>
+<p>SlotServe reads <code>SLOTSERVE_*</code> environment variables, or a <code>.env</code> file in its working directory. Docker Compose loads <code>.env</code> automatically.</p>
+<h2 id="compose-variables">Compose variables<a class="headerlink" href="#compose-variables" title="Permanent link">&para;</a></h2>
+<p>These only exist in <code>docker-compose.yml</code> and describe the <strong>host</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LLAMA_CPP_DIR</code></td>
+<td><em>required</em></td>
+<td>Directory containing <code>llama-server</code>; mounted read-only at <code>/opt/llama.cpp</code></td>
+</tr>
+<tr>
+<td><code>MODELS_DIR</code></td>
+<td><em>required</em></td>
+<td>Directory with <code>.gguf</code> files; mounted at <code>/models</code></td>
+</tr>
+<tr>
+<td><code>DATA_DIR</code></td>
+<td><code>./data</code></td>
+<td>SQLite database and logs; mounted at <code>/data</code></td>
+</tr>
+<tr>
+<td><code>PORT</code></td>
+<td><code>8000</code></td>
+<td>Published port</td>
+</tr>
+<tr>
+<td><code>CUDA_IMAGE</code></td>
+<td><code>nvidia/cuda:12.8.1-runtime-ubuntu24.04</code></td>
+<td>Base image; match the CUDA major version of your llama.cpp build</td>
+</tr>
+</tbody>
+</table>
+<h3 id="llama-server">llama-server<a class="headerlink" href="#llama-server" title="Permanent link">&para;</a></h3>
+<p>SlotServe runs <code>SLOTSERVE_LLAMA_SERVER_CMD</code> for llama.cpp models; in Docker that is <code>/opt/llama.cpp/llama-server</code>, the <code>llama-server</code> in <code>LLAMA_CPP_DIR</code>. The health check <strong>engine</strong> (and the setup checklist item <strong>Inference engine</strong>) says whether it is found. If not: <code>LLAMA_CPP_DIR</code> must be the directory that contains <code>llama-server</code> itself (usually <code>llama.cpp/build/bin</code>), the file must be executable and built for this machine, and shared builds need their <code>lib*.so</code> files next to it. Without Docker, set <code>SLOTSERVE_LLAMA_SERVER_CMD</code> to the full path.</p>
+<h2 id="slotserve-settings">SlotServe settings<a class="headerlink" href="#slotserve-settings" title="Permanent link">&para;</a></h2>
+<!-- settings:start (generated by tools/gen_settings_doc.py from the settings registry; do not edit) -->
+
+<p>Admins change every setting except the deployment parameters in <strong>Admin → System settings</strong>, without a restart: overrides live in the database and win over <code>.env</code>, and <strong>Use default</strong> removes one. Each change is in the audit log with its old and new value (secrets only as a fingerprint) and can be undone. <em>Level</em> is where the setting appears: <em>basic</em> on the policy cards, <em>advanced</em> in the full list, <em>expert</em> folded away. Settings marked ⚠️ can run commands as root on the host (an engine command, a mounted directory, a forwarder image): changing them is recorded as a sensitive change and announced to all admins (a later version also asks for your password again). The deployment parameters are read at start: change them in <code>.env</code> and restart.</p>
+<h3 id="sign-up-and-access">Sign-up and access<a class="headerlink" href="#sign-up-and-access" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Level</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_REGISTRATION_OPEN</code></td>
+<td><code>true</code></td>
+<td>basic</td>
+<td>Allow sign-up with the invite code</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_INVITE_CODE</code></td>
+<td><code>change-me</code></td>
+<td>basic</td>
+<td>Code required to sign up; while it is <code>change-me</code> (or empty) only the first admin can sign up, with the <a href="#first-admin-and-setup-code">setup code</a></td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_APPROVAL_MODE</code></td>
+<td><code>off</code></td>
+<td>basic</td>
+<td><code>off</code>, <code>long</code> or <code>all</code>: which bookings need an admin's approval</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_APPROVAL_HOURS</code></td>
+<td><code>4</code></td>
+<td>advanced</td>
+<td>With <code>long</code>, bookings longer than this need approval</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_API_KEY_REVEAL</code></td>
+<td><code>false</code></td>
+<td>advanced</td>
+<td>Keep an encrypted copy of new API keys so owners can view them again</td>
+</tr>
+</tbody>
+</table>
+<h3 id="booking-and-fair-use">Booking and fair use<a class="headerlink" href="#booking-and-fair-use" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Level</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_QUOTA_WEEKLY_HOURS</code></td>
+<td><code>0</code></td>
+<td>basic</td>
+<td>Hours one person may book per week (0 = unlimited; admins exempt; admins can grant extra hours per person)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_MAX_RESERVATION_HOURS</code></td>
+<td><code>8</code></td>
+<td>basic</td>
+<td>Longest single booking</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_MAX_ADVANCE_DAYS</code></td>
+<td><code>30</code></td>
+<td>basic</td>
+<td>How far ahead people can book</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_QUOTA_UPCOMING</code></td>
+<td><code>0</code></td>
+<td>advanced</td>
+<td>Open bookings one person may hold (0 = unlimited)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_SLOT_MINUTES</code></td>
+<td><code>30</code></td>
+<td>advanced</td>
+<td>Calendar granularity</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_REMINDER_MINUTES</code></td>
+<td><code>10</code></td>
+<td>advanced</td>
+<td>Lead time of start and end reminders</td>
+</tr>
+</tbody>
+</table>
+<h3 id="notifications-and-time">Notifications and time<a class="headerlink" href="#notifications-and-time" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Level</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_TIMEZONE</code></td>
+<td><code>UTC</code></td>
+<td>basic</td>
+<td>IANA time zone for notifications and weekly quotas</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_PUBLIC_URL</code></td>
+<td><em>empty</em></td>
+<td>basic</td>
+<td>Address people use to reach SlotServe; used in links and to recognise SlotServe's own pages</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_CHAT_DEFAULT_LOCALE</code></td>
+<td><code>en</code></td>
+<td>advanced</td>
+<td><code>en</code> or <code>zh-CN</code>: language of group webhooks, group chats and chats not linked yet</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_TELEGRAM_BOT_TOKEN</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>Telegram bot token; empty disables the bot</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_TELEGRAM_PROXY</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td><code>http://</code> or <code>socks5://</code> proxy for Telegram</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dev-environments">Dev environments<a class="headerlink" href="#dev-environments" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Level</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_DEVENV_ENABLED</code></td>
+<td><code>false</code></td>
+<td>basic</td>
+<td>Dev environments: book GPU time as a Docker container with SSH</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_CPU_ENABLED</code></td>
+<td><code>true</code></td>
+<td>advanced</td>
+<td>Let people start dev environments without a GPU (no booking)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_CPU_PER_USER</code></td>
+<td><code>2</code></td>
+<td>basic</td>
+<td>Environments without a GPU one person can run at once</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_CPU_CORES</code></td>
+<td><code>4</code></td>
+<td>basic</td>
+<td>CPU cores one environment without a GPU may use (0 = the whole shared pool)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_CPU_MEMORY_GB</code></td>
+<td><code>16</code></td>
+<td>basic</td>
+<td>Memory one environment without a GPU may use (0 = the host's memory less max(4 GB, 10 %))</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_CPU_MEMORY_POOL_GB</code></td>
+<td><code>0</code></td>
+<td>expert</td>
+<td>Memory all environments without a GPU may claim together (0 = no limit)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_CPU_CORES_PER_GPU</code></td>
+<td><code>8</code></td>
+<td>expert</td>
+<td>CPU cores each lane reserves per GPU for its bookings (cpuset); 0 = none</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_SSH_HOST</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>Host name shown in ssh commands; empty = the address the browser uses</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_SSH_PORTS</code></td>
+<td><code>2200-2299</code></td>
+<td>advanced</td>
+<td>Host ports given to dev environments</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PASSWORD_LOGIN</code></td>
+<td><code>true</code></td>
+<td>advanced</td>
+<td>Allow SSH logins with the environment password as well as keys</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_CPUS</code></td>
+<td><code>0</code></td>
+<td>advanced</td>
+<td>CPU limit of one environment with a GPU (0 = no limit)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_MEMORY_GB</code></td>
+<td><code>0</code></td>
+<td>advanced</td>
+<td>Memory limit of one environment with a GPU (0 = the host's memory less max(4 GB, 10 %))</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PIDS_LIMIT</code></td>
+<td><code>4096</code></td>
+<td>expert</td>
+<td>Processes one dev environment may run at once (a fork bomb stays inside its container)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_SHM_GB</code></td>
+<td><code>8</code></td>
+<td>advanced</td>
+<td>Shared memory (<code>/dev/shm</code>) of one environment</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_CUSTOM_IMAGES</code></td>
+<td><code>true</code></td>
+<td>advanced</td>
+<td>Let people create templates from any image</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_ALLOWED_REGISTRIES</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>Comma-separated registries images may come from; empty = any</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_SAVED_IMAGES</code></td>
+<td><code>3</code></td>
+<td>advanced</td>
+<td>Saved environment images per person</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PULL_MINUTES</code></td>
+<td><code>60</code></td>
+<td>expert</td>
+<td>Download the image this long before a booking</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PROJECTS</code></td>
+<td><code>3</code></td>
+<td>advanced</td>
+<td>Kept (paused) environments per person; 0 = none</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PROJECT_DAYS</code></td>
+<td><code>0</code></td>
+<td>advanced</td>
+<td>Remove kept environments unused this many days (0 = never)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PUBLIC_PORTS_ENABLED</code></td>
+<td><code>true</code></td>
+<td>advanced</td>
+<td>Let people publish container ports directly on host ports (no SlotServe login)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PUBLIC_PORTS</code></td>
+<td><code>2300-2399</code></td>
+<td>advanced</td>
+<td>Host ports for direct ports (keep apart from the SSH ports)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PUBLIC_PORT_LIMIT</code></td>
+<td><code>5</code></td>
+<td>advanced</td>
+<td>Direct ports per person; admins have no limit; 0 = only admins</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_WEB_URL</code></td>
+<td><em>empty</em></td>
+<td>expert</td>
+<td>How browsers reach the web port of dev environments, e.g. behind a reverse proxy; empty = the same host on <code>DEVENV_WEB_PORT</code></td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_WEB_COMPAT</code></td>
+<td><code>false</code></td>
+<td>expert</td>
+<td>Compatibility mode for web apps that break on the shared web origin's rules between environments (weakens the isolation between environments)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_PLATFORM_CONTEXT</code></td>
+<td><code>true</code></td>
+<td>advanced</td>
+<td>Inside new environments: <code>SLOTSERVE_*</code> variables, a login banner (time left, <code>/workspace</code>, how to call a model) and <code>OPENAI_BASE_URL</code> pointing at the container-side gateway</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_LLM_KEY</code></td>
+<td><code>true</code></td>
+<td>expert</td>
+<td>Give each personal environment its own LLM key (<code>llm</code> scope, revoked when the environment stops; a 0600 file exported as <code>OPENAI_API_KEY</code> in login shells, never in the container's environment; shared environments get none)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_FORWARDER_IMAGE</code></td>
+<td><code>alpine/socat:1.8.1.1</code></td>
+<td>expert</td>
+<td>⚠️ <strong>Runs as root on the host.</strong> Image of the per-port forwarder containers (needs <code>socat</code> on its PATH)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_STORAGE_DIR</code></td>
+<td><em>empty</em></td>
+<td>expert</td>
+<td>⚠️ <strong>Runs as root on the host.</strong> Directory on the Docker host for persistent data (bind mounts); empty = Docker named volumes. System directories (<code>/etc</code>, <code>/root</code>, <code>/var/lib/docker</code>, <code>/proc</code>, <code>/sys</code>, <code>/boot</code>, <code>/usr</code>, <code>/bin</code>, <code>/lib*</code>, <code>/var/run</code> …) are refused</td>
+</tr>
+</tbody>
+</table>
+<h3 id="models-and-downloads">Models and downloads<a class="headerlink" href="#models-and-downloads" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Level</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_DEFAULT_LLAMA_ARGS</code></td>
+<td><code>-ngl 99 -c 8192</code></td>
+<td>basic</td>
+<td>Arguments given to newly registered models</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_HF_ENDPOINT</code></td>
+<td><code>https://huggingface.co</code></td>
+<td>basic</td>
+<td>Hugging Face endpoint or mirror</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_HF_TOKEN</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>Token for gated or private repositories</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DOWNLOAD_MIN_FREE_GB</code></td>
+<td><code>2</code></td>
+<td>advanced</td>
+<td>Disk space that must remain free after a download</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_PLAYGROUND_ENABLED</code></td>
+<td><code>true</code></td>
+<td>advanced</td>
+<td>The web page's chat with a model (uses the browser session, never a key)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_PLAYGROUND_RATE_PER_MINUTE</code></td>
+<td><code>20</code></td>
+<td>advanced</td>
+<td>Playground requests per person and minute; 0 = no limit</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_PLAYGROUND_DEFAULT_MODEL_ONLY</code></td>
+<td><code>false</code></td>
+<td>advanced</td>
+<td>Playground uses only the default model, never another loaded one</td>
+</tr>
+</tbody>
+</table>
+<h3 id="model-loading">Model loading<a class="headerlink" href="#model-loading" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Level</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_PRELOAD_MIN_MINUTES</code></td>
+<td><code>3</code></td>
+<td>advanced</td>
+<td>Start loading a booked model at least this many minutes early</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_LOAD_TIMEOUT_SECONDS</code></td>
+<td><code>1800</code></td>
+<td>advanced</td>
+<td>Give up if a model is not ready after this long</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DRAIN_SECONDS</code></td>
+<td><code>30</code></td>
+<td>advanced</td>
+<td>Before a model switch, wait this long for running requests to finish</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_PRELOAD_BUFFER_SECONDS</code></td>
+<td><code>60</code></td>
+<td>expert</td>
+<td>Extra margin when preloading before a booking</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_STOP_TIMEOUT_SECONDS</code></td>
+<td><code>20</code></td>
+<td>expert</td>
+<td>Grace period before a model server is killed</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DISK_READ_MBPS</code></td>
+<td><code>150</code></td>
+<td>expert</td>
+<td>Used to estimate load time before a model's first load</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_SCHEDULER_INTERVAL_SECONDS</code></td>
+<td><code>5</code></td>
+<td>expert</td>
+<td>How often the scheduler re-evaluates</td>
+</tr>
+</tbody>
+</table>
+<h3 id="engines">Engines<a class="headerlink" href="#engines" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Level</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_VLLM_CMD</code></td>
+<td><code>vllm serve</code></td>
+<td>expert</td>
+<td>⚠️ <strong>Runs as root on the host.</strong> Command for the vLLM engine</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_SGLANG_CMD</code></td>
+<td><code>python -m sglang.launch_server</code></td>
+<td>expert</td>
+<td>⚠️ <strong>Runs as root on the host.</strong> Command for the SGLang engine</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_CUSTOM_ENGINE_CMD</code></td>
+<td><em>empty</em></td>
+<td>expert</td>
+<td>⚠️ <strong>Runs as root on the host.</strong> Template for the custom engine: <code>{model}</code> <code>{host}</code> <code>{port}</code> <code>{name}</code></td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_CUSTOM_ENGINE_HEALTH</code></td>
+<td><code>/health</code></td>
+<td>expert</td>
+<td>Path polled until the custom engine is ready</td>
+</tr>
+</tbody>
+</table>
+<h3 id="feishu-lark">Feishu / Lark<a class="headerlink" href="#feishu-lark" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Level</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_FEISHU_ENABLED</code></td>
+<td><code>false</code></td>
+<td>advanced</td>
+<td>Feishu / Lark bot (<a href="../integrations/#feishu-lark">setup</a>)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_FEISHU_APP_ID</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>App ID of the Feishu app</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_FEISHU_APP_SECRET</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>App secret of the Feishu app</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_FEISHU_DOMAIN</code></td>
+<td><code>https://open.feishu.cn</code></td>
+<td>expert</td>
+<td>Open platform address; Lark uses <code>https://open.larksuite.com</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="dingtalk">DingTalk<a class="headerlink" href="#dingtalk" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Level</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_DINGTALK_ENABLED</code></td>
+<td><code>false</code></td>
+<td>advanced</td>
+<td>DingTalk bot in Stream mode</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DINGTALK_CLIENT_ID</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>Client ID (AppKey) of the DingTalk app</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DINGTALK_CLIENT_SECRET</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>Client secret (AppSecret) of the DingTalk app</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DINGTALK_ROBOT_CODE</code></td>
+<td><em>empty</em></td>
+<td>expert</td>
+<td>Robot code; empty = the client ID</td>
+</tr>
+</tbody>
+</table>
+<h3 id="wecom">WeCom<a class="headerlink" href="#wecom" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Level</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_WECOM_ENABLED</code></td>
+<td><code>false</code></td>
+<td>advanced</td>
+<td>WeCom self-built app</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_WECOM_CORP_ID</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>Corp ID of the WeCom app</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_WECOM_AGENT_ID</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>Agent ID of the WeCom app</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_WECOM_SECRET</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>Secret of the WeCom app</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_WECOM_TOKEN</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>Callback token; only for receiving commands</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_WECOM_AES_KEY</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>Callback EncodingAESKey (43 characters); only for receiving commands</td>
+</tr>
+</tbody>
+</table>
+<h3 id="qq">QQ<a class="headerlink" href="#qq" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Level</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_QQ_ENABLED</code></td>
+<td><code>false</code></td>
+<td>advanced</td>
+<td>QQ official bot</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_QQ_APP_ID</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>App ID of the QQ bot</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_QQ_APP_SECRET</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>App secret of the QQ bot</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_QQ_SANDBOX</code></td>
+<td><code>false</code></td>
+<td>expert</td>
+<td>Use the QQ sandbox environment</td>
+</tr>
+</tbody>
+</table>
+<h3 id="group-webhooks">Group webhooks<a class="headerlink" href="#group-webhooks" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Level</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_GROUP_EVENTS</code></td>
+<td><code>admin_alerts,announcements</code></td>
+<td>advanced</td>
+<td>What group webhooks receive: <code>admin_alerts</code>, <code>approvals</code>, <code>announcements</code></td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_FEISHU_WEBHOOK_URL</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>Feishu / Lark group robot webhook</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_FEISHU_WEBHOOK_SECRET</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>Signing secret of the Feishu / Lark group robot</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DINGTALK_WEBHOOK_URL</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>DingTalk group robot webhook</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DINGTALK_WEBHOOK_SECRET</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>Signing secret of the DingTalk group robot</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_WECOM_WEBHOOK_URL</code></td>
+<td><em>empty</em></td>
+<td>advanced</td>
+<td>WeCom group robot webhook</td>
+</tr>
+</tbody>
+</table>
+<h3 id="monitoring">Monitoring<a class="headerlink" href="#monitoring" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Level</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_METRICS_TOKEN</code></td>
+<td><em>empty</em></td>
+<td>expert</td>
+<td>Bearer token for <code>/metrics</code>; empty disables it</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_USAGE_BUSY_PERCENT</code></td>
+<td><code>10</code></td>
+<td>expert</td>
+<td>A GPU counts as used in a minute when its utilization is at least this (applies to new samples)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="housekeeping-and-backups">Housekeeping and backups<a class="headerlink" href="#housekeeping-and-backups" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Level</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_USAGE_RETENTION_DAYS</code></td>
+<td><code>365</code></td>
+<td>advanced</td>
+<td>Keep per-request rows this long, then fold them into daily totals (0 = forever; otherwise ≥ 90)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_USAGE_SAMPLE_DAYS</code></td>
+<td><code>30</code></td>
+<td>expert</td>
+<td>Keep per-minute GPU usage samples this long, then fold them into hourly totals (0 = never fold)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_AUDIT_RETENTION_DAYS</code></td>
+<td><code>730</code></td>
+<td>advanced</td>
+<td>Keep audit log entries this long (0 = forever)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_BACKUP_KEEP</code></td>
+<td><code>7</code></td>
+<td>advanced</td>
+<td>Daily backup bundles to keep (0 = no automatic backups)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_BACKUP_TARGET</code></td>
+<td><em>empty</em></td>
+<td>basic</td>
+<td>Where each backup bundle is also copied: an absolute path or <code>storage:&lt;id&gt;</code> (empty = no copy off this machine)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_BACKUP_HOUR</code></td>
+<td><code>3</code></td>
+<td>advanced</td>
+<td>Local hour of the daily backup (-1 = every 24 hours from start)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="deployment-restart-to-apply">Deployment (restart to apply)<a class="headerlink" href="#deployment-restart-to-apply" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Level</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SLOTSERVE_DEVENV_GATEWAY_PORT</code></td>
+<td><code>8002</code></td>
+<td>expert</td>
+<td>Port of the container-side gateway: only the <code>/v1</code> API, for dev environments (<code>http://slotserve-gw:&lt;port&gt;/v1</code>); 0 = off</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_GATEWAY_HOST</code></td>
+<td><em>empty</em></td>
+<td>expert</td>
+<td>Address the container-side gateway listens on; empty = the Docker bridge's address (<code>docker0</code>) when SlotServe runs on the host, every address when it runs in a container</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_SECRET_KEY</code></td>
+<td><em>generated</em></td>
+<td>expert</td>
+<td>Signs session cookies and encrypts stored secrets. Unset, empty or <code>change-me</code>: SlotServe generates a random key on first start and keeps it in <code>DATA_DIR/secret_key</code> (owner-only). A value you set always wins</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_HOST</code></td>
+<td><code>0.0.0.0</code></td>
+<td>expert</td>
+<td>Listen address</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_PORT</code></td>
+<td><code>8000</code></td>
+<td>expert</td>
+<td>Listen port</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_COOKIE_SECURE</code></td>
+<td><code>false</code></td>
+<td>expert</td>
+<td>Mark cookies <code>Secure</code>; set <code>true</code> behind HTTPS</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_FORWARDED_ALLOW_IPS</code></td>
+<td><code>127.0.0.1</code></td>
+<td>expert</td>
+<td>Reverse proxies whose <code>X-Forwarded-For</code> is trusted (comma separated, <code>*</code> = any), so sign-in throttling and logs see the real client address</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DATA_DIR</code></td>
+<td><code>data</code></td>
+<td>expert</td>
+<td>Database and logs</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_MODELS_DIR</code></td>
+<td><code>models</code></td>
+<td>expert</td>
+<td>Model directory (scanned, and target of downloads)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_STATIC_DIR</code></td>
+<td><em>bundled</em></td>
+<td>expert</td>
+<td>Built frontend directory</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_LLAMA_SERVER_CMD</code></td>
+<td><code>llama-server</code></td>
+<td>expert</td>
+<td>⚠️ <strong>Runs as root on the host.</strong> Command used to start llama-server; may include a prefix such as <code>taskset -c 0-15 llama-server</code></td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_LLAMA_HOST</code></td>
+<td><code>127.0.0.1</code></td>
+<td>expert</td>
+<td>Address the model servers bind to (keep it local)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_LLAMA_PORT</code></td>
+<td><code>8081</code></td>
+<td>expert</td>
+<td>Port of the first lane's model server; lane <em>N</em> uses this + <em>N</em> - 1</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DOCKER_HOST</code></td>
+<td><code>unix:///var/run/docker.sock</code></td>
+<td>expert</td>
+<td>⚠️ <strong>Runs as root on the host.</strong> Docker (or Podman) API used for dev environments</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DROPBEAR_PATH</code></td>
+<td><code>/opt/slotserve/bin/dropbearmulti</code></td>
+<td>expert</td>
+<td>Static Dropbear (<code>dropbearmulti</code>) copied into each dev environment; bundled in the image</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DEVENV_WEB_PORT</code></td>
+<td><code>8001</code></td>
+<td>expert</td>
+<td>Port of the dev environment web interfaces, a separate origin (0 = serve them on <code>PORT</code>, not recommended)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_STORAGE_HELPER_IMAGE</code></td>
+<td><code>busybox:1.37</code></td>
+<td>expert</td>
+<td>Image of the short-lived helper containers that check storages and create folders on them (never a person's image; pulled when missing)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_STORAGE_CHECK_MINUTES</code></td>
+<td><code>30</code></td>
+<td>expert</td>
+<td>How often storages are checked (free space, per-person usage); 0 = only on demand</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_TELEGRAM_API_BASE</code></td>
+<td><code>https://api.telegram.org</code></td>
+<td>expert</td>
+<td>Telegram Bot API address, for a self-hosted Bot API server</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_DINGTALK_API_BASE</code></td>
+<td><code>https://api.dingtalk.com</code></td>
+<td>expert</td>
+<td>DingTalk API address (only for proxies or testing)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_WECOM_API_BASE</code></td>
+<td><code>https://qyapi.weixin.qq.com</code></td>
+<td>expert</td>
+<td>WeCom API address (only for proxies or testing)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_QQ_API_BASE</code></td>
+<td><code>https://api.sgroup.qq.com</code></td>
+<td>expert</td>
+<td>QQ bot API address (only for proxies or testing)</td>
+</tr>
+<tr>
+<td><code>SLOTSERVE_QQ_TOKEN_URL</code></td>
+<td><code>https://bots.qq.com/app/getAppAccessToken</code></td>
+<td>expert</td>
+<td>QQ bot token address (only for proxies or testing)</td>
+</tr>
+</tbody>
+</table>
+<!-- settings:end -->
+
+<h2 id="per-model-launch-arguments">Per-model launch arguments<a class="headerlink" href="#per-model-launch-arguments" title="Permanent link">&para;</a></h2>
+<p>Each model has a free-form argument string that is appended to the command. For llama.cpp models:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>&lt;SLOTSERVE_LLAMA_SERVER_CMD&gt; -m &lt;file&gt; --host 127.0.0.1 --port 8081 --alias &lt;name&gt; &lt;your arguments&gt;
+</code></pre></div>
+<p>vLLM, SGLang and custom engines build their command the same way; see <a href="../gpus-and-engines/#engines">GPUs, lanes &amp; engines</a>.</p>
+<p><code>-m</code>, <code>--host</code>, <code>--port</code> and <code>--alias</code> are always set by SlotServe; copies in your arguments are ignored. Useful arguments:</p>
+<table>
+<thead>
+<tr>
+<th>Goal</th>
+<th>Arguments</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Offload all layers</td>
+<td><code>-ngl 99</code></td>
+</tr>
+<tr>
+<td>Context size</td>
+<td><code>-c 16384</code></td>
+</tr>
+<tr>
+<td>Parallel requests</td>
+<td><code>-np 4</code> (context is split between slots)</td>
+</tr>
+<tr>
+<td>Flash attention</td>
+<td><code>--flash-attn on</code></td>
+</tr>
+<tr>
+<td>Vision models</td>
+<td><code>--mmproj /models/mmproj-model-f16.gguf</code></td>
+</tr>
+<tr>
+<td>Embeddings</td>
+<td><code>--embedding --pooling mean</code></td>
+</tr>
+<tr>
+<td>KV cache quantization</td>
+<td><code>-ctk q8_0 -ctv q8_0</code></td>
+</tr>
+</tbody>
+</table>
+<p>Run <code>llama-server --help</code> for the full list. After editing the arguments of the loaded model, press <strong>Reload model</strong> on the overview page.</p>
+<h2 id="backups-and-restore">Backups and restore<a class="headerlink" href="#backups-and-restore" title="Permanent link">&para;</a></h2>
+<p>SlotServe writes a backup bundle (database, generated secret key, SSH host keys, manifest) to <code>data/backups/</code> every day at <code>SLOTSERVE_BACKUP_HOUR</code>, keeps the newest <code>SLOTSERVE_BACKUP_KEEP</code>, and copies each one to <code>SLOTSERVE_BACKUP_TARGET</code> (a mounted path or <code>storage:&lt;id&gt;</code>) when it is set. <strong>Admin → Overview → Backups</strong> lists them and makes one on demand. A snapshot is also taken before every database upgrade; those are never deleted. <code>slotserve restore &lt;bundle&gt;</code> puts one back (with the server stopped) and the next start shows a reconciliation report.</p>
+<p>Workspaces, kept environments' data, saved images and models are not part of a backup. Details, the off-machine copy and the restore steps: <a href="../operations/#backups">Backups</a> and <a href="../operations/#restore">Restore from a backup</a>.</p>
+<h2 id="first-admin-and-setup-code">First admin and setup code<a class="headerlink" href="#first-admin-and-setup-code" title="Permanent link">&para;</a></h2>
+<p>While no admin account exists, SlotServe prints a one-time <strong>setup code</strong> in its log at every start:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>slotserve<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-A4<span class="w"> </span><span class="s2">"No admin account"</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>setup-code<span class="w">     </span><span class="c1"># or ask for it directly</span>
+</code></pre></div>
+<p>Open SlotServe: the sign-up form asks for the setup code instead of the invite code, and the account becomes the admin. The code stops working as soon as an admin exists, and installations that already have an admin never ask for it. Everyone else signs up with the invite code (or is created in <strong>Admin → Users</strong>).</p>
+<h2 id="requests-from-other-pages">Requests from other pages<a class="headerlink" href="#requests-from-other-pages" title="Permanent link">&para;</a></h2>
+<p>SlotServe refuses changing requests (POST, PUT, PATCH, DELETE) to its own API that do not come from its own pages: an <code>Origin</code> must be SlotServe's own address (the host the browser used, or <code>SLOTSERVE_PUBLIC_URL</code>), <code>Origin: null</code> is always refused, and requests with the session cookie but without <code>Origin</code> must carry the header <code>X-SlotServe: 1</code> (the web UI sends it). This stops pages on dev environment ports or other sites from acting for a signed-in person. API clients are not affected: <code>/v1</code> with API keys, <code>/metrics</code>, chat platform callbacks and scripts without the session cookie.</p>
+<p>Behind a reverse proxy, pass the original host (<code>proxy_set_header Host $host;</code> for nginx) or set <code>SLOTSERVE_PUBLIC_URL</code>; otherwise changes made in the web UI are refused with "did not come from a SlotServe page".</p>
+<h2 id="admin-command-line">Admin command line<a class="headerlink" href="#admin-command-line" title="Permanent link">&para;</a></h2>
+<p>Most account tasks are done in <strong>Admin → Users</strong>. The command line is for when no admin can sign in:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>setup-code<span class="w">               </span><span class="c1"># code for creating the first admin</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>reset-password<span class="w"> </span>&lt;username&gt;
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>set-admin<span class="w"> </span>&lt;username&gt;
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>set-admin<span class="w"> </span>&lt;username&gt;<span class="w"> </span>--revoke
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>doctor<span class="w">                   </span><span class="c1"># run the health checks (exit code 1 on an error)</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>--no-deps<span class="w"> </span>slotserve<span class="w"> </span>slotserve<span class="w"> </span>restore<span class="w"> </span>&lt;bundle&gt;<span class="w">   </span><span class="c1"># with the server stopped</span>
+</code></pre></div>
+<p>See <a href="../operations/">Operations</a> for when to use which.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 SlotServe contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

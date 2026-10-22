@@ -1,0 +1,1262 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Book GPU time slots and serve models behind an OpenAI-compatible gateway.">
+      
+      
+      
+        <link rel="canonical" href="https://peleryuan.github.io/slotserve/user-guide/">
+      
+      
+        <link rel="prev" href="../operations/">
+      
+      
+        <link rel="next" href="../model-catalog/">
+      
+      
+        
+          <link rel="alternate" href="./" hreflang="en">
+        
+          <link rel="alternate" href="../zh/user-guide/" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>User guide - SlotServe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#user-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="SlotServe" class="md-header__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SlotServe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              User guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="../zh/user-guide/" hreflang="zh" class="md-select__link">
+              简体中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PelerYuan/slotserve" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="SlotServe" class="md-nav__button md-logo" aria-label="SlotServe" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="logo">
+
+    </a>
+    SlotServe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PelerYuan/slotserve" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PelerYuan/slotserve
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#booking-the-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Booking the GPU
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Booking the GPU">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#booking-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Booking types
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changing-bookings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing bookings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#waitlist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Waitlist
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lanes-and-approval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lanes and approval
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quotas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quotas
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Models
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#model-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model catalog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#downloading-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Downloading models
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API keys
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#administration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Administration
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Notifications & integrations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gpus-and-engines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GPUs, lanes & engines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-environments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev environments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How scheduling works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#booking-the-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Booking the GPU
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Booking the GPU">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#booking-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Booking types
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changing-bookings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing bookings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#waitlist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Waitlist
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lanes-and-approval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lanes and approval
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quotas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quotas
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Models
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#model-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model catalog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#downloading-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Downloading models
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API keys
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#administration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Administration
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="user-guide">User guide<a class="headerlink" href="#user-guide" title="Permanent link">&para;</a></h1>
+<h2 id="booking-the-gpu">Booking the GPU<a class="headerlink" href="#booking-the-gpu" title="Permanent link">&para;</a></h2>
+<p>Open <strong>Schedule</strong> and drag across the calendar, or press <strong>New booking</strong>. Choose what to book, adjust the time and add an optional note.</p>
+<p><img alt="Schedule" src="../assets/screenshots/schedule.png" /></p>
+<ul>
+<li>Bookings snap to 30-minute slots (configurable) and cannot overlap.</li>
+<li>A slot that has already started can still be booked; it starts <em>now</em>. <strong>Start now</strong> in the dialog does this for you.</li>
+<li>The dialog shows the model's <strong>estimated load time</strong>. If someone else's booking ends exactly when yours starts and uses a different model, loading happens inside your slot and the dialog warns you.</li>
+<li>During your booking only <strong>your</strong> API keys are accepted.</li>
+<li><strong>Cancel</strong> an upcoming booking, or <strong>End now</strong> to release the GPU early. The default model comes back right away.</li>
+</ul>
+<h3 id="booking-types">Booking types<a class="headerlink" href="#booking-types" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>What happens during the slot</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Run a model</strong></td>
+<td>Your model (optionally with one of its <strong>presets</strong>) is loaded before the slot starts. Only your API keys are accepted.</td>
+</tr>
+<tr>
+<td><strong>Whole GPU</strong></td>
+<td>The model server is stopped shortly before the slot, so the GPU is completely free for training or any other program. The API returns <code>503 gpu_exclusive</code>. The default model comes back when the slot ends.</td>
+</tr>
+<tr>
+<td><strong>Dev environment</strong></td>
+<td>A Docker container with the GPU and SSH runs for the slot; your <code>/workspace</code> is kept. See <a href="../dev-environments/">Dev environments</a>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="changing-bookings">Changing bookings<a class="headerlink" href="#changing-bookings" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Edit</strong> an upcoming booking to move it or change its model, preset or note.</li>
+<li><strong>Extend</strong> a running booking by 30 minutes, 1 hour or 2 hours, if the time after it is free. You can also shorten it with <strong>Edit</strong>.</li>
+<li><strong>Repeat weekly</strong> creates the same slot for several weeks. Either every week fits, or nothing is booked and the dialog says which week clashes. Cancelling one booking of a series asks whether to cancel only that one or the rest of the series as well.</li>
+<li>Admins can edit or cancel anyone's booking and <strong>book for someone else</strong>. The person is notified on the chat platforms they linked.</li>
+</ul>
+<h3 id="waitlist">Waitlist<a class="headerlink" href="#waitlist" title="Permanent link">&para;</a></h3>
+<p>If the time you want is taken, the dialog offers <strong>Join waitlist</strong>. When that time frees up (a cancellation or an early end), SlotServe books it for you automatically, or just notifies you if you unticked <strong>Book automatically</strong>. Your open waitlist entries appear under <strong>My bookings</strong>.</p>
+<h3 id="lanes-and-approval">Lanes and approval<a class="headerlink" href="#lanes-and-approval" title="Permanent link">&para;</a></h3>
+<p>With several GPU groups ("lanes"), the calendar shows a tab per lane and the booking dialog asks which lane to book. When approval mode is on, the dialog says if your booking needs an admin's approval; it then shows as <strong>Awaiting approval</strong> and you are notified of the decision. See <a href="../gpus-and-engines/">GPUs, lanes &amp; engines</a>.</p>
+<h3 id="quotas">Quotas<a class="headerlink" href="#quotas" title="Permanent link">&para;</a></h3>
+<p>Admins can limit how many hours one person may book per calendar week and how many open bookings they may hold. The limits do not apply to admins.</p>
+<h2 id="models">Models<a class="headerlink" href="#models" title="Permanent link">&para;</a></h2>
+<p><strong>Models</strong> lists every registered model with its engine, size, estimated load time and launch arguments.</p>
+<p><img alt="Models" src="../assets/screenshots/models.png" /></p>
+<ul>
+<li><strong>Scan folder</strong> registers new <code>.gguf</code> files from the models directory as llama.cpp models.</li>
+<li><strong>Add model</strong> registers a model by hand: pick the engine (llama.cpp, vLLM, SGLang or custom) and give a file, directory or Hugging Face repository.</li>
+<li><strong>Edit</strong> changes the name (the <code>model</code> id clients see), launch arguments and description. The person who added a model and admins can edit or delete it.</li>
+<li><strong>Set as default</strong> (admin) chooses the model used when nobody has booked the GPU. With several lanes this sets the first lane's default; other lanes are set in <strong>Admin → GPUs &amp; lanes</strong>.</li>
+<li><strong>Server log</strong> shows the tail of the model server's output - the first place to look when a model fails to start.</li>
+<li><strong>Presets</strong> (in <strong>Edit</strong>) store alternative argument sets for the same file, for example a long-context variant with a larger <code>-c</code>. People pick a preset when booking; the model's own arguments are the default.</li>
+</ul>
+<h3 id="model-catalog">Model catalog<a class="headerlink" href="#model-catalog" title="Permanent link">&para;</a></h3>
+<p>The <strong>Catalog</strong> tab lists popular open models with exact download sizes, an estimate of the GPU memory each variant needs and whether it fits on each lane. <strong>Deploy</strong> downloads a variant through the queue below and registers it with suitable launch arguments. See <a href="../model-catalog/">Model catalog</a>.</p>
+<h3 id="downloading-models">Downloading models<a class="headerlink" href="#downloading-models" title="Permanent link">&para;</a></h3>
+<p>Paste a direct link to a <code>.gguf</code> file and press <strong>Download</strong>, for example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>https://huggingface.co/&lt;user&gt;/&lt;repo&gt;/resolve/main/&lt;file&gt;.gguf
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>https://hf-mirror.com/&lt;user&gt;/&lt;repo&gt;/resolve/main/&lt;file&gt;.gguf
+</code></pre></div>
+<p>Or open the <strong>Hugging Face</strong> tab, enter a repository such as <code>Qwen/Qwen3-8B-GGUF</code> and press <strong>List files</strong>. Pick the quantizations you want; split models are grouped and all parts are queued. Set <strong>Hugging Face endpoint</strong> (for example <code>https://hf-mirror.com</code>) and <strong>Hugging Face token</strong> in the admin settings if needed.</p>
+<p>Downloads run one at a time, write to <code>&lt;file&gt;.part</code> and resume from where they stopped if retried. A finished <code>.gguf</code> is registered automatically. For split models (<code>-00001-of-0000N.gguf</code>) add every part; the first part becomes the model.</p>
+<h2 id="api-keys">API keys<a class="headerlink" href="#api-keys" title="Permanent link">&para;</a></h2>
+<p><strong>Access credentials → New key</strong> creates a key and shows it <strong>once</strong>. Store it in your client or a secret manager. Revoke a key to stop it immediately.</p>
+<p>If an admin turns on <strong>Let people view their API keys again</strong> (<strong>Admin → System settings → Accounts</strong>), SlotServe keeps an encrypted copy of each new key and its owner can press <strong>View</strong> to see it later. Keys created while the switch is off cannot be shown, and turning it off deletes every stored copy. The copies are encrypted with <code>SLOTSERVE_SECRET_KEY</code>; changing that key makes them unreadable. See <a href="../api/">API</a> for client setup.</p>
+<p>The same page holds your SSH public keys and environment password for <a href="../dev-environments/">dev environments</a> when they are switched on.</p>
+<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
+<p><strong>Usage</strong> is about GPU time: how much was booked, how much of it the GPUs actually worked, and what that cost in energy. Pick the last 7, 30 or 90 days, and <strong>Everyone</strong> or <strong>Just me</strong> (everyone can see everyone's usage).</p>
+<ul>
+<li><strong>Tiles</strong>: GPU-hours booked (booked time × the number of GPUs in the lane), GPU-hours used (time a GPU's utilization was at or above the busy threshold, 10 % by default), average utilization while GPUs were booked (or during your bookings), energy with peak memory, and tokens with requests.</li>
+<li><strong>GPU-hours over time</strong>: stacked by person (booked, from the calendar) or by kind (recorded). Kinds are model bookings, whole-GPU bookings, dev environments, shared use while nobody has the lane booked (the lane's idle model or a shared environment) and unused time. Up to 7 days are shown in 6-hour steps, longer periods per day.</li>
+<li><strong>Utilization by lane</strong> over time.</li>
+<li><strong>Tables</strong> by person (booked and used GPU-hours, utilization while booked, peak memory, energy, tokens), by lane with its occupancy, by kind, by GPU and by model. Many booked hours with low utilization means GPUs are booked but sit idle.</li>
+</ul>
+<p>SlotServe records every GPU once a minute: utilization, memory, power and who held it as what. On machines without GPU metrics (no <code>nvidia-smi</code>) it still records who held each lane, but used time, utilization, memory and energy stay empty. Per-minute samples are folded into hourly totals after 30 days (<strong>Admin → System settings → Maintenance</strong>). <strong>Export CSV</strong> downloads per-person totals, GPU time per day, lane, GPU, kind and person, a daily request summary, or every request.</p>
+<h2 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Appearance</strong>: language and light, dark or system theme. The same choices are in the menu under your name, and the sign-in page has a light/dark button.</li>
+<li><strong>Chat notifications</strong>: link Telegram, Feishu / Lark, DingTalk, WeCom or QQ and choose which notifications you get. See <a href="../integrations/">Notifications &amp; integrations</a>.</li>
+<li><strong>Calendar subscription</strong>: private links that show bookings in your calendar app.</li>
+</ul>
+<p><img alt="Usage" src="../assets/screenshots/usage.png" /></p>
+<h2 id="administration">Administration<a class="headerlink" href="#administration" title="Permanent link">&para;</a></h2>
+<p>The first account (created with the <a href="../configuration/#first-admin-and-setup-code">setup code</a>) is the admin. Admins see an <strong>Admin</strong> entry in the sidebar.</p>
+<p><img alt="Admin" src="../assets/screenshots/admin.png" /></p>
+<table>
+<thead>
+<tr>
+<th>Tab</th>
+<th>What you can do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Overview</td>
+<td>Counts of users, keys, open and pending bookings, requests and tokens in the last 24 h; recent model loads with failures; restart a lane's model server and read its log; <strong>load a model now</strong> or <strong>unload</strong> while nobody has the GPU booked, for a set time or until the next booking</td>
+</tr>
+<tr>
+<td>Runtime monitor</td>
+<td>Per lane: state, model, engine, GPUs, port, PID, running requests and what the scheduler wants; loading progress read from the server's output (or estimated); on failure the error, exit code, retry countdown and the server's last lines; the exact launch command; live server output with filter, pause and download; every load with its command and output excerpt</td>
+</tr>
+<tr>
+<td>GPUs &amp; lanes</td>
+<td>Detected GPUs; create, edit and delete lanes and choose each lane's default model; edit the launch arguments of the model a lane is running and reload it</td>
+</tr>
+<tr>
+<td>Users</td>
+<td>Create users (no invite code needed), reset passwords, grant or remove admin, disable, enable or delete accounts</td>
+</tr>
+<tr>
+<td>Bookings</td>
+<td>Every booking, filtered by status or person; approve or reject requests; edit, cancel or end any booking; book for someone else</td>
+</tr>
+<tr>
+<td>Requests</td>
+<td>Every API request with person, key, model, status, duration and tokens; filter to errors</td>
+</tr>
+<tr>
+<td>Overview → Backups</td>
+<td>Daily database copies; back up now and download</td>
+</tr>
+<tr>
+<td>API keys</td>
+<td>Every active key with its owner and last use; revoke any key</td>
+</tr>
+<tr>
+<td>Chat channels</td>
+<td>Whether each chat bot is connected and how many people linked it, the WeCom callback URL, group webhook tests and announcements</td>
+</tr>
+<tr>
+<td>System settings</td>
+<td>Every operational setting: registration, booking limits and quotas, approval, preloading and timeouts, engine commands, downloads, chat platforms and group webhooks, retention and backups</td>
+</tr>
+<tr>
+<td>Audit log</td>
+<td>Who did what and when, for every admin action</td>
+</tr>
+</tbody>
+</table>
+<p>Rules that protect the system:</p>
+<ul>
+<li>You cannot disable, demote or delete your own account, and at least one active admin always remains.</li>
+<li>Disabling an account signs it out, refuses its API keys and cancels its open bookings. Enabling it again restores the keys.</li>
+<li>Deleting an account also deletes its keys, bookings and usage history. Disable instead if you want to keep the history.</li>
+<li>System settings take effect immediately and are stored in the database, overriding <code>.env</code>.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 SlotServe contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.highlight", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
