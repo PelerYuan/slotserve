@@ -6,15 +6,18 @@ something new, and a row to ``services/docker_endpoints.py`` whenever SlotServe 
 
 import asyncio
 import inspect
+import io
 import json
 import os
 import shutil
 import subprocess
 import sys
+import tarfile
 from pathlib import Path
 
 import pytest
 
+from slotserve.containers.image_clean import SECRET_FILES, committed_env
 from slotserve.services import docker_endpoints
 from slotserve.services.devenv import SshBundle, booking_ssh_files
 from slotserve.services.devenv.ssh import generate_host_key, host_public_key
@@ -290,6 +293,53 @@ async def test_save_as_image(backend):
     await backend.docker.remove_image(ref)
     assert not await backend.docker.image_exists(ref)
     await backend.docker.remove_image(ref)  # gone: no error
+
+
+@endpoints(
+    "containers.create",
+    "containers.inspect",
+    "containers.archive_put",
+    "containers.archive_get",
+    "images.inspect",
+    "images.commit",
+)
+async def test_saved_image_without_secrets(backend):
+    """R1-11 (containers/image_clean.py): a saved image keeps the image's own variables, gets SlotServe's emptied
+    and has the secret files SlotServe copied in replaced; ExtraHosts (slotserve-gw) is accepted."""
+    body = backend.container(
+        Env=["SLOTSERVE_END=2026-01-05T17:30:00+00:00", "JUPYTER_TOKEN=web-token", "PLAIN=template"],
+        host={"ExtraHosts": ["slotserve-gw:host-gateway"]},
+    )
+    cid = await backend.docker.create(backend.name("clean"), body)
+    secrets_in = {path: (b"secret " + path.encode(), mode) for path, (_, mode) in SECRET_FILES.items()}
+    await backend.docker.put_archive(cid, "/", tar_files(secrets_in))
+    info = await backend.docker.inspect(cid)
+    image = await backend.docker.image_inspect(info["Config"]["Image"])
+    assert image is not None
+    assert await backend.docker.image_inspect(f"slotserve-contract-absent-{backend.run}:x") is None
+    env = committed_env(info["Config"]["Env"], image["Config"]["Env"])
+    await backend.docker.put_archive(cid, "/", tar_files(SECRET_FILES))
+    ref = f"slotserve-contract/clean-{backend.run}:1"
+    backend.images.append(ref)
+    assert await backend.docker.commit(cid, ref, comment="contract", env=env)
+    saved = (await backend.docker.image_inspect(ref))["Config"]["Env"]
+    assert "SLOTSERVE_END=" in saved and "JUPYTER_TOKEN=" in saved and "PLAIN=" in saved
+    assert set(image["Config"]["Env"]) <= set(saved)  # PATH and the image's own variables stay
+    assert not any(e.split("=", 1)[1] for e in saved if e.split("=", 1)[0] in ("SLOTSERVE_END", "JUPYTER_TOKEN"))
+    copy = await backend.docker.create(backend.name("from-saved"), backend.container(Image=ref))
+    archive = await backend.docker.get_archive(copy, "/opt/slotserve/ssh_host_key")
+    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+        member = next(m for m in tar.getmembers() if m.isfile())
+        assert tar.extractfile(member).read() == b""
+    assert await backend.docker.get_archive(copy, f"/slotserve-contract-absent-{backend.run}") is None
+
+
+@endpoints("networks.inspect")
+async def test_default_bridge_address(backend):
+    """The container-side gateway listens on the default bridge's address (gateway/container_gw.py)."""
+    info = await backend.docker.network_inspect("bridge")
+    assert any(c.get("Gateway") for c in (info.get("IPAM") or {}).get("Config") or [])
+    assert await backend.docker.network_inspect(f"slotserve-contract-absent-{backend.run}") is None
 
 
 @endpoints("containers.create", "containers.start", "containers.exec", "exec.start", "exec.inspect")

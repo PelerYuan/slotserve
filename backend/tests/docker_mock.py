@@ -59,6 +59,9 @@ class _DeclaredOnly:
         await self.app(scope, replay, send)
 
 
+DEFAULT_PATH = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+
 class FakeDocker:
     def __init__(self):
         self.app = FastAPI()
@@ -75,6 +78,9 @@ class FakeDocker:
         self.wait_code: int | None = None  # exit code reported for helper containers (default: their own)
         self.removed_volumes: list[str] = []
         self.commits: list[tuple[str, str]] = []
+        # Saved images (docker commit): ref -> {"files": {path: data} of the container's layer, "Env": [...]}
+        self.saved: dict[str, dict] = {}
+        self.image_env: dict[str, list[str]] = {}  # Config.Env of images (default: a PATH)
         self.created: list[tuple[str, dict]] = []  # (name, config) of every container ever created
         # Storage (services/storage.py): named volumes, what helper containers print, mounts that fail
         self.volumes: dict[str, dict] = {}  # name -> {Name, Driver, Options, Labels}
@@ -134,7 +140,8 @@ class FakeDocker:
         @self.app.get("/v1.41/images/{name:path}/json")
         async def image(name: str):
             if unquote(name) in self.images:
-                return {"Id": "sha256:" + unquote(name)}
+                env = self.image_env.get(unquote(name), [DEFAULT_PATH])
+                return {"Id": "sha256:" + unquote(name), "Config": {"Env": list(env)}}
             return JSONResponse({"message": f"No such image: {unquote(name)}"}, status_code=404)
 
         @self.app.post("/v1.41/images/create")
@@ -226,6 +233,15 @@ class FakeDocker:
             del self.networks[n["Id"]]
             return Response(status_code=204)
 
+        @self.app.get("/v1.41/networks/{ref}")
+        async def network_inspect(ref: str):
+            if unquote(ref) == "bridge":  # Docker's default network
+                return {"Name": "bridge", "IPAM": {"Config": [{"Subnet": "172.17.0.0/16", "Gateway": "172.17.0.1"}]}}
+            n = net(unquote(ref))
+            if n is None:
+                return JSONResponse({"message": f"network {unquote(ref)} not found"}, status_code=404)
+            return {"Id": n["Id"], "Name": n["Name"], "Labels": n["Labels"]}
+
         @self.app.get("/v1.41/networks")
         async def network_list(filters: str = "{}"):
             wanted = json.loads(filters).get("label", [])
@@ -286,11 +302,10 @@ class FakeDocker:
             if c is None:
                 return JSONResponse({"message": "no such container"}, status_code=404)
             base = path.rstrip("/")
-            files = {
-                p: data
-                for p, data in self.image_files.get(c["Config"].get("Image", ""), {}).items()
-                if p.startswith(base + "/")
-            }
+            # the image's files, and what was copied into the container since
+            layer = {**self.image_files.get(c["Config"].get("Image", ""), {})}
+            layer.update({"/" + p: d for p, d in self.archives.get(c["Id"], {}).items()})
+            files = {p: data for p, data in layer.items() if p.startswith(base + "/") or p == base}
             if not files:
                 return JSONResponse({"message": f"Could not find the file {path} in container"}, status_code=404)
             name = base.rsplit("/", 1)[-1]
@@ -356,7 +371,12 @@ class FakeDocker:
                 "Id": c["Id"],
                 "Name": "/" + c["Name"],
                 "State": {"Running": c["Running"], "ExitCode": c["ExitCode"]},
-                "Config": {"Image": c["Config"].get("Image"), "Labels": c["Config"].get("Labels") or {}},
+                "Config": {
+                    "Image": c["Config"].get("Image"),
+                    "Labels": c["Config"].get("Labels") or {},
+                    "Env": self.image_env.get(c["Config"].get("Image", ""), [DEFAULT_PATH])
+                    + list(c["Config"].get("Env") or []),
+                },
                 "NetworkSettings": {
                     "Ports": ports if c["Running"] else {},
                     "Networks": {
@@ -446,11 +466,28 @@ class FakeDocker:
             return Response(content=b"\x01\x00\x00\x00" + len(text).to_bytes(4, "big") + text)
 
         @self.app.post("/v1.41/commit")
-        async def commit(container: str, repo: str, tag: str):
-            if find(container) is None:
+        async def commit(container: str, repo: str, tag: str, request: Request):
+            c = find(container)
+            if c is None:
                 return JSONResponse({"message": "no such container"}, status_code=404)
-            self.images.add(f"{repo}:{tag}")
-            self.commits.append((find(container)["Id"], f"{repo}:{tag}"))
+            ref = f"{repo}:{tag}"
+            image = c["Config"].get("Image", "")
+            container_env = self.image_env.get(image, [DEFAULT_PATH]) + list(c["Config"].get("Env") or [])
+            raw = await request.body()
+            env = list((json.loads(raw) if raw else {}).get("Env") or [])
+            # like Docker: the container's variables that the given Env does not name are added back
+            if not env:
+                env = container_env
+            else:
+                named = {e.split("=", 1)[0] for e in env}
+                env += [e for e in container_env if e.split("=", 1)[0] not in named]
+            files = {p.lstrip("/"): d for p, d in self.image_files.get(image, {}).items()}
+            files.update(self.archives.get(c["Id"], {}))
+            self.images.add(ref)
+            self.image_env[ref] = env
+            self.image_files[ref] = {"/" + p: d for p, d in files.items()}
+            self.saved[ref] = {"files": files, "Env": env}
+            self.commits.append((c["Id"], ref))
             return JSONResponse({"Id": "sha256:saved"}, status_code=201)
 
     def add_container(self, name: str, labels: dict, running: bool = True) -> str:

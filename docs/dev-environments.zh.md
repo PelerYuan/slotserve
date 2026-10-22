@@ -148,6 +148,21 @@ code-server 以 `--auth password` 运行：SlotServe 用它的会话 cookie 替�
 
 **保存为镜像**会把运行中的容器（装好的软件、`/workspace` 以外的文件）保存成你自己的新模板，下次预约直接从这里继续。`/workspace` 本来就会保留，不会打进镜像。新模板会带上环境的端口声明，包括你添加的端口以及每个端口是否直连。每人可保存的镜像数量有上限（默认 3 个）；删除已保存的模板会同时删除服务器上的镜像。
 
+保存之前（以及保留的环境做快照之前），SlotServe 会清空只属于本次环境、由它放进容器的内容：环境密钥、SSH 主机密钥和 root 的密码哈希；镜像里的 `SLOTSERVE_*`、`OPENAI_*` 和网页令牌变量会被置空，镜像自己的变量保持不变。下次启动时会重新写入。
+
+## 环境内的平台信息 {#inside-the-environment}
+
+每个新环境都知道自己在哪里、怎样调用模型（管理员设置：**环境内的平台信息**，默认开启）：
+
+- **环境变量**：`SLOTSERVE_USER`、`SLOTSERVE_END`（预约结束时间）、`SLOTSERVE_ENV_ID`、`SLOTSERVE_ENV`（模板或保留环境的名称）、`SLOTSERVE_LANE`、`SLOTSERVE_GPUS`、`SLOTSERVE_MACHINE`、`SLOTSERVE_CHECKPOINT_DIR`（`/workspace/.checkpoints`，供训练脚本约定使用）以及 `OPENAI_BASE_URL`。预约延长后，登录 shell 会读到新的结束时间（`/run/slotserve/env`）；容器自身的环境变量保留启动时的值。
+- **LLM 接口**：`OPENAI_BASE_URL` 为 `http://slotserve-gw:8002/v1`，这是 SlotServe 专门给环境用的小监听端口，只提供 `/v1` 接口（不提供网页界面和 `/api`）。请求与 SlotServe 自身端口上一样经过密钥校验、准入和用量记录。模板自己设置了 `OPENAI_BASE_URL` 时以模板为准。
+- **环境密钥**：预约的环境和无 GPU 环境会得到一把专属密钥（`sk-ss-env-...`，仅 `llm` 权限，以你的身份调用）。它写在 `/run/slotserve/llm-key`（仅 root 可读），在登录 shell 中导出为 `OPENAI_API_KEY`，因此无需任何配置即可运行 `python3 -c 'from openai import OpenAI; print(OpenAI().models.list())'`。它从不出现在容器的环境变量里（`docker inspect` 看不到），环境停止即吊销，每次最长有效 24 小时（环境运行期间自动顺延）。空闲 lane 的共享环境没有密钥，请在那里使用你自己的 API 密钥。管理员可以关闭（**环境 LLM 密钥**）。
+- **登录提示**：SSH 登录时最多显示三行：环境、GPU 与剩余时间；`/workspace` 用量；LLM 接口和一行示例。
+
+非登录 shell（某些网页终端）不会读取 `/etc/profile.d`，可在其中执行 `. /etc/profile.d/slotserve-platform.sh`。以非 root 用户运行（保留镜像自身入口）的镜像读不到密钥文件。
+
+监听位置：SlotServe 直接运行在主机上时，监听 Docker 默认网桥的地址（`docker0`，例如 `172.17.0.1`），环境通过 `/etc/hosts` 找到它，主机以外的网络访问不到；SlotServe 运行在容器中时，监听它自己的地址，并在每个环境的网络中以 `slotserve-gw` 的名字出现（端口不对外发布）。可用 `SLOTSERVE_DEVENV_GATEWAY_PORT`（默认 8002，0 表示关闭）和 `SLOTSERVE_DEVENV_GATEWAY_HOST` 调整。主机防火墙若丢弃容器到主机的流量，也会挡住它。Docker 在另一台机器上时，环境里没有 LLM 接口。
+
 ## 登录方式：SSH 公钥和环境密码
 
 登录凭据在**访问凭据**页面（与 API 密钥在一起）：

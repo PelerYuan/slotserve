@@ -9,7 +9,13 @@
     ],
     "Env": [
       "SLOTSERVE_USER=alice",
-      "SLOTSERVE_END=2026-01-05T17:30:00+00:00"
+      "SLOTSERVE_END=2026-01-05T17:30:00+00:00",
+      "SLOTSERVE_ENV_ID=11",
+      "SLOTSERVE_ENV=thesis",
+      "SLOTSERVE_LANE=Lane A",
+      "SLOTSERVE_GPUS=0,1",
+      "SLOTSERVE_MACHINE=",
+      "SLOTSERVE_CHECKPOINT_DIR=/workspace/.checkpoints"
     ],
     "ExposedPorts": {
       "22/tcp": {}
@@ -96,6 +102,10 @@
     "WorkingDir": "/workspace"
   },
   "files": {
+    "etc/profile.d/slotserve-platform.sh": {
+      "mode": "0o644",
+      "text": "# Added by SlotServe: the platform inside this environment (variables, LLM key, login banner)\nif [ -r /run/slotserve/env ]; then . /run/slotserve/env; fi\nif [ -z \"${OPENAI_API_KEY:-}\" ] && [ -r /run/slotserve/llm-key ]; then\n  OPENAI_API_KEY=\"$(cat /run/slotserve/llm-key)\"\n  export OPENAI_API_KEY\nfi\ncase \"$-\" in\n  *i*)\n    if [ -r /run/slotserve/motd.sh ] && [ -z \"${SLOTSERVE_MOTD_SHOWN:-}\" ]; then\n      SLOTSERVE_MOTD_SHOWN=1\n      export SLOTSERVE_MOTD_SHOWN\n      . /run/slotserve/motd.sh\n    fi\n    ;;\nesac\n"
+    },
     "etc/profile.d/slotserve.sh": {
       "mode": "0o644",
       "text": "# Added by SlotServe\n[ -d /workspace ] && [ \"$PWD\" = \"$HOME\" ] && cd /workspace\n"
@@ -127,6 +137,14 @@
     "opt/slotserve/start.sh": {
       "mode": "0o755",
       "text": "#!/bin/sh\n# Started by SlotServe: an SSH server (dropbear) next to the environment's own main process.\n/bin/sh /opt/slotserve/ssh.sh --setup || exit 1\n/bin/sh /opt/slotserve/ssh.sh --run &\ncd /workspace 2>/dev/null || true\nif [ \"$#\" -gt 0 ]; then exec \"$@\"; fi\nwhile :; do sleep 3600; done\n"
+    },
+    "run/slotserve/env": {
+      "mode": "0o644",
+      "text": "# Written by SlotServe; rewritten when the booking is extended\nexport SLOTSERVE_END=2026-01-05T17:30:00+00:00\nexport SLOTSERVE_END_EPOCH=1767634200\nexport SLOTSERVE_END_LABEL='2026-01-05 17:30 UTC'\n"
+    },
+    "run/slotserve/motd.sh": {
+      "mode": "0o644",
+      "text": "# SlotServe login banner (sourced by /etc/profile.d/slotserve-platform.sh)\n_ss_left=\nif [ -n \"${SLOTSERVE_END_EPOCH:-}\" ]; then\n  _ss_s=$(( SLOTSERVE_END_EPOCH - $(date +%s) ))\n  if [ \"$_ss_s\" -gt 0 ]; then\n    _ss_left=\"$(( _ss_s / 3600 ))h$(( _ss_s % 3600 / 60 ))m\"' left, until '\"$SLOTSERVE_END_LABEL\"\n  else\n    _ss_left='the booking has ended'\n  fi\nfi\nprintf '%s\\n' 'thesis · GPU 0,1'\"${_ss_left:+ · $_ss_left}\"\nif [ -d /workspace ]; then\n  df -hP /workspace 2>/dev/null | awk -v f='/workspace: %s used of %s (%s)\\n' 'NR == 2 { printf f, $3, $2, $5 }'\nfi\nunset _ss_left _ss_s\n"
     }
   },
   "keep_entrypoint": false,

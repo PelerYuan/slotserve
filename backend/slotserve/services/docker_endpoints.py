@@ -126,6 +126,7 @@ CREATE_FIELDS = frozenset(
         "HostConfig.RestartPolicy",
         "HostConfig.RestartPolicy.Name",
         "HostConfig.NetworkMode",
+        "HostConfig.ExtraHosts",  # slotserve-gw (containers/contributors/platform_env.py)
         "HostConfig.PortBindings",
         "HostConfig.PortBindings.*",
         "HostConfig.PortBindings.*[].HostIp",
@@ -158,6 +159,9 @@ ENDPOINTS: tuple[Endpoint, ...] = (
         "POST",
         "/commit",
         query=frozenset({"container", "repo", "tag", "comment", "pause"}),
+        # the image's own environment: SlotServe's variables emptied (containers/image_clean.py, R1-11)
+        body="json",
+        fields=frozenset({"Env"}),
         label_scoped=True,
     ),
     # containers
@@ -252,6 +256,8 @@ ENDPOINTS: tuple[Endpoint, ...] = (
         label_scoped=True,
     ),
     Endpoint("networks.list", "GET", "/networks", query=frozenset({"filters"}), writes=False),
+    # the default bridge's address: where the container-side gateway listens (gateway/container_gw.py)
+    Endpoint("networks.inspect", "GET", "/networks/{network}", writes=False),
     Endpoint(
         "networks.connect",
         "POST",

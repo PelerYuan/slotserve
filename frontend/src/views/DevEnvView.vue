@@ -1,71 +1,85 @@
 <script setup lang="ts">
-import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+// Dev environments (F03/F04/F10/F11): with environments open, they come first and "Open a new environment" is
+// folded; otherwise the page starts with the three-step start card. Then shared environments, kept ones,
+// templates, direct ports, the CPU limits, and files and storage.
+import { computed, h, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
-import { NButton, NCheckbox, NInput, NInputNumber, NModal, NSelect, NSwitch, useDialog, useMessage } from 'naive-ui'
-import { ExternalLink, KeyRound, Plus, Terminal, Users } from 'lucide-vue-next'
-import CodeBlock from '@/components/CodeBlock.vue'
-import StorageInfo from '@/components/StorageInfo.vue' // storage hook
-// devenv_cpu: environments without a GPU
+import { NButton, NCheckbox, NInput, NInputNumber, NModal, NSelect, NSwitch, useDialog } from 'naive-ui'
+import { KeyRound, Plus, Terminal } from 'lucide-vue-next'
 import CpuPanel from '@/components/devenv/CpuPanel.vue'
 import CpuProjectControls from '@/components/devenv/CpuProjectControls.vue'
-import CpuSessionInfo from '@/components/devenv/CpuSessionInfo.vue'
 import CpuStartButton from '@/components/devenv/CpuStartButton.vue'
-import DevEnvPorts from '@/components/devenv/DevEnvPorts.vue'
 import PublicPorts from '@/components/devenv/PublicPorts.vue'
 import QuickBook from '@/features/quickbook/components/QuickBook.vue'
 import { api } from '@/api/client'
-import type { DevInfo, DevProject, DevSession, DevTemplate, DevWebKind, Reservation } from '@/api/types'
+import type { DevInfo, DevProject, DevSession, DevTemplate, DevTemplateInput, DevWebKind, Reservation } from '@/api/types'
 import { session } from '@/composables/session'
 import { useErrorMessage } from '@/composables/useErrorMessage'
+import { devenvApi, type DevSessionX } from '@/features/devenv/api'
+import EnvCard from '@/features/devenv/components/EnvCard.vue'
+import PreviewLine from '@/features/devenv/components/PreviewLine.vue'
+import SharedEnvCard from '@/features/devenv/components/SharedEnvCard.vue'
+import StartCard from '@/features/devenv/components/StartCard.vue'
+import { environmentTitles, sshAliases } from '@/features/devenv/naming'
+import StorageInfo from '@/features/devenv/StorageInfo.vue'
 import { formatBytes, formatDateTime, formatRange, relativeFromNow } from '@/utils/format'
 
 const { t } = useI18n()
-const router = useRouter()
 const dialog = useDialog()
-const message = useMessage()
 const { showError } = useErrorMessage()
 const isAdmin = computed(() => !!session.user?.is_admin)
 
 const info = ref<DevInfo | null>(null)
-const sessions = ref<DevSession[]>([])
-const templates = ref<DevTemplate[]>([])
+const sessions = ref<DevSessionX[]>([])
+const templates = ref<(DevTemplate & { compat?: boolean })[]>([])
 const hasKeys = ref(true)
 const projects = ref<DevProject[]>([])
-const upcoming = ref<Reservation[]>([])
+const bookings = ref<Reservation[]>([])
 const everyone = ref(false)
+const loaded = ref(false)
 
 const sharedSessions = computed(() => sessions.value.filter((s) => s.kind === 'shared'))
 const own = computed(() => sessions.value.filter((s) => s.kind !== 'shared'))
 const open = computed(() => own.value.filter((s) => s.state !== 'stopped'))
 const history = computed(() => own.value.filter((s) => s.state === 'stopped').slice(0, 8))
-// A way in: an SSH key, or the environment password while password logins are allowed.
+// A way in over SSH: a key, or the environment password while password logins are allowed. Only the SSH path
+// needs it; web interfaces open without one (F03).
 const canLogIn = computed(() => hasKeys.value || (!!info.value?.password_login && !!info.value?.password_set))
 const prepared = computed(() => new Set(sessions.value.map((s) => s.reservation_id)))
-const notPrepared = computed(() => upcoming.value.filter((r) => !prepared.value.has(r.id)))
-const shared = computed(() => templates.value.filter((x) => x.kind === 'builtin'))
+const upcoming = computed(() =>
+  bookings.value.filter(
+    (r) =>
+      (r.devenv_template_id || r.devenv_project_id) &&
+      (r.phase === 'upcoming' || r.phase === 'pending' || r.phase === 'active') &&
+      !prepared.value.has(r.id),
+  ),
+)
+const builtin = computed(() => templates.value.filter((x) => x.kind === 'builtin'))
 const ownTemplates = computed(() => templates.value.filter((x) => x.kind !== 'builtin'))
+
+const titles = computed(() => environmentTitles([...open.value, ...sharedSessions.value], bookings.value))
+const aliases = computed(() => sshAliases(titles.value))
+const sshHost = computed(() => info.value?.ssh_host ?? window.location.hostname)
+const bookingOf = (s: DevSession) => bookings.value.find((r) => r.id === s.reservation_id) ?? null
+const projectOf = (s: DevSession) => projects.value.find((p) => p.id === s.project_id) ?? null
 
 async function load() {
   try {
     const [i, s, tpl, k, p, mine] = await Promise.all([
       api.devenv.info(),
-      api.devenv.sessions(everyone.value),
+      devenvApi.sessions(everyone.value),
       api.devenv.templates(),
       api.sshKeys(),
       api.devenv.projects(everyone.value),
-      api.reservations(new Date(Date.now() - 3_600_000), new Date(Date.now() + 60 * 86_400_000), true),
+      api.reservations(new Date(Date.now() - 86_400_000), new Date(Date.now() + 60 * 86_400_000), true),
     ])
     info.value = i
     sessions.value = s
     templates.value = tpl
     hasKeys.value = k.length > 0
     projects.value = p
-    upcoming.value = mine.filter(
-      (r) =>
-        (r.devenv_template_id || r.devenv_project_id) &&
-        (r.phase === 'upcoming' || r.phase === 'pending' || r.phase === 'active'),
-    )
+    bookings.value = mine
+    loaded.value = true
   } catch (e) {
     showError(e)
   }
@@ -78,65 +92,43 @@ onMounted(() => {
 })
 onBeforeUnmount(() => window.clearInterval(timer))
 
-// QuickBook opens on this page (no jump to the schedule)
-const quickBook = ref(false)
-function book() {
-  quickBook.value = true
+// ---- opening: the start card, QuickBook for the GPU path ---------------------------------------------------------
+const showStart = ref(false)
+const startVisible = computed(() => !open.value.length || showStart.value)
+async function started(s: DevSession) {
+  showStart.value = false
+  await load()
+  await nextTick()
+  document.querySelector(`[data-session="${s.id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+const quickBook = reactive({ show: false, templateId: null as number | null, projectId: null as number | null })
+function book(target?: { templateId: number | null; projectId: number | null }) {
+  Object.assign(quickBook, { show: true, templateId: target?.templateId ?? null, projectId: target?.projectId ?? null })
+}
+
+function cancelBooking(r: Reservation) {
+  dialog.warning({
+    title: t('devenvUi.upcoming.cancel'),
+    content: t('devenvUi.upcoming.cancelConfirm', { range: formatRange(r.start_at, r.end_at) }),
+    positiveText: t('devenvUi.upcoming.cancel'),
+    negativeText: t('common.close'),
+    onPositiveClick: async () => {
+      try {
+        await devenvApi.end(r.id)
+        load()
+      } catch (e) {
+        showError(e)
+      }
+    },
+  })
 }
 
 function describeTemplate(x: DevTemplate) {
   return x.builtin_key ? t(`devenv.builtin.${x.builtin_key}`) : x.description
 }
 
-function vscodeConfig(s: DevSession) {
-  return `Host ${s.kind === 'shared' ? `slotserve-${s.lane_name ?? 'shared'}`.replace(/[^\w.-]/g, '-') : 'slotserve-dev'}
-  HostName ${info.value?.ssh_host ?? 'server'}
-  Port ${s.ssh_port}
-  User ${s.ssh_user ?? 'root'}`
-}
-
-// ---- session actions --------------------------------------------------------
-async function restart(s: DevSession) {
-  try {
-    await api.devenv.restart(s.id)
-    message.success(t('devenv.restarting'))
-    load()
-  } catch (e) {
-    showError(e)
-  }
-}
-
-const saveForm = reactive({ open: false, id: 0, name: '' })
-const busy = ref(false)
-function openSave(s: DevSession) {
-  Object.assign(saveForm, { open: true, id: s.id, name: s.template_name ?? '' })
-}
-async function save() {
-  busy.value = true
-  try {
-    await api.devenv.save(saveForm.id, saveForm.name.trim())
-    saveForm.open = false
-    message.success(t('devenv.saving'))
-    load()
-  } catch (e) {
-    showError(e)
-  } finally {
-    busy.value = false
-  }
-}
-
-const logs = reactive({ open: false, text: '', title: '' })
-async function showLogs(s: DevSession) {
-  try {
-    logs.text = (await api.devenv.logs(s.id)).text || t('devenv.noLogs')
-    logs.title = s.template_name ?? s.image
-    logs.open = true
-  } catch (e) {
-    showError(e)
-  }
-}
-
 // ---- templates ----------------------------------------------------------------
+const busy = ref(false)
 const tplForm = reactive({
   open: false,
   id: null as number | null,
@@ -150,6 +142,7 @@ const tplForm = reactive({
   keepEntrypoint: false,
   paths: '',
   shared: false,
+  compat: false,
 })
 const webKinds: DevWebKind[] = ['desktop', 'jupyter', 'vscode', 'http']
 const webKindOptions = computed(() => webKinds.map((k) => ({ value: k, label: t(`devenv.web.kind.${k}`) })))
@@ -159,10 +152,7 @@ const portModeOptions = computed(() =>
 function addPort() {
   tplForm.ports.push({ name: '', port: null, kind: 'http', mode: 'login' })
 }
-function openLabel(p: { name: string; kind: DevWebKind }) {
-  return p.kind === 'http' ? t('devenv.web.openNamed', { name: p.name }) : t(`devenv.web.open.${p.kind}`)
-}
-function openTemplate(x?: DevTemplate) {
+function openTemplate(x?: DevTemplate & { compat?: boolean }) {
   Object.assign(tplForm, {
     open: true,
     id: x?.id ?? null,
@@ -176,6 +166,7 @@ function openTemplate(x?: DevTemplate) {
     keepEntrypoint: x?.keep_entrypoint ?? false,
     paths: x ? x.persist_paths.join('\n') : '',
     shared: false,
+    compat: x?.compat ?? false,
   })
 }
 function parseEnv(text: string): Record<string, string> {
@@ -194,7 +185,7 @@ function parseLines(text: string): string[] {
 }
 async function saveTemplate() {
   busy.value = true
-  const body = {
+  const body: Record<string, unknown> = {
     name: tplForm.name.trim(),
     image: tplForm.image.trim(),
     description: tplForm.description.trim(),
@@ -206,14 +197,14 @@ async function saveTemplate() {
     keep_entrypoint: tplForm.keepEntrypoint,
     persist_paths: parseLines(tplForm.paths),
   }
+  if (isAdmin.value) body.compat = tplForm.compat
   try {
     if (tplForm.id) {
-      const patch: Record<string, unknown> = { ...body }
-      if (tplForm.kind === 'saved') delete patch.image
-      if (tplForm.kind === 'builtin' && !body.description) delete patch.description
-      await api.devenv.updateTemplate(tplForm.id, patch)
+      if (tplForm.kind === 'saved') delete body.image
+      if (tplForm.kind === 'builtin' && !body.description) delete body.description
+      await api.devenv.updateTemplate(tplForm.id, body)
     } else {
-      await api.devenv.createTemplate({ ...body, shared: tplForm.shared })
+      await api.devenv.createTemplate({ ...(body as unknown as DevTemplateInput), shared: tplForm.shared })
     }
     tplForm.open = false
     load()
@@ -296,17 +287,6 @@ function removeProject(p: DevProject) {
 }
 
 const projectTone: Record<string, string> = { running: 'ok', paused: 'brand', missing: 'danger', new: '' }
-
-const stateTone: Record<string, string> = {
-  running: 'ok',
-  failed: 'danger',
-  pulling: 'warn',
-  starting: 'warn',
-  stopping: 'warn',
-  ready: 'brand',
-  waiting: '',
-  stopped: '',
-}
 </script>
 
 <template>
@@ -314,9 +294,9 @@ const stateTone: Record<string, string> = {
     <header class="page-header">
       <div>
         <h1>{{ t('devenv.title') }}</h1>
-        <p>{{ t('devenv.subtitle') }}</p>
+        <p>{{ t('devenvUi.subtitle') }}</p>
       </div>
-      <NButton type="primary" :disabled="!info?.enabled" @click="book">
+      <NButton type="primary" secondary :disabled="!info?.enabled" @click="book()">
         <template #icon><Terminal :size="16" /></template>
         {{ t('devenv.book') }}
       </NButton>
@@ -328,275 +308,209 @@ const stateTone: Record<string, string> = {
       <span v-if="isAdmin && info.docker.error" class="mono small"> {{ info.docker.error }}</span>
     </div>
 
-    <div v-if="info?.enabled && !canLogIn" class="card card-pad notice warn">
-      <KeyRound :size="16" />
-      <span>{{ info.password_login ? t('devenv.needKey') : t('devenv.needKeyOnly') }}</span>
-      <NButton size="small" type="primary" secondary @click="router.push({ name: 'keys' })">{{ t('devenv.credentials') }}</NButton>
-    </div>
-    <p v-else-if="info?.enabled" class="faint small cred-hint">
-      <KeyRound :size="13" />
-      {{ t('devenv.credentialsHint') }}
-      <RouterLink :to="{ name: 'keys' }">{{ t('devenv.credentials') }}</RouterLink>
-    </p>
-
-    <!-- shared environments of idle lanes -->
-    <section v-if="sharedSessions.length" class="block">
-      <div class="block-head">
-        <h2 class="block-title">{{ t('devenv.sharedTitle') }}</h2>
-      </div>
-      <article v-for="s in sharedSessions" :key="`shared${s.id}`" class="card card-pad env" data-kind="shared">
-        <div class="row env-head">
-          <Users :size="15" class="faint" />
-          <span class="strong">{{ s.lane_name }}</span>
-          <span class="badge brand">{{ t('devenv.sharedBadge') }}</span>
-          <span class="badge" :class="stateTone[s.state]">{{ t(`devenv.state.${s.state}`) }}</span>
-          <span class="spacer" />
-          <span class="faint small">{{ s.template_name ?? s.image }}</span>
-        </div>
-        <p class="muted small">{{ t('devenv.sharedHint', { user: s.ssh_user ?? '?' }) }}</p>
-        <div v-if="s.state === 'pulling'" class="progress">
-          <div class="bar"><span :style="{ width: `${s.progress ?? 3}%` }" /></div>
-          <div class="faint small">{{ t('devenv.pulling', { pct: s.progress !== null ? Math.round(s.progress) : '…' }) }}</div>
-        </div>
-        <template v-if="s.state === 'running' && s.ssh_command">
-          <div class="ssh">
-            <div class="faint small">{{ t('devenv.connect') }}</div>
-            <CodeBlock :code="s.ssh_command" inline />
-          </div>
-          <details class="vscode">
-            <summary class="small">{{ t('devenv.vscode') }}</summary>
-            <CodeBlock :code="vscodeConfig(s)" />
-          </details>
-        </template>
-        <DevEnvPorts v-if="s.state === 'running'" :session="s" :can-manage="false" />
-        <div v-if="isAdmin && s.error" class="failure"><pre class="mono small">{{ s.error }}</pre></div>
-        <div v-if="isAdmin" class="row wrap actions">
-          <NButton v-if="s.state === 'running' || s.state === 'failed'" size="small" secondary @click="restart(s)">
-            {{ s.state === 'failed' ? t('devenv.retry') : t('devenv.restart') }}
-          </NButton>
-          <NButton size="small" quaternary @click="showLogs(s)">{{ t('devenv.logs') }}</NButton>
-        </div>
-      </article>
-    </section>
-
-    <!-- devenv_cpu: environments without a GPU -->
-    <CpuPanel v-if="info?.enabled" :templates="templates" :projects="projects" :can-log-in="canLogIn" @changed="load" />
-
-    <!-- environments -->
-    <section class="block">
-      <div class="block-head">
-        <h2 class="block-title">{{ t('devenv.sessions') }}</h2>
-        <label v-if="isAdmin" class="row small toggle">
-          <NSwitch v-model:value="everyone" size="small" @update:value="load" />{{ t('devenv.everyone') }}
-        </label>
-      </div>
-      <div v-if="!open.length && !notPrepared.length" class="card card-pad empty">{{ t('devenv.noSessions') }}</div>
-
-      <article v-for="s in open" :key="s.id" class="card card-pad env">
-        <div class="row env-head">
-          <span class="strong">{{ s.project_name ?? s.template_name ?? s.image }}</span>
-          <span class="badge" :class="stateTone[s.state]">{{ t(`devenv.state.${s.state}`) }}</span>
-          <span v-if="s.project_name && s.template_name" class="faint small">{{ s.template_name }}</span>
-          <span v-if="everyone" class="faint small">{{ s.username }}</span>
-          <span class="spacer" />
-          <span class="faint small num">
-            <template v-if="s.start_at && s.end_at">{{ formatRange(s.start_at, s.end_at) }}</template>
-            <template v-if="s.lane_name"> · {{ s.lane_name }}</template>
-          </span>
-        </div>
-        <div class="mono small faint image">{{ s.image }}</div>
-        <CpuSessionInfo v-if="s.kind === 'cpu'" :session="s" :projects="projects" @changed="load" />
-
-        <div v-if="s.state === 'pulling'" class="progress">
-          <div class="bar"><span :style="{ width: `${s.progress ?? 3}%` }" /></div>
-          <div class="faint small">
-            {{ t('devenv.pulling', { pct: s.progress !== null ? Math.round(s.progress) : '…' }) }}
-            <span v-if="s.detail" class="mono"> · {{ s.detail }}</span>
+    <template v-if="info?.enabled && loaded">
+      <!-- your environments first, when there are any -->
+      <section v-if="open.length || upcoming.length || isAdmin" class="block" data-test="my-environments">
+        <div class="block-head">
+          <h2 class="block-title">{{ t('devenv.sessions') }}</h2>
+          <div class="row head-actions">
+            <label v-if="isAdmin" class="row small toggle">
+              <NSwitch v-model:value="everyone" size="small" @update:value="load" />{{ t('devenv.everyone') }}
+            </label>
+            <NButton v-if="open.length" size="small" :secondary="!showStart" data-test="open-new" @click="showStart = !showStart">
+              <template #icon><Plus :size="14" /></template>
+              {{ t('devenvUi.start.openNew') }}
+            </NButton>
           </div>
         </div>
-        <p v-else-if="(s.state === 'ready' || s.state === 'waiting') && s.kind !== 'cpu'" class="muted small">
-          {{ t('devenv.waitingStart') }}
-        </p>
-        <p v-else-if="s.state === 'starting'" class="muted small">
-          {{ s.detail === 'snapshot' ? t('devenv.snapshot') : t('devenv.starting') }}
-        </p>
-
-        <div v-if="s.state === 'running' && s.web.length" class="row wrap web">
-          <NButton
-            v-for="p in s.web"
-            :key="p.port"
-            tag="a"
-            :href="p.url"
-            target="_blank"
-            rel="noopener"
-            type="primary"
-            size="small"
-          >
-            <template #icon><ExternalLink :size="14" /></template>
-            {{ openLabel(p) }}
-          </NButton>
-          <span class="faint small">{{ t('devenv.web.newTab') }}</span>
-        </div>
-        <DevEnvPorts v-if="s.state === 'running'" :session="s" :can-manage="s.mine || isAdmin" />
-
-        <template v-if="s.state === 'running' && s.ssh_command">
-          <div class="ssh">
-            <div class="faint small">{{ t('devenv.connect') }}</div>
-            <CodeBlock :code="s.ssh_command" inline />
+        <StartCard
+          v-if="open.length && showStart"
+          :templates="templates"
+          :projects="projects"
+          :info="info"
+          :can-log-in="canLogIn"
+          @started="started"
+          @book="book"
+          @credentials="load"
+        />
+        <p v-if="!open.length && !upcoming.length" class="faint small">{{ t('devenvUi.empty') }}</p>
+        <EnvCard
+          v-for="s in open"
+          :key="s.id"
+          :session="s"
+          :title="titles.get(s.id) ?? s.image"
+          :alias="aliases.get(s.id) ?? 'slotserve'"
+          :ssh-host="sshHost"
+          :booking="bookingOf(s)"
+          :project="projectOf(s)"
+          :show-owner="everyone && !s.mine"
+          :can-log-in="canLogIn"
+          :password-login="!!info.password_login"
+          @changed="load"
+        />
+        <article v-for="r in upcoming" :key="`r${r.id}`" class="card card-pad env upcoming" data-test="upcoming">
+          <div class="row wrap env-head">
+            <span class="strong">{{ r.note?.trim() || r.devenv_project_name || r.devenv_template_name }}</span>
+            <span class="badge">{{ r.status === 'pending' ? t('phase.pending') : t('phase.upcoming') }}</span>
+            <span class="faint small num">{{ formatRange(r.start_at, r.end_at) }}<template v-if="r.lane_name"> · {{ r.lane_name }}</template></span>
+            <span class="spacer" />
+            <NButton size="small" quaternary @click="cancelBooking(r)">{{ t('devenvUi.upcoming.cancel') }}</NButton>
           </div>
-          <details class="vscode">
-            <summary class="small">{{ t('devenv.vscode') }}</summary>
-            <p class="faint small">{{ t('devenv.vscodeHint') }}</p>
-            <CodeBlock :code="vscodeConfig(s)" />
-          </details>
-          <p v-if="info?.host_key_fingerprint" class="faint small">
-            {{ t('devenv.hostKey') }} <span class="mono">{{ info.host_key_fingerprint }}</span>
-          </p>
-          <p v-if="s.detail === 'saving'" class="small warn-text">{{ t('devenv.saving') }}</p>
-        </template>
+          <p class="muted small">{{ t('devenv.preparedAhead', { minutes: info.pull_minutes ?? 60 }) }}</p>
+        </article>
+      </section>
 
-        <div v-if="s.state === 'failed'" class="failure">
-          <pre class="mono small">{{ s.error }}</pre>
+      <!-- open a new one: the first thing on the page when nothing is open -->
+      <StartCard
+        v-if="!open.length"
+        :templates="templates"
+        :projects="projects"
+        :info="info"
+        :can-log-in="canLogIn"
+        @started="started"
+        @book="book"
+        @credentials="load"
+      />
+      <p v-if="!open.length && !upcoming.length && !isAdmin" class="faint small empty-line">{{ t('devenvUi.empty') }}</p>
+
+      <!-- shared environments of idle lanes -->
+      <section v-if="sharedSessions.length" class="block">
+        <div class="block-head">
+          <h2 class="block-title">{{ t('devenv.sharedTitle') }}</h2>
         </div>
-        <p v-else-if="s.error" class="small warn-text">{{ s.error }}</p>
+        <SharedEnvCard
+          v-for="s in sharedSessions"
+          :key="`shared${s.id}`"
+          :session="s"
+          :alias="aliases.get(s.id) ?? 'slotserve-shared'"
+          :ssh-host="sshHost"
+          :has-keys="hasKeys"
+          @changed="load"
+        />
+      </section>
 
-        <div class="row wrap actions">
-          <NButton v-if="s.state === 'running'" size="small" secondary :disabled="s.detail === 'saving'" @click="openSave(s)">
-            {{ t('devenv.save') }}
-          </NButton>
-          <NButton v-if="s.state === 'running' || s.state === 'failed'" size="small" secondary @click="restart(s)">
-            {{ s.state === 'failed' ? t('devenv.retry') : t('devenv.restart') }}
-          </NButton>
-          <NButton size="small" quaternary @click="showLogs(s)">{{ t('devenv.logs') }}</NButton>
-        </div>
-      </article>
-
-      <article v-for="r in notPrepared" :key="`r${r.id}`" class="card card-pad env">
-        <div class="row env-head">
-          <span class="strong">{{ r.devenv_project_name ?? r.devenv_template_name }}</span>
-          <span class="badge">{{ r.status === 'pending' ? t('phase.pending') : t('phase.upcoming') }}</span>
-          <span class="spacer" />
-          <span class="faint small num">{{ formatRange(r.start_at, r.end_at) }}</span>
-        </div>
-        <p class="muted small">{{ t('devenv.preparedAhead', { minutes: info?.pull_minutes ?? 60 }) }}</p>
-      </article>
-
-      <details v-if="history.length" class="history">
+      <details v-if="history.length" class="history block">
         <summary class="small muted">{{ t('devenv.history') }}</summary>
         <ul>
           <li v-for="s in history" :key="s.id" class="small">
-            <span class="strong">{{ s.template_name ?? s.image }}</span>
+            <span class="strong">{{ s.project_name ?? s.template_name ?? s.image }}</span>
             <span class="faint num"> · {{ s.started_at ? formatDateTime(s.started_at) : '—' }}</span>
             <span v-if="everyone" class="faint"> · {{ s.username }}</span>
           </li>
         </ul>
       </details>
-    </section>
 
-    <!-- kept environments -->
-    <section class="block">
-      <div class="block-head">
-        <h2 class="block-title">{{ t('devenv.projects') }}</h2>
-      </div>
-      <p class="muted small">{{ t('devenv.projectsHint') }}</p>
-      <div v-if="!projects.length" class="faint small">{{ t('devenv.projectsEmpty', { n: info?.projects_limit ?? 3 }) }}</div>
-      <div class="grid">
-        <article v-for="p in projects" :key="p.id" class="card card-pad tpl" data-kind="project">
-          <div class="row">
-            <span class="strong">{{ p.name }}</span>
-            <span class="badge" :class="projectTone[p.state]">{{ t(`devenv.projectState.${p.state}`) }}</span>
-            <span v-if="everyone && p.owner" class="faint small">{{ p.owner }}</span>
-          </div>
-          <div class="mono small faint image">{{ p.template_name ?? p.image }}</div>
-          <p class="small muted">
-            <template v-if="p.last_used_at">{{ t('devenv.lastUsed', { time: relativeFromNow(p.last_used_at) }) }}</template>
-            <template v-if="p.size_bytes !== null"> · {{ formatBytes(p.size_bytes) }}</template>
-            <template v-if="p.upcoming"> · {{ t('devenv.upcomingBookings', { n: p.upcoming }) }}</template>
-          </p>
-          <p v-if="p.persist_paths.length" class="mono small faint">{{ p.persist_paths.join('  ') }}</p>
-          <CpuProjectControls :project="p" @changed="load" />
-          <div class="row actions">
-            <NButton size="tiny" quaternary @click="openProject(p)">{{ t('common.edit') }}</NButton>
-            <NButton size="tiny" quaternary type="error" :disabled="p.state === 'running'" @click="removeProject(p)">
-              {{ t('common.delete') }}
-            </NButton>
-          </div>
-        </article>
-      </div>
-      <p v-if="info?.project_days" class="faint small">{{ t('devenv.projectDays', { n: info.project_days }) }}</p>
-    </section>
+      <!-- kept environments -->
+      <section v-if="projects.length" class="block">
+        <div class="block-head">
+          <h2 class="block-title">{{ t('devenv.projects') }}</h2>
+        </div>
+        <p class="muted small">{{ t('devenv.projectsHint') }}</p>
+        <div class="grid">
+          <article v-for="p in projects" :key="p.id" class="card card-pad tpl" data-kind="project">
+            <div class="row wrap">
+              <span class="strong">{{ p.name }}</span>
+              <span class="badge" :class="projectTone[p.state]">{{ t(`devenv.projectState.${p.state}`) }}</span>
+              <span v-if="everyone && p.owner" class="faint small">{{ p.owner }}</span>
+            </div>
+            <div class="small faint">{{ p.template_name ?? p.image }}</div>
+            <p class="small muted">
+              <template v-if="p.last_used_at">{{ t('devenv.lastUsed', { time: relativeFromNow(p.last_used_at) }) }}</template>
+              <template v-if="p.size_bytes !== null"> · {{ formatBytes(p.size_bytes) }}</template>
+              <template v-if="p.upcoming"> · {{ t('devenv.upcomingBookings', { n: p.upcoming }) }}</template>
+            </p>
+            <p v-if="p.persist_paths.length" class="mono small faint">{{ p.persist_paths.join('  ') }}</p>
+            <CpuProjectControls :project="p" @changed="load" />
+            <div class="row wrap actions">
+              <NButton v-if="p.mine" size="tiny" secondary @click="book({ templateId: null, projectId: p.id })">{{ t('devenvUi.bookGpu') }}</NButton>
+              <NButton size="tiny" quaternary @click="openProject(p)">{{ t('common.edit') }}</NButton>
+              <NButton size="tiny" quaternary type="error" :disabled="p.state === 'running'" @click="removeProject(p)">
+                {{ t('common.delete') }}
+              </NButton>
+            </div>
+          </article>
+        </div>
+        <p v-if="info.project_days" class="faint small">{{ t('devenv.projectDays', { n: info.project_days }) }}</p>
+      </section>
 
-    <!-- direct ports (host ports) -->
-    <PublicPorts v-if="info?.enabled" :is-admin="isAdmin" />
+      <!-- templates -->
+      <section class="block">
+        <div class="block-head">
+          <h2 class="block-title">{{ t('devenv.templates') }}</h2>
+          <NButton v-if="info.custom_images || isAdmin" size="small" secondary @click="openTemplate()">
+            <template #icon><Plus :size="14" /></template>
+            {{ t('devenv.newTemplate') }}
+          </NButton>
+        </div>
+        <div class="grid">
+          <article v-for="x in builtin" :key="x.id" class="card card-pad tpl" :class="{ off: !x.enabled }" data-test="template">
+            <div class="row wrap">
+              <span class="strong">{{ x.name }}</span>
+              <span v-if="!x.enabled" class="badge">{{ t('devenv.off') }}</span>
+              <span v-for="p in x.web_ports" :key="p.port" class="badge brand">{{ t(`devenv.web.kind.${p.kind}`) }}</span>
+              <span v-if="!x.web_ports.length" class="badge">SSH</span>
+              <span v-if="isAdmin && x.compat" class="badge warn" :title="t('devenvUi.compatHint')">{{ t('devenvUi.compat') }}</span>
+              <span class="spacer" />
+              <NSwitch v-if="isAdmin" :value="x.enabled" size="small" @update:value="(v: boolean) => toggleTemplate(x, v)" />
+            </div>
+            <p class="small muted">{{ describeTemplate(x) }}</p>
+            <details class="tpl-details">
+              <summary class="small faint">{{ t('devenvUi.details') }}</summary>
+              <div class="mono small faint image">{{ x.image }}</div>
+            </details>
+            <div v-if="x.enabled" class="row wrap actions">
+              <CpuStartButton :template-id="x.id" @started="load" />
+              <NButton size="tiny" quaternary @click="book({ templateId: x.id, projectId: null })">{{ t('devenvUi.bookGpu') }}</NButton>
+            </div>
+            <div v-if="isAdmin" class="row actions">
+              <NButton size="tiny" quaternary @click="openTemplate(x)">{{ t('common.edit') }}</NButton>
+              <NButton size="tiny" quaternary type="error" @click="removeTemplate(x)">{{ t('common.delete') }}</NButton>
+            </div>
+          </article>
+        </div>
+        <h3 class="sub">{{ t('devenv.mine') }}</h3>
+        <div v-if="!ownTemplates.length" class="faint small">{{ t('devenv.mineEmpty', { n: info.saved_limit ?? 3 }) }}</div>
+        <div class="grid">
+          <article v-for="x in ownTemplates" :key="x.id" class="card card-pad tpl">
+            <div class="row wrap">
+              <span class="strong">{{ x.name }}</span>
+              <span class="badge" :class="{ brand: x.kind === 'saved' }">{{ t(`devenv.kind.${x.kind}`) }}</span>
+              <span v-for="p in x.web_ports" :key="p.port" class="badge brand">{{ t(`devenv.web.kind.${p.kind}`) }}</span>
+              <span v-if="everyone && x.owner" class="faint small">{{ x.owner }}</span>
+            </div>
+            <p v-if="x.description" class="small muted">{{ x.description }}</p>
+            <details class="tpl-details">
+              <summary class="small faint">{{ t('devenvUi.details') }}</summary>
+              <div class="mono small faint image">{{ x.image }}</div>
+            </details>
+            <div class="row wrap actions">
+              <CpuStartButton :template-id="x.id" @started="load" />
+              <NButton size="tiny" quaternary @click="book({ templateId: x.id, projectId: null })">{{ t('devenvUi.bookGpu') }}</NButton>
+              <NButton size="tiny" quaternary @click="openTemplate(x)">{{ t('common.edit') }}</NButton>
+              <NButton size="tiny" quaternary type="error" @click="removeTemplate(x)">{{ t('common.delete') }}</NButton>
+            </div>
+          </article>
+        </div>
+        <p class="faint small share-hint">{{ t('devenvUi.shareHint') }}</p>
+      </section>
 
-    <!-- templates -->
-    <section class="block">
-      <div class="block-head">
-        <h2 class="block-title">{{ t('devenv.templates') }}</h2>
-        <NButton v-if="info?.custom_images || isAdmin" size="small" secondary @click="openTemplate()">
-          <template #icon><Plus :size="14" /></template>
-          {{ t('devenv.newTemplate') }}
-        </NButton>
-      </div>
-      <div class="grid">
-        <article v-for="x in shared" :key="x.id" class="card card-pad tpl" :class="{ off: !x.enabled }">
-          <div class="row">
-            <span class="strong">{{ x.name }}</span>
-            <span v-if="!x.enabled" class="badge">{{ t('devenv.off') }}</span>
-            <span v-for="p in x.web_ports" :key="p.port" class="badge brand">{{ t(`devenv.web.kind.${p.kind}`) }}</span>
-            <span class="spacer" />
-            <template v-if="isAdmin">
-              <NSwitch :value="x.enabled" size="small" @update:value="(v: boolean) => toggleTemplate(x, v)" />
-            </template>
-          </div>
-          <div class="mono small faint image">{{ x.image }}</div>
-          <p class="small muted">{{ describeTemplate(x) }}</p>
-          <div v-if="x.enabled" class="row actions"><CpuStartButton :template-id="x.id" @started="load" /></div>
-          <div v-if="isAdmin" class="row actions">
-            <NButton size="tiny" quaternary @click="openTemplate(x)">{{ t('common.edit') }}</NButton>
-            <NButton size="tiny" quaternary type="error" @click="removeTemplate(x)">{{ t('common.delete') }}</NButton>
-          </div>
-        </article>
-      </div>
-      <h3 class="sub">{{ t('devenv.mine') }}</h3>
-      <div v-if="!ownTemplates.length" class="faint small">{{ t('devenv.mineEmpty', { n: info?.saved_limit ?? 3 }) }}</div>
-      <div class="grid">
-        <article v-for="x in ownTemplates" :key="x.id" class="card card-pad tpl">
-          <div class="row">
-            <span class="strong">{{ x.name }}</span>
-            <span class="badge" :class="{ brand: x.kind === 'saved' }">{{ t(`devenv.kind.${x.kind}`) }}</span>
-            <span v-for="p in x.web_ports" :key="p.port" class="badge brand">{{ t(`devenv.web.kind.${p.kind}`) }}</span>
-          </div>
-          <div class="mono small faint image">{{ x.image }}</div>
-          <p v-if="x.description" class="small muted">{{ x.description }}</p>
-          <div class="row actions">
-            <CpuStartButton :template-id="x.id" @started="load" />
-            <NButton size="tiny" quaternary @click="openTemplate(x)">{{ t('common.edit') }}</NButton>
-            <NButton size="tiny" quaternary type="error" @click="removeTemplate(x)">{{ t('common.delete') }}</NButton>
-          </div>
-        </article>
-      </div>
-    </section>
+      <!-- direct ports (host ports) -->
+      <PublicPorts :is-admin="isAdmin" />
 
-    <!-- storage hook: storages from Admin -> Storage -->
-    <StorageInfo v-if="info?.enabled" />
+      <!-- environments without a GPU: limits (cores of the shared pool for admins only) -->
+      <CpuPanel :templates="templates" :projects="projects" @changed="load" />
+
+      <!-- files and storage -->
+      <StorageInfo />
+
+      <p class="faint small cred-hint">
+        <KeyRound :size="13" />
+        {{ t('devenv.credentialsHint') }}
+        <RouterLink :to="{ name: 'keys' }">{{ t('devenv.credentials') }}</RouterLink>
+      </p>
+    </template>
 
     <!-- dialogs -->
-    <NModal v-model:show="saveForm.open" preset="card" :title="t('devenv.save')" style="max-width: 460px">
-      <p class="muted small">{{ t('devenv.saveHint') }}</p>
-      <NInput v-model:value="saveForm.name" :placeholder="t('devenv.templateName')" maxlength="64" />
-      <template #footer>
-        <div class="footer">
-          <NButton @click="saveForm.open = false">{{ t('common.cancel') }}</NButton>
-          <NButton type="primary" :loading="busy" :disabled="!saveForm.name.trim()" @click="save">{{ t('devenv.save') }}</NButton>
-        </div>
-      </template>
-    </NModal>
-
-    <NModal v-model:show="logs.open" preset="card" :title="logs.title" style="max-width: 820px">
-      <pre class="log mono">{{ logs.text }}</pre>
-    </NModal>
-
     <NModal
       v-model:show="tplForm.open"
       preset="card"
@@ -662,6 +576,12 @@ const stateTone: Record<string, string> = {
         <label v-if="isAdmin && !tplForm.id" class="row small toggle">
           <NSwitch v-model:value="tplForm.shared" size="small" />{{ t('devenv.shared') }}
         </label>
+        <template v-if="isAdmin">
+          <label class="row small toggle">
+            <NSwitch v-model:value="tplForm.compat" size="small" />{{ t('devenvUi.compatSwitch') }}
+          </label>
+          <span class="faint small">{{ t('devenvUi.compatHint') }}</span>
+        </template>
       </div>
       <template #footer>
         <div class="footer">
@@ -692,7 +612,18 @@ const stateTone: Record<string, string> = {
         </div>
       </template>
     </NModal>
-    <QuickBook v-model:show="quickBook" intent="devenv" @done="load" />
+
+    <QuickBook
+      v-model:show="quickBook.show"
+      intent="devenv"
+      :template-id="quickBook.templateId ?? undefined"
+      :project-id="quickBook.projectId ?? undefined"
+      @done="load"
+    >
+      <template #summary="{ kind, templateId, projectId, laneId }">
+        <PreviewLine v-if="kind === 'devenv'" :template-id="templateId" :project-id="projectId" :lane-id="laneId" gpu />
+      </template>
+    </QuickBook>
   </div>
 </template>
 
@@ -708,15 +639,15 @@ const stateTone: Record<string, string> = {
   color: var(--danger);
   background: var(--danger-soft);
 }
-.notice.warn {
-  background: var(--brand-softer);
-}
 .cred-hint {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  margin: -4px 0 16px;
+  margin: 8px 0 0;
+}
+.empty-line {
+  margin: -12px 0 24px;
 }
 .block {
   margin-bottom: 28px;
@@ -725,7 +656,12 @@ const stateTone: Record<string, string> = {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 12px;
+}
+.head-actions {
+  gap: 12px;
 }
 .block-title {
   font-size: 15px;
@@ -737,40 +673,19 @@ const stateTone: Record<string, string> = {
   margin: 18px 0 10px;
   color: var(--text-2);
 }
-.empty {
-  color: var(--text-3);
-  text-align: center;
-}
 .env {
   margin-bottom: 12px;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 .env-head {
   gap: 10px;
 }
+.env p {
+  margin: 0;
+}
 .image {
   word-break: break-all;
-}
-.progress .bar {
-  height: 8px;
-  border-radius: 999px;
-  background: var(--surface-muted);
-  overflow: hidden;
-  margin-bottom: 6px;
-}
-.progress .bar span {
-  display: block;
-  height: 100%;
-  background: var(--brand);
-  transition: width 0.4s ease;
-}
-.ssh {
-  display: grid;
-  gap: 6px;
-}
-.web {
-  gap: 10px;
 }
 .web-fields {
   display: grid;
@@ -785,27 +700,6 @@ const stateTone: Record<string, string> = {
 }
 .web-row {
   gap: 8px;
-}
-.vscode summary {
-  cursor: pointer;
-  color: var(--text-2);
-}
-.vscode p {
-  margin: 6px 0;
-}
-.failure pre {
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: #0f1117;
-  color: #fca5a5;
-  white-space: pre-wrap;
-  word-break: break-all;
-  max-height: 220px;
-  overflow: auto;
-}
-.warn-text {
-  color: var(--warning, #b45309);
 }
 .actions {
   gap: 8px;
@@ -823,6 +717,7 @@ const stateTone: Record<string, string> = {
   display: grid;
   gap: 6px;
   align-content: start;
+  min-width: 0;
 }
 .tpl p {
   margin: 0;
@@ -830,21 +725,18 @@ const stateTone: Record<string, string> = {
 .tpl.off {
   opacity: 0.6;
 }
+.tpl-details summary {
+  cursor: pointer;
+}
+.share-hint {
+  margin: 12px 0 0;
+}
+.history summary {
+  cursor: pointer;
+}
 .history ul {
   margin: 8px 0 0;
   padding-left: 18px;
-}
-.log {
-  margin: 0;
-  max-height: 60vh;
-  overflow: auto;
-  padding: 12px;
-  border-radius: 8px;
-  background: #0f1117;
-  color: #c9ced8;
-  font-size: 12px;
-  white-space: pre-wrap;
-  word-break: break-all;
 }
 .form {
   display: grid;
@@ -863,5 +755,10 @@ const stateTone: Record<string, string> = {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 </style>
