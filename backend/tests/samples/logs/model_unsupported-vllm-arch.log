@@ -1,0 +1,1 @@
+(APIServer pid=7102) ValueError: Model architectures ['Gemma3nForConditionalGeneration'] are not supported for now. Supported architectures: dict_keys(['AquilaModel', 'AquilaForCausalLM', 'ArcticForCausalLM', 'BaiChuanForCausalLM', 'BloomForCausalLM', 'Gemma2ForCausalLM', 'Gemma3ForCausalLM', 'LlamaForCausalLM', 'MistralForCausalLM', 'Qwen2ForCausalLM', 'Qwen3ForCausalLM'])

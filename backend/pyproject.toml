@@ -33,7 +33,7 @@ slotserve = "slotserve.__main__:main"
 include = ["slotserve*"]
 
 [tool.setuptools.package-data]
-slotserve = ["static/**/*", "resources/*.json"]
+slotserve = ["static/**/*", "resources/*.json", "services/diagnostics/*.json"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

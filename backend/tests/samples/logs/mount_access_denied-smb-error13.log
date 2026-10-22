@@ -1,0 +1,2 @@
+mount error(13): Permission denied
+Refer to the mount.cifs(8) manual page (e.g. man mount.cifs) and kernel log messages (dmesg)
