@@ -66,10 +66,28 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn
 }
 
+// 403 `sudo_required`: the handler asks for the password again (features/sudo) and resolves true once sudo mode is
+// on; the request is then sent once more. Without a handler, or when it resolves false, the error is thrown.
+let onSudoRequired: (() => Promise<boolean>) | null = null
+export function setSudoHandler(fn: () => Promise<boolean>) {
+  onSudoRequired = fn
+}
+
 const CSRF_HEADER = { 'X-SlotServe': '1' }
 
 // exported for api modules of their own (e.g. ./devenvPorts.ts)
 export async function request<T>(method: string, path: string, body?: unknown, query?: Record<string, unknown>): Promise<T> {
+  try {
+    return await send<T>(method, path, body, query)
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 403 && e.code === 'sudo_required' && onSudoRequired) {
+      if (await onSudoRequired()) return await send<T>(method, path, body, query)
+    }
+    throw e
+  }
+}
+
+async function send<T>(method: string, path: string, body?: unknown, query?: Record<string, unknown>): Promise<T> {
   let url = path
   if (query) {
     const qs = new URLSearchParams()

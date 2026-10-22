@@ -34,9 +34,9 @@ from . import settings_impact
 Tier = Literal["basic", "advanced", "expert"]
 
 # Root-equivalent settings ("danger": "root") need sudo mode (password entered within the last 5 minutes, A06) to be
-# changed - once the web UI can ask for the password (W1-07). Until then the change is allowed but audited as
-# ``settings.sensitive_update`` and announced to all admins. W1-07 flips this to True when it ships the prompt.
-ENFORCE_SUDO_FOR_DANGER = False
+# changed; the web UI asks for the password when a save answers 403 ``sudo_required`` and repeats it. Such changes
+# are also audited as ``settings.sensitive_update`` and announced to all admins.
+ENFORCE_SUDO_FOR_DANGER = True
 
 # Groups in display order: (id, English heading, Chinese heading). The frontend has its own labels for the ids.
 GROUPS: tuple[tuple[str, str, str], ...] = (

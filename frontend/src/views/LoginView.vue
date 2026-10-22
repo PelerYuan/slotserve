@@ -6,17 +6,20 @@ import { NButton, NForm, NFormItem, NInput } from 'naive-ui'
 import { CalendarClock, Moon, Plug, RefreshCw, Sun } from 'lucide-vue-next'
 import BrandMark from '@/components/BrandMark.vue'
 import AuthShowcase from '@/components/AuthShowcase.vue'
-import { api, ApiError } from '@/api/client'
+import { api, ApiError, request } from '@/api/client'
+import type { User } from '@/api/types'
 import { securityApi } from '@/features/security/api'
+import { setupApi, type InviteCheck } from '@/features/admin-setup/api'
 import { session } from '@/composables/session'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { setLocale } from '@/i18n'
 import { isDark, setThemeMode } from '@/composables/theme'
+import { formatDate } from '@/utils/format'
 
 const { t, locale } = useI18n()
 const router = useRouter()
 const route = useRoute()
-const { describe } = useErrorMessage()
+const { describe, message } = useErrorMessage()
 
 const mode = ref<'login' | 'register'>('login')
 const form = reactive({ username: '', password: '', invite: '', setupCode: '' })
@@ -36,13 +39,34 @@ async function loadSetupState() {
   }
   if (setupRequired.value) mode.value = 'register'
 }
-onMounted(loadSetupState)
+// An invite link (/login?invite=ssi-...) opens the sign-up form with the token taken over; the global invite code
+// is never put into a URL.
+const inviteToken = typeof route.query.invite === 'string' ? route.query.invite.trim() : ''
+const invite = ref<InviteCheck | null>(null)
+const inviteUsable = computed(() => !!inviteToken && !setupRequired.value && invite.value?.valid === true)
+
+async function loadInvite() {
+  if (!inviteToken) return
+  mode.value = 'register'
+  try {
+    invite.value = await setupApi.checkInvite(inviteToken)
+    if (!invite.value.valid) error.value = describe(new ApiError(403, invite.value.code ?? 'invite_invalid'))
+  } catch (e) {
+    error.value = describe(e)
+  }
+}
+
+onMounted(async () => {
+  await loadSetupState()
+  await loadInvite()
+})
 
 const canSubmit = computed(
   () =>
     form.username.trim() &&
     form.password &&
-    (mode.value === 'login' || (setupRequired.value ? form.setupCode.trim() : form.invite.trim())),
+    (mode.value === 'login' ||
+      (setupRequired.value ? form.setupCode.trim() : inviteUsable.value || form.invite.trim())),
 )
 
 async function submit() {
@@ -50,14 +74,29 @@ async function submit() {
   busy.value = true
   error.value = ''
   try {
-    session.user =
+    const user: User & { approval_pending?: boolean } =
       mode.value === 'login'
         ? await api.login(form.username.trim(), form.password)
-        : await securityApi.register(
-            form.username.trim(),
-            form.password,
-            setupRequired.value ? { setup_code: form.setupCode.trim() } : { invite_code: form.invite.trim() },
-          )
+        : inviteUsable.value
+          ? await request<User>('POST', '/api/auth/register', {
+              username: form.username.trim(),
+              password: form.password,
+              invite_token: inviteToken,
+            })
+          : await securityApi.register(
+              form.username.trim(),
+              form.password,
+              setupRequired.value ? { setup_code: form.setupCode.trim() } : { invite_code: form.invite.trim() },
+            )
+    if (user.approval_pending) {
+      // signed up with an invite that needs approval: no session until an admin approves
+      message.info(t('auth.invitePending'))
+      error.value = t('auth.invitePending')
+      mode.value = 'login'
+      form.password = ''
+      return
+    }
+    session.user = user
     const next =
       typeof route.query.next === 'string' && route.query.next.startsWith('/') && !route.query.next.startsWith('//')
         ? route.query.next
@@ -183,6 +222,13 @@ function setMode(m: 'login' | 'register') {
                   @keyup.enter="submit"
                 />
               </NFormItem>
+              <p v-else-if="inviteUsable && invite" class="invite-note" data-testid="invite-note">
+                {{
+                  invite.requires_approval
+                    ? t('auth.inviteLinkApproval')
+                    : t('auth.inviteLink', { date: invite.expires_at ? formatDate(invite.expires_at) : '' })
+                }}
+              </p>
               <NFormItem v-else :label="t('auth.inviteCode')">
                 <NInput
                   v-model:value="form.invite"
@@ -428,6 +474,14 @@ h1 {
 }
 .pill.register {
   transform: translateX(100%);
+}
+.invite-note {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 13px;
 }
 .setup {
   margin: -8px 0 20px;

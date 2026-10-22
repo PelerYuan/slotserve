@@ -16,6 +16,7 @@ import { api } from './api/client'
 import { session } from './composables/session'
 import { isDark } from './composables/theme'
 import { darkOverrides, themeOverrides } from './theme'
+import SudoPrompt from './features/sudo/SudoPrompt.vue'
 
 const { locale } = useI18n()
 const nLocale = computed(() => (locale.value === 'zh-CN' ? zhCN : enUS))
@@ -47,6 +48,7 @@ watch(
       <NNotificationProvider>
         <NDialogProvider>
           <RouterView />
+          <SudoPrompt />
         </NDialogProvider>
       </NNotificationProvider>
     </NMessageProvider>

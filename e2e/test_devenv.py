@@ -58,7 +58,7 @@ def test_devenv_without_gpu_ui(page: Page, server: str):
         expect(panel.get_by_role("button", name="Start without GPU")).to_be_visible()
         expect(page.locator("[data-test=cpu-start]").first).to_be_visible()
 
-        page.goto(f"{server}/admin?tab=settings")
+        page.goto(f"{server}/admin?tab=settings&q=GPU")  # expert settings are shown when searched
         expect(page.get_by_text("CPU cores reserved per GPU")).to_be_visible()
         expect(page.get_by_text("Without-GPU environments per person")).to_be_visible()
     finally:

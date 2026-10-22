@@ -10,13 +10,18 @@ import { useErrorMessage } from '@/composables/useErrorMessage'
 import { useNow } from '@/composables/useNow'
 import { formatDateTime, formatDuration } from '@/utils/format'
 import { loadProgress } from '@/utils/progress'
+import DiagnosisCard from '@/features/admin-setup/components/DiagnosisCard.vue'
+import type { Diagnosis } from '@/features/admin-setup/api'
+
+// failed lanes and failed loads carry the likely cause (services/diagnostics, F08)
+type Diagnosed = { diagnosis?: Diagnosis | null }
 
 const { t } = useI18n()
 const message = useMessage()
 const { showError } = useErrorMessage()
 const now = useNow(500)
 
-const lanes = ref<LaneRuntime[]>([])
+const lanes = ref<(LaneRuntime & Diagnosed)[]>([])
 const laneId = ref<number | null>(null)
 const lane = computed(() => lanes.value.find((l) => l.lane_id === laneId.value) ?? lanes.value[0] ?? null)
 const progress = computed(() => (lane.value ? loadProgress(lane.value.runtime, now.value) : null))
@@ -109,7 +114,7 @@ function onScroll() {
 }
 
 // ---- history ----------------------------------------------------------------
-const events = ref<LoadEvent[]>([])
+const events = ref<(LoadEvent & Diagnosed)[]>([])
 const failedOnly = ref(false)
 const open = ref<number | null>(null)
 async function loadEvents() {
@@ -248,8 +253,18 @@ watch(
           {{ t('admin.runtimeView.retryNow') }}
         </NButton>
       </div>
-      <p v-if="lane.runtime.error_hint === 'oom'" class="small">{{ t('admin.runtimeView.oomHint') }}</p>
-      <pre v-if="lane.failure_log.length" class="excerpt">{{ lane.failure_log.join('\n') }}</pre>
+      <DiagnosisCard
+        v-if="lane.diagnosis?.recognized"
+        class="diag-card"
+        :diagnosis="lane.diagnosis"
+        :title="`${lane.lane_name}: ${lane.runtime.model_name ?? ''}`"
+        :log-url="api.admin.runtimeLogUrl(lane.lane_id)"
+        retry
+        :retrying="restarting"
+        @retry="restart"
+      />
+      <p v-else-if="lane.runtime.error_hint === 'oom'" class="small">{{ t('admin.runtimeView.oomHint') }}</p>
+      <pre v-if="lane.failure_log.length && !lane.diagnosis?.recognized" class="excerpt">{{ lane.failure_log.join('\n') }}</pre>
     </div>
 
     <div v-if="lane.command" class="command">
@@ -327,6 +342,7 @@ watch(
               <td colspan="5">
                 <div v-if="e.exit_code !== null" class="small">{{ t('admin.runtimeView.exitCode', { code: e.exit_code }) }}</div>
                 <div v-if="e.command" class="small"><span class="faint">{{ t('admin.runtimeView.command') }}</span> <code class="mono">{{ e.command }}</code></div>
+                <DiagnosisCard v-if="e.diagnosis?.recognized" class="diag-card" :diagnosis="e.diagnosis" :title="e.model_name ?? ''" />
                 <pre v-if="e.log_excerpt" class="excerpt">{{ e.log_excerpt }}</pre>
                 <div v-else-if="e.success" class="faint small">{{ t('admin.runtimeView.noExcerpt') }}</div>
               </td>
@@ -339,6 +355,9 @@ watch(
 </template>
 
 <style scoped>
+.diag-card {
+  margin: 10px 0;
+}
 .lane-pills {
   display: flex;
   flex-wrap: wrap;

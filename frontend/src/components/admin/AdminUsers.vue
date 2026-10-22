@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed, h, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NDropdown, NInput, NModal, NSwitch, useDialog, useMessage } from 'naive-ui'
+import { NButton, NDropdown, NInput, NModal, NSelect, NSwitch, useDialog, useMessage } from 'naive-ui'
 import { MoreHorizontal, Plus, Search, ShieldCheck } from 'lucide-vue-next'
 import { api } from '@/api/client'
 import type { AdminUser } from '@/api/types'
 import { session } from '@/composables/session'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { formatCompact, formatDate, relativeFromNow } from '@/utils/format'
+import { settingsApi, type UserPolicy } from '@/features/settings/api'
+import UserLimits from '@/features/settings/components/UserLimits.vue'
+import InvitesPanel from '@/features/admin-setup/components/InvitesPanel.vue'
 
 const { t } = useI18n()
 const dialog = useDialog()
@@ -26,12 +29,40 @@ async function load() {
   } finally {
     loaded.value = true
   }
+  loadPolicies()
 }
 onMounted(load)
 
+// ---- this week's hours per person (F07) -------------------------------------
+const policies = ref<Record<number, UserPolicy>>({})
+async function loadPolicies() {
+  const ids = users.value.filter((u) => !u.is_admin && !u.disabled_at).map((u) => u.id)
+  const out: Record<number, UserPolicy> = {}
+  for (let i = 0; i < ids.length; i += 6) {
+    const batch = await Promise.all(ids.slice(i, i + 6).map((id) => settingsApi.policy(id).catch(() => null)))
+    for (const p of batch) if (p) out[p.user_id] = p
+  }
+  policies.value = out
+}
+type Load = 'none' | 'ok' | 'near' | 'over'
+function weekLoad(u: AdminUser): Load {
+  const p = policies.value[u.id]
+  if (!p || p.exempt || !p.quota_weekly_hours) return 'none'
+  const share = p.booked_hours_this_week / p.quota_weekly_hours
+  return share > 1.001 ? 'over' : share >= 0.8 ? 'near' : 'ok'
+}
+const show = ref<'all' | 'near'>('all')
+const showOptions = computed(() => [
+  { label: t('settingsUi.limits.filterAll'), value: 'all' },
+  { label: t('settingsUi.limits.filterNear'), value: 'near' },
+])
+const limits = reactive({ open: false, user: null as AdminUser | null })
+
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase()
-  return q ? users.value.filter((u) => u.username.toLowerCase().includes(q)) : users.value
+  let list = q ? users.value.filter((u) => u.username.toLowerCase().includes(q)) : users.value
+  if (show.value === 'near') list = list.filter((u) => ['near', 'over'].includes(weekLoad(u)))
+  return list
 })
 
 const isSelf = (u: AdminUser) => u.id === session.user?.id
@@ -114,6 +145,7 @@ function actionsFor(u: AdminUser) {
   return [
     { key: 'admin', label: u.is_admin ? t('admin.users.revokeAdmin') : t('admin.users.makeAdmin'), disabled: self },
     { key: 'password', label: t('admin.users.resetPassword') },
+    { key: 'limits', label: t('settingsUi.limits.menu') },
     { type: 'divider', key: 'd' },
     {
       key: 'disable',
@@ -131,6 +163,7 @@ function actionsFor(u: AdminUser) {
 function onAction(key: string, u: AdminUser) {
   if (key === 'admin') patch(u, { is_admin: !u.is_admin })
   else if (key === 'password') Object.assign(resetForm, { user: u, password: randomPassword() })
+  else if (key === 'limits') Object.assign(limits, { open: true, user: u })
   else if (key === 'delete') Object.assign(deleteForm, { user: u, confirm: '' })
   else if (key === 'disable') {
     if (u.disabled_at) patch(u, { disabled: false })
@@ -150,9 +183,12 @@ const usernameOk = computed(() => /^[A-Za-z0-9_.-]{3,32}$/.test(createForm.usern
 
 <template>
   <div class="toolbar">
-    <NInput v-model:value="query" :placeholder="t('admin.users.search')" clearable class="search">
-      <template #prefix><Search :size="15" class="faint" /></template>
-    </NInput>
+    <div class="left">
+      <NInput v-model:value="query" :placeholder="t('admin.users.search')" clearable class="search">
+        <template #prefix><Search :size="15" class="faint" /></template>
+      </NInput>
+      <NSelect v-model:value="show" :options="showOptions" :placeholder="t('settingsUi.limits.filterPh')" class="show-select" />
+    </div>
     <NButton type="primary" @click="openCreate">
       <template #icon><Plus :size="16" /></template>
       {{ t('admin.users.create') }}
@@ -167,6 +203,7 @@ const usernameOk = computed(() => /^[A-Za-z0-9_.-]{3,32}$/.test(createForm.usern
             <th>{{ t('admin.users.user') }}</th>
             <th>{{ t('admin.users.status') }}</th>
             <th>{{ t('admin.users.lastActive') }}</th>
+            <th>{{ t('settingsUi.limits.column') }}</th>
             <th class="right">{{ t('admin.users.usage30d') }}</th>
             <th class="right">{{ t('admin.users.keys') }}</th>
             <th class="right">{{ t('admin.users.upcoming') }}</th>
@@ -188,9 +225,27 @@ const usernameOk = computed(() => /^[A-Za-z0-9_.-]{3,32}$/.test(createForm.usern
             </td>
             <td>
               <span v-if="u.disabled_at" class="badge danger">{{ t('admin.users.disabled') }}</span>
+              <span v-else-if="(u as AdminUser & { approval_pending?: boolean }).approval_pending" class="badge warn">
+                {{ t('adminSetup.invites.pendingTitle') }}
+              </span>
               <span v-else class="badge ok">{{ t('admin.users.active') }}</span>
             </td>
             <td class="muted">{{ u.last_active_at ? relativeFromNow(u.last_active_at) : t('admin.users.never') }}</td>
+            <td class="week" :data-week="weekLoad(u)">
+              <button v-if="policies[u.id]" class="week-btn" @click="Object.assign(limits, { open: true, user: u })">
+                <span class="num">
+                  {{
+                    policies[u.id].quota_weekly_hours
+                      ? t('settingsUi.limits.usage', { booked: policies[u.id].booked_hours_this_week, quota: policies[u.id].quota_weekly_hours })
+                      : t('settingsUi.limits.usageUnlimited', { booked: policies[u.id].booked_hours_this_week })
+                  }}
+                </span>
+                <span v-if="policies[u.id].extra_hours" class="badge brand">{{ t('settingsUi.limits.extra', { n: policies[u.id].extra_hours }) }}</span>
+                <span v-if="weekLoad(u) === 'over'" class="badge danger">{{ t('settingsUi.limits.over') }}</span>
+                <span v-else-if="weekLoad(u) === 'near'" class="badge warn">{{ t('settingsUi.limits.near') }}</span>
+              </button>
+              <span v-else class="faint small">{{ u.is_admin ? t('settingsUi.limits.exempt') : '—' }}</span>
+            </td>
             <td class="right num">
               <div>{{ formatCompact(u.tokens_30d) }} tokens</div>
               <div class="faint small">{{ t('admin.users.requests', { n: u.requests_30d }) }}</div>
@@ -211,6 +266,15 @@ const usernameOk = computed(() => /^[A-Za-z0-9_.-]{3,32}$/.test(createForm.usern
     </div>
     <div v-if="loaded && !filtered.length" class="empty">—</div>
   </section>
+
+  <InvitesPanel class="invites-panel" @changed="load" />
+
+  <UserLimits
+    v-model:show="limits.open"
+    :user-id="limits.user?.id ?? null"
+    :username="limits.user?.username ?? ''"
+    @changed="(p: UserPolicy) => (policies = { ...policies, [p.user_id]: p })"
+  />
 
   <!-- create -->
   <NModal
@@ -311,8 +375,49 @@ const usernameOk = computed(() => /^[A-Za-z0-9_.-]{3,32}$/.test(createForm.usern
   justify-content: space-between;
   margin-bottom: 12px;
 }
+.left {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
 .search {
   max-width: 280px;
+}
+.show-select {
+  width: 230px;
+}
+.week-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  margin: -2px -6px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.week-btn:hover {
+  background: var(--hover);
+}
+.invites-panel {
+  margin-top: 16px;
+}
+@media (max-width: 760px) {
+  .toolbar {
+    flex-wrap: wrap;
+  }
+  .left {
+    flex-wrap: wrap;
+  }
+  .search,
+  .show-select {
+    max-width: none;
+    width: 100%;
+  }
 }
 .table td {
   white-space: nowrap;

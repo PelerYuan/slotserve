@@ -156,15 +156,15 @@ async def test_unchanged_values_write_no_audit_entry(make_client):
 # ---- root-equivalent settings ----------------------------------------------------------------------------------
 
 
-async def test_danger_settings_are_sensitive_and_need_sudo_once_enforced(make_client, app, monkeypatch):
+async def test_danger_settings_are_sensitive_and_need_sudo(make_client, app, monkeypatch):
+    assert app_settings.ENFORCE_SUDO_FOR_DANGER  # the web UI asks for the password (W1-07)
     admin = await make_client("root")
     r = await admin.put("/api/admin/settings", json={"custom_engine_cmd": "my-engine --port {port}"})
-    assert r.status_code == 200  # not enforced until the web UI can ask for the password (W1-07)
+    assert r.status_code == 200  # signing up (or in) counts as entering the password
     entry = (await admin.get("/api/admin/audit")).json()["items"][0]
     assert entry["action"] == "settings.sensitive_update"
     assert entry["detail"]["after"] == {"custom_engine_cmd": "my-engine --port {port}"}
 
-    monkeypatch.setattr(app_settings, "ENFORCE_SUDO_FOR_DANGER", True)
     real_now = sudo._now
     monkeypatch.setattr(sudo, "_now", lambda: real_now() + 10 * 60)  # sudo mode of the sign-up has expired
     r = await admin.put("/api/admin/settings", json={"custom_engine_cmd": ""})

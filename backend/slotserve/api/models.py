@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..db import get_db, utcnow
-from ..deps import admin_user, current_user, get_lanes
+from ..deps import admin_user, current_user, get_lanes, sudo_admin
 from ..errors import ApiError
 from ..orm import HOLDING_STATUSES, Lane, LlmModel, ModelPreset, Reservation, User
 from ..runtime.engines import ENGINES, ArgReview, member_source_ok, review_args, split_args
@@ -74,13 +74,10 @@ async def scan_models(user: User = Depends(current_user), db: AsyncSession = Dep
 # (``denied``) need ``confirm_args`` (400 ``args_confirm_required`` with ``denied: [flags]`` otherwise).
 
 
-def _require_recent_auth(admin: User) -> None:
-    """Hook: an admin changing launch arguments must have re-entered their password recently.
-
-    TODO(W0-01): replace with the ``sudo_user`` dependency (re-authentication, 5 minutes) once it is merged:
-    make the endpoints below that call this take ``Depends(sudo_user)`` when the arguments change.
-    """
-    return None
+async def _require_recent_auth(request: Request, admin: User) -> None:
+    """An admin changing launch arguments (they run on the host) must have entered their password within the last
+    few minutes: 403 ``sudo_required`` otherwise; the web UI then asks for it and repeats the request."""
+    await sudo_admin(request, admin)
 
 
 async def _review(db: AsyncSession, engine: str, args: str, approved: list[str]) -> ArgReview:
@@ -92,12 +89,14 @@ async def _review(db: AsyncSession, engine: str, args: str, approved: list[str])
     return review_args(ENGINES[engine], args, roots, approved, excluded)
 
 
-def _gate(user: User, review: ArgReview, confirm: bool, can_request: bool, request_approval: bool) -> bool:
+async def _gate(
+    request: Request, user: User, review: ArgReview, confirm: bool, can_request: bool, request_approval: bool
+) -> bool:
     """True: the arguments may be used now. False: store them as a request for an admin. Raises otherwise."""
     if user.is_admin:
         if review.denied and not confirm:
             raise ApiError(status.HTTP_400_BAD_REQUEST, "args_confirm_required", denied=review.denied)
-        _require_recent_auth(user)
+        await _require_recent_auth(request, user)
         return True
     if not review.needs_approval:
         return True
@@ -164,7 +163,7 @@ async def create_model(
     default = get_settings().default_llama_args if body.engine == "llama.cpp" else ""
     args = body.args.strip() or default
     review = await _review(db, body.engine, args, [default])  # the defaults are the admin's own setting
-    use_now = _gate(user, review, body.confirm_args, True, body.request_approval)
+    use_now = await _gate(request, user, review, body.confirm_args, True, body.request_approval)
     path, size = _source(body.engine, body.path)
     model = LlmModel(
         name=body.name,
@@ -224,7 +223,7 @@ async def update_model(
     if args_changed or (engine_changed and not user.is_admin):
         # Arguments accepted for one engine mean nothing for another.
         review = await _review(db, engine, args, [] if engine_changed else [model.args])
-        if _gate(user, review, body.confirm_args, not engine_changed, body.request_approval):
+        if await _gate(request, user, review, body.confirm_args, not engine_changed, body.request_approval):
             if args_changed:
                 record(db, user, "model.args_update", model.name, before=model.args, after=args, denied=review.denied)
             model.args, model.args_pending = args, None
@@ -241,6 +240,7 @@ async def update_model(
 async def approve_args(
     model_id: int,
     body: ModelArgsReviewIn,
+    request: Request,
     admin: User = Depends(admin_user),
     db: AsyncSession = Depends(get_db),
     lanes: LaneManager = Depends(get_lanes),
@@ -250,7 +250,7 @@ async def approve_args(
     if not model.args_pending:
         raise ApiError(status.HTTP_409_CONFLICT, "no_pending_args")
     review = await _review(db, model.engine or "llama.cpp", model.args_pending, [model.args])
-    _gate(admin, review, body.confirm_args, False, False)
+    await _gate(request, admin, review, body.confirm_args, False, False)
     record(
         db,
         admin,
@@ -368,7 +368,12 @@ async def delete_model(
 
 
 async def _preset_args(
-    db: AsyncSession, user: User, model: LlmModel, body: PresetIn, preset: ModelPreset | None = None
+    request: Request,
+    db: AsyncSession,
+    user: User,
+    model: LlmModel,
+    body: PresetIn,
+    preset: ModelPreset | None = None,
 ) -> str:
     """Presets follow the model's argument policy; there is no approval request for them (ask an admin)."""
     args = body.args.strip()
@@ -377,7 +382,7 @@ async def _preset_args(
         return args
     approved = [model.args] + ([before] if before else [])
     review = await _review(db, model.engine or "llama.cpp", args, approved)
-    _gate(user, review, body.confirm_args, False, False)
+    await _gate(request, user, review, body.confirm_args, False, False)
     label = f"{model.name} ({body.name.strip()})"
     record(db, user, "model.args_update", label, before=before or "", after=args, denied=review.denied)
     return args
@@ -400,12 +405,18 @@ async def _name_free(db: AsyncSession, model: LlmModel, name: str, exclude: int 
 
 @router.post("/{model_id}/presets", response_model=PresetOut, status_code=201)
 async def create_preset(
-    model_id: int, body: PresetIn, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
+    model_id: int,
+    body: PresetIn,
+    request: Request,
+    user: User = Depends(current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     model = await _get_model(db, model_id)
     _check_owner(model, user)
     await _name_free(db, model, body.name.strip())
-    preset = ModelPreset(model_id=model.id, name=body.name.strip(), args=await _preset_args(db, user, model, body))
+    preset = ModelPreset(
+        model_id=model.id, name=body.name.strip(), args=await _preset_args(request, db, user, model, body)
+    )
     db.add(preset)
     await db.commit()
     return preset
@@ -416,6 +427,7 @@ async def update_preset(
     model_id: int,
     preset_id: int,
     body: PresetIn,
+    request: Request,
     user: User = Depends(current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -423,7 +435,7 @@ async def update_preset(
     _check_owner(model, user)
     preset = await _get_preset(db, model, preset_id)
     await _name_free(db, model, body.name.strip(), exclude=preset.id)
-    preset.args = await _preset_args(db, user, model, body, preset)
+    preset.args = await _preset_args(request, db, user, model, body, preset)
     preset.name = body.name.strip()
     await db.commit()
     return preset

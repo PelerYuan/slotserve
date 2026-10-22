@@ -19,7 +19,7 @@ def test_admin_pages_render(page: Page, server: str):
         "audit",
     ):
         page.goto(f"{server}/admin?tab={tab}")
-        expect(page.locator(".n-tabs-tab--active")).to_be_visible()
+        expect(page.locator("[role=tab][aria-selected=true]")).to_be_visible()
         page.wait_for_load_state("networkidle")
     page.goto(f"{server}/settings")
     page.get_by_text("Dark", exact=True).click()

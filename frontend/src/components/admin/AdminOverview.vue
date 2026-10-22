@@ -11,12 +11,17 @@ import type { AdminStats, Backup, Model } from '@/api/types'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { useStatus } from '@/composables/useStatus'
 import { formatBytes, formatCompact, formatDateTime, formatDuration, formatNumber, formatTime } from '@/utils/format'
+import SetupChecklist from '@/features/admin-setup/components/SetupChecklist.vue'
+import HealthTable from '@/features/admin-setup/components/HealthTable.vue'
+import { useHealth } from '@/features/admin-setup/health'
 
 const emit = defineEmits<{ navigate: [tab: 'users' | 'reservations' | 'keys' | 'runtime'] }>()
 const { t } = useI18n()
 const message = useMessage()
 const { showError } = useErrorMessage()
 const { status, refresh } = useStatus()
+// setup checklist (onboarding checks) on top, every check in the health table below (F06, F08)
+const { health, replace: replaceCheck, load: loadHealth } = useHealth()
 
 const stats = ref<AdminStats | null>(null)
 const logs = ref(false)
@@ -146,6 +151,8 @@ const seconds = (a: string, b: string) => (new Date(b).getTime() - new Date(a).g
 </script>
 
 <template>
+  <SetupChecklist :checks="health?.checks ?? []" @updated="replaceCheck" @invited="loadHealth" />
+
   <div class="grid">
     <component
       :is="tile.to ? 'button' : 'div'"
@@ -284,6 +291,8 @@ const seconds = (a: string, b: string) => (new Date(b).getTime() - new Date(a).g
       </table>
     </div>
   </section>
+
+  <HealthTable :health="health" @updated="replaceCheck" @reloaded="(h) => (health = h)" />
 
   <LogDrawer v-model:show="logs" :lane-id="lane?.id" />
 </template>

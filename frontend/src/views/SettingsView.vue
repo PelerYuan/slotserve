@@ -11,6 +11,7 @@ import { setThemeMode, themeMode, type ThemeMode } from '@/composables/theme'
 import { useErrorMessage } from '@/composables/useErrorMessage'
 import { setLocale, type Locale } from '@/i18n'
 import { formatDateTime } from '@/utils/format'
+import SessionsList from '@/features/settings/components/SessionsList.vue'
 
 const { t, locale } = useI18n()
 const dialog = useDialog()
@@ -299,6 +300,8 @@ const themes: { value: ThemeMode; icon: typeof Sun }[] = [
         </NButton>
       </NForm>
     </section>
+
+    <SessionsList />
 
     <section class="card">
       <div class="card-header"><h3 class="card-title">{{ t('settings.about') }}</h3></div>

@@ -8,6 +8,7 @@ from conftest import make_gguf
 from slotserve.db import SessionLocal
 from slotserve.orm import AuditLog, CatalogDeploy, User
 from slotserve.runtime.engines import parse_flags
+from slotserve.security import sudo
 from slotserve.services.catalog_deploy import Deployer
 
 
@@ -147,6 +148,28 @@ async def test_admin_confirms_denied_flags(make_client, models_dir, app):
     async with SessionLocal() as db:
         rows = (await db.execute(AuditLog.__table__.select().where(AuditLog.action == "model.args_update"))).all()
     assert any(json.loads(row.detail)["denied"] == ["--slot-save-path"] for row in rows)
+
+
+async def test_admin_argument_changes_need_sudo(make_client, models_dir, app, monkeypatch):
+    """Launch arguments run on the host: an admin changing them must have entered the password recently."""
+    admin, bob, model = await _setup(make_client, models_dir)
+    r = await bob.patch(f"/api/models/{model['id']}", json={"args": "--log-file x", "request_approval": True})
+    assert r.status_code == 200 and r.json()["args_pending"] == "--log-file x"
+    real_now = sudo._now
+    monkeypatch.setattr(sudo, "_now", lambda: real_now() + 10 * 60)  # sudo mode of the sign-up has expired
+    url = f"/api/models/{model['id']}"
+    for method, path, body in (
+        ("PATCH", url, {"args": "-ngl 10"}),
+        ("POST", f"{url}/args/approve", {"confirm_args": True}),
+        ("POST", f"{url}/presets", {"name": "p", "args": "-c 4096"}),
+    ):
+        r = await admin.request(method, path, json=body)
+        assert r.status_code == 403 and r.json()["detail"]["code"] == "sudo_required", (path, r.text)
+    # members are not asked (their arguments are checked by the policy instead), nor are admins for other fields
+    assert (await bob.patch(url, json={"args": "-ngl 20"})).is_success
+    assert (await admin.patch(url, json={"description": "fast"})).is_success
+    assert (await admin.post("/api/auth/sudo", json={"password": "secret123"})).is_success
+    assert (await admin.patch(url, json={"args": "-ngl 10"})).is_success
 
 
 async def test_presets_follow_the_policy(make_client, models_dir, app):
