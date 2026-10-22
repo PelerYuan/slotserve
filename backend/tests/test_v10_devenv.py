@@ -528,6 +528,7 @@ async def test_old_session_table_is_rebuilt(tmp_path):
     )
     con.commit()
     con.close()
+    dbmod.prepare(path, tmp_path / "backups")
     dbmod.configure(f"sqlite+aiosqlite:///{path.as_posix()}")
     try:
         await dbmod.create_all()

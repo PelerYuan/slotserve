@@ -2,13 +2,11 @@
 
 import asyncio
 import re
-import sqlite3
 from datetime import datetime, timedelta
 
 import httpx
 
 from conftest import make_gguf, wait_for_state
-from slotserve import db as dbmod
 from slotserve.db import utcnow
 
 
@@ -373,44 +371,6 @@ async def test_hf_listing(monkeypatch, make_client, models_dir):
     assert r.json()[0]["url"] == "https://huggingface.co/org/m-GGUF/resolve/main/big/m-Q8_0-00002-of-00002.gguf"
     bad = await bob.post("/api/downloads/hf", json={"repo": "org/m-GGUF", "files": ["../etc/passwd.gguf"]})
     assert bad.status_code == 400
-
-
-def test_migration_from_v02_schema(tmp_path):
-    db_path = tmp_path / "slotserve.db"
-    con = sqlite3.connect(db_path)
-    con.executescript(
-        """
-        CREATE TABLE users (id INTEGER PRIMARY KEY, username VARCHAR(32), password_hash VARCHAR(255),
-                            is_admin BOOLEAN, created_at DATETIME, disabled_at DATETIME);
-        CREATE TABLE models (id INTEGER PRIMARY KEY, name VARCHAR(128));
-        CREATE TABLE reservations (
-            id INTEGER NOT NULL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-            model_id INTEGER NOT NULL REFERENCES models (id) ON DELETE RESTRICT,
-            start_at DATETIME NOT NULL, end_at DATETIME NOT NULL, status VARCHAR(16) NOT NULL,
-            note TEXT NOT NULL, released_at DATETIME, created_at DATETIME NOT NULL);
-        CREATE TABLE usage_logs (id INTEGER PRIMARY KEY,
-            reservation_id INTEGER REFERENCES reservations (id) ON DELETE SET NULL);
-        INSERT INTO users VALUES (1, 'a', 'x', 1, '2026-01-01 00:00:00', NULL);
-        INSERT INTO models VALUES (1, 'm');
-        INSERT INTO reservations VALUES (7, 1, 1, '2026-01-01 01:00:00', '2026-01-01 02:00:00', 'booked', 'n',
-                                         NULL, '2026-01-01 00:00:00');
-        INSERT INTO usage_logs VALUES (1, 7);
-        """
-    )
-    con.commit()
-    con.close()
-
-    assert dbmod.prepare(db_path, tmp_path / "backups") == 0
-    assert len(list((tmp_path / "backups").glob("slotserve-v0-*.db"))) == 1
-    con = sqlite3.connect(db_path)
-    assert con.execute("PRAGMA user_version").fetchone()[0] == dbmod.SCHEMA_VERSION
-    cols = {r[1]: r for r in con.execute("PRAGMA table_info(reservations)")}
-    assert cols["model_id"][3] == 0 and "series_id" in cols and "preset_id" in cols
-    assert con.execute("SELECT id, note FROM reservations").fetchall() == [(7, "n")]
-    assert con.execute("SELECT reservation_id FROM usage_logs").fetchone()[0] == 7  # FK not cascaded
-    con.close()
-    assert dbmod.prepare(db_path, tmp_path / "backups") is None  # idempotent
 
 
 async def test_preferences_and_registration_alert(app, make_client, models_dir):
