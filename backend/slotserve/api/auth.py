@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel, Field
@@ -168,4 +168,4 @@ async def sudo_enter(body: SudoIn, request: Request, user: User = Depends(curren
 
 
 def _utc(ts: float | None) -> datetime | None:
-    return None if ts is None else datetime.fromtimestamp(ts, tz=timezone.utc)
+    return None if ts is None else datetime.fromtimestamp(ts, tz=UTC)

@@ -69,7 +69,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-打开 `http://<服务器>:8000`，第一个注册的账号自动成为管理员。然后进入**模型 → 扫描目录**，设置默认模型，创建 API 密钥，即可调用：
+打开 `http://<服务器>:8000`，用日志中的初始化码注册（`docker compose exec slotserve slotserve setup-code`），该账号即成为管理员。然后进入**模型 → 扫描目录**，设置默认模型，创建 API 密钥，即可调用：
 
 ```python
 from openai import OpenAI

@@ -63,7 +63,7 @@ async def test_route_list_is_complete(app):
     for known in ("/api/admin/backups", "/api/auth/register", "/api/models/{model_id}/default", WECOM_CALLBACK):
         assert known in paths
     assert len(routes) > 60
-    assert EXEMPT <= paths
+    assert paths >= EXEMPT
 
 
 async def test_every_write_route_refuses_foreign_requests(app):

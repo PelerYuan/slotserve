@@ -40,8 +40,8 @@ cp .env.example .env
 | `MODELS_DIR` | `/mnt/ssd/models` | 宿主机上存放 `.gguf` 的目录（建议 SSD） |
 | `DATA_DIR` | `./data` | 数据库与日志 |
 | `PORT` | `8000` | 网页与接口端口 |
-| `SLOTSERVE_INVITE_CODE` | *你的邀请码* | 注册时需要填写 |
-| `SLOTSERVE_SECRET_KEY` | `openssl rand -hex 32` | 会话 Cookie 签名密钥 |
+| `SLOTSERVE_INVITE_CODE` | *你的邀请码* | 注册时需要填写（未设置前只有第一个管理员能注册） |
+| `SLOTSERVE_SECRET_KEY` | *留空* 或 `openssl rand -hex 32` | 会话 Cookie 签名密钥；留空则自动生成并保存在 `DATA_DIR/secret_key` |
 
 其余配置见[配置参考](configuration.md)。
 
@@ -68,7 +68,7 @@ docker compose logs -f
 
 ## 4. 网页上的第一步
 
-1. **注册。** 第一个注册的账号自动成为管理员。
+1. **创建管理员账号。** 在还没有管理员时，日志中会显示一个一次性的**初始化码**（`docker compose logs slotserve`，或 `docker compose exec slotserve slotserve setup-code`）。注册表单会要求填写它，该账号即成为管理员，初始化码随即失效。其他人用邀请码注册。详见[初始化码与第一个管理员](configuration.md#初始化码与第一个管理员)。
 2. **模型 → 扫描目录。** `MODELS_DIR` 中的 `.gguf` 文件会被登记（多模态投影文件和分片模型的非首片会被跳过）。
 3. 按需**编辑启动参数**，例如 `-ngl 99 -c 16384 --flash-attn on`。
 4. **设为默认模型**（管理员）。GPU 没有预约时会加载它。有多张 GPU 时，先在**管理 → GPU 与通道**中划分通道，每个通道各有默认模型。

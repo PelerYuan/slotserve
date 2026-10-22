@@ -47,9 +47,7 @@ async def running_app(tmp_path: Path, monkeypatch, **env: str | None):
 
 def client(app, *, csrf_header: bool = True, **kwargs) -> httpx.AsyncClient:
     headers = {"X-SlotServe": "1"} if csrf_header else {}
-    return httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://test", headers=headers, **kwargs
-    )
+    return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test", headers=headers, **kwargs)
 
 
 async def register(c: httpx.AsyncClient, username: str, **extra) -> httpx.Response:

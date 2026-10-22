@@ -23,6 +23,7 @@ from playwright.sync_api import Browser, sync_playwright
 from helpers import INVITE, PASSWORD, sign_in
 
 ROOT = Path(__file__).resolve().parents[1]
+SERVER_DATA: dict[str, Path] = {}  # base URL -> SLOTSERVE_DATA_DIR of that server
 
 # The tests share one server and build on each other (the first sign-up becomes the admin and sets the default
 # model; later tests add a second lane), so modules run in this order. Modules not listed run afterwards, in
@@ -99,6 +100,7 @@ def server(tmp_path_factory):
                 log.close()
                 raise RuntimeError((tmp / "server.log").read_text(errors="replace")[-4000:]) from None
             time.sleep(0.3)
+    SERVER_DATA[base] = tmp / "data"
     yield base
     if os.name == "nt":
         # Windows ends the server without running its shutdown, so its model servers would be left
@@ -111,6 +113,12 @@ def server(tmp_path_factory):
     except subprocess.TimeoutExpired:
         proc.kill()
     log.close()
+
+
+@pytest.fixture(scope="session")
+def setup_code(server) -> str:
+    """The code for creating the first admin (what an operator reads from the log / `slotserve setup-code`)."""
+    return (SERVER_DATA[server] / "setup_code").read_text().strip()
 
 
 @pytest.fixture(scope="session")

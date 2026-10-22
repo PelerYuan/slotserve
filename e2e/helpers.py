@@ -17,6 +17,7 @@ def sign_in(page: Page, base: str, username: str, password: str = PASSWORD) -> N
 
 def api(page: Page, base: str, method: str, path: str, data=None):
     """Call the SlotServe API with the page's session; fails the test on an error status."""
-    resp = page.request.fetch(f"{base}{path}", method=method, data=data)
+    # X-SlotServe: what the frontend's API client sends (CsrfGuard refuses changing requests without it)
+    resp = page.request.fetch(f"{base}{path}", method=method, data=data, headers={"X-SlotServe": "1"})
     assert resp.ok, f"{method} {path}: {resp.status} {resp.text()}"
     return resp.json() if resp.status != 204 else None

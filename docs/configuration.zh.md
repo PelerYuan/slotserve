@@ -18,10 +18,10 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `SLOTSERVE_INVITE_CODE` | `change-me` | 注册所需邀请码 |
+| `SLOTSERVE_INVITE_CODE` | `change-me` | 注册所需邀请码；为 `change-me`（或为空）时只有第一个管理员能注册（使用[初始化码](#初始化码与第一个管理员)） |
 | `SLOTSERVE_REGISTRATION_OPEN` | `true` | 是否允许凭邀请码注册 |
 | `SLOTSERVE_API_KEY_REVEAL` | `false` | 为新建的 API 密钥保存加密副本，所有者之后可以再次查看 |
-| `SLOTSERVE_SECRET_KEY` | `change-me` | 会话 Cookie 签名密钥 |
+| `SLOTSERVE_SECRET_KEY` | *自动生成* | 会话 Cookie 签名与已存密钥加密所用的密钥。未设置、为空或为 `change-me` 时，SlotServe 首次启动会生成随机密钥并保存在 `DATA_DIR/secret_key`（仅属主可读）。显式设置的值始终优先 |
 | `SLOTSERVE_HOST` | `0.0.0.0` | 监听地址 |
 | `SLOTSERVE_PORT` | `8000` | 监听端口 |
 | `SLOTSERVE_COOKIE_SECURE` | `false` | Cookie 加 `Secure` 标记；在 HTTPS 后面时设为 `true` |
@@ -143,11 +143,29 @@ docker compose start
 
 请另外把 `data/` 复制到其他地方保存：与数据库在同一块盘上的备份挡不住硬盘损坏。
 
+## 初始化码与第一个管理员
+
+还没有管理员账号时，SlotServe 每次启动都会在日志中打印一个一次性的**初始化码**：
+
+```bash
+docker compose logs slotserve | grep -A4 "No admin account"
+docker compose exec slotserve slotserve setup-code     # 或直接查询
+```
+
+打开 SlotServe，注册表单会要求填写初始化码（而不是邀请码），注册的账号即成为管理员。一旦存在管理员，初始化码立即失效；已经有管理员的安装不会要求填写。其他人用邀请码注册（或由管理员在**管理 → 用户**中创建）。
+
+## 来自其他页面的请求
+
+SlotServe 拒绝不是由自己页面发出的修改类请求（POST、PUT、PATCH、DELETE）：`Origin` 必须是 SlotServe 自己的地址（浏览器访问用的主机，或 `SLOTSERVE_PUBLIC_URL`），`Origin: null` 一律拒绝；带会话 Cookie 但没有 `Origin` 的请求必须带 `X-SlotServe: 1` 请求头（网页界面会自动带上）。这样开发环境端口上的页面或其他网站无法冒用已登录用户的身份。API 客户端不受影响：使用 API 密钥的 `/v1`、`/metrics`、聊天平台回调，以及不带会话 Cookie 的脚本。
+
+在反向代理之后，请转发原始主机名（nginx：`proxy_set_header Host $host;`）或设置 `SLOTSERVE_PUBLIC_URL`，否则在网页上的修改会被拒绝（提示“不是从 SlotServe 页面发出的”）。
+
 ## 管理员命令行
 
 日常的账号管理在**管理 → 用户**中完成。命令行用于没有管理员能登录的情况：
 
 ```bash
+docker compose exec slotserve slotserve setup-code               # 创建第一个管理员所需的初始化码
 docker compose exec slotserve slotserve reset-password <用户名>
 docker compose exec slotserve slotserve set-admin <用户名>
 docker compose exec slotserve slotserve set-admin <用户名> --revoke

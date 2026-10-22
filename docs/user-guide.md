@@ -98,7 +98,7 @@ SlotServe records every GPU once a minute: utilization, memory, power and who he
 
 ## Administration
 
-The first account is the admin. Admins see an **Admin** entry in the sidebar.
+The first account (created with the [setup code](configuration.md#first-admin-and-setup-code)) is the admin. Admins see an **Admin** entry in the sidebar.
 
 ![Admin](assets/screenshots/admin.png)
 

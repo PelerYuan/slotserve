@@ -15,6 +15,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import db
 from ..orm import User
 from .secret_key import write_private
 
@@ -93,8 +94,6 @@ class SetupCode:
 
 async def cli_setup_code(settings) -> str | None:
     """``slotserve setup-code``: the current code, or None when an admin already exists."""
-    from .. import db
-
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     db.configure(settings.database_url)
     await db.create_all()

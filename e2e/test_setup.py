@@ -1,17 +1,18 @@
-"""First run: the first person to sign up becomes the admin and sets up the models."""
+"""First run: the first person signs up with the setup code, becomes the admin and sets up the models."""
 
 from playwright.sync_api import Page, expect
 
-from helpers import INVITE, PASSWORD, api
+from helpers import PASSWORD, api
 
 
-def test_first_user_registers_and_sets_up_models(page: Page, server: str):
+def test_first_user_registers_and_sets_up_models(page: Page, server: str, setup_code: str):
     page.goto(f"{server}/login")
-    page.get_by_role("tab", name="Sign up").click()
+    expect(page.get_by_role("heading", name="Set up SlotServe")).to_be_visible()  # opens on sign-up
+    expect(page.get_by_text("slotserve setup-code", exact=False).first).to_be_visible()
     inputs = page.locator("input")
     inputs.nth(0).fill("admin")
     inputs.nth(1).fill(PASSWORD)
-    inputs.nth(2).fill(INVITE)
+    inputs.nth(2).fill(setup_code)
     page.get_by_role("button", name="Sign up", exact=True).last.click()
     page.wait_for_url(f"{server}/")
     expect(page.get_by_role("link", name="Admin", exact=True)).to_be_visible()

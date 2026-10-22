@@ -60,6 +60,8 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn
 }
 
+const CSRF_HEADER = { 'X-SlotServe': '1' }
+
 // exported for api modules of their own (e.g. ./devenvPorts.ts)
 export async function request<T>(method: string, path: string, body?: unknown, query?: Record<string, unknown>): Promise<T> {
   let url = path
@@ -74,7 +76,8 @@ export async function request<T>(method: string, path: string, body?: unknown, q
     res = await fetch(url, {
       method,
       credentials: 'same-origin',
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      // X-SlotServe marks requests of SlotServe's own pages (CsrfGuard, backend/slotserve/security/csrf.py)
+      headers: body === undefined ? CSRF_HEADER : { ...CSRF_HEADER, 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
   } catch {
