@@ -10,6 +10,8 @@ from urllib.parse import quote
 
 import httpx
 
+from ..containers.harden import check as check_hardened
+
 log = logging.getLogger(__name__)
 
 API = "/v1.41"
@@ -20,6 +22,14 @@ class DockerError(Exception):
         super().__init__(message)
         self.status = status
         self.message = message
+
+
+class UnhardenedSpec(DockerError):
+    """A container body that did not go through harden() (or was loosened afterwards); never sent to Docker."""
+
+    def __init__(self, found: list[str]):
+        super().__init__(500, "container spec refused (not hardened): " + "; ".join(found))
+        self.found = found
 
 
 def split_image(ref: str) -> tuple[str, str]:
@@ -155,6 +165,10 @@ class DockerClient:
     # ---- containers -----------------------------------------------------------
 
     async def create(self, name: str, config: dict) -> str:
+        """Creates a container. Only bodies that went through ``containers.harden.harden()`` are accepted."""
+        if found := check_hardened(config):
+            log.error("refused to create container %s: %s", name, "; ".join(found))
+            raise UnhardenedSpec(found)
         resp = await self._request("POST", "/containers/create", params={"name": name}, json=config)
         return resp.json()["Id"]
 

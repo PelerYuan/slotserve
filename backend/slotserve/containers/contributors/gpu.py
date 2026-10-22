@@ -1,7 +1,8 @@
-"""GPUs: a lane's devices; none for CPU-only environments."""
+"""GPUs: exactly the lane's devices (a lane without any cannot start a GPU environment); none for CPU-only
+environments."""
 
 from ..context import SessionContext
-from ..model import ContainerSpec
+from ..model import ContainerSpec, SpecError
 
 
 class GpuContributor:
@@ -13,8 +14,8 @@ class GpuContributor:
             return
         devices = ctx.lane.devices if ctx.lane else None
         request: dict = {"Driver": "nvidia", "Capabilities": [["gpu"]]}
-        if devices:
-            request["DeviceIDs"] = [str(d) for d in devices]
-        else:
-            request["Count"] = -1
+        if not devices:
+            # never "all GPUs" (Count -1): a lane that names none would hand out every GPU of the machine
+            raise SpecError("devenv_lane_no_gpus", lane=ctx.lane.name if ctx.lane else "")
+        request["DeviceIDs"] = [str(d) for d in devices]
         spec.devices = [request]

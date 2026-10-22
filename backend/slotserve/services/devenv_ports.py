@@ -24,6 +24,8 @@ import re
 import httpx
 from sqlalchemy import func, select
 
+from ..containers.harden import harden
+from ..containers.helpers import HELPER_POLICY
 from ..db import utcnow
 from ..orm import DevPort, DevProject, DevSession, DevTemplate, User
 from .docker_api import DockerError
@@ -325,7 +327,7 @@ class PortManager:
         from .devenv import LABEL
 
         listen = f"{FORWARD_LISTEN}/tcp"
-        return {
+        body = {
             "Image": image,
             "Entrypoint": ["socat"],
             "Cmd": [
@@ -353,6 +355,7 @@ class PortManager:
                 "PidsLimit": 256,
             },
         }
+        return harden(body, kind="forwarder", node_policy=HELPER_POLICY)
 
     async def _start(self, db, row: DevPort, s: DevSession, spec: str, image: str) -> None:
         network = _session_web(s).get("network") or ""

@@ -183,7 +183,7 @@ async def test_shared_environment(app, make_client):
     await bob.post("/api/ssh-keys", json={"public_key": key})
     await eve.put("/api/devenv/password", json={"password": "eve's password"})
     lane = (await admin.get("/api/lanes")).json()[0]
-    body = {"name": lane["name"], "idle_mode": "devenv", "idle_template_id": mine["id"]}
+    body = {"name": lane["name"], "gpus": lane["gpus"], "idle_mode": "devenv", "idle_template_id": mine["id"]}
     r = await admin.patch(f"/api/admin/lanes/{lane['id']}", json=body)
     assert r.status_code == 400  # only templates offered to everyone
     body["idle_template_id"] = cuda["id"]

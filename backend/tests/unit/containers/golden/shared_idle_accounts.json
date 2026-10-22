@@ -14,6 +14,13 @@
       "22/tcp": {}
     },
     "HostConfig": {
+      "CapDrop": [
+        "NET_RAW",
+        "MKNOD",
+        "SYS_CHROOT",
+        "AUDIT_WRITE",
+        "SETFCAP"
+      ],
       "CpusetCpus": "16-23",
       "DeviceRequests": [
         {
@@ -29,6 +36,14 @@
         }
       ],
       "Init": true,
+      "LogConfig": {
+        "Config": {
+          "max-file": "5",
+          "max-size": "50m"
+        },
+        "Type": "json-file"
+      },
+      "Memory": 123695058125,
       "Mounts": [
         {
           "Source": "slotserve-idle-home-l2",
@@ -43,16 +58,28 @@
         }
       ],
       "NetworkMode": "slotserve-devenv-11",
+      "PidsLimit": 4096,
       "PortBindings": {},
       "RestartPolicy": {
         "Name": "no"
       },
-      "ShmSize": 8589934592
+      "SecurityOpt": [
+        "no-new-privileges:true"
+      ],
+      "ShmSize": 8589934592,
+      "Ulimits": [
+        {
+          "Hard": 1048576,
+          "Name": "nofile",
+          "Soft": 1048576
+        }
+      ]
     },
     "Hostname": "lane-b-idle",
     "Image": "pytorch/pytorch:latest",
     "Labels": {
       "slotserve.devenv": "1",
+      "slotserve.hardened": "1",
       "slotserve.kind": "shared",
       "slotserve.session": "11"
     },

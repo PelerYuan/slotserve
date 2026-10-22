@@ -24,9 +24,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from slotserve.config import Settings
+from slotserve.containers.harden import check
 from slotserve.db import Base
 from slotserve.orm import DevProject, DevSession, DevTemplate, Lane, Reservation, SshKey, Storage, User
-from slotserve.services.devenv import BUILTINS, DevEnvManager, SshBundle
+from slotserve.services.devenv import BUILTINS, DevEnvError, DevEnvManager, SshBundle
 
 GOLDEN = Path(__file__).parent / "golden"
 UPDATE = os.environ.get("SLOTSERVE_UPDATE_GOLDEN") == "1"
@@ -130,7 +131,7 @@ def cases() -> dict[str, tuple]:
             {},
         ),
         # Legacy storage directory (bind mounts to prepare), kept paths of the template, CPU and memory limits, no
-        # models mount and a lane that does not restrict its GPUs (Count -1).
+        # models mount, on a lane with one GPU.
         "booking_storage_dir_template_paths_limits": (
             [
                 DevTemplate(
@@ -141,7 +142,7 @@ def cases() -> dict[str, tuple]:
                     owner_id=1,
                     persist_paths=json.dumps(["/root/.cache", "/opt/conda/envs"]),
                 ),
-                *booking(lane_id=3, template_id=5),
+                *booking(lane_id=2, template_id=5),
             ],
             {"devenv_storage_dir": "/srv/slotserve/", "devenv_cpus": 6.5, "devenv_memory_gb": 48.0},
             {"models": ""},
@@ -359,6 +360,28 @@ async def test_plan_golden(case, monkeypatch):
         path.write_text(text, encoding="utf-8", newline="\n")
     assert path.is_file(), f"no golden file for {case}; run with SLOTSERVE_UPDATE_GOLDEN=1"
     assert json.loads(text) == json.loads(path.read_text(encoding="utf-8")), f"container spec changed: {case}"
+
+
+@pytest.mark.parametrize("case", sorted(cases()))
+async def test_every_case_is_hardened(case, monkeypatch):
+    """The security fields are in every golden body, and nothing harden() refuses is."""
+    monkeypatch.setattr(secrets, "token_urlsafe", lambda n=None: TOKEN)
+    config = (await _plan(*cases()[case]))["config"]
+    host = config["HostConfig"]
+    assert check(config) == []
+    assert host["PidsLimit"] > 0 and host["Memory"] > 0 and host["LogConfig"]["Type"] == "json-file"
+    assert all(c in host["CapDrop"] for c in ("NET_RAW", "MKNOD", "SYS_CHROOT", "AUDIT_WRITE", "SETFCAP"))
+    assert not host.get("Privileged") and host["NetworkMode"] != "host"
+    assert all(m.get("Source") != "/" for m in host.get("Mounts", []))
+    assert all(r.get("Count") != -1 and r.get("DeviceIDs") for r in host.get("DeviceRequests", []))
+
+
+async def test_a_lane_without_gpus_cannot_start_a_gpu_environment(monkeypatch):
+    """No more "all GPUs" (Count -1): the person gets an error an admin can fix (give the lane its GPUs)."""
+    monkeypatch.setattr(secrets, "token_urlsafe", lambda n=None: TOKEN)
+    with pytest.raises(DevEnvError) as caught:
+        await _plan([builtin("pytorch", id=1), *booking(lane_id=3)], {}, {})
+    assert caught.value.code == "devenv_lane_no_gpus" and caught.value.params == {"lane": "any GPU"}
 
 
 def test_every_golden_file_has_a_case():

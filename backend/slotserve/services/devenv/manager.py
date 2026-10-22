@@ -9,7 +9,7 @@ import re
 import secrets
 import socket
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from http.cookiejar import CookieJar, CookiePolicy
 from pathlib import Path
@@ -17,7 +17,7 @@ from pathlib import Path
 import httpx
 from sqlalchemy import func, or_, select
 
-from ...containers.build import build_spec
+from ...containers.build import build_spec, render_for_docker
 from ...containers.context import (
     Account,
     LaneInfo,
@@ -29,8 +29,9 @@ from ...containers.context import (
     UserInfo,
 )
 from ...containers.contributors.ssh import account_files
-from ...containers.model import NodePolicy, SpecError
-from ...containers.render import render
+from ...containers.harden import HardenError
+from ...containers.helpers import helper_body, helper_spec
+from ...containers.model import ContainerSpec, NodePolicy, SpecError
 from ...db import SessionLocal, utcnow
 from ...orm import HOLDING_STATUSES, DevProject, DevSession, DevTemplate, Lane, Reservation, SshKey, User
 from ...runtime.manager import RuntimeState
@@ -76,18 +77,60 @@ class _NoCookies(CookiePolicy):
 
 @dataclass
 class Plan:
-    """Everything needed to (re)create and start the container of a session."""
+    """Everything needed to (re)create and start the container of a session: its spec (``containers/``), the
+    machine's policy, and the managed storage to prepare. The Docker body is rendered and hardened on demand, so
+    nothing changes it after ``harden()``."""
 
-    name: str
-    files: dict[str, tuple[bytes, int]]
-    config: dict
-    binds: list[tuple[str, str]]  # (directory under the storage dir, path in the container) to prepare
-    accounts_digest: str | None = None
-    network: str = ""
-    network_labels: dict = field(default_factory=dict)
-    web: dict = field(default_factory=dict)  # declared ports and token (see DevEnvManager._web_spec)
-    keep_entrypoint: bool = False
+    spec: ContainerSpec
+    policy: NodePolicy
     storage: "storage.StoragePlan | None" = None  # managed storages (services/storage.py)
+
+    @property
+    def name(self) -> str:
+        return self.spec.name
+
+    @property
+    def files(self) -> dict[str, tuple[bytes, int]]:
+        return self.spec.files
+
+    @property
+    def binds(self) -> list[tuple[str, str]]:
+        """(directory under the storage dir, path in the container) to prepare."""
+        return self.spec.prepare
+
+    @property
+    def accounts_digest(self) -> str | None:
+        return self.spec.accounts_digest
+
+    @property
+    def network(self) -> str:
+        return self.spec.network
+
+    @property
+    def network_labels(self) -> dict:
+        return self.spec.network_labels
+
+    @property
+    def web(self) -> dict:
+        """Declared ports and token (see DevEnvManager._web_spec)."""
+        return self.spec.web
+
+    @property
+    def keep_entrypoint(self) -> bool:
+        return self.spec.keep_entrypoint
+
+    def body(self, ssh_port: int | None = None) -> dict:
+        """The Docker create body (hardened), with SSH published on ``ssh_port``."""
+        if ssh_port is not None:
+            self.spec.port_bindings["22/tcp"] = [{"HostIp": "0.0.0.0", "HostPort": str(ssh_port)}]
+        try:
+            return render_for_docker(self.spec, self.policy)
+        except HardenError as exc:
+            raise DevEnvError(exc.code, **exc.params) from exc
+
+    @property
+    def config(self) -> dict:
+        return self.body()
 
 
 class DevEnvManager:
@@ -543,7 +586,6 @@ class DevEnvManager:
         web = self._web_spec(s, template)
         models = await self._models_mount()
         placement = await self.cpu.placement(db, s, lane)  # devenv_cpu: cores of the lane, or the shared pool
-        host = self.cpu.host or {}
         return SessionContext(
             session_id=s.id,
             kind=s.kind or "booking",
@@ -556,7 +598,7 @@ class DevEnvManager:
                 cpu_memory_gb=self.settings.devenv_cpu_memory_gb,
                 **placement,
             ),
-            node_policy=NodePolicy(host_memory=host.get("memory") or None),
+            node_policy=NodePolicy(host_memory=self.cpu.host_memory, pids_limit=self.settings.devenv_pids_limit),
             web=web,
             user=UserInfo(user.id, user.username) if user is not None else None,
             template=(
@@ -587,18 +629,9 @@ class DevEnvManager:
             spec = build_spec(ctx)
         except SpecError as exc:
             raise DevEnvError(exc.code, **exc.params) from exc
-        return Plan(
-            spec.name,
-            spec.files,
-            render(spec),
-            spec.prepare,
-            spec.accounts_digest,
-            spec.network,
-            spec.network_labels,
-            spec.web,
-            spec.keep_entrypoint,
-            ctx.storage,
-        )
+        plan = Plan(spec, ctx.node_policy, ctx.storage)
+        plan.body()  # refuses what harden() never allows, before anything is prepared
+        return plan
 
     @staticmethod
     def _web_spec(s: DevSession, template: DevTemplate | None) -> dict:
@@ -719,14 +752,7 @@ class DevEnvManager:
         await self._helper(f"slotserve-prep-{s.id}", s.image, storage, "\n".join(lines))
 
     async def _helper(self, name: str, image: str, storage: str, script: str) -> None:
-        config = {
-            "Image": image,
-            "Entrypoint": ["/bin/sh", "-c", script],
-            "Cmd": [],
-            "User": "root",
-            "Labels": {LABEL: "helper"},
-            "HostConfig": {"Binds": [f"{storage}:/slotserve-storage"]},
-        }
+        config = helper_body(helper_spec(image, script, label_key=LABEL, binds=[f"{storage}:/slotserve-storage"]))
         await self.docker.remove(name)
         cid = await self.docker.create(name, config)
         try:
@@ -763,9 +789,9 @@ class DevEnvManager:
         await self._ensure_network(plan, fresh=project is None)
         last_error = ""
         for port in candidates[:5]:
-            plan.config["HostConfig"]["PortBindings"]["22/tcp"] = [{"HostIp": "0.0.0.0", "HostPort": str(port)}]
+            body = plan.body(ssh_port=port)
             await self.docker.remove(plan.name)
-            cid = await self.docker.create(plan.name, plan.config)
+            cid = await self.docker.create(plan.name, body)
             try:
                 await self.docker.put_archive(cid, "/", archive)
                 await self.docker.start(cid)
@@ -863,7 +889,7 @@ class DevEnvManager:
         project.image, project.container_id, project.container_port = ref, None, None
         project.container_web = None
         s.image, s.detail = ref, None
-        plan.config["Image"] = ref
+        plan.spec.image = ref
         if old != ref and old.startswith(f"slotserve/project-{project.id}:"):
             with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
                 await self.docker.remove_image(old)

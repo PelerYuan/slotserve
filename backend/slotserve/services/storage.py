@@ -34,6 +34,7 @@ from pathlib import Path
 import httpx
 from sqlalchemy import select
 
+from ..containers.helpers import helper_body, helper_spec
 from ..db import SessionLocal, utcnow
 from ..orm import Storage, User
 from ..security import decrypt_api_key, encrypt_api_key
@@ -377,15 +378,7 @@ async def run_helper(
     timeout: float = 600,
 ) -> tuple[int, str]:
     """Runs a script in a short-lived container; returns (exit code, output)."""
-    config = {
-        "Image": image,
-        "Entrypoint": ["/bin/sh", "-c", script],
-        "Cmd": [],
-        "User": "root",
-        "Env": [f"{k}={v}" for k, v in (env or {}).items()],
-        "Labels": {LABEL: "helper"},
-        "HostConfig": {"Mounts": mounts},
-    }
+    config = helper_body(helper_spec(image, script, label_key=LABEL, mounts=mounts, env=env))
     await docker.remove(name)
     cid = await docker.create(name, config)
     try:

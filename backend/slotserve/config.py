@@ -129,7 +129,8 @@ class Settings(BaseSettings):
     devenv_ssh_host: str = ""  # host name shown in the ssh command; empty = the address the browser uses
     devenv_ssh_ports: str = "2200-2299"
     devenv_cpus: float = 0.0  # 0 = no limit
-    devenv_memory_gb: float = 0.0  # 0 = no limit
+    devenv_memory_gb: float = 0.0  # 0 = the host's memory less max(4 GB, 10%) (containers/harden.py)
+    devenv_pids_limit: int = 4096  # processes per container (fork bombs stay inside it)
     devenv_shm_gb: float = 8.0
     devenv_custom_images: bool = True
     devenv_allowed_registries: str = ""  # comma separated, e.g. docker.io,nvcr.io; empty = any
@@ -150,7 +151,7 @@ class Settings(BaseSettings):
     devenv_cpu_per_user: int = 2  # CPU-only environments one person can run at the same time
     devenv_cpu_cores_per_gpu: int = 8  # CPU cores each GPU lane reserves for whoever uses it; 0 = none
     devenv_cpu_cores: float = 4.0  # cores one CPU-only environment may use at most; 0 = the whole shared pool
-    devenv_cpu_memory_gb: float = 16.0  # RAM one CPU-only environment may use at most; 0 = no limit
+    devenv_cpu_memory_gb: float = 16.0  # RAM one CPU-only environment may use at most; 0 = the host default
     devenv_cpu_memory_pool_gb: float = 0.0  # RAM all CPU-only environments together may claim; 0 = no limit
     # Direct ports: container ports published on the host as http://server:<port> (no SlotServe login), through a
     # small forwarder container per port (services/devenv_ports.py).

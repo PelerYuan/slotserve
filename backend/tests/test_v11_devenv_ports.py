@@ -304,7 +304,7 @@ async def test_shared_environment_only_declared_ports(app, make_client):
     tpl = (await admin.post("/api/devenv/templates", json=body)).json()
     docker.images.add("me/shared:1")
     lane = (await admin.get("/api/lanes")).json()[0]
-    patch = {"name": lane["name"], "idle_mode": "devenv", "idle_template_id": tpl["id"]}
+    patch = {"name": lane["name"], "gpus": lane["gpus"], "idle_mode": "devenv", "idle_template_id": tpl["id"]}
     assert (await admin.patch(f"/api/admin/lanes/{lane['id']}", json=patch)).status_code == 200
     scheduler = app.state.lanes.get(lane["id"]).scheduler
     for _ in range(200):

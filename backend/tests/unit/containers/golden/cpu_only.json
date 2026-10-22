@@ -17,9 +17,23 @@
       "22/tcp": {}
     },
     "HostConfig": {
+      "CapDrop": [
+        "NET_RAW",
+        "MKNOD",
+        "SYS_CHROOT",
+        "AUDIT_WRITE",
+        "SETFCAP"
+      ],
       "CpuShares": 512,
       "CpusetCpus": "31",
       "Init": true,
+      "LogConfig": {
+        "Config": {
+          "max-file": "5",
+          "max-size": "50m"
+        },
+        "Type": "json-file"
+      },
       "Memory": 17179869184,
       "Mounts": [
         {
@@ -36,16 +50,28 @@
       ],
       "NanoCpus": 1000000000,
       "NetworkMode": "slotserve-devenv-11",
+      "PidsLimit": 4096,
       "PortBindings": {},
       "RestartPolicy": {
         "Name": "no"
       },
-      "ShmSize": 8589934592
+      "SecurityOpt": [
+        "no-new-privileges:true"
+      ],
+      "ShmSize": 8589934592,
+      "Ulimits": [
+        {
+          "Hard": 1048576,
+          "Name": "nofile",
+          "Soft": 1048576
+        }
+      ]
     },
     "Hostname": "alice-dev",
     "Image": "pytorch/pytorch:latest",
     "Labels": {
       "slotserve.devenv": "1",
+      "slotserve.hardened": "1",
       "slotserve.kind": "cpu",
       "slotserve.session": "11",
       "slotserve.user": "alice"

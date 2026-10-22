@@ -5,7 +5,10 @@ import base64
 import os
 from datetime import timedelta
 
-from slotserve.db import utcnow
+from sqlalchemy import update
+
+from slotserve.db import SessionLocal, utcnow
+from slotserve.orm import Lane
 from slotserve.services.devenv import SshBundle, parse_port_range, parse_public_key
 
 
@@ -38,6 +41,11 @@ async def _setup(app, make_client):
     bob = await make_client("bob")
     r = await admin.put("/api/admin/settings", json={"devenv_enabled": True})
     assert r.status_code == 200, r.text
+    # A GPU environment gets exactly its lane's GPUs (never "all GPUs"): without nvidia-smi the default lane names
+    # none, so give it GPU 0.
+    async with SessionLocal() as db:
+        await db.execute(update(Lane).where(Lane.gpu_indices == "").values(gpu_indices="0"))
+        await db.commit()
     return admin, bob
 
 

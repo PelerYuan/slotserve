@@ -135,6 +135,7 @@ class CpuEnvs:
         self.m = manager
         self.settings = manager.settings
         self.host: dict | None = None  # {"cpus": n, "memory": bytes}
+        self.host_memory: int | None = None  # bytes, also when Docker does not say how many cores there are
         self._host_at: float | None = None
         self.live: dict[int, Live] = {}  # session id -> last reading
         self._pending: dict[int, Pending] = {}
@@ -156,9 +157,11 @@ class CpuEnvs:
             info = await self.m.docker.info()
             cpus, memory = int(info.get("NCPU") or 0), int(info.get("MemTotal") or 0)
             self.host = {"cpus": cpus, "memory": memory} if cpus > 0 else None
+            self.host_memory = memory or None
         except Exception as exc:  # noqa: BLE001 - best effort: without it nothing gets a cpuset
             log.debug("docker info failed: %s", exc)
             self.host = None
+            self.host_memory = None
         return self.host
 
     async def layout(self, db) -> CoreLayout | None:
@@ -194,7 +197,8 @@ class CpuEnvs:
         }
 
     async def refresh_limits(self, container_id: str, host_config: dict) -> None:
-        """Called before a kept container starts again: brings its CPU placement and limits up to date."""
+        """Called before a kept container starts again: brings its CPU placement, memory and process limits up to
+        date."""
         body: dict = {}
         host = self.host
         cpuset = host_config.get("CpusetCpus") or (f"0-{host['cpus'] - 1}" if host else None)
@@ -207,6 +211,8 @@ class CpuEnvs:
         if host_config.get("Memory"):
             body["Memory"] = host_config["Memory"]
             body["MemorySwap"] = host_config["Memory"] * 2
+        if host_config.get("PidsLimit"):
+            body["PidsLimit"] = host_config["PidsLimit"]
         if not body:
             return
         try:
