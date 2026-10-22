@@ -47,8 +47,12 @@ def test_lanes_and_approval_ui(page: Page, server: str):
     member.context.close()
 
     page.goto(f"{server}/admin?tab=reservations")
+    # Let the bookings load first: a filter clicked before that is reset when the list arrives.
+    expect(page.get_by_role("button", name="Approve").first).to_be_visible(timeout=15000)
     page.locator(".n-radio-button", has_text="Awaiting approval").click()
-    page.get_by_role("button", name="Approve").first.click()
+    approve = page.get_by_role("button", name="Approve").first
+    expect(approve).to_be_visible()
+    approve.click()
     expect(page.get_by_text("No bookings match these filters.")).to_be_visible()
     api(page, server, "PUT", "/api/admin/settings", {"approval_mode": None})
     assert not page.errors  # type: ignore[attr-defined]

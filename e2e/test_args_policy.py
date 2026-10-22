@@ -52,7 +52,8 @@ def test_member_requests_and_admin_approves(page: Page, server: str):
     page.get_by_text("Approve requested arguments").click()
     # --log-file writes files: the admin confirms explicitly
     # wait for the approval itself: the badge also disappears for a moment while the list reloads
-    with page.expect_response(lambda r: "/args/approve" in r.url) as approved:
+    # the first approve answers args_confirm_required (that is what shows "Use them"): wait for the confirmed one
+    with page.expect_response(lambda r: "/args/approve" in r.url and r.ok) as approved:
         page.get_by_role("button", name="Use them").click()
     assert approved.value.ok, approved.value.text()
     expect(page.get_by_text("Arguments awaiting approval")).to_have_count(0)
