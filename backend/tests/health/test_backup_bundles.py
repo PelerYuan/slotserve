@@ -84,6 +84,11 @@ async def test_daily_bundle_is_copied_to_a_path_target(app, make_client, tmp_pat
 
 
 async def test_bundle_is_copied_to_a_managed_storage_through_a_helper(app, make_client):
+    # The housekeeper's own daily backup would race this test's explicit one; stop it first.
+    housekeeper = [t for t in asyncio.all_tasks() if t.get_name() == "housekeeper"]
+    for task in housekeeper:
+        task.cancel()
+    await asyncio.gather(*housekeeper, return_exceptions=True)
     await make_client("root")
     async with SessionLocal() as db:
         st = Storage(name="nas", kind="nfs", purpose="shared", server="nas.local", remote_path="/export/backup")

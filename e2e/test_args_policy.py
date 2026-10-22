@@ -51,7 +51,10 @@ def test_member_requests_and_admin_approves(page: Page, server: str):
     row.get_by_role("button").last.click()
     page.get_by_text("Approve requested arguments").click()
     # --log-file writes files: the admin confirms explicitly
-    page.get_by_role("button", name="Use them").click()
+    # wait for the approval itself: the badge also disappears for a moment while the list reloads
+    with page.expect_response(lambda r: "/args/approve" in r.url) as approved:
+        page.get_by_role("button", name="Use them").click()
+    assert approved.value.ok, approved.value.text()
     expect(page.get_by_text("Arguments awaiting approval")).to_have_count(0)
     model = next(m for m in page.request.get(f"{base}/api/models").json() if m["name"] == "member-model")
     assert model["args"] == "-ngl 99 --log-file /tmp/x.log" and model["args_pending"] is None
