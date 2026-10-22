@@ -64,6 +64,8 @@ class LlmModel(Base):
     status: Mapped[str] = mapped_column(String(16), default="ready")
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
     args: Mapped[str] = mapped_column(Text, default="")
+    # Launch arguments the owner asked for that need an admin's approval first; ``args`` stays in use until then.
+    args_pending: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str] = mapped_column(Text, default="")
     # llama.cpp (NULL) | vllm | sglang | custom; file_path is then a directory or repository id
     engine: Mapped[str | None] = mapped_column(String(16), nullable=True)

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import Settings
 from ..orm import DevProject, DevTemplate, Lane, LlmModel, ModelLoadEvent, ModelPreset, Reservation, User
+from ..runtime.engines import engine_for, review_args
 from ..schemas import ModelOut, PresetOut, ReservationOut
 
 LOAD_HISTORY = 5
@@ -20,6 +21,14 @@ def _model_source_exists(m: LlmModel) -> bool:
     if (m.engine or "llama.cpp") == "llama.cpp":
         return path.is_file()
     return path.exists() or not path.is_absolute()
+
+
+async def model_roots(db: AsyncSession, settings: Settings) -> tuple[list[Path], list[Path]]:
+    """Where members may point models and file arguments: the models folder and model libraries (never the data
+    folder, which holds the database and secrets). Returns ``(roots, excluded)``."""
+    from .storage import model_library_dirs  # storage hook: model libraries from Admin -> Storage
+
+    return [settings.models_dir, *await model_library_dirs(db)], [settings.data_dir]
 
 
 def as_utc(value: datetime | str) -> datetime:
@@ -167,9 +176,15 @@ async def model_out(
         )
         for p in rows.scalars():
             presets.setdefault(p.model_id, []).append(PresetOut.model_validate(p))
+    roots = await model_roots(db, settings) if any(m.args_pending for m in models) else ([], [])
     out = []
     for m in models:
         path = Path(m.file_path)
+        pending = m.args_pending or None
+        try:
+            needs = review_args(engine_for(m), pending, roots[0], [m.args], roots[1]).needs_approval if pending else []
+        except ValueError:
+            needs = []
         out.append(
             ModelOut(
                 id=m.id,
@@ -191,6 +206,8 @@ async def model_out(
                 engine=m.engine or "llama.cpp",
                 default_lane_ids=sorted(lane_defaults.get(m.id, [])),
                 exceeds_vram=bool(vram_bytes) and m.size_bytes > vram_bytes * 0.95,
+                args_pending=pending,
+                needs_approval=needs,
             )
         )
     return out

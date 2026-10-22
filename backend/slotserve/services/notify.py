@@ -41,6 +41,7 @@ EVENT_PREF = {
     "booking_rejected": "booking_changes",
     "booking_expired": "booking_changes",
     "approval_requested": "admin_alerts",
+    "args_approval_requested": "admin_alerts",
     "fallback": "booking_changes",
     "waitlist_free": "waitlist",
     "waitlist_booked": "waitlist",
@@ -56,7 +57,14 @@ EVENT_PREF = {
     "storage_down": "admin_alerts",
 }
 
-ADMIN_EVENTS = {"load_failed", "user_registered", "disk_low", "storage_quota_admin", "storage_down"}
+ADMIN_EVENTS = {
+    "load_failed",
+    "user_registered",
+    "disk_low",
+    "storage_quota_admin",
+    "storage_down",
+    "args_approval_requested",
+}
 # Events that can also go to group webhooks, by the kind admins switch on (setting group_events).
 GROUP_KIND = {
     "load_failed": "admin_alerts",
@@ -66,6 +74,7 @@ GROUP_KIND = {
     "storage_down": "admin_alerts",
     "fallback_admin": "admin_alerts",
     "approval_requested": "approvals",
+    "args_approval_requested": "approvals",
     "announcement": "announcements",
 }
 RETRY_SECONDS = (30, 120, 600, 1800, 7200)  # then the message is dropped
@@ -101,6 +110,8 @@ MESSAGES: dict[str, dict[str, str]] = {
         "extend60": "+1 hour",
         "release": "End now",
         "approval_requested": "📝 {user} asks for {when}: {what}{series}.",
+        "args_approval_requested": "📝 {user} asks to run {model} with launch arguments an admin must approve: "
+        "{flags}. Review them on the Models page.",
         "series_suffix": " (weekly, {count} bookings)",
         "booking_approved": "✅ Your booking {when} was approved.",
         "booking_rejected": "🚫 Your booking {when} was not approved.{reason}",
@@ -140,6 +151,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "extend60": "延长 1 小时",
         "release": "立即结束",
         "approval_requested": "📝 {user} 申请预约 {when}：{what}{series}。",
+        "args_approval_requested": "📝 {user} 申请以需管理员批准的启动参数运行 {model}：{flags}。请在「模型」页处理。",
         "series_suffix": "（每周重复，共 {count} 次）",
         "booking_approved": "✅ 你的预约 {when} 已通过审批。",
         "booking_rejected": "🚫 你的预约 {when} 未通过审批。{reason}",

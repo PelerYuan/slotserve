@@ -45,6 +45,12 @@ import type {
   WaitlistEntry,
 } from './types'
 
+// Launch-argument policy answers (see composables/argsGate.ts).
+export interface ArgsGateFlags {
+  confirm_args?: boolean
+  request_approval?: boolean
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -144,19 +150,23 @@ export const api = {
   scanModels: () => request<{ added: string[]; skipped: number }>('POST', '/api/models/scan'),
   updateModel: (
     id: number,
-    patch: Partial<Pick<Model, 'name' | 'args' | 'description' | 'engine'>> & { path?: string },
+    patch: Partial<Pick<Model, 'name' | 'args' | 'description' | 'engine'>> & { path?: string } & ArgsGateFlags,
   ) => request<Model>('PATCH', `/api/models/${id}`, patch),
-  createModel: (body: { name: string; engine: string; path: string; args: string; description: string }) =>
-    request<Model>('POST', '/api/models', body),
+  createModel: (
+    body: { name: string; engine: string; path: string; args: string; description: string } & ArgsGateFlags,
+  ) => request<Model>('POST', '/api/models', body),
+  approveModelArgs: (id: number, confirm_args = false) =>
+    request<Model>('POST', `/api/models/${id}/args/approve`, { confirm_args }),
+  dropPendingModelArgs: (id: number) => request<Model>('DELETE', `/api/models/${id}/args/pending`),
   setDefault: (id: number, laneId?: number | null) =>
     request<Model>('POST', `/api/models/${id}/default`, undefined, { lane_id: laneId ?? undefined }),
   clearDefault: (id: number) => request<void>('DELETE', `/api/models/${id}/default`),
   deleteModel: (id: number, deleteFile: boolean) =>
     request<void>('DELETE', `/api/models/${id}`, undefined, { delete_file: deleteFile }),
-  createPreset: (modelId: number, name: string, args: string) =>
-    request<Preset>('POST', `/api/models/${modelId}/presets`, { name, args }),
-  updatePreset: (modelId: number, id: number, name: string, args: string) =>
-    request<Preset>('PATCH', `/api/models/${modelId}/presets/${id}`, { name, args }),
+  createPreset: (modelId: number, name: string, args: string, extra: ArgsGateFlags = {}) =>
+    request<Preset>('POST', `/api/models/${modelId}/presets`, { name, args, ...extra }),
+  updatePreset: (modelId: number, id: number, name: string, args: string, extra: ArgsGateFlags = {}) =>
+    request<Preset>('PATCH', `/api/models/${modelId}/presets/${id}`, { name, args, ...extra }),
   deletePreset: (modelId: number, id: number) => request<void>('DELETE', `/api/models/${modelId}/presets/${id}`),
 
   // downloads

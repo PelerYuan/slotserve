@@ -39,6 +39,9 @@ export interface Model {
   exceeds_vram: boolean
   engine: Engine
   default_lane_ids: number[]
+  // launch arguments waiting for an admin's approval, and the flags in them that need it
+  args_pending: string | null
+  needs_approval: string[]
 }
 
 export type Engine = 'llama.cpp' | 'vllm' | 'sglang' | 'custom'
