@@ -33,6 +33,8 @@ from ...containers.harden import COMPAT_LABEL, HARDENED_LABEL, HardenError
 from ...containers.harden import VERSION as HARDEN_VERSION
 from ...containers.helpers import Folder, parent_binds, q
 from ...containers.model import ContainerSpec, NodePolicy, SpecError
+from ...containers.names import placeholder_values
+from ...containers.redact import redact
 from ...db import SessionLocal, utcnow
 from ...orm import (
     HOLDING_STATUSES,
@@ -633,14 +635,22 @@ class DevEnvManager:
             s.error = None
         self._accounts_digest[s.id] = digest
 
-    async def _context(self, db, s: DevSession) -> SessionContext:
-        """Everything the container of a session is built from (read here; ``containers/`` does no I/O)."""
+    async def _context(self, db, s: DevSession, preview: bool = False) -> SessionContext:
+        """Everything the container of a session is built from (read here; ``containers/`` does no I/O).
+        ``preview``: nothing is created (no host key; the SSH binary may be missing)."""
         user = await db.get(User, s.user_id) if s.user_id else None
         template = await db.get(DevTemplate, s.template_id) if s.template_id else None
         project = await db.get(DevProject, s.project_id) if s.project_id else None
         lane = await db.get(Lane, s.lane_id) if s.lane_id else None
         r = await db.get(Reservation, s.reservation_id) if s.reservation_id else None
-        bundle = self.ssh_bundle()
+        if preview:
+            try:
+                binary = self.ssh_bundle().binary
+            except DevEnvError:
+                binary = b""
+            host_key = b""
+        else:
+            binary, host_key = self.ssh_bundle().binary, self.host_key(self.env_key(s))[0]
         password_login = self.settings.devenv_password_login
         # managed storages from Admin -> Storage (personal /workspace, project data, shared data, libraries)
         sp = await storage.plan_for(db, self.settings.secret_key, user, shared=s.kind == "shared")
@@ -659,7 +669,7 @@ class DevEnvManager:
             session_id=s.id,
             kind=s.kind or "booking",
             image=s.image,
-            ssh=SshInputs(bundle.binary, self.host_key(self.env_key(s))[0], keys, secret, password_login, accounts),
+            ssh=SshInputs(binary, host_key, keys, secret, password_login, accounts),
             resources=Resources(
                 shm_bytes=int(self.settings.devenv_shm_gb * 1024**3),
                 cpus=self.settings.devenv_cpus,
@@ -702,6 +712,59 @@ class DevEnvManager:
         plan = Plan(spec, ctx.node_policy, ctx.storage)
         plan.body()  # refuses what harden() never allows, before anything is prepared
         return plan
+
+    async def preview(self, db, s: DevSession) -> dict:
+        """What a (not yet existing) session's container would get, as a redacted summary (F02/F03 "what you
+        get"). ``s`` is a transient DevSession; nothing is written, pulled, created or started."""
+        ctx = await self._context(db, s, preview=True)
+        out: dict = {"ok": True, "error": None}
+        try:
+            spec = build_spec(ctx)
+            body = render_for_docker(spec, ctx.node_policy)
+        except (SpecError, HardenError) as exc:
+            return {"ok": False, "error": {"code": exc.code, "params": exc.params}}
+        host = body["HostConfig"]
+        secrets_ = [ctx.web.get("token"), ctx.ssh.secret, ctx.ssh.host_key]
+        secrets_.append(placeholder_values(0, [], ctx.web.get("token") or "")["token_sha256"])
+        for st in getattr(ctx.storage, "storages", {}).values():
+            with contextlib.suppress(Exception):
+                secrets_.append(storage.password(st, self.settings.secret_key))
+        requests = host.get("DeviceRequests") or []
+        out.update(
+            kind=ctx.kind,
+            image=spec.image,
+            compat=bool(body["Labels"].get(COMPAT_LABEL)),
+            gpus=[g for r in requests for g in r.get("DeviceIDs") or []],
+            cpuset=host.get("CpusetCpus"),
+            cpus=host["NanoCpus"] / 1e9 if host.get("NanoCpus") else None,
+            memory=host.get("Memory"),
+            pids_limit=host.get("PidsLimit"),
+            shm=host.get("ShmSize"),
+            mounts=[
+                {
+                    "target": m["Target"],
+                    "type": m["Type"],
+                    "source": m["Source"],
+                    "read_only": bool(m.get("ReadOnly")),
+                }
+                for m in host.get("Mounts") or []
+            ],
+            web=[{"name": p["name"], "port": p["port"], "kind": p["kind"]} for p in ctx.web.get("ports", [])],
+            ssh={
+                "keys": len(ctx.ssh.keys),
+                "password": bool(ctx.ssh.secret),
+                "accounts": len(ctx.ssh.accounts),
+                "needs_credentials": not ctx.web.get("ports"),
+            },
+            security={
+                "no_new_privileges": any(o.startswith("no-new-privileges") for o in host.get("SecurityOpt") or []),
+                "cap_drop": host.get("CapDrop") or [],
+                "log": host.get("LogConfig"),
+            },
+            files=sorted(spec.files),
+            body=redact(body, secrets_),
+        )
+        return redact(out, secrets_)
 
     @staticmethod
     def _web_spec(s: DevSession, template: DevTemplate | None) -> dict:

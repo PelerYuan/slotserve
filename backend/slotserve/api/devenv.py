@@ -517,6 +517,55 @@ async def session_logs(
     return {"text": await request.app.state.devenv.logs(s, tail)}
 
 
+# ---- preview ----------------------------------------------------------------------
+
+
+class PreviewIn(BaseModel):
+    template_id: int | None = None
+    project_id: int | None = None  # a kept environment (its template and kept directories)
+    gpu: bool = True  # False: an environment without a GPU (CPU-only)
+    lane_id: int | None = None  # the lane of a GPU environment; default: the first lane
+
+
+@router.post("/preview")
+async def preview(
+    body: PreviewIn, request: Request, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
+):
+    """What an environment would get - GPUs, CPU, memory, mounts, web interfaces, SSH, security - without starting
+    anything. Redacted: no tokens, password hashes, keys or storage passwords (containers/redact.py)."""
+    project = None
+    if body.project_id is not None:
+        project = await db.get(DevProject, body.project_id)
+        if project is None or (project.owner_id != user.id and not user.is_admin):
+            raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+        template = await db.get(DevTemplate, project.template_id) if project.template_id else None
+    else:
+        template = await db.get(DevTemplate, body.template_id) if body.template_id is not None else None
+        if not visible(template, user):
+            raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    lane_id = None
+    if body.gpu:
+        lane = await db.get(Lane, body.lane_id) if body.lane_id is not None else None
+        if lane is None:
+            lane = (await db.execute(select(Lane).order_by(Lane.position, Lane.id).limit(1))).scalar_one_or_none()
+        if lane is None:
+            raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+        lane_id = lane.id
+    s = DevSession(
+        id=0,
+        kind="booking" if body.gpu else "cpu",
+        user_id=user.id,
+        template_id=template.id if template else None,
+        project_id=project.id if project else None,
+        lane_id=lane_id,
+        image=project.image if project else (template.image if template else ""),
+        state="waiting",
+    )
+    out = await request.app.state.devenv.preview(db, s)
+    await db.rollback()  # nothing of the transient session is kept
+    return out
+
+
 # ---- shared idle environments ---------------------------------------------------
 
 
