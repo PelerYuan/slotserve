@@ -45,6 +45,7 @@ from ..security import hash_password, sudo
 from ..services import app_settings, booking, kv, maintenance, policies, queries
 from ..services.audit import AUDIT_ACTIONS, record, split_detail
 from ..services.review import review
+from .runtime_admin import load_event_diagnosis
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -95,6 +96,7 @@ async def stats(_: User = Depends(admin_user), db: AsyncSession = Depends(get_db
                 finished_at=e.finished_at,
                 success=e.success,
                 error=e.error,
+                diagnosis=load_event_diagnosis(e),
             )
             for e, name in events
         ],
