@@ -11,6 +11,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from pathlib import Path
 
 import pytest
 from playwright.sync_api import Browser, Page, expect
@@ -128,7 +129,7 @@ def server(tmp_path_factory, browser: Browser):
                 if proc.poll() is not None or time.monotonic() > deadline:
                     raise RuntimeError((tmp / "server.log").read_text(errors="replace")[-4000:]) from None
                 time.sleep(0.3)
-        _seed(browser, base)
+        _seed(browser, base, tmp / "data")
         yield base
     finally:
         if os.name == "nt":
@@ -143,17 +144,17 @@ def server(tmp_path_factory, browser: Browser):
 
 
 def _call(ctx, base: str, method: str, path: str, data=None):
-    resp = ctx.request.fetch(f"{base}{path}", method=method, data=data)
+    resp = ctx.request.fetch(f"{base}{path}", method=method, data=data, headers={"X-SlotServe": "1"})
     assert resp.ok, f"{method} {path}: {resp.status} {resp.text()}"
     return resp.json() if resp.status != 204 else None
 
 
-def _seed(browser: Browser, base: str) -> None:
+def _seed(browser: Browser, base: str, data: Path) -> None:
     ctx = browser.new_context()
     try:
-        _call(
-            ctx, base, "POST", "/api/auth/register", {"username": "admin", "password": PASSWORD, "invite_code": INVITE}
-        )
+        # The first account is the admin: it signs up with the setup code from the data directory.
+        code = (data / "setup_code").read_text().strip()
+        _call(ctx, base, "POST", "/api/auth/register", {"username": "admin", "password": PASSWORD, "setup_code": code})
         _call(ctx, base, "POST", "/api/models/scan")
         models = {m["name"]: m["id"] for m in _call(ctx, base, "GET", "/api/models")}
         _call(ctx, base, "POST", f"/api/models/{models['chat-small']}/default")
@@ -276,7 +277,6 @@ def test_booking_dialog_title_follows_the_booking_type(browser: Browser, server:
     page.context.close()
 
 
-@pytest.mark.xfail(reason="LoginView.vue is owned by W0-01; its inputs still need placeholders", strict=False)
 @pytest.mark.parametrize("locale", ["en-US", "zh-CN"])
 def test_login_page_has_no_default_placeholders(browser: Browser, server: str, locale: str):
     ctx = browser.new_context(locale=locale)

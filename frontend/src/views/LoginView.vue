@@ -152,7 +152,13 @@ function setMode(m: 'login' | 'register') {
         </div>
         <NForm class="form rise" style="--d: 0.15s" :show-require-mark="false" @submit.prevent="submit">
           <NFormItem :label="t('auth.username')" :feedback="mode === 'register' ? t('auth.usernameRule') : undefined">
-            <NInput v-model:value="form.username" size="large" autofocus :input-props="{ autocomplete: 'username' }" />
+            <NInput
+              v-model:value="form.username"
+              size="large"
+              autofocus
+              :placeholder="t('ph.loginUsername')"
+              :input-props="{ autocomplete: 'username' }"
+            />
           </NFormItem>
           <NFormItem :label="t('auth.password')" :feedback="mode === 'register' ? t('auth.passwordRule') : undefined">
             <NInput
@@ -160,6 +166,7 @@ function setMode(m: 'login' | 'register') {
               type="password"
               size="large"
               show-password-on="click"
+              :placeholder="t('ph.loginPassword')"
               :input-props="{ autocomplete: mode === 'login' ? 'current-password' : 'new-password' }"
               @keyup.enter="submit"
             />
@@ -180,6 +187,7 @@ function setMode(m: 'login' | 'register') {
                 <NInput
                   v-model:value="form.invite"
                   size="large"
+                  :placeholder="t('ph.inviteCode')"
                   :disabled="mode !== 'register'"
                   @keyup.enter="submit"
                 />

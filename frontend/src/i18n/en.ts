@@ -1249,6 +1249,7 @@ export default {
         storage_update: 'Changed storage',
         storage_delete: 'Deleted storage',
         model_args_request: 'Asked for model arguments',
+        auth_first_admin: 'Set up the first admin',
         model_args_update: 'Changed model arguments',
       },
       allGpus: 'all visible GPUs',
@@ -1386,6 +1387,9 @@ export default {
   },
   // Input placeholders: every input and select says what goes in it (never the component library's default).
   ph: {
+    loginUsername: 'Your username',
+    loginPassword: 'Your password',
+    inviteCode: 'From the admin',
     lane: 'Choose a lane',
     laneName: 'e.g. GPU 0 or Training',
     model: 'Choose a model',

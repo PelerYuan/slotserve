@@ -1248,6 +1248,7 @@ const zh: typeof en = {
         storage_update: '修改存储',
         storage_delete: '删除存储',
         model_args_request: '申请模型参数',
+        auth_first_admin: '创建首个管理员',
         model_args_update: '修改模型参数',
       },
       allGpus: '全部可见 GPU',
@@ -1384,6 +1385,9 @@ const zh: typeof en = {
     inLane: '通道 {lane}',
   },
   ph: {
+    loginUsername: '你的用户名',
+    loginPassword: '你的密码',
+    inviteCode: '向管理员索取',
     lane: '选择通道',
     laneName: '例如 GPU 0 或 训练',
     model: '选择模型',
