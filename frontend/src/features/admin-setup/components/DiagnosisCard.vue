@@ -111,6 +111,8 @@ async function copy() {
   background: var(--surface);
   padding: 12px 14px;
   font-size: 13px;
+  color: var(--text);
+  text-align: left;
 }
 .diag.known {
   border-left-color: var(--danger);

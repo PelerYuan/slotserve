@@ -1,12 +1,14 @@
 """Admin UI of W1-07: grouped admin sections, the settings page (cards, search, preview with notification, history and
 undo), the audit log filters, per-person extra hours and the health / setup checklist on the admin overview."""
 
+import re
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
+from conftest import ROOT
 from helpers import INVITE, PASSWORD, api, sign_in
 
 TABS = ["overview", "runtime", "lanes", "storage", "users", "reservations", "keys", "channels", "settings", "audit"]
@@ -231,3 +233,29 @@ def test_overview_checklist_and_health(page: Page, server: str, locale: str):
         assert state["dismissed"]["reason"] == "we use e-mail"
         api(page, server, "DELETE", "/api/health/checks/chat/dismiss")
     assert not page.errors  # type: ignore[attr-defined]
+
+
+def _label_keys(source: str) -> set[str]:
+    """Property names of the `admin.settings` texts in one i18n source (labels, `<key>_desc`, ...)."""
+    start = source.index("    settings: {", source.index("  admin: {"))
+    end = source.index("\n    },", start)
+    return set(re.findall(r"^      ([a-z_0-9]+):", source[start:end], re.M))
+
+
+def test_every_registry_setting_has_a_label_in_both_languages():
+    """The settings page is built from the registry: each setting needs a label (and a description unless it is a
+    read-only deployment parameter) in English and Chinese, in i18n/*.ts or features/settings/i18n.ts."""
+    from slotserve.services import app_settings
+
+    src = ROOT / "frontend" / "src"
+    feature_en, feature_zh = (
+        (src / "features" / "settings" / "i18n.ts").read_text(encoding="utf-8").split("export const zh")
+    )
+    for lang, base, feature in (("en", "en.ts", feature_en), ("zh-CN", "zh-CN.ts", feature_zh)):
+        keys = _label_keys((src / "i18n" / base).read_text(encoding="utf-8")) | _label_keys(feature)
+        missing = [k for k in app_settings.REGISTRY if k not in keys]
+        assert not missing, f"{lang}: settings without a label: {missing}"
+        missing = [
+            k for k, spec in app_settings.REGISTRY.items() if not spec.restart_required and f"{k}_desc" not in keys
+        ]
+        assert not missing, f"{lang}: settings without a description: {missing}"

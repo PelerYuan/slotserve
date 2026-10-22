@@ -174,6 +174,7 @@ async function retry(c: HealthCheck) {
 }
 .title {
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 .meta {
   display: flex;

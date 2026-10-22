@@ -180,9 +180,13 @@ const inviteOpen = ref(false)
 .item.done .name {
   color: var(--text-2);
 }
+.text {
+  min-width: 0;
+}
 .title {
   color: var(--text-2);
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 .evidence {
   margin: 6px 0 0;
