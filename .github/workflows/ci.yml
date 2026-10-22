@@ -121,50 +121,34 @@ jobs:
           done
           docker logs slotserve
           exit 1
-      - name: SSH into a dev environment container (no GPU)
-        # Builds the files exactly as SlotServe does for a booking (booking_ssh_files) with the bundled
-        # Dropbear, then logs in to a stock Ubuntu container with a key and with a password.
-        run: |
-          set -eux
-          sudo apt-get install -y -qq sshpass >/dev/null
-          cid=$(docker create slotserve:ci)
-          docker cp "$cid:/opt/slotserve/bin/dropbearmulti" ./dropbearmulti
-          docker rm "$cid"
-          ./dropbearmulti dropbearkey -t ed25519 -f hostkey
-          ssh-keygen -q -t ed25519 -N "" -f client
-          mkdir -p ctx
-          docker run --rm -v "$PWD:/w" -w /w --entrypoint python slotserve:ci -c '
-          import pathlib
-          from slotserve.services.devenv import SshBundle, booking_ssh_files
-          from slotserve.services.shacrypt import sha512_crypt
-          bundle = SshBundle(pathlib.Path("dropbearmulti").read_bytes(), pathlib.Path("hostkey").read_bytes(), "")
-          files = booking_ssh_files(bundle, [pathlib.Path("client.pub").read_text().strip()], sha512_crypt("ci-secret-pw"))
-          for rel, (data, mode) in files.items():
-              path = pathlib.Path("ctx", rel)
-              path.parent.mkdir(parents=True, exist_ok=True)
-              path.write_bytes(data)
-              path.chmod(mode)
-          '
-          sudo chmod 700 ctx/opt/slotserve/ssh
-          sudo chown -R 0:0 ctx
-          docker create --name devenv -p 2222:22 -e FROM_IMAGE=yes --init --user root -w /workspace \
-            --mount type=volume,source=ci-workspace,target=/workspace \
-            --entrypoint /bin/sh ubuntu:24.04 /opt/slotserve/start.sh
-          sudo tar -C ctx -cf - opt etc | docker cp - devenv:/
-          docker start devenv
-          sleep 2
-          opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5"
-          for i in $(seq 1 20); do
-            ssh $opts -o BatchMode=yes -i client -p 2222 root@127.0.0.1 true 2>/dev/null && break
-            sleep 0.5
-          done
-          ssh $opts -o BatchMode=yes -i client -p 2222 root@127.0.0.1 \
-            'echo LOGIN_OK; echo "env=$FROM_IMAGE"; id -u' | tee out
-          grep -q LOGIN_OK out
-          grep -q env=yes out
-          sshpass -p ci-secret-pw ssh $opts -o PubkeyAuthentication=no -p 2222 root@127.0.0.1 'echo PASSWORD_OK' | tee out2
-          grep -q PASSWORD_OK out2
-          if sshpass -p wrong-password ssh $opts -o PubkeyAuthentication=no -p 2222 root@127.0.0.1 true; then
-            echo "a wrong password must be refused"; exit 1
-          fi
-          docker logs devenv
+
+  contract-docker:
+    # L3 contract tests (backend/tests/contract) against a real Docker daemon: the same cases the backend job
+    # runs against the fake. No GPU on these runners, so GPU cases skip. Includes the SSH login into a container
+    # built from the golden booking spec with the image's own Dropbear (key, environment, password, wrong password).
+    name: Docker contract (real Docker, no GPU)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - uses: docker/setup-buildx-action@v4
+      - name: Build the bundled Dropbear (the image's dropbear stage)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: dropbear
+          push: false
+          outputs: type=local,dest=${{ runner.temp }}/dropbear
+          cache-from: type=gha
+      - run: sudo apt-get install -y -qq sshpass openssh-client >/dev/null
+      - run: pip install -e "backend[dev]"
+      - run: docker version
+      - run: pytest -q -rs tests/contract
+        working-directory: backend
+        env:
+          SLOTSERVE_TEST_DOCKER: "1"
+          SLOTSERVE_TEST_DROPBEAR: ${{ runner.temp }}/dropbear/out/dropbearmulti
