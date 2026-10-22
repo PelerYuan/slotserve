@@ -242,7 +242,7 @@ async def devenv_info(request: Request, user: User = Depends(current_user)):
     s = get_settings()
     manager = request.app.state.devenv
     docker = await manager.refresh_status() if s.devenv_enabled else {"ok": False, "error": None, "version": None}
-    return {
+    out = {
         "enabled": s.devenv_enabled,
         "docker": docker if user.is_admin else {"ok": docker["ok"]},
         "ssh_host": ssh_host(request),
@@ -256,6 +256,9 @@ async def devenv_info(request: Request, user: User = Depends(current_user)):
         "projects_limit": s.devenv_projects,
         "project_days": s.devenv_project_days,
     }
+    if user.is_admin:
+        out["hardening"] = await manager.hardening_summary() if s.devenv_enabled else None
+    return out
 
 
 # ---- templates ----------------------------------------------------------------

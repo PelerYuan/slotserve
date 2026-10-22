@@ -142,3 +142,12 @@ async def test_web_templates_start_without_credentials(app, make_client):
     await _end(bob, app, booking)
     r = await bob.post("/api/devenv/cpu/start", json={"template_id": templates["jupyter-pytorch"]["id"]})
     assert r.status_code == 201, r.text
+
+
+async def test_admins_see_what_hardening_applies(app, make_client):
+    admin, bob = await _setup(app, make_client)
+    info = (await admin.get("/api/devenv")).json()["hardening"]
+    gib = 1024**3
+    assert info["pids_limit"] == 4096 and info["host_memory"] == 128 * gib
+    assert info["default_memory"] == 128 * gib - int(128 * gib * 0.10) and info["memory_default_applies"] is True
+    assert "hardening" not in (await bob.get("/api/devenv")).json()

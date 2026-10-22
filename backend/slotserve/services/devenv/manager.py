@@ -250,6 +250,22 @@ class DevEnvManager:
         self._bundle = SshBundle(binary_path.read_bytes())
         return self._bundle
 
+    async def hardening_summary(self) -> dict:
+        """What harden() applies on this machine, for the admin overview (D14): a memory setting of 0 used to mean
+        "no limit" and now means the host's memory less a reserve."""
+        await self.cpu.host_info()
+        policy = NodePolicy(host_memory=self.cpu.host_memory, pids_limit=self.settings.devenv_pids_limit)
+        default = policy.default_memory()
+        return {
+            "version": HARDEN_VERSION,
+            "pids_limit": self.settings.devenv_pids_limit,
+            "host_memory": self.cpu.host_memory,
+            "default_memory": default,
+            # environments whose memory limit now comes from the host default instead of "no limit"
+            "memory_default_applies": self.settings.devenv_memory_gb <= 0,
+            "cpu_memory_default_applies": self.settings.devenv_cpu_memory_gb <= 0,
+        }
+
     @staticmethod
     def env_key(s: DevSession) -> str:
         """Whose host key a session's container gets: its kept environment's, its lane's shared one, or its own."""
@@ -649,6 +665,7 @@ class DevEnvManager:
                 cpus=self.settings.devenv_cpus,
                 memory_gb=self.settings.devenv_memory_gb,
                 cpu_memory_gb=self.settings.devenv_cpu_memory_gb,
+                pids=self.settings.devenv_pids_limit,
                 **placement,
             ),
             node_policy=NodePolicy(host_memory=self.cpu.host_memory, pids_limit=self.settings.devenv_pids_limit),

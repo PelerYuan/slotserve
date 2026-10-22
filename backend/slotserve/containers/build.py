@@ -4,6 +4,8 @@ point: a new concern is a new contributor file plus one line here."""
 from .context import SessionContext
 from .contributors.cpu import CpuContributor
 from .contributors.gpu import GpuContributor
+from .contributors.limits import LimitsContributor
+from .contributors.logging import LoggingContributor
 from .contributors.models import ModelsContributor
 from .contributors.session import SessionContributor
 from .contributors.ssh import SshContributor
@@ -21,6 +23,8 @@ CONTRIBUTORS = [
     GpuContributor(),
     ModelsContributor(),
     CpuContributor(),
+    LimitsContributor(),
+    LoggingContributor(),
 ]
 
 
