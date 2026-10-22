@@ -99,7 +99,9 @@ async def test_preview_is_redacted(app, make_client):
     assert p["web"] == [{"name": "JupyterLab", "port": 8888, "kind": "jupyter"}]
     assert p["ssh"] == {"keys": 0, "password": True, "accounts": 0, "needs_credentials": False}
     assert p["security"]["no_new_privileges"] and "NET_RAW" in p["security"]["cap_drop"]
-    assert {"target": "/team", "type": "volume"}.items() <= next(m for m in p["mounts"] if m["target"] == "/team").items()
+    assert {"target": "/team", "type": "volume"}.items() <= next(
+        m for m in p["mounts"] if m["target"] == "/team"
+    ).items()
     assert "opt/slotserve/root.hash" in p["files"] and "opt/slotserve/ssh_host_key" in p["files"]
     text = r.text
     async with SessionLocal() as db:

@@ -13,6 +13,7 @@ import CpuSessionInfo from '@/components/devenv/CpuSessionInfo.vue'
 import CpuStartButton from '@/components/devenv/CpuStartButton.vue'
 import DevEnvPorts from '@/components/devenv/DevEnvPorts.vue'
 import PublicPorts from '@/components/devenv/PublicPorts.vue'
+import QuickBook from '@/features/quickbook/components/QuickBook.vue'
 import { api } from '@/api/client'
 import type { DevInfo, DevProject, DevSession, DevTemplate, DevWebKind, Reservation } from '@/api/types'
 import { session } from '@/composables/session'
@@ -77,8 +78,10 @@ onMounted(() => {
 })
 onBeforeUnmount(() => window.clearInterval(timer))
 
+// QuickBook opens on this page (no jump to the schedule)
+const quickBook = ref(false)
 function book() {
-  router.push({ name: 'schedule', query: { book: 'devenv' } })
+  quickBook.value = true
 }
 
 function describeTemplate(x: DevTemplate) {
@@ -689,6 +692,7 @@ const stateTone: Record<string, string> = {
         </div>
       </template>
     </NModal>
+    <QuickBook v-model:show="quickBook" intent="devenv" @done="load" />
   </div>
 </template>
 
