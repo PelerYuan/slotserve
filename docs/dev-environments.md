@@ -148,6 +148,21 @@ Each port is opened one of two ways, which you can switch at any time:
 
 **Save as image** stores the running container (installed packages, files outside `/workspace`) as a new template of yours, so the next booking starts exactly where you left off. `/workspace` is kept anyway and is not part of the image. The new template declares the environment's ports, including the ones you added and whether each is direct. The number of saved images per person is limited (default 3); deleting a saved template removes the image from the server.
 
+Before saving (and before a kept environment is snapshotted) SlotServe empties what it copied in for this environment only: the environment key, the SSH host key and root's password hash; the `SLOTSERVE_*`, `OPENAI_*` and web token variables are emptied in the image, which keeps its own variables. The next start fills them in again.
+
+## Inside the environment {#inside-the-environment}
+
+Every new environment knows where it is and how to call a model (admins: **Platform context in environments**, on by default):
+
+- **Variables**: `SLOTSERVE_USER`, `SLOTSERVE_END` (the booking's end), `SLOTSERVE_ENV_ID`, `SLOTSERVE_ENV` (the template's or kept environment's name), `SLOTSERVE_LANE`, `SLOTSERVE_GPUS`, `SLOTSERVE_MACHINE`, `SLOTSERVE_CHECKPOINT_DIR` (`/workspace/.checkpoints`, a convention for training scripts) and `OPENAI_BASE_URL`. When a booking is extended, login shells see the new end (`/run/slotserve/env`); the container's own environment keeps the end it started with.
+- **The LLM endpoint**: `OPENAI_BASE_URL` is `http://slotserve-gw:8002/v1`, a small listener of SlotServe that serves only the `/v1` API to the environments (not the web UI or `/api`). Requests go through the same keys, admission and usage records as on SlotServe's own port. A template that sets its own `OPENAI_BASE_URL` keeps it.
+- **The environment key**: a booked or CPU-only environment gets its own key (`sk-ss-env-...`, `llm` scope only, acting as you). It is written to `/run/slotserve/llm-key` (readable by root only) and exported as `OPENAI_API_KEY` in login shells, so `python3 -c 'from openai import OpenAI; print(OpenAI().models.list())'` works without any setup. It is never in the container's environment (`docker inspect` does not show it), is revoked when the environment stops and lives at most 24 hours at a time (moved on while the environment runs). Shared environments of idle lanes get no key: use your own API key there. Admins can switch keys off (**Environment LLM key**).
+- **Login banner**: SSH logins show at most three lines: the environment, its GPUs and the time left; `/workspace` usage; the LLM endpoint with a one-line example.
+
+Shells that are not login shells (some web terminals) do not read `/etc/profile.d`; run `. /etc/profile.d/slotserve-platform.sh` there. Images that run as another user than root (their own entrypoint) cannot read the key file.
+
+Where the listener is: when SlotServe runs on the host, on the address of Docker's default bridge (`docker0`, e.g. `172.17.0.1`) - environments find it through `/etc/hosts`, and nothing outside the machine reaches it. When SlotServe runs in a container, on its own addresses, as `slotserve-gw` on each environment's network (the port is not published). `SLOTSERVE_DEVENV_GATEWAY_PORT` (default 8002, 0 = off) and `SLOTSERVE_DEVENV_GATEWAY_HOST` change it. A host firewall that drops traffic from containers to the host blocks it too. With Docker on another machine, environments get no LLM endpoint.
+
 ## Logging in: SSH keys and the environment password
 
 Your credentials are on the **Access credentials** page (next to your API keys):

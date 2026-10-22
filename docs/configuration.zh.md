@@ -80,6 +80,8 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_DEVENV_PUBLIC_PORT_LIMIT` | `5` | 进阶 | 每人直连端口数；管理员不受限制；0 表示只有管理员 |
 | `SLOTSERVE_DEVENV_WEB_URL` | *空* | 专家 | 浏览器访问开发环境网页端口的地址，例如经过反向代理时；留空则为同一主机的 `DEVENV_WEB_PORT` |
 | `SLOTSERVE_DEVENV_WEB_COMPAT` | `false` | 专家 | 兼容模式：用于在共享网页源的环境隔离规则下无法正常工作的网页应用（会削弱环境之间的隔离） |
+| `SLOTSERVE_DEVENV_PLATFORM_CONTEXT` | `true` | 进阶 | 新环境内提供 `SLOTSERVE_*` 变量、登录提示（剩余时间、`/workspace`、如何调用模型）以及指向容器侧网关的 `OPENAI_BASE_URL` |
+| `SLOTSERVE_DEVENV_LLM_KEY` | `true` | 专家 | 为每个个人环境发放专属 LLM 密钥（`llm` 权限，环境停止即吊销；以 0600 文件提供，登录 shell 中导出为 `OPENAI_API_KEY`，从不放进容器环境变量；共享环境不发放） |
 | `SLOTSERVE_DEVENV_FORWARDER_IMAGE` | `alpine/socat:1.8.1.1` | 专家 | ⚠️ **以 root 身份在宿主机上执行。** 每个端口的转发容器所用镜像（PATH 中需要有 `socat`） |
 | `SLOTSERVE_DEVENV_STORAGE_DIR` | *空* | 专家 | ⚠️ **以 root 身份在宿主机上执行。** Docker 主机上存放持久数据的目录（绑定挂载）；留空则使用 Docker 命名卷。系统目录（`/etc`、`/root`、`/var/lib/docker`、`/proc`、`/sys`、`/boot`、`/usr`、`/bin`、`/lib*`、`/var/run` 等）会被拒绝 |
 
@@ -187,6 +189,8 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 
 | 变量 | 默认值 | 层级 | 说明 |
 | --- | --- | --- | --- |
+| `SLOTSERVE_DEVENV_GATEWAY_PORT` | `8002` | 专家 | 容器侧网关的端口：只提供 `/v1` 接口，供开发环境使用（`http://slotserve-gw:<端口>/v1`）；0 表示关闭 |
+| `SLOTSERVE_DEVENV_GATEWAY_HOST` | *空* | 专家 | 容器侧网关监听的地址；留空时，SlotServe 直接运行在主机上则为 Docker 网桥地址（`docker0`），运行在容器中则为所有地址 |
 | `SLOTSERVE_SECRET_KEY` | *自动生成* | 专家 | 会话 Cookie 签名与已存密钥加密所用的密钥。未设置、为空或为 `change-me` 时，SlotServe 首次启动会生成随机密钥并保存在 `DATA_DIR/secret_key`（仅属主可读）。显式设置的值始终优先 |
 | `SLOTSERVE_HOST` | `0.0.0.0` | 专家 | 监听地址 |
 | `SLOTSERVE_PORT` | `8000` | 专家 | 监听端口 |
