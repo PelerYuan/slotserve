@@ -44,6 +44,7 @@ from ..orm import (
     DevProject,
     DevSession,
     DownloadTask,
+    KeyValue,
     LlmModel,
     ModelLoadEvent,
     Notification,
@@ -445,7 +446,16 @@ async def load_status(db: AsyncSession) -> dict[str, Any]:
 
 
 async def save_status(db: AsyncSession, status: dict[str, Any]) -> None:
-    await kv.put(db, STATUS_KEY, status)
+    """Upsert: a manual and the daily backup may record at the same moment."""
+    from sqlalchemy.dialects.sqlite import insert
+
+    from ..db import utcnow
+
+    value = json.dumps(status, default=str)
+    stmt = insert(KeyValue).values(key=STATUS_KEY, value=value, updated_at=utcnow())
+    await db.execute(
+        stmt.on_conflict_do_update(index_elements=[KeyValue.key], set_={"value": value, "updated_at": utcnow()})
+    )
     await db.commit()
 
 

@@ -20,17 +20,12 @@ from slotserve.services import maintenance
 BACKEND = Path(__file__).resolve().parents[2]
 
 
-async def test_unwritable_backup_folder_alerts_and_the_age_metric_exists(app, make_client):
+async def test_unwritable_backup_folder_alerts_and_the_age_metric_exists(app, make_client, tmp_path, monkeypatch):
     admin = await make_client("root")
     await admin.put("/api/admin/settings", json={"metrics_token": "m-token-3"})
-    settings = app.state.settings
-    for p in maintenance.list_backups(settings):  # the first start already took one
-        if p.is_dir():
-            shutil.rmtree(p, ignore_errors=True)
-        else:
-            p.unlink()
-    shutil.rmtree(maintenance.backup_dir(settings), ignore_errors=True)
-    maintenance.backup_dir(settings).write_text("not a folder")  # the folder cannot be created
+    blocker = tmp_path / "blocker"
+    blocker.write_text("a file where the backup folder's parent should be")
+    monkeypatch.setattr(maintenance, "backup_dir", lambda settings: blocker / "backups")  # cannot be created
     hk = app.state.housekeeper
     hk._backup_failed_at = None
     await hk._backup(utcnow())

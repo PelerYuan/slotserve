@@ -95,7 +95,17 @@ class Check:
 
 REGISTRY: dict[str, Check] = {}
 TITLES: dict[str, tuple[str, str]] = {}  # title key -> (English, Chinese) with {param} placeholders
-_diagnoser: Callable[[str], dict | None] | None = None
+
+
+def _pattern_library(evidence: str) -> dict | None:
+    """The error pattern library (services/diagnostics): a diagnosis only when a pattern matched."""
+    from .diagnostics import diagnose
+
+    d = diagnose(evidence)
+    return d.model_dump(mode="json") if d.recognized else None
+
+
+_diagnoser: Callable[[str], dict | None] | None = _pattern_library
 
 
 def register_check(
@@ -122,7 +132,7 @@ def register_titles(titles: dict[str, tuple[str, str]]) -> None:
 
 
 def set_diagnoser(fn: Callable[[str], dict | None] | None) -> None:
-    """The error pattern library (services/diagnostics) attaches a diagnosis to error checks with evidence."""
+    """Replaces what attaches a diagnosis to error checks with evidence (default: the error pattern library)."""
     global _diagnoser
     _diagnoser = fn
 

@@ -70,7 +70,12 @@ async def test_docker_down_alerts_once_after_two_minutes_and_recovers(app, make_
     healthy = app.state.devenv.refresh_status
 
     async def down(force=False):
-        return {"ok": False, "error": "Cannot connect to the Docker daemon", "version": None}
+        return {
+            "ok": False,
+            "error": "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. "
+            "Is the docker daemon running?",
+            "version": None,
+        }
 
     app.state.devenv.refresh_status = down
     await monitor.run_checks(force=True, ids={"docker"})
@@ -87,6 +92,7 @@ async def test_docker_down_alerts_once_after_two_minutes_and_recovers(app, make_
     body = (await admin.get("/api/health")).json()
     docker = next(c for c in body["checks"] if c["id"] == "docker")
     assert docker["level"] == "error" and docker["alerted"] and "daemon" in docker["evidence"]
+    assert docker["diagnosis"]["id"] == "docker_unreachable"  # the error pattern library (services/diagnostics)
 
     app.state.devenv.refresh_status = healthy
     await monitor.run_checks(force=True, ids={"docker"})
