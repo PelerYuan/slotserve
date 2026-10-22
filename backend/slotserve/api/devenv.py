@@ -71,6 +71,7 @@ class TemplateIn(BaseModel):
     keep_entrypoint: bool = False
     persist_paths: list[str] = Field(default_factory=list, max_length=20)  # kept besides /workspace
     shared: bool = False  # admins: offer it to everyone
+    compat: bool = False  # admins: compatibility mode, no no-new-privileges (sudo, s6-overlay; D14)
 
 
 class TemplatePatch(BaseModel):
@@ -83,6 +84,7 @@ class TemplatePatch(BaseModel):
     keep_entrypoint: bool | None = None
     persist_paths: list[str] | None = Field(default=None, max_length=20)
     enabled: bool | None = None
+    compat: bool | None = None  # admins only
 
 
 class TemplateOut(BaseModel):
@@ -95,6 +97,7 @@ class TemplateOut(BaseModel):
     web_ports: list[WebPort]
     keep_entrypoint: bool
     persist_paths: list[str]
+    compat: bool  # runs in compatibility mode (no no-new-privileges): the UI says so
     kind: str  # builtin | custom | saved
     builtin_key: str | None
     owner: str | None
@@ -222,6 +225,7 @@ async def _template_out(db: AsyncSession, rows: list[DevTemplate], user: User) -
                 web_ports=[WebPort(**p) for p in load_web_ports(t.web_ports)],
                 keep_entrypoint=bool(t.keep_entrypoint),
                 persist_paths=load_paths(t.persist_paths),
+                compat=bool(t.compat),
                 kind=t.kind,
                 builtin_key=t.builtin_key,
                 owner=names.get(t.owner_id),
@@ -273,7 +277,7 @@ async def list_templates(user: User = Depends(current_user), db: AsyncSession = 
 @router.post("/templates", response_model=TemplateOut, status_code=201)
 async def create_template(body: TemplateIn, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
     s = get_settings()
-    if body.shared and not user.is_admin:
+    if (body.shared or body.compat) and not user.is_admin:
         raise ApiError(status.HTTP_403_FORBIDDEN, "admin_required")
     if not s.devenv_custom_images and not user.is_admin:
         raise ApiError(status.HTTP_403_FORBIDDEN, "devenv_custom_disabled")
@@ -292,6 +296,7 @@ async def create_template(body: TemplateIn, user: User = Depends(current_user), 
         persist_paths=dump_paths(_paths(body.persist_paths)),
         kind="builtin" if body.shared else "custom",
         owner_id=None if body.shared else user.id,
+        compat=body.compat,
     )
     db.add(t)
     if body.shared:
@@ -340,6 +345,11 @@ async def update_template(
         t.persist_paths = dump_paths(_paths(body.persist_paths))
     if body.enabled is not None:
         t.enabled = body.enabled
+    if body.compat is not None and bool(body.compat) != bool(t.compat):
+        if not user.is_admin:
+            raise ApiError(status.HTTP_403_FORBIDDEN, "admin_required")
+        t.compat = body.compat
+        record(db, user, "devenv.template_compat", t.name, compat=body.compat)
     if t.kind == "builtin":
         record(db, user, "devenv.template_update", t.name, image=t.image, enabled=t.enabled)
     await db.commit()

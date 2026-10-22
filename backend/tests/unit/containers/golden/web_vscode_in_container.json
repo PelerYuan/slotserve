@@ -5,7 +5,7 @@
     "Cmd": [
       "/bin/sh",
       "-c",
-      "code-server --bind-addr 0.0.0.0:8080 --auth none --disable-telemetry --disable-update-check /workspace"
+      "code-server --bind-addr 0.0.0.0:8080 --auth password --disable-telemetry --disable-update-check /workspace"
     ],
     "Entrypoint": [
       "/bin/sh",
@@ -16,7 +16,8 @@
       "SLOTSERVE_END=2026-01-05T17:30:00+00:00",
       "SLOTSERVE_WEB_BASE=/devenv/11/port/8080/",
       "SLOTSERVE_WEB_PORT=8080",
-      "SLOTSERVE_WEB_TOKEN=golden-web-token"
+      "SLOTSERVE_WEB_TOKEN=golden-web-token",
+      "HASHED_PASSWORD=8c1d02a82a2045f0bf1779ac5870c2be84aab791e3bcceb3dc932094c93af113"
     ],
     "ExposedPorts": {
       "22/tcp": {},

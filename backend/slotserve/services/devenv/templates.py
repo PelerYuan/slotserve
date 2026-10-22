@@ -51,14 +51,17 @@ BUILTINS = (
         ),
         "web_ports": json.dumps([{"name": "Desktop", "port": 3000, "kind": "desktop"}]),
         "keep_entrypoint": True,
+        "compat": True,  # s6-overlay needs setuid: runs without no-new-privileges (D14)
     },
     {
         "builtin_key": "vscode",
         "name": "VS Code",
         "image": "codercom/code-server:4.141.0",
         "description": "VS Code in the browser (code-server), opened on /workspace.",
-        "command": "code-server --bind-addr 0.0.0.0:8080 --auth none --disable-telemetry --disable-update-check"
+        # the proxy signs people in (code-server's session cookie, containers/contributors/web.py)
+        "command": "code-server --bind-addr 0.0.0.0:8080 --auth password --disable-telemetry --disable-update-check"
         " /workspace",
+        "env": json.dumps({"HASHED_PASSWORD": "{token_sha256}"}),
         "web_ports": json.dumps([{"name": "VS Code", "port": 8080, "kind": "vscode"}]),
     },
 )

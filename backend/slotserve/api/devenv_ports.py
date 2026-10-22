@@ -28,6 +28,12 @@ Mode = Literal["login", "direct"]
 class PortIn(BaseModel):
     name: str = Field(default="", max_length=32)
     mode: Mode = "login"
+    # Opening VS Code, a desktop or JupyterLab as a direct port lets anyone who reaches the host port use it without
+    # signing in to SlotServe (R1-08): the request has to say it knows.
+    confirm_unauthenticated: bool = False
+
+
+UNAUTHENTICATED_KINDS = ("vscode", "desktop", "jupyter")
 
 
 class PortOut(BaseModel):
@@ -192,6 +198,11 @@ async def put_port(
         db.add(row)
     default_name = declared[port]["name"] if port in declared else str(port)
     row.name = clean_name(body.name, port) if body.name.strip() else (row.name or default_name)
+    kind = declared[port]["kind"] if port in declared else "http"
+    unconfirmed = kind in UNAUTHENTICATED_KINDS and not body.confirm_unauthenticated
+    if body.mode == "direct" and row.mode != "direct" and unconfirmed:
+        await db.rollback()
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "devenv_port_unauthenticated", kind=kind)
     if body.mode == "direct" and row.host_port is None:
         problem = await manager.direct_problem(db, owner, owner_id, acting_admin=user.is_admin)
         if problem is not None:

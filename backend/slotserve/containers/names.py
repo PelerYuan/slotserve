@@ -1,5 +1,6 @@
 """Names and small pure helpers shared by the contributors and the dev environment manager."""
 
+import hashlib
 import json
 import re
 
@@ -53,7 +54,14 @@ def load_web_ports(raw: str | None) -> list[dict]:
 
 def placeholder_values(session_id: int, ports: list[dict], token: str) -> dict[str, str]:
     """``{base_path}``/``{port}`` are the first declared port's, ``{base_path_<port>}`` any declared port's."""
-    values = {"session": str(session_id), "token": token, "base_path": "", "port": ""}
+    values = {
+        "session": str(session_id),
+        "token": token,
+        # code-server's HASHED_PASSWORD (its legacy SHA-256 form): the proxy signs people in with it (web.py)
+        "token_sha256": hashlib.sha256(token.encode()).hexdigest(),
+        "base_path": "",
+        "port": "",
+    }
     for i, p in enumerate(ports):
         values[f"base_path_{p['port']}"] = web_base(session_id, p["port"])
         if i == 0:
@@ -62,7 +70,8 @@ def placeholder_values(session_id: int, ports: list[dict], token: str) -> dict[s
 
 
 def fill_placeholders(text: str, values: dict[str, str]) -> str:
-    """Replaces ``{base_path}``, ``{token}``, ``{port}`` and ``{session}``; other braces are left alone."""
+    """Replaces ``{base_path}``, ``{token}``, ``{token_sha256}``, ``{port}`` and ``{session}``; other braces are left
+    alone."""
     for key, value in values.items():
         text = text.replace("{" + key + "}", value)
     return text

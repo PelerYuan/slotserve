@@ -1,4 +1,10 @@
-"""Web interfaces and the template's own start: declared ports, their token and base path, command, environment."""
+"""Web interfaces and the template's own start: declared ports, their token and base path, command, environment.
+
+Every start gets a random token. JupyterLab and the desktop check it themselves and the proxy adds it to the requests
+it trusts; VS Code (code-server) runs with ``--auth password`` and ``HASHED_PASSWORD={token_sha256}``, and the proxy
+adds code-server's session cookie (``code_server_cookie``), so people never see its password page while nobody
+reaching the port without SlotServe gets in (R1-08).
+"""
 
 import contextlib
 import json
@@ -6,6 +12,14 @@ import json
 from ..context import SessionContext
 from ..model import ContainerSpec
 from ..names import fill_placeholders, placeholder_values
+
+CODE_SERVER_COOKIE = "code-server-session"
+
+
+def code_server_cookie(token: str) -> tuple[str, str]:
+    """The session cookie code-server accepts when it runs with HASHED_PASSWORD = sha256(token) (its SHA-256
+    password method compares the cookie with the hash)."""
+    return CODE_SERVER_COOKIE, placeholder_values(0, [], token)["token_sha256"]
 
 
 class WebContributor:

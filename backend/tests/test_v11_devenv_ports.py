@@ -106,7 +106,12 @@ async def test_add_direct_and_login_ports_at_runtime(app, make_client):
     # a login port that is not declared; the declared one switched to direct
     r = await bob.put(f"/api/devenv/sessions/{sid}/ports/7860", json={})
     assert next(p for p in r.json()["ports"] if p["port"] == 7860)["mode"] == "login"
+    # JupyterLab has no login of its own once opened directly: the request must confirm it (R1-08)
     r = await bob.put(f"/api/devenv/sessions/{sid}/ports/8888", json={"mode": "direct"})
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "devenv_port_unauthenticated"
+    r = await bob.put(
+        f"/api/devenv/sessions/{sid}/ports/8888", json={"mode": "direct", "confirm_unauthenticated": True}
+    )
     lab = next(p for p in r.json()["ports"] if p["port"] == 8888)
     assert lab["declared"] and lab["host_port"] == 2301 and lab["name"] == "Lab"
     await _ticks(app, 1)

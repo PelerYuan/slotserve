@@ -5,6 +5,8 @@
 - ``devenv_shared_members``: who joined a lane's shared idle environment. Only they get an account there, with
   their keys only (no password hashes in the container any more, R1-10). Everyone who could log in with a key
   before the upgrade is carried over for every lane, so existing users keep their access.
+- The built-in VS Code template runs code-server with ``--auth password`` (the proxy signs people in, R1-08) unless
+  admins changed its command.
 """
 
 import sqlite3
@@ -14,6 +16,12 @@ from . import MigrationReport
 from ._util import add_column, count, index_exists, table_exists
 
 VERSION = 7
+
+OLD_VSCODE = "code-server --bind-addr 0.0.0.0:8080 --auth none --disable-telemetry --disable-update-check /workspace"
+NEW_VSCODE = (
+    "code-server --bind-addr 0.0.0.0:8080 --auth password --disable-telemetry --disable-update-check /workspace"
+)
+NEW_VSCODE_ENV = '{"HASHED_PASSWORD": "{token_sha256}"}'
 
 MEMBERS = """CREATE TABLE devenv_shared_members (
 	lane_id INTEGER NOT NULL,
@@ -46,6 +54,12 @@ def up(con: sqlite3.Connection) -> MigrationReport | None:
             "shared idle environments: people with an SSH key were carried over as members of every lane;"
             " password logins there are off from now on"
         )
+    changed = con.execute(
+        "UPDATE devenv_templates SET command = ?, env = ? WHERE builtin_key = 'vscode' AND command = ? AND env IS NULL",
+        (NEW_VSCODE, NEW_VSCODE_ENV, OLD_VSCODE),
+    ).rowcount
+    if changed:
+        report.affected["devenv_templates (built-in VS Code signs in through the proxy)"] = changed
     if not index_exists(con, "ix_devenv_shared_members_user_id"):
         con.execute(MEMBERS_INDEX)
     return report if report.affected else None

@@ -75,9 +75,6 @@
       "RestartPolicy": {
         "Name": "no"
       },
-      "SecurityOpt": [
-        "no-new-privileges:true"
-      ],
       "ShmSize": 8589934592,
       "Ulimits": [
         {
@@ -90,6 +87,7 @@
     "Hostname": "alice-dev",
     "Image": "registry.example/team/image:1",
     "Labels": {
+      "slotserve.compat": "1",
       "slotserve.devenv": "1",
       "slotserve.hardened": "1",
       "slotserve.kind": "booking",

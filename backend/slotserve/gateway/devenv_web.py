@@ -39,6 +39,7 @@ from sqlalchemy import select
 from starlette.background import BackgroundTask
 from starlette.websockets import WebSocketDisconnect
 
+from ..containers.contributors.web import code_server_cookie
 from ..db import SessionLocal
 from ..deps import SESSION_USER_KEY, current_user
 from ..errors import ApiError
@@ -250,6 +251,11 @@ def _forward_headers(items, drop: set[str], t: Target, scheme: str, client: str 
     items = list(items)
     headers: list[tuple[str, str]] = [(k, v) for k, v in items if k.lower() not in drop]
     cookie = _cookies_without_ours("; ".join(v for k, v in items if k.lower() == "cookie"))
+    if t.kind == "vscode" and t.token and t.trusted:
+        # code-server runs with --auth password: SlotServe signs the person in with its session cookie (R1-08)
+        name, value = code_server_cookie(t.token)
+        kept = [c for c in (cookie or "").split("; ") if c and c.split("=", 1)[0].strip() != name]
+        cookie = "; ".join([*kept, f"{name}={value}"])
     if cookie and t.trusted:  # the app's own login cookies count only for requests SlotServe trusts
         headers.append(("cookie", cookie))
     if auth := _auth_header(t):
