@@ -46,7 +46,7 @@ flowchart TD
 | 有进行中的预约，模型仍在加载 | `503` + `Retry-After` | `403 gpu_reserved` |
 | 有进行中的整卡预约 | `503 gpu_exclusive` | `403 gpu_reserved` |
 
-待审批的预约不会让通道变忙，也不会加载模型，只是别人不能再约同一时段。有多个通道时，见[接口请求由哪个通道处理](gpus-and-engines.md#接口请求由哪个通道处理)。
+待审批的预约不会让通道变忙，也不会加载模型，只是别人不能再约同一时段。有多个通道时，见[接口请求由哪个通道处理](gpus-and-engines.md#which-lane-serves-an-api-request)。
 
 空闲时段的使用属于尽力而为：预加载下一个预约的模型时可能会被打断。
 

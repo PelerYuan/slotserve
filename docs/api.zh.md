@@ -63,7 +63,7 @@ SlotServe 在 `/v1` 提供 **OpenAI 兼容**接口。任何可以设置 base URL
 - 已登记、但只在别人预约的通道上提供的模型 → `403 gpu_reserved`；
 - 已登记、但没有任何通道在提供的模型 → `409 model_not_loaded`，需要预约才能加载。
 
-请求总是以实际服务的模型名转发给推理进程，所以会校验模型名的后端（vLLM、SGLang）也能正常接收。完整的路由规则见[多 GPU 与推理后端](gpus-and-engines.md#接口请求由哪个通道处理)。
+请求总是以实际服务的模型名转发给推理进程，所以会校验模型名的后端（vLLM、SGLang）也能正常接收。完整的路由规则见[多 GPU 与推理后端](gpus-and-engines.md#which-lane-serves-an-api-request)。
 
 ## 错误
 

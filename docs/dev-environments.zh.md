@@ -1,27 +1,63 @@
 # 开发环境
 
-除了运行模型和整卡，预约还可以是**开发环境**：预约期间，SlotServe 会运行一个带该通道 GPU 和 SSH 服务的 Docker 容器，你用 SSH 公钥或环境密码登录。`/workspace` 里的文件在多次预约之间一直保留，也可以把整个环境保留下来。通道还可以在无人预约时运行一个所有人都能登录的**共享环境**；任何人也可以随时在共享 CPU 核心上运行[无 GPU 模式](#without-a-gpu)的环境。
+**开发环境**是你在服务器上的一个专属 Docker 容器：浏览器里的 VS Code、JupyterLab 或桌面，或者通过 SSH 使用的终端。`/workspace` 里的文件在不同环境之间一直保留。你可以随时**不带 GPU** 启动一个环境来写代码、装环境，需要时再**预约 GPU**；也可以把整个环境保留下来。通道还可以在无人预约时运行一个**共享环境**，所有加入的人都能登录。
 
 ```mermaid
 sequenceDiagram
     participant U as 你
     participant S as SlotServe
     participant D as Docker
-    U->>S: 预约开发环境（模板、时间）
-    Note over S,D: 开始前最多一小时
-    S->>D: 下载镜像
-    Note over S,D: 预约开始时
-    S->>S: 停止该通道的推理进程
-    S->>D: 创建网络和容器（通道的 GPU、/workspace、只读的 /models）
-    S->>D: 放入 SSH 服务和你的公钥，启动
-    S-->>U: ssh -p 2201 root@服务器（网页和 Telegram）
-    U->>D: SSH、VS Code Remote-SSH、端口转发
+    U->>S: 打开：VS Code（浏览器），不要 GPU
+    S->>D: 按需拉取镜像，创建网络和容器（/workspace、只读的 /models）
+    S-->>U: 就绪后卡片上出现「打开」（大约一分钟）
+    U->>S: 打开
+    S-->>U: 跳转到网页端口（:8001）的一次性链接，VS Code 在新标签页中打开
+    Note over U,D: 之后：在预约的时间里带 GPU
+    S->>S: 开始时：停止该通道的推理进程
+    S->>D: 容器获得该通道的 GPU（添加了公钥时还有 SSH）
     Note over S,D: 预约结束时
-    S->>D: 停止并删除容器（/workspace 保留；保留的环境只停止）
+    S->>D: 删除容器（/workspace 保留；保留的环境只暂停）
     S->>S: 重新加载该通道的默认模型
 ```
 
-## 开启（管理员）
+## 第一个环境：浏览器里的 VS Code {#first-environment}
+
+1. 打开**开发环境**。在**打开一个环境**下：
+    - **选择工具**：**VS Code（浏览器）**（或 JupyterLab、Ubuntu 桌面、终端、你保留的环境或其他模板）；
+    - **要 GPU 吗？** 选**先不用**：推荐用来装环境、写代码，随时可以切到 GPU；
+    - 点**打开**。
+2. 新环境的卡片会显示进度（第一次需要下载镜像）。大约一分钟后卡片上出现**打开 VS Code** 按钮：VS Code 在新的浏览器标签页中打开 `/workspace`。
+3. 开始工作。文件请放在 `/workspace`：环境结束后它仍然保留，并且你所有的环境看到的都是同一个 `/workspace`。容器里的其他内容（在 `/workspace` 以外用 `apt` 或 `pip` 装的软件包）会在环境结束时删除，除非你保留这个环境或把它保存为镜像（见[保留的环境](#kept-environments-projects)和[保存环境](#saving-an-environment)）。
+4. VS Code 里有终端（**Terminal → New Terminal**）。你在容器里是 `root`，所以 `apt install` 不需要 `sudo`。共享模型在 `/models`（只读），`OPENAI_BASE_URL` / `OPENAI_API_KEY` 让代码可以直接调用 SlotServe 的模型（见[环境内的平台信息](#inside-the-environment)）。
+5. 用完后在卡片上点**停止**。不带 GPU 的环境会一直运行到你停止或暂停它，没有时间限制。
+
+浏览器里的工具不需要 SSH 密钥、密码或预约：你已经登录了 SlotServe，SlotServe 会替你登录应用。打开时会经过一个跳转到 SlotServe **网页界面端口**（8001）的一次性链接，这个端口把各环境的页面与 SlotServe 本身隔开（见[独立的源](#their-own-origin)）。
+
+### 带 GPU {#with-a-gpu}
+
+把**先不用**换成**要 GPU**，再选时间：SlotServe 会为你预约一块空闲的 GPU（和总览上一样的简短预约对话框；**预约带 GPU 的环境**会直接打开它）。也可以在任何预约对话框中选择「开发环境」。镜像会提前下载；预约开始时容器带着该通道的 GPU 启动，卡片上显示剩余时间、**+1 小时**（下一小时已被占用时会说明原因）、实时 GPU 使用情况和**结束**。预约结束时容器会被删除（`/workspace` 保留），保留的环境除外；结束前 10 分钟的提醒里有延长按钮。
+
+你在无 GPU 状态下使用过的保留环境，可以预约 GPU 后从上次离开的地方继续；见[无 GPU 模式](#without-a-gpu)。
+
+### 从终端或本地 VS Code 连接：SSH {#ssh}
+
+第二种方式是 SSH，适用于你自己的终端、VS Code **Remote-SSH**、`scp` 或端口转发。需要在 SlotServe 上添加 SSH 公钥（或设置环境密码）：
+
+1. 工具选择**终端 / SSH**（其他工具也都带 SSH）。第一次时页面会直接要求你填写公钥：粘贴公钥、按页面给出的两条命令为你的系统生成一个，或者让浏览器生成密钥对（私钥只下载一次，只有公钥发送给 SlotServe）。见[登录方式](#logging-in-ssh-keys-and-the-environment-password)。
+2. 环境运行后，卡片上会显示连接命令：
+
+    ```bash
+    ssh -p 2201 root@服务器
+    ```
+
+3. **VS Code Remote-SSH**：把卡片上的配置片段加到 `~/.ssh/config`；每个环境都有自己的 Host 别名和主机密钥，连接那个别名即可。每次预约的端口可能不同。
+4. 自己启动的程序（TensorBoard、演示页面、API）可以在卡片的**端口**里用浏览器打开（见[端口](#ports)），或用 SSH 端口转发访问，如 `ssh -p 2201 -L 8888:localhost:8888 root@服务器`。
+
+第一次 `ssh` 到某个环境时会询问是否信任它的主机密钥：请与卡片上的**主机密钥**对比指纹。
+
+## 开启（管理员） {#setting-it-up-admin}
+
+### Docker 访问 {#docker}
 
 1. 把 Docker 套接字挂载进 SlotServe：在 `docker-compose.yml` 里取消注释
 
@@ -29,37 +65,22 @@ sequenceDiagram
     - /var/run/docker.sock:/var/run/docker.sock
     ```
 
-    然后执行 `docker compose up -d`。容器通过 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) 使用 GPU，SlotServe 本身已经依赖它。
+    然后执行 `docker compose up -d`。容器通过 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) 使用 GPU，SlotServe 本身已经依赖它。不在容器中运行 SlotServe 时，运行它的用户需要有访问套接字的权限（`docker` 组）。`SLOTSERVE_DOCKER_HOST` 可以指向别处（其他套接字、`tcp://`）。
 
-2. 打开**管理 → 系统设置 → 开发环境 → 开发环境**。
+2. 打开**管理 → 系统设置 → 开发环境 → 开发环境**。Docker 有响应时，设置进度中的**开发环境**和健康检查 **docker** 会打勾；否则该检查的详情会说明原因（"Cannot connect to the Docker daemon"、套接字权限不足）。
 
-3. 在宿主机防火墙中放行 **SSH 端口范围**（默认 `2200-2299`），每个运行中的环境占用其中一个端口。如果允许用户直连发布端口（见下文「端口」），还要放行**直连端口范围**（默认 `2300-2399`）；以及**网页界面端口**（`SLOTSERVE_DEVENV_WEB_PORT`，默认 `8001`，`docker-compose.yml` 已发布）。
+3. 在宿主机防火墙中放行需要的端口：浏览器工具用的**网页界面端口**（`SLOTSERVE_DEVENV_WEB_PORT`，默认 `8001`，`docker-compose.yml` 已发布）；**SSH 端口范围**（默认 `2200-2299`，每个运行中的环境占用其中一个端口）；如果允许用户直接发布端口（见[端口](#ports)），还有**直连端口范围**（默认 `2300-2399`）。SSH 端口和直连端口由 Docker 自己发布，会绕过 `ufw`；见[端口与防火墙](operations.md#firewall)。
 
 4. 按需设置 **SSH 主机名**（用户在 `root@` 后面输入的地址）、CPU、内存、共享内存上限、允许的镜像仓库、是否允许**密码登录**、存放持久数据的**存储目录**，以及保留环境的限制。
 
+在反向代理之后，还要设置**网页界面地址**（`SLOTSERVE_DEVENV_WEB_URL`）；见[反向代理](operations.md#reverse-proxy)。
+
 !!! warning "安全"
-    能控制 Docker 套接字就能控制宿主机。SlotServe 启动的容器不加额外特权，只挂载该通道的 GPU、用户自己的 `/workspace` 卷和只读的模型目录；但 SlotServe 的管理员从此可以在宿主机上运行容器。只在用户可信的服务器上开启开发环境。
+    能控制 Docker 套接字就能控制宿主机。SlotServe 只启动经过加固、不带额外特权的容器（见[资源上限与加固](#limits-and-hardening)），只挂载该通道的 GPU、用户自己的 `/workspace` 和只读的模型目录；但 SlotServe 的管理员从此可以在宿主机上运行容器。只在用户可信的服务器上开启开发环境。
 
     **Podman** 提供与 Docker 兼容、不需要 root 守护进程的接口。把 `SLOTSERVE_DOCKER_HOST` 指向它的套接字（如 `unix:///run/podman/podman.sock`）即可改用 Podman，GPU 需要按 Podman 的 CDI 方式配置。
 
-## 使用
-
-1. 在**访问凭据**页面添加 SSH 公钥或设置环境密码（见下文）。
-2. 点**预约开发环境**（或在预约弹窗中选「开发环境」），选择模板（或保留的环境）和时间。
-3. 镜像会提前下载，页面上能看到进度。预约开始后，页面会显示连接命令：
-
-    ```bash
-    ssh -p 2201 root@服务器
-    ```
-
-    在容器里你是 `root`。文件请放在 `/workspace`；共享模型在 `/models`（只读）。
-
-4. **VS Code**：把页面上的配置片段加到 `~/.ssh/config`，用 Remote-SSH 连接。每次预约的端口可能不同。
-5. **浏览器里的桌面、JupyterLab、VS Code**：带网页界面的模板运行时，卡片上有**打开桌面 / 打开 JupyterLab / 打开 VS Code** 按钮（见下文「网页界面」）。自己启动的其他程序（TensorBoard、演示页面、API、数据库……）可以在环境运行时在卡片的**端口**里添加（见下文「端口」），也可以用 SSH 端口转发访问，如 `ssh -p 2201 -L 8888:localhost:8888 root@服务器`。
-
-预约结束时容器会被删除（保留的环境除外）。需要更久的话请及时延长（结束前 10 分钟的提醒里有延长按钮）。
-
-### 模板
+### 模板 {#templates}
 
 | 模板 | 镜像 | 网页界面 |
 | --- | --- | --- |
@@ -74,7 +95,7 @@ sequenceDiagram
 
 每个人都可以用任意镜像新建**自己的模板**（除非管理员关闭了自定义镜像或限制了镜像仓库），可以指定主进程和环境变量。镜像需要包含 `/bin/sh`；SSH 不依赖镜像，SlotServe 会放入自带的小型静态 SSH 服务。
 
-### 网页界面
+### 网页界面 {#web-interfaces}
 
 SlotServe 可以在浏览器里打开运行中环境的任意端口，地址是 `/devenv/<会话>/port/<端口>/`，由**网页界面端口**提供（见下文「独立的源」）。模板以端口列表的形式**声明网页界面**，每个端口有名称和类型（桌面、JupyterLab、VS Code 或其他网页应用）；环境运行时，卡片上每个端口都有一个**打开…**按钮（新标签页）。其他端口（比如自己在 6006 端口启动的 TensorBoard）可以在**端口**里添加，或在 SlotServe 地址后直接输入 `/devenv/<会话>/port/6006/` 打开。只有预约人和管理员能打开（不属于任何预约的环境对所有已登录用户开放），并且需要先登录 SlotServe。
 
@@ -98,7 +119,7 @@ flowchart LR
 !!! note
     桌面使用的浏览器视频接口需要安全上下文：请通过 HTTPS（或 `localhost`）访问 SlotServe。桌面里的硬件加速图形可能需要在模板环境变量中加入 `NVIDIA_DRIVER_CAPABILITIES=all`，取决于宿主机的驱动配置。
 
-#### 独立的源
+#### 独立的源 {#their-own-origin}
 
 环境里的应用由使用者自己编写。如果它们和 SlotServe 使用同一个地址，某人环境里的网页就能以打开者（比如管理员）的身份操作 SlotServe。因此网页界面使用**单独的端口**（`SLOTSERVE_DEVENV_WEB_PORT`，默认 `8001`）：浏览器把它当作不同的源，而且这个端口从不接受 SlotServe 的登录 Cookie。
 
@@ -124,7 +145,7 @@ sequenceDiagram
 
 code-server 以 `--auth password` 运行：SlotServe 用它的会话 cookie 替你登录，不经过 SlotServe 的请求（其他容器、宿主机上的其他人）只会看到它的登录页。
 
-### 端口
+### 端口 {#ports}
 
 环境运行时，卡片上会列出它的**端口**：模板声明的端口和你添加的端口。每个端口显示名称、容器端口、访问方式、带**打开**和**复制**按钮的地址，以及是否有程序在监听（SlotServe 会查看容器里正在监听的套接字；「仅本机」表示应用只监听 `127.0.0.1`，需要改为监听 `0.0.0.0`）。正在监听但还没列出的端口会显示出来，一键即可添加。
 
@@ -144,7 +165,7 @@ code-server 以 `--auth password` 运行：SlotServe 用它的会话 cookie 替�
 - 首次发布时如果宿主机端口已被其他程序占用，会自动换用下一个空闲号码；固定号码后来被占用时，卡片上会显示问题。
 - 开发环境页面的**直连端口**列出你的直连端口（包括暂停中的保留环境的端口），可以释放。管理员打开**所有人**可以看到所有人的直连端口并**收回**：宿主机端口回到池中，容器端口仍可在登录后访问。
 
-### 保存环境
+### 保存环境 {#saving-an-environment}
 
 **保存为镜像**会把运行中的容器（装好的软件、`/workspace` 以外的文件）保存成你自己的新模板，下次预约直接从这里继续。`/workspace` 本来就会保留，不会打进镜像。新模板会带上环境的端口声明，包括你添加的端口以及每个端口是否直连。每人可保存的镜像数量有上限（默认 3 个）；删除已保存的模板会同时删除服务器上的镜像。
 
@@ -163,7 +184,7 @@ code-server 以 `--auth password` 运行：SlotServe 用它的会话 cookie 替�
 
 监听位置：SlotServe 直接运行在主机上时，监听 Docker 默认网桥的地址（`docker0`，例如 `172.17.0.1`），环境通过 `/etc/hosts` 找到它，主机以外的网络访问不到；SlotServe 运行在容器中时，监听它自己的地址，并在每个环境的网络中以 `slotserve-gw` 的名字出现（端口不对外发布）。可用 `SLOTSERVE_DEVENV_GATEWAY_PORT`（默认 8002，0 表示关闭）和 `SLOTSERVE_DEVENV_GATEWAY_HOST` 调整。主机防火墙若丢弃容器到主机的流量，也会挡住它。Docker 在另一台机器上时，环境里没有 LLM 接口。
 
-## 登录方式：SSH 公钥和环境密码
+## 登录方式：SSH 公钥和环境密码 {#logging-in-ssh-keys-and-the-environment-password}
 
 登录凭据在**访问凭据**页面（与 API 密钥在一起）：
 
@@ -187,7 +208,9 @@ SlotServe 创建的每个容器在交给 Docker 之前都要经过最后一个�
 
 旧版本创建的保留环境会在下次启动时做一次快照并重新创建，因为这些设置无法加到已有的容器上。
 
-## 保留的环境（项目）
+这些限制在环境里意味着什么（`sudo`、`ping`、任务被结束），以及何时使用兼容模式：见[容器加固与兼容模式](operations.md#hardening)。
+
+## 保留的环境（项目） {#kept-environments-projects}
 
 通常预约结束时容器会被删除，只保留 `/workspace`。如果想保留装好的一切，在预约对话框中选择**保留为新环境**并起个名字。这个预约结束时容器只会被停止（暂停）。之后的预约可以选择**继续使用**：同一个容器会重新启动，并放入你当前的公钥和密码。
 
@@ -209,7 +232,7 @@ SlotServe 创建的每个容器在交给 Docker 之前都要经过最后一个�
 !!! note "快照"
     每次在 CPU 和预约的 GPU 之间切换，都会把容器保存为一层镜像。如果一个保留的环境长期频繁切换，请不时删除它并重新保留一个（或把它保存为镜像，再从该镜像开始保留环境），因为镜像的层数有上限。
 
-### 公平地共享 CPU
+### 公平地共享 CPU {#sharing-the-cpu-fairly}
 
 ```mermaid
 flowchart LR
@@ -231,15 +254,15 @@ flowchart LR
 
 修改这些设置只对之后创建的容器生效；保留的容器会在下次启动时获得新的 CPU 分配和上限。
 
-### 用量
+### 用量 {#usage}
 
 每个无 GPU 环境的 CPU 时间和内存每隔几秒从 Docker 读取一次，并每分钟记到它的使用者名下（类型为“纯 CPU 环境”）。**用量**页面会按人显示 **CPU 核时**。
 
-### 管理员能看到什么
+### 管理员能看到什么 {#cpu-what-admins-see}
 
 **无 GPU 模式**部分会列出所有正在运行的无 GPU 环境，包括使用者、状态、正在使用的 CPU 核数和内存，以及**暂停** / **停止**按钮（会记入审计日志）。相关设置在**管理 → 系统设置 → 开发环境**中。
 
-## 空闲通道：共享环境
+## 空闲通道：共享环境 {#idle-lanes-a-shared-environment}
 
 管理员可以为每个通道选择无人预约时运行什么（**管理 → GPU 与通道 → 未被预约时**）：
 
@@ -259,7 +282,7 @@ ssh -p 2205 alice@服务器
 
 账号在容器启动时创建，并在有人加入、离开或修改公钥时（以及每分钟一次）更新。镜像需要带有 `useradd` 或 `adduser`；两者都没有时环境会启动失败并给出明确的提示。只能使用面向所有人的模板（内置模板或管理员共享的模板）。
 
-## 存储
+## 存储 {#storage}
 
 管理员可以在**管理 → 存储**中添加主机目录、NFS 导出和 SMB 共享，用作共享数据、个人空间（`/workspace`）、项目数据和模型库，详见[存储](storage.md)。下面说明的是没有添加存储时的情况。
 
@@ -276,7 +299,7 @@ ssh -p 2205 alice@服务器
 
 这里填写的是 Docker 主机上的路径，而不是 SlotServe 容器内的路径。缺少的目录会由一个使用 SlotServe 自己的辅助镜像（`SLOTSERVE_STORAGE_HELPER_IMAGE`，默认 `busybox:1.37`）、用完即删的辅助容器创建，它只挂载要处理的目录的上一级，因此 SlotServe 本身不需要访问该目录。新目录会像新卷一样填入环境镜像中的内容：内容通过 Docker 的归档 API 从镜像中复制出来，环境镜像本身不会为此运行。
 
-## 管理员能看到什么
+## 管理员能看到什么 {#what-admins-see}
 
 - 在**开发环境**页面打开**所有人**，可以看到每个环境的状态、镜像、端口和错误；**日志**显示容器输出。
 - 启动失败的环境（镜像不存在、容器退出、没有空闲端口）会显示原因，可以点**重试**重新启动，预约人也会收到通知。

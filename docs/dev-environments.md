@@ -1,27 +1,63 @@
 # Dev environments
 
-Besides running a model or taking the whole GPU, a booking can be a **dev environment**: for the length of the booking SlotServe runs a Docker container with the lane's GPUs and an SSH server, and you log in with your SSH key or your environment password. Your files in `/workspace` are kept between bookings, and you can keep the whole environment too. Lanes can also run a **shared environment** everyone can log into while nobody has them booked, and anyone can run an environment [without a GPU](#without-a-gpu) on the shared CPU cores at any time.
+A **dev environment** is a Docker container of your own on the server: VS Code, JupyterLab or a desktop in the browser, or a terminal over SSH. Your files in `/workspace` are kept between environments. Start one **without a GPU** at any time to write code and set things up, and **book a GPU** when you need it; you can keep the whole environment too. Lanes can also run a **shared environment** everyone who joined can log into while nobody has them booked.
 
 ```mermaid
 sequenceDiagram
     participant U as You
     participant S as SlotServe
     participant D as Docker
-    U->>S: book a dev environment (template, time)
-    Note over S,D: up to an hour before the start
-    S->>D: pull the image
-    Note over S,D: at the start
-    S->>S: stop the lane's model server
-    S->>D: create a network and the container (lane GPUs, /workspace, /models read-only)
-    S->>D: copy in the SSH server and your public keys, start
-    S-->>U: ssh -p 2201 root@server (web page and Telegram)
-    U->>D: ssh, VS Code Remote-SSH, port forwarding
+    U->>S: Open: VS Code (browser), no GPU
+    S->>D: pull the image if needed, create a network and the container (/workspace, /models read-only)
+    S-->>U: the card shows Open when it is ready (about a minute)
+    U->>S: Open
+    S-->>U: one-time link to the web port (:8001), VS Code opens in a new tab
+    Note over U,D: later: with a GPU for a booked time
+    S->>S: at the start: stop the lane's model server
+    S->>D: the container gets the lane's GPUs (and SSH, when you added a key)
     Note over S,D: when the booking ends
-    S->>D: stop and remove the container (/workspace stays; a kept environment is only stopped)
+    S->>D: remove the container (/workspace stays; a kept environment is only paused)
     S->>S: load the lane's default model again
 ```
 
-## Setting it up (admin)
+## Your first environment: VS Code in the browser {#first-environment}
+
+1. Open **Dev environments**. Under **Open an environment**:
+    - **Choose a tool**: **VS Code (browser)** (or JupyterLab, the Ubuntu desktop, a terminal, one of your kept environments or another template);
+    - **Do you need a GPU?** **Not now** - recommended for setting up and writing code; you can move to a GPU any time;
+    - press **Open**.
+2. The new environment's card shows its progress (the image is downloaded the first time). After about a minute it has an **Open VS Code** button: VS Code opens in a new browser tab, on `/workspace`.
+3. Work. Your files belong in `/workspace`, which is kept after the environment ends and is the same in every environment of yours. Everything else in the container (packages installed with `apt` or `pip` outside `/workspace`) is removed when it ends, unless you keep the environment or save it as an image (see [Kept environments](#kept-environments-projects) and [Saving an environment](#saving-an-environment)).
+4. A terminal is inside VS Code (**Terminal → New Terminal**). You are `root` in the container, so `apt install` works without `sudo`. The shared models are at `/models` (read-only), and `OPENAI_BASE_URL` / `OPENAI_API_KEY` let code call SlotServe's models right away (see [Inside the environment](#inside-the-environment)).
+5. When you are done, **Stop** it on its card. An environment without a GPU runs until you stop or pause it; there is no time limit.
+
+No SSH key, no password and no booking are needed for the browser tools: you are signed in to SlotServe, and SlotServe signs you in to the app. Opening it goes through a one-time link to SlotServe's **web interface port** (8001), which keeps environments' pages apart from SlotServe itself (see [Their own origin](#their-own-origin)).
+
+### With a GPU {#with-a-gpu}
+
+Choose **Yes, with a GPU** instead of **Not now**, and pick a time: SlotServe books a free GPU for you (the same short booking dialog as on the Overview; **Book with a GPU** opens it directly). Or choose **Dev environment** in any booking dialog. The image is downloaded ahead of time; at the start of the booking the container starts with the lane's GPUs, and the card shows the time left, **+1 h** (it says why when the next hour is taken), live GPU use and **End**. When the booking ends the container is removed (`/workspace` stays) unless it is a kept environment; the reminder 10 minutes before the end has buttons to extend.
+
+A kept environment you used without a GPU can be booked with a GPU and continues where you left it; see [Without a GPU](#without-a-gpu).
+
+### From a terminal or local VS Code: SSH {#ssh}
+
+The second way in is SSH, for your own terminal, VS Code **Remote-SSH**, `scp` or port forwarding. It needs an SSH public key (or the environment password) on SlotServe:
+
+1. Choose **Terminal / SSH** as the tool (or any other: they all have SSH). The page asks for your public key inline the first time: paste it, use the two commands it shows for your system to make one, or let the browser make a key pair (the private key is downloaded once, only the public key is sent). See [Logging in](#logging-in-ssh-keys-and-the-environment-password).
+2. When the environment runs, its card shows the command:
+
+    ```bash
+    ssh -p 2201 root@server
+    ```
+
+3. **VS Code Remote-SSH**: add the snippet from the card to `~/.ssh/config`; each environment has its own Host alias and host key, so connect to that alias. The port can change between bookings.
+4. Anything you start yourself (TensorBoard, a demo, an API) can be opened in the browser under **Ports** on the card (see [Ports](#ports)), or with SSH port forwarding, e.g. `ssh -p 2201 -L 8888:localhost:8888 root@server`.
+
+The first `ssh` to an environment asks to trust its host key: compare the fingerprint with the **Host key** on the card.
+
+## Setting it up (admin) {#setting-it-up-admin}
+
+### Docker access {#docker}
 
 1. Mount the Docker socket into SlotServe. In `docker-compose.yml` uncomment
 
@@ -29,37 +65,22 @@ sequenceDiagram
     - /var/run/docker.sock:/var/run/docker.sock
     ```
 
-    and run `docker compose up -d`. Containers need GPU access through the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), which the SlotServe container already uses.
+    and run `docker compose up -d`. Containers need GPU access through the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), which the SlotServe container already uses. Without Docker in a container, the user running SlotServe needs access to the socket (the `docker` group). `SLOTSERVE_DOCKER_HOST` points elsewhere (another socket, `tcp://`).
 
-2. Turn on **Admin → System settings → Dev environments → Dev environments**.
+2. Turn on **Admin → System settings → Dev environments → Dev environments**. The setup checklist item **Dev environments** and the health check **docker** tick when Docker answers; if not, the check's evidence says why ("Cannot connect to the Docker daemon", permission denied on the socket).
 
-3. Open the **SSH ports** range (default `2200-2299`) in the host firewall. Each running environment gets one port from it. Open the **Direct port range** (default `2300-2399`) as well if people may publish ports directly (see [Ports](#ports)), and the **web interface port** (`SLOTSERVE_DEVENV_WEB_PORT`, default `8001`, published by `docker-compose.yml`).
+3. Open the ports people need in the host firewall: the **web interface port** (`SLOTSERVE_DEVENV_WEB_PORT`, default `8001`, published by `docker-compose.yml`) for the browser tools, the **SSH ports** range (default `2200-2299`; each running environment gets one port from it), and the **Direct port range** (default `2300-2399`) if people may publish ports directly (see [Ports](#ports)). Docker publishes the SSH and direct ports itself, past `ufw`; see [Ports and firewall](operations.md#firewall).
 
 4. Optionally set **SSH host name** (what people should type after `root@`), CPU, memory and shared-memory limits, which image registries are allowed, whether **Password logins** are allowed, a **Storage directory** for persistent data, and the limits for kept environments.
 
+Behind a reverse proxy, also set **Web interface address** (`SLOTSERVE_DEVENV_WEB_URL`); see [Reverse proxy](operations.md#reverse-proxy).
+
 !!! warning "Security"
-    Whoever controls the Docker socket controls the host. SlotServe only starts containers without extra privileges, with the lane's GPUs, the person's `/workspace` volume and the models directory read-only, but anyone with admin rights in SlotServe can now run containers on the host. Only enable dev environments on a server whose users you trust.
+    Whoever controls the Docker socket controls the host. SlotServe only starts hardened containers without extra privileges (see [Limits and hardening](#limits-and-hardening)), with the lane's GPUs, the person's `/workspace` and the models directory read-only, but anyone with admin rights in SlotServe can now run containers on the host. Only enable dev environments on a server whose users you trust.
 
     **Podman** provides a Docker-compatible API without a root daemon. Point `SLOTSERVE_DOCKER_HOST` at its socket (for example `unix:///run/podman/podman.sock`) to use it instead; GPU access then needs Podman's CDI setup.
 
-## Using it
-
-1. On **Access credentials**, add an SSH public key or set an environment password (see below).
-2. Press **Book an environment** (or choose **Dev environment** in the booking dialog), pick a template (or a kept environment) and a time.
-3. The image is downloaded ahead of time; the page shows the progress. When the booking starts, the page shows the command to connect:
-
-    ```bash
-    ssh -p 2201 root@server
-    ```
-
-    You are `root` inside the container. Your files belong in `/workspace`; the shared models are at `/models` (read-only).
-
-4. **VS Code**: add the snippet from the page to `~/.ssh/config` and connect with Remote-SSH. The port can change between bookings.
-5. **Desktop, JupyterLab, VS Code in the browser**: templates with a web interface show an **Open desktop / Open JupyterLab / Open VS Code** button while they run (see [Web interfaces](#web-interfaces)). Anything else you start yourself (TensorBoard, a demo, an API, a database) can be added under **Ports** on the environment's card while it runs (see [Ports](#ports)), or reached with SSH port forwarding, e.g. `ssh -p 2201 -L 8888:localhost:8888 root@server`.
-
-When the booking ends the container is removed, unless it is a kept environment. Extend the booking in time (the reminder 10 minutes before the end has buttons for that) if you need longer.
-
-### Templates
+### Templates {#templates}
 
 | Template | Image | Web interface |
 | --- | --- | --- |
@@ -74,7 +95,7 @@ The built-in templates use CUDA 12 builds, which run on a wide range of GPUs and
 
 Anyone can add **their own template** from any image (unless an admin turned custom images off or limited the registries), with an optional main process and environment variables. The image needs `/bin/sh`; SSH works in any image because SlotServe brings its own small static SSH server.
 
-### Web interfaces
+### Web interfaces {#web-interfaces}
 
 SlotServe opens any port of a running environment in the browser at `/devenv/<session>/port/<port>/`, served on the **web interface port** (see [Their own origin](#their-own-origin)). A template **declares its web interfaces** as a list of ports, each with a name and a kind (desktop, JupyterLab, VS Code or any other web app); while the environment runs, its card has an **Open …** button for each of them (new tab). Other ports, e.g. a TensorBoard you start yourself on port 6006, can be added under **Ports** or opened by typing `/devenv/<session>/port/6006/` on the SlotServe address. Only the person who booked the environment and admins can open its ports (environments that belong to no booking are open to everyone signed in); you need to be signed in to SlotServe.
 
@@ -98,7 +119,7 @@ The built-ins: **JupyterLab + PyTorch** (JupyterLab on port 8888, files in `/wor
 !!! note
     The desktop streams video with modern browser APIs that need a secure context: open SlotServe over HTTPS (or on `localhost`). Hardware-accelerated graphics in the desktop may need `NVIDIA_DRIVER_CAPABILITIES=all` in the template's environment variables, depending on the host's driver setup.
 
-#### Their own origin
+#### Their own origin {#their-own-origin}
 
 Apps in environments are written by whoever uses them. If they were served on SlotServe's own address, a page in someone's environment could use SlotServe with the rights of whoever opens it (an admin, for example). So the web interfaces are served on a **port of their own** (`SLOTSERVE_DEVENV_WEB_PORT`, default `8001`): browsers treat it as a different site origin, and it never accepts SlotServe's login cookie.
 
@@ -124,7 +145,7 @@ sequenceDiagram
 
 code-server runs with `--auth password`: SlotServe signs you in with its session cookie, so a request that does not come through SlotServe (another container, someone on the host) gets its login page.
 
-### Ports
+### Ports {#ports}
 
 While an environment runs, its card lists its **ports**: the ones its template declares and any you add. For each port you see its name, the container port, how it is opened, its address with **Open** and **Copy** buttons, and whether something listens on it (SlotServe looks at the container's listening sockets; *Localhost only* means the app listens on `127.0.0.1` and must be told to listen on `0.0.0.0`). Ports that something listens on but that are not listed yet are offered for adding with one click.
 
@@ -144,7 +165,7 @@ Each port is opened one of two ways, which you can switch at any time:
 - A port that the host already uses is skipped when it is first published (the next free number is taken). If a fixed port is taken later, the card shows the problem.
 - **Direct ports** on the Dev environments page lists your direct ports, including those of paused kept environments, and lets you release one. Admins see everyone's with **Everyone** and can **reclaim** any: the host port goes back to the pool and the container port stays reachable behind the login.
 
-### Saving an environment
+### Saving an environment {#saving-an-environment}
 
 **Save as image** stores the running container (installed packages, files outside `/workspace`) as a new template of yours, so the next booking starts exactly where you left off. `/workspace` is kept anyway and is not part of the image. The new template declares the environment's ports, including the ones you added and whether each is direct. The number of saved images per person is limited (default 3); deleting a saved template removes the image from the server.
 
@@ -163,7 +184,7 @@ Shells that are not login shells (some web terminals) do not read `/etc/profile.
 
 Where the listener is: when SlotServe runs on the host, on the address of Docker's default bridge (`docker0`, e.g. `172.17.0.1`) - environments find it through `/etc/hosts`, and nothing outside the machine reaches it. When SlotServe runs in a container, on its own addresses, as `slotserve-gw` on each environment's network (the port is not published). `SLOTSERVE_DEVENV_GATEWAY_PORT` (default 8002, 0 = off) and `SLOTSERVE_DEVENV_GATEWAY_HOST` change it. A host firewall that drops traffic from containers to the host blocks it too. With Docker on another machine, environments get no LLM endpoint.
 
-## Logging in: SSH keys and the environment password
+## Logging in: SSH keys and the environment password {#logging-in-ssh-keys-and-the-environment-password}
 
 Your credentials are on the **Access credentials** page (next to your API keys):
 
@@ -187,7 +208,9 @@ Every container SlotServe creates goes through one last, fixed step before Docke
 
 Kept environments created by an older version are snapshotted and recreated once on their next start, because these settings cannot be added to an existing container.
 
-## Kept environments (projects)
+What this means inside an environment (`sudo`, `ping`, killed jobs) and when to use compatibility mode: [Container hardening and compatibility mode](operations.md#hardening).
+
+## Kept environments (projects) {#kept-environments-projects}
 
 Normally the container is removed when the booking ends and only `/workspace` stays. To keep everything you installed, choose **Keep as new** in the booking dialog and give the environment a name. When that booking ends the container is only stopped (paused). A later booking can **Continue** it: the same container starts again, with your current keys and password copied in.
 
@@ -196,7 +219,7 @@ Normally the container is removed when the booking ends and only `/workspace` st
 - The **Dev environments** page lists your kept environments with their state (paused, running, not started yet, container missing), size and last use. You can rename them, change their kept directories and delete them; deleting removes the container and its snapshot, and optionally its kept directories. `/workspace` is never deleted.
 - One kept environment cannot be booked twice at the same time. Admins limit how many each person may keep (**Kept environments per person**, default 3) and can remove kept environments unused for a number of days (**Remove unused kept environments after**; 0 = never; their data stays).
 
-## Without a GPU
+## Without a GPU {#without-a-gpu}
 
 Not everything needs a GPU. Editing code, moving data, installing packages or a CPU job can run in a dev environment **without a GPU**, at any time and without a booking:
 
@@ -209,7 +232,7 @@ Not everything needs a GPU. Editing code, moving data, installing packages or a 
 !!! note "Snapshots"
     Each switch between the CPU and a booking's GPUs saves the container as an image layer. If a kept environment switches very often over a long time, delete it and keep a fresh one now and then (or save it as an image and start a kept environment from that), because images have a limit on the number of layers.
 
-### Sharing the CPU fairly
+### Sharing the CPU fairly {#sharing-the-cpu-fairly}
 
 ```mermaid
 flowchart LR
@@ -231,15 +254,15 @@ flowchart LR
 
 Changing these settings applies to containers created afterwards; a kept container gets its new CPU placement and limits the next time it starts.
 
-### Usage
+### Usage {#usage}
 
 The CPU time and memory of every environment without a GPU are read from Docker every few seconds and recorded each minute for its owner (kind "CPU-only environments"). The **Usage** page then shows **CPU core-hours** per person.
 
-### What admins see
+### What admins see {#cpu-what-admins-see}
 
 The **Without a GPU** section lists every running environment without a GPU with its owner, state, CPU cores and memory in use, and a **Pause** / **Stop** button (logged in the audit log). Admins find the settings in **Admin → System settings → Dev environments**.
 
-## Idle lanes: a shared environment
+## Idle lanes: a shared environment {#idle-lanes-a-shared-environment}
 
 Admins choose per lane what runs while nobody has it booked (**Admin → GPUs & lanes → When not booked**):
 
@@ -259,7 +282,7 @@ ssh -p 2205 alice@server
 
 Accounts are created when the container starts and refreshed when someone joins, leaves or changes their keys (and once a minute). The image needs `useradd` or `adduser`; if it has neither the environment fails with a clear message. Only templates offered to everyone (built-in or shared by an admin) can be used.
 
-## Storage
+## Storage {#storage}
 
 Admins can add host directories, NFS exports and SMB shares in **Admin → Storage** for shared data, personal spaces (`/workspace`), project data and model libraries; see [Storage](storage.md). What follows is what happens without them.
 
@@ -276,7 +299,7 @@ With **Storage directory** set to a directory on the Docker host (for example `/
 
 The path is a path on the Docker host, not inside the SlotServe container. Missing directories are created by a short-lived helper container of SlotServe's own helper image (`SLOTSERVE_STORAGE_HELPER_IMAGE`, default `busybox:1.37`) that mounts only the parent folders it works in, so SlotServe does not need access to the directory itself. A new directory is filled from the environment's image, like a new volume: the content is copied out of the image with Docker's archive API, the image itself never runs for this.
 
-## What admins see
+## What admins see {#what-admins-see}
 
 - **Dev environments** with **Everyone** switched on lists every environment with its state, image, port and errors; **Logs** shows the container output.
 - A failed environment (image not found, container exited, no free port) shows the reason and can be started again with **Try again**. The person is notified.
