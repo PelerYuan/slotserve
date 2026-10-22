@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     # Keep an encrypted copy of new API keys so their owners can view them again.
     api_key_reveal: bool = False
     cookie_secure: bool = False
+    # Addresses of reverse proxies whose X-Forwarded-For is trusted (comma separated, "*" = any), so sign-in
+    # throttling and logs see the real client address.
+    forwarded_allow_ips: str = "127.0.0.1"
     static_dir: Path | None = None
     # Base URL people use to open SlotServe (e.g. http://gpu-box:8000); used in links sent by the bot.
     public_url: str = ""
@@ -164,6 +167,15 @@ class Settings(BaseSettings):
     # How browsers reach that port, e.g. https://gpu-box:8443 behind a reverse proxy; empty = the host name the
     # browser uses for SlotServe with devenv_web_port.
     devenv_web_url: str = ""
+    # Compatibility mode for apps that break on the shared web origin's cross-environment rules (a missing
+    # Referer, one browser using one person's environments at a time; gateway/devenv_web.py). Weakens the
+    # isolation between environments; nothing else.
+    devenv_web_compat: bool = False
+
+    # Playground: the web page's chat with a model (api/playground.py). It uses the browser session, never a key.
+    playground_enabled: bool = True
+    playground_rate_per_minute: int = 20  # requests per person and minute; 0 = no limit
+    playground_default_model_only: bool = False  # only the default model, never another loaded one
 
     @property
     def database_url(self) -> str:

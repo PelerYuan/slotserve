@@ -8,11 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..db import get_db
-from ..deps import SESSION_USER_KEY, current_user
+from ..deps import current_user
 from ..errors import ApiError
 from ..orm import User
 from ..schemas import LoginIn, PasswordChangeIn, RegisterIn, UserOut
-from ..security import constant_time_equals, hash_password, sudo, verify_password
+from ..security import constant_time_equals, credentials, hash_password, sessions, sudo, verify_password
+from ..security.credentials import CredentialError
 from ..security.setup_code import SetupCode, admin_exists
 from ..services.audit import record
 
@@ -23,6 +24,8 @@ DEFAULT_INVITE_CODE = "change-me"
 
 class RegisterBody(RegisterIn):
     invite_code: str = ""
+    # An invite link's token (``ssi-...``, security/credentials.py); used instead of the global invite code.
+    invite_token: str = Field(default="", max_length=128)
     # Required (instead of the invite code) while no admin exists; see security/setup_code.py.
     setup_code: str = Field(default="", max_length=64)
 
@@ -33,6 +36,20 @@ class SudoIn(BaseModel):
 
 class SetupOut(BaseModel):
     setup_required: bool
+
+
+class SessionOut(BaseModel):
+    id: int
+    created_at: datetime
+    last_seen_at: datetime
+    expires_at: datetime
+    ip: str | None = None
+    user_agent: str | None = None
+    current: bool = False
+
+
+class RevokedOut(BaseModel):
+    revoked: int
 
 
 class SudoOut(BaseModel):
@@ -64,6 +81,8 @@ async def register(body: RegisterBody, request: Request, db: AsyncSession = Depe
                 return await _register_first_admin(body, request, db, setup, ip)
     if not settings.registration_open:
         raise ApiError(status.HTTP_403_FORBIDDEN, "registration_closed")
+    if body.invite_token.strip():
+        return await _register_with_invite(body, request, db, ip)
     if not invite_code_usable(settings.invite_code):
         raise ApiError(status.HTTP_403_FORBIDDEN, "invite_code_not_set")
     limiter.check(ip=ip)
@@ -73,8 +92,49 @@ async def register(body: RegisterBody, request: Request, db: AsyncSession = Depe
     await _check_username(db, body.username)
     user = User(username=body.username, password_hash=hash_password(body.password), is_admin=False)
     db.add(user)
+    await db.flush()
+    record(db, user, "auth.register", user.username, method="invite_code")
     await db.commit()
-    request.session[SESSION_USER_KEY] = user.id
+    sessions.sign_in(request, user.id)
+    request.app.state.notifier.emit("user_registered", username=user.username)
+    return user
+
+
+async def _register_with_invite(body: RegisterBody, request: Request, db: AsyncSession, ip: str):
+    """Sign-up with an invite link: counts one use; with ``requires_approval`` the account waits for an admin
+    (``approval_pending``, no session) and the response says so."""
+    limiter = request.app.state.limiter
+    limiter.check(ip=ip)
+    try:
+        invite = await credentials.check_invite(db, body.invite_token)
+    except CredentialError as exc:
+        limiter.failure(ip=ip)
+        raise ApiError(status.HTTP_403_FORBIDDEN, exc.code) from None
+    await _check_username(db, body.username)
+    if not await credentials.consume_invite(db, invite.id):
+        raise ApiError(status.HTTP_403_FORBIDDEN, "invite_used_up")
+    user = User(
+        username=body.username,
+        password_hash=hash_password(body.password),
+        is_admin=False,
+        approval_pending=invite.requires_approval,
+        invite_id=invite.id,
+    )
+    db.add(user)
+    await db.flush()
+    record(
+        db,
+        user,
+        "auth.register",
+        user.username,
+        method="invite",
+        invite_id=invite.id,
+        invite=invite.prefix,
+        approval_pending=invite.requires_approval,
+    )
+    await db.commit()
+    if not user.approval_pending:
+        sessions.sign_in(request, user.id)
     request.app.state.notifier.emit("user_registered", username=user.username)
     return user
 
@@ -95,7 +155,7 @@ async def _register_first_admin(body: RegisterBody, request: Request, db: AsyncS
     await db.commit()
     setup.consume()
     log.info("first admin account %r created; the setup code is no longer valid", user.username)
-    request.session[SESSION_USER_KEY] = user.id
+    sessions.sign_in(request, user.id)
     sudo.grant(request, user.id)
     return user
 
@@ -121,10 +181,12 @@ async def login(body: LoginIn, request: Request, db: AsyncSession = Depends(get_
         record(db, user, "auth.login_failed", username[:64], ip=ip)
         await db.commit()
         raise ApiError(status.HTTP_401_UNAUTHORIZED, "invalid_credentials")
-    limiter.success(username=username)
+    limiter.success(username=username, ip=ip)
     if user.disabled_at is not None:
         raise ApiError(status.HTTP_403_FORBIDDEN, "account_disabled")
-    request.session[SESSION_USER_KEY] = user.id
+    if user.approval_pending:
+        raise ApiError(status.HTTP_403_FORBIDDEN, "account_pending")
+    sessions.sign_in(request, user.id)
     sudo.grant(request, user.id)  # the password was just entered
     record(db, user, "auth.login", user.username, ip=ip)
     await db.commit()
@@ -143,12 +205,52 @@ async def me(user: User = Depends(current_user)):
 
 @router.put("/password", status_code=204)
 async def change_password(
-    body: PasswordChangeIn, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
+    body: PasswordChangeIn, request: Request, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
 ):
+    """Changes the password and signs out every other browser of this person (this one stays signed in)."""
     if not verify_password(body.old_password, user.password_hash):
         raise ApiError(status.HTTP_400_BAD_REQUEST, "invalid_credentials")
     user.password_hash = hash_password(body.new_password)
+    await sessions.revoke_user(db, user.id, "password", except_id=sessions.current_id(request))
     await db.commit()
+
+
+@router.get("/sessions", response_model=list[SessionOut])
+async def list_sessions(request: Request, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
+    """The browsers this person is signed in on (``current`` = this one)."""
+    current = sessions.current_id(request)
+    return [
+        SessionOut(
+            id=s.id,
+            created_at=s.created_at,
+            last_seen_at=s.last_seen_at,
+            expires_at=s.expires_at,
+            ip=s.ip,
+            user_agent=s.user_agent,
+            current=s.id == current,
+        )
+        for s in await sessions.active_sessions(db, user.id)
+    ]
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+async def end_session(
+    session_id: int, request: Request, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
+):
+    """Signs one of this person's browsers out (ending the current one is the same as logging out)."""
+    if not await sessions.revoke_one(db, user.id, session_id):
+        raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    await db.commit()
+    if session_id == sessions.current_id(request):
+        request.session.clear()
+
+
+@router.post("/sessions/revoke-others", response_model=RevokedOut)
+async def end_other_sessions(request: Request, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
+    """Signs out every other browser of this person ("sign out everywhere else")."""
+    n = await sessions.revoke_user(db, user.id, "revoked", except_id=sessions.current_id(request))
+    await db.commit()
+    return RevokedOut(revoked=n)
 
 
 @router.get("/sudo", response_model=SudoOut)
@@ -167,7 +269,7 @@ async def sudo_enter(body: SudoIn, request: Request, user: User = Depends(curren
     if not verify_password(body.password, user.password_hash):
         limiter.failure(username=user.username, ip=ip)
         raise ApiError(status.HTTP_401_UNAUTHORIZED, "invalid_credentials")
-    limiter.success(username=user.username)
+    limiter.success(username=user.username, ip=ip)
     return SudoOut(active=True, expires_at=_utc(sudo.grant(request, user.id)))
 
 

@@ -36,6 +36,10 @@ class User(Base):
     ical_token: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     # SSH password for dev environments (separate from the web login), as a SHA-512-crypt hash only.
     devenv_password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Signed up with an invite that asks for an admin's approval: cannot sign in until approved.
+    approval_pending: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    # The invite (``invites.id``) used to sign up; no foreign key, the invite may be deleted later.
+    invite_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class ApiKey(Base):
@@ -49,6 +53,55 @@ class ApiKey(Base):
     # Encrypted with SECRET_KEY, only while admins allow viewing keys again (setting api_key_reveal).
     key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    # security/credentials.py: api (made by its owner) | env (issued to one dev environment)
+    kind: Mapped[str] = mapped_column(String(8), default="api", server_default="api")
+    # What the key may do; "llm" = the OpenAI-compatible /v1 API. Never an admin scope (D15).
+    scope: Mapped[str] = mapped_column(String(64), default="llm", server_default="llm")
+    expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    # kind env: the dev environment the key belongs to; it stops working when the environment stops.
+    devenv_session_id: Mapped[int | None] = mapped_column(
+        ForeignKey("devenv_sessions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    last_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class LoginSession(Base):
+    """A signed-in browser (security/sessions.py). The cookie holds a random token; only its hash is stored."""
+
+    __tablename__ = "sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    data: Mapped[str] = mapped_column(Text, default="{}")  # JSON: what request.session holds
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    # logout | password | disabled | revoked | replaced
+    revoked_reason: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
+
+class Invite(Base):
+    """An invite link (``ssi-...``) admins hand out instead of the global invite code (security/credentials.py)."""
+
+    __tablename__ = "invites"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    prefix: Mapped[str] = mapped_column(String(16))
+    note: Mapped[str] = mapped_column(String(64), default="")
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    max_uses: Mapped[int] = mapped_column(Integer, default=50)
+    uses: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # People who sign up with it wait for an admin's approval before they can sign in.
+    requires_approval: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
@@ -196,6 +249,8 @@ class UsageLog(Base):
     duration_ms: Mapped[int] = mapped_column(Integer, default=0)
     status_code: Mapped[int] = mapped_column(Integer, default=200)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+    # api (an API key) | env (a dev environment's key) | playground (the web page, no key)
+    source: Mapped[str] = mapped_column(String(16), default="api", server_default="api")
 
 
 class ModelLoadEvent(Base):

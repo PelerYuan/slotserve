@@ -365,7 +365,17 @@ async def test_proxy_http_and_websocket(app, make_client, servers):
     cookie = bob.cookies.get("slotserve_session")
     base = f"http://127.0.0.1:{ss_port}"
 
-    async with httpx.AsyncClient(base_url=base, headers={"cookie": f"slotserve_session={cookie}; theme=dark"}) as c:
+    # what a browser sends for a page's own requests (security/web_origin.py: only these get the token)
+    browser = {"cookie": f"slotserve_session={cookie}; theme=dark", "sec-fetch-site": "same-origin"}
+    browser["referer"] = f"{base}{prefix}lab"
+    async with httpx.AsyncClient(base_url=base, headers={"cookie": browser["cookie"]}) as plain:
+        # without Fetch Metadata (a script, a very old browser): passed on, but without the token or app cookies
+        seen = (await plain.get(prefix + "api/x")).json()
+        assert "authorization" not in seen["headers"] and "cookie" not in seen["headers"]
+        # a page of another environment, or one that hides where it is: refused
+        r = await plain.get(prefix + "api/x", headers={"sec-fetch-site": "same-origin", "sec-fetch-mode": "cors"})
+        assert r.status_code == 403 and r.json()["detail"]["params"]["reason"] == "referer_missing"
+    async with httpx.AsyncClient(base_url=base, headers=browser) as c:
         # the app knows its base path: it gets the full path, the token, not SlotServe's cookie
         r = await c.get(prefix + "api/contents/a%20b?type=notebook", headers={"origin": base})
         assert r.status_code == 200, r.text
@@ -393,6 +403,7 @@ async def test_proxy_http_and_websocket(app, make_client, servers):
         # a port the template does not declare: a plain app that gets the prefix stripped and no token
         other = f"/devenv/{sid}/port/6006/"
         seen = (await c.get(other + "static/x.js")).json()
+        assert seen["headers"]["cookie"] == "theme=dark"
         assert seen["path"] == "/static/x.js" and "authorization" not in seen["headers"] and asked[-1] == 6006
         r = await c.get(other + "redirect")
         assert r.headers["location"] == f"/devenv/{sid}/port/6006/elsewhere?x=1"

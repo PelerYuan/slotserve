@@ -7,11 +7,11 @@ import re
 
 import pytest
 from security_helpers import client, register_admin, running_app
-from starlette.middleware.sessions import SessionMiddleware
 
 from slotserve.api.channels import WECOM_CALLBACK
 from slotserve.gateway.devenv_web_auth import WebOriginGuard
 from slotserve.security.csrf import CsrfGuard, check
+from slotserve.security.sessions import ServerSessionMiddleware
 
 UNSAFE = ("POST", "PUT", "PATCH", "DELETE")
 EXEMPT = {"/v1/{path:path}", WECOM_CALLBACK}
@@ -152,7 +152,7 @@ async def test_pages_on_the_web_port_get_their_own_message(tmp_path, monkeypatch
 
 def test_middleware_order(app):
     """CsrfGuard runs first (outermost), then WebOriginGuard, then the session middleware."""
-    assert [m.cls for m in app.user_middleware] == [CsrfGuard, WebOriginGuard, SessionMiddleware]
+    assert [m.cls for m in app.user_middleware] == [CsrfGuard, WebOriginGuard, ServerSessionMiddleware]
 
 
 @pytest.mark.parametrize(

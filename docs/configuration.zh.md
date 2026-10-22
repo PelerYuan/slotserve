@@ -78,6 +78,7 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_DEVENV_PUBLIC_PORTS` | `2300-2399` | 进阶 | 直连端口使用的宿主机端口（与 SSH 端口分开） |
 | `SLOTSERVE_DEVENV_PUBLIC_PORT_LIMIT` | `5` | 进阶 | 每人直连端口数；管理员不受限制；0 表示只有管理员 |
 | `SLOTSERVE_DEVENV_WEB_URL` | *空* | 专家 | 浏览器访问开发环境网页端口的地址，例如经过反向代理时；留空则为同一主机的 `DEVENV_WEB_PORT` |
+| `SLOTSERVE_DEVENV_WEB_COMPAT` | `false` | 专家 | 兼容模式：用于在共享网页源的环境隔离规则下无法正常工作的网页应用（会削弱环境之间的隔离） |
 | `SLOTSERVE_DEVENV_FORWARDER_IMAGE` | `alpine/socat:1.8.1.1` | 专家 | ⚠️ **以 root 身份在宿主机上执行。** 每个端口的转发容器所用镜像（PATH 中需要有 `socat`） |
 | `SLOTSERVE_DEVENV_STORAGE_DIR` | *空* | 专家 | ⚠️ **以 root 身份在宿主机上执行。** Docker 主机上存放持久数据的目录（绑定挂载）；留空则使用 Docker 命名卷。系统目录（`/etc`、`/root`、`/var/lib/docker`、`/proc`、`/sys`、`/boot`、`/usr`、`/bin`、`/lib*`、`/var/run` 等）会被拒绝 |
 
@@ -89,6 +90,9 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_HF_ENDPOINT` | `https://huggingface.co` | 常用 | Hugging Face 地址或镜像 |
 | `SLOTSERVE_HF_TOKEN` | *空* | 进阶 | 受限或私有仓库所需的 Token |
 | `SLOTSERVE_DOWNLOAD_MIN_FREE_GB` | `2` | 进阶 | 下载完成后磁盘至少保留的空间 |
+| `SLOTSERVE_PLAYGROUND_ENABLED` | `true` | 进阶 | 网页上与模型对话的试用页（使用浏览器会话，不使用密钥） |
+| `SLOTSERVE_PLAYGROUND_RATE_PER_MINUTE` | `20` | 进阶 | 每人每分钟的试用请求数；0 表示不限 |
+| `SLOTSERVE_PLAYGROUND_DEFAULT_MODEL_ONLY` | `false` | 进阶 | 试用页只使用默认模型，不使用其他已加载的模型 |
 
 ### 模型加载
 
@@ -184,6 +188,7 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_HOST` | `0.0.0.0` | 专家 | 监听地址 |
 | `SLOTSERVE_PORT` | `8000` | 专家 | 监听端口 |
 | `SLOTSERVE_COOKIE_SECURE` | `false` | 专家 | Cookie 加 `Secure` 标记；在 HTTPS 后面时设为 `true` |
+| `SLOTSERVE_FORWARDED_ALLOW_IPS` | `127.0.0.1` | 专家 | 信任其 `X-Forwarded-For` 的反向代理地址（逗号分隔，`*` 表示任意），以便登录限速和日志看到真实客户端地址 |
 | `SLOTSERVE_DATA_DIR` | `data` | 专家 | 数据库与日志目录 |
 | `SLOTSERVE_MODELS_DIR` | `models` | 专家 | 模型目录（扫描及下载目标） |
 | `SLOTSERVE_STATIC_DIR` | *内置* | 专家 | 前端构建产物目录 |

@@ -17,6 +17,12 @@ IP_FIELD = "_ip"
 AUDIT_ACTIONS = frozenset(
     {
         "auth.first_admin",
+        "user.reject",
+        "user.approve",
+        "invite.revoke",
+        "invite.create",
+        "devenv.open_as_admin",
+        "auth.register",
         "auth.login",
         "auth.login_failed",
         "backup.create",

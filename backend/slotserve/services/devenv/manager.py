@@ -12,7 +12,7 @@ import socket
 import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from http.cookiejar import CookieJar, CookiePolicy
+from http.cookiejar import CookiePolicy
 from pathlib import Path
 
 import httpx
@@ -135,11 +135,9 @@ class DevEnvManager:
     def web_client(self) -> httpx.AsyncClient:
         """The HTTP client the web proxy uses. It never keeps cookies, so nothing leaks between people."""
         if self._web_http is None:
-            self._web_http = httpx.AsyncClient(
-                timeout=httpx.Timeout(None, connect=10.0),
-                cookies=httpx.Cookies(CookieJar(policy=_NoCookies())),
-                trust_env=False,
-            )
+            self._web_http = httpx.AsyncClient(timeout=httpx.Timeout(None, connect=10.0), trust_env=False)
+            # set on the client's own jar: httpx copies a jar passed as cookies= into one with the default policy
+            self._web_http.cookies.jar.set_policy(_NoCookies())
         return self._web_http
 
     async def close(self) -> None:

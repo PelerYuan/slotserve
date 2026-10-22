@@ -78,6 +78,7 @@ Admins change every setting except the deployment parameters in **Admin → Syst
 | `SLOTSERVE_DEVENV_PUBLIC_PORTS` | `2300-2399` | advanced | Host ports for direct ports (keep apart from the SSH ports) |
 | `SLOTSERVE_DEVENV_PUBLIC_PORT_LIMIT` | `5` | advanced | Direct ports per person; admins have no limit; 0 = only admins |
 | `SLOTSERVE_DEVENV_WEB_URL` | *empty* | expert | How browsers reach the web port of dev environments, e.g. behind a reverse proxy; empty = the same host on `DEVENV_WEB_PORT` |
+| `SLOTSERVE_DEVENV_WEB_COMPAT` | `false` | expert | Compatibility mode for web apps that break on the shared web origin's rules between environments (weakens the isolation between environments) |
 | `SLOTSERVE_DEVENV_FORWARDER_IMAGE` | `alpine/socat:1.8.1.1` | expert | ⚠️ **Runs as root on the host.** Image of the per-port forwarder containers (needs `socat` on its PATH) |
 | `SLOTSERVE_DEVENV_STORAGE_DIR` | *empty* | expert | ⚠️ **Runs as root on the host.** Directory on the Docker host for persistent data (bind mounts); empty = Docker named volumes. System directories (`/etc`, `/root`, `/var/lib/docker`, `/proc`, `/sys`, `/boot`, `/usr`, `/bin`, `/lib*`, `/var/run` …) are refused |
 
@@ -89,6 +90,9 @@ Admins change every setting except the deployment parameters in **Admin → Syst
 | `SLOTSERVE_HF_ENDPOINT` | `https://huggingface.co` | basic | Hugging Face endpoint or mirror |
 | `SLOTSERVE_HF_TOKEN` | *empty* | advanced | Token for gated or private repositories |
 | `SLOTSERVE_DOWNLOAD_MIN_FREE_GB` | `2` | advanced | Disk space that must remain free after a download |
+| `SLOTSERVE_PLAYGROUND_ENABLED` | `true` | advanced | The web page's chat with a model (uses the browser session, never a key) |
+| `SLOTSERVE_PLAYGROUND_RATE_PER_MINUTE` | `20` | advanced | Playground requests per person and minute; 0 = no limit |
+| `SLOTSERVE_PLAYGROUND_DEFAULT_MODEL_ONLY` | `false` | advanced | Playground uses only the default model, never another loaded one |
 
 ### Model loading
 
@@ -184,6 +188,7 @@ Admins change every setting except the deployment parameters in **Admin → Syst
 | `SLOTSERVE_HOST` | `0.0.0.0` | expert | Listen address |
 | `SLOTSERVE_PORT` | `8000` | expert | Listen port |
 | `SLOTSERVE_COOKIE_SECURE` | `false` | expert | Mark cookies `Secure`; set `true` behind HTTPS |
+| `SLOTSERVE_FORWARDED_ALLOW_IPS` | `127.0.0.1` | expert | Reverse proxies whose `X-Forwarded-For` is trusted (comma separated, `*` = any), so sign-in throttling and logs see the real client address |
 | `SLOTSERVE_DATA_DIR` | `data` | expert | Database and logs |
 | `SLOTSERVE_MODELS_DIR` | `models` | expert | Model directory (scanned, and target of downloads) |
 | `SLOTSERVE_STATIC_DIR` | *bundled* | expert | Built frontend directory |

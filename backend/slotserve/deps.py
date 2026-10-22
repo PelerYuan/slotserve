@@ -5,8 +5,9 @@ from .db import get_db
 from .errors import ApiError
 from .orm import User
 from .security import sudo
+from .security.sessions import UID_KEY
 
-SESSION_USER_KEY = "uid"
+SESSION_USER_KEY = UID_KEY
 
 
 async def current_user(request: Request, db: AsyncSession = Depends(get_db)) -> User:
@@ -14,7 +15,7 @@ async def current_user(request: Request, db: AsyncSession = Depends(get_db)) -> 
     if uid is None:
         raise ApiError(status.HTTP_401_UNAUTHORIZED, "not_authenticated")
     user = await db.get(User, uid)
-    if user is None or user.disabled_at is not None:
+    if user is None or user.disabled_at is not None or user.approval_pending:
         request.session.clear()
         raise ApiError(status.HTTP_401_UNAUTHORIZED, "not_authenticated")
     return user

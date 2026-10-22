@@ -521,6 +521,18 @@ REGISTRY: dict[str, Editable] = {
             "浏览器访问开发环境网页端口的地址，例如经过反向代理时；留空则为同一主机的 `DEVENV_WEB_PORT`",
         ),
     ),
+    "devenv_web_compat": Editable(
+        bool,
+        group="devenv",
+        tier="expert",
+        depends_on="devenv_enabled",
+        keywords=("web", "compatibility", "兼容"),
+        doc=(
+            "Compatibility mode for web apps that break on the shared web origin's rules between environments "
+            "(weakens the isolation between environments)",
+            "兼容模式：用于在共享网页源的环境隔离规则下无法正常工作的网页应用（会削弱环境之间的隔离）",
+        ),
+    ),
     "devenv_forwarder_image": Editable(
         str,
         min=1,
@@ -587,6 +599,33 @@ REGISTRY: dict[str, Editable] = {
         group="models",
         keywords=("disk", "磁盘"),
         doc=("Disk space that must remain free after a download", "下载完成后磁盘至少保留的空间"),
+    ),
+    "playground_enabled": Editable(
+        bool,
+        group="models",
+        keywords=("playground", "chat", "试用"),
+        doc=(
+            "The web page's chat with a model (uses the browser session, never a key)",
+            "网页上与模型对话的试用页（使用浏览器会话，不使用密钥）",
+        ),
+    ),
+    "playground_rate_per_minute": Editable(
+        int,
+        min=0,
+        max=10_000,
+        unit="/min",
+        group="models",
+        depends_on="playground_enabled",
+        doc=("Playground requests per person and minute; 0 = no limit", "每人每分钟的试用请求数；0 表示不限"),
+    ),
+    "playground_default_model_only": Editable(
+        bool,
+        group="models",
+        depends_on="playground_enabled",
+        doc=(
+            "Playground uses only the default model, never another loaded one",
+            "试用页只使用默认模型，不使用其他已加载的模型",
+        ),
     ),
     # ---- runtime -----------------------------------------------------------------------------------------------
     "preload_min_minutes": Editable(
@@ -947,6 +986,18 @@ REGISTRY: dict[str, Editable] = {
         restart_required=True,
         keywords=("https",),
         doc=("Mark cookies `Secure`; set `true` behind HTTPS", "Cookie 加 `Secure` 标记；在 HTTPS 后面时设为 `true`"),
+    ),
+    "forwarded_allow_ips": Editable(
+        str,
+        group="deployment",
+        tier="expert",
+        restart_required=True,
+        keywords=("reverse proxy", "x-forwarded-for", "反向代理"),
+        doc=(
+            "Reverse proxies whose `X-Forwarded-For` is trusted (comma separated, `*` = any), so sign-in throttling "
+            "and logs see the real client address",
+            "信任其 `X-Forwarded-For` 的反向代理地址（逗号分隔，`*` 表示任意），以便登录限速和日志看到真实客户端地址",
+        ),
     ),
     "data_dir": Editable(
         str, group="deployment", tier="expert", restart_required=True, doc=("Database and logs", "数据库与日志目录")
