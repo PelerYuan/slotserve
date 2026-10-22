@@ -18,6 +18,8 @@ from pathlib import Path
 import httpx
 from sqlalchemy import func, or_, select
 
+from ...containers.model import ContainerSpec
+from ...containers.render import render
 from ...db import SessionLocal, utcnow
 from ...orm import HOLDING_STATUSES, DevProject, DevSession, DevTemplate, Lane, Reservation, SshKey, User
 from ...runtime.manager import RuntimeState
@@ -627,51 +629,53 @@ class DevEnvManager:
             device_request["Count"] = -1
         if models := await self._models_mount():
             mounts.append({"Type": "bind", "Source": models, "Target": "/models", "ReadOnly": True})
-        host_config: dict = {
-            "DeviceRequests": [device_request],
-            "Mounts": mounts,
-            "ShmSize": int(self.settings.devenv_shm_gb * 1024**3),
-            # an image that keeps its entrypoint may run an init system that has to be PID 1
-            "Init": not keep,
-            "RestartPolicy": {"Name": "no"},
-            "NetworkMode": network,
-            "PortBindings": {},
-        }
-        exposed: dict = {"22/tcp": {}}
-        for p in web["ports"]:
-            exposed[f"{p['port']}/tcp"] = {}
-            if not self.in_container:
-                # only SlotServe (on this host) reaches it; Docker picks a free port
-                host_config["PortBindings"][f"{p['port']}/tcp"] = [{"HostIp": "127.0.0.1", "HostPort": ""}]
-        if self.settings.devenv_cpus > 0:
-            host_config["NanoCpus"] = int(self.settings.devenv_cpus * 1e9)
-        if self.settings.devenv_memory_gb > 0:
-            host_config["Memory"] = int(self.settings.devenv_memory_gb * 1024**3)
-        await self.cpu.apply_resources(db, s, lane, host_config, env)  # devenv_cpu: cpuset, CPU-only limits
         labels = {LABEL: "1", "slotserve.session": str(s.id), "slotserve.kind": s.kind or "booking"}
         if user is not None:
             labels["slotserve.user"] = user.username
         if project is not None:
             labels["slotserve.project"] = str(project.id)
-        config: dict = {
-            "Image": s.image,
-            "Hostname": hostname,
-            "Env": [f"{k}={v}" for k, v in env.items()],
-            "ExposedPorts": exposed,
-            "Labels": labels,
-            "HostConfig": host_config,
-        }
+        spec = ContainerSpec(
+            name=name,
+            image=s.image,
+            kind=s.kind or "booking",
+            hostname=hostname,
+            env=env,
+            mounts=mounts,
+            devices=[device_request],
+            shm=int(self.settings.devenv_shm_gb * 1024**3),
+            # an image that keeps its entrypoint may run an init system that has to be PID 1
+            init=not keep,
+            restart="no",
+            network=network,
+            labels=labels,
+            files=files,
+            exposed=[22],
+            keep_entrypoint=keep,
+        )
+        for p in web["ports"]:
+            spec.exposed.append(p["port"])
+            if not self.in_container:
+                # only SlotServe (on this host) reaches it; Docker picks a free port
+                spec.port_bindings[f"{p['port']}/tcp"] = [{"HostIp": "127.0.0.1", "HostPort": ""}]
+        resources: dict = {"DeviceRequests": spec.devices}
+        if self.settings.devenv_cpus > 0:
+            resources["NanoCpus"] = int(self.settings.devenv_cpus * 1e9)
+        if self.settings.devenv_memory_gb > 0:
+            resources["Memory"] = int(self.settings.devenv_memory_gb * 1024**3)
+        await self.cpu.apply_resources(db, s, lane, resources, env)  # devenv_cpu: cpuset, CPU-only limits
+        spec.devices = resources.pop("DeviceRequests", None)
+        spec.memory = resources.pop("Memory", None)
+        spec.cpu = resources
         if keep:
             # the image's own entrypoint and user; SSH is added with docker exec once it runs
             if command:
-                config["Cmd"] = command
+                spec.cmd = command
         else:
-            config.update(
-                Entrypoint=["/bin/sh", "/opt/slotserve/start.sh"],
-                Cmd=command,
-                User="root",
-                WorkingDir="/" if s.kind == "shared" else "/workspace",
-            )
+            spec.entrypoint = ["/bin/sh", "/opt/slotserve/start.sh"]
+            spec.cmd = command
+            spec.user = "root"
+            spec.workdir = "/" if s.kind == "shared" else "/workspace"
+        config = render(spec)
         return Plan(name, files, config, binds, digest, network, network_labels, web, keep, sp)
 
     @staticmethod
