@@ -21,6 +21,7 @@ from ..orm import CatalogDeploy, CatalogEntryRow, DownloadTask, Lane, LlmModel, 
 from ..runtime.engines import ENGINES, parse_flags, review_args
 from . import catalog, kv, queries, scanner
 from .catalog import Entry, Variant
+from .models import sync_default_flags
 
 log = logging.getLogger(__name__)
 
@@ -264,12 +265,6 @@ async def queue_files(db: AsyncSession, settings: Settings, user_id: int, plans:
             task_id = task.id
         ids.append(task_id)
     return ids
-
-
-async def sync_default_flags(db: AsyncSession) -> None:
-    from ..api.models import sync_default_flags as sync  # local import: api imports services
-
-    await sync(db)
 
 
 class Deployer:

@@ -29,7 +29,7 @@ from ..config import Settings, get_settings
 from ..db import utcnow
 from ..errors import ApiError
 from ..orm import HOLDING_STATUSES, DevProject, Lane, Reservation, User
-from . import booking
+from . import booking, policies
 
 Kind = Literal["model", "exclusive", "devenv"]
 Window = tuple[datetime, datetime]
@@ -187,7 +187,8 @@ async def _weekly_hours_left(db: AsyncSession, s: Settings, user: User, start: d
     for s_at, e_at in rows.all():
         s_at, e_at = booking.aware(s_at), booking.aware(e_at)
         used += (min(e_at, week_end) - max(s_at, week)).total_seconds() / 3600
-    return round(max(0.0, s.quota_weekly_hours - used), 2)
+    limit = s.quota_weekly_hours + policies.extra_hours(await policies.grants(db, user.id), week, week_end)
+    return round(max(0.0, limit - used), 2)
 
 
 async def _devenv_rules(db: AsyncSession, s: Settings, req: Request, owner: User, reasons: list[Reason]) -> None:

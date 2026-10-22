@@ -5,7 +5,7 @@ Keys of dev environments (``sk-ss-env-``) are issued and ended with their enviro
 
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -54,7 +54,9 @@ async def list_keys(user: User = Depends(current_user), db: AsyncSession = Depen
 
 
 @router.post("", response_model=ApiKeyCreatedOut, status_code=201)
-async def create_key(body: ApiKeyCreateIn, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
+async def create_key(
+    body: ApiKeyCreateIn, request: Request, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
+):
     existing = (await db.execute(_own_keys(user).with_only_columns(ApiKey.id))).all()
     if len(existing) >= MAX_KEYS_PER_USER:
         raise ApiError(status.HTTP_400_BAD_REQUEST, "too_many_keys", limit=MAX_KEYS_PER_USER)
@@ -64,7 +66,7 @@ async def create_key(body: ApiKeyCreateIn, user: User = Depends(current_user), d
     key, raw = await credentials.issue_api_key(
         db, user, name=body.name.strip(), scope=body.scope, expires_at=expires_at, encrypt=encrypt
     )
-    record(db, user, "key.create", f"{user.username}/{key.name}", prefix=key.prefix, scope=key.scope)
+    record(db, user, "key.create", f"{user.username}/{key.name}", ip=request, prefix=key.prefix, scope=key.scope)
     await db.commit()
     return ApiKeyCreatedOut(**key_out(key, reveal=settings.api_key_reveal).model_dump(), key=raw)
 

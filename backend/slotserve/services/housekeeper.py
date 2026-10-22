@@ -1,8 +1,8 @@
-"""Periodic jobs: booking reminders, "ready" notices, the waitlist and disk checks."""
+"""Periodic jobs: booking reminders, "ready" notices, the waitlist, retention and the daily backup."""
 
 import asyncio
+import contextlib
 import logging
-import shutil
 from datetime import datetime, timedelta
 
 from sqlalchemy import delete, select
@@ -13,7 +13,7 @@ from ..db import SessionLocal, utcnow
 from ..errors import ApiError
 from ..orm import Reservation, SentNotification, User, WaitlistEntry
 from ..runtime.manager import RuntimeState
-from . import booking, maintenance
+from . import booking, health, maintenance
 
 log = logging.getLogger(__name__)
 
@@ -34,12 +34,19 @@ class Housekeeper:
         self.state = app_state
         self.settings: Settings = app_state.settings
         self._wake = asyncio.Event()
-        self._last_disk_check: datetime | None = None
         self._last_retention: datetime | None = None
         self._backup_failed_at: datetime | None = None
+        self._copy: asyncio.Task | None = None
+        self._backup_lock = asyncio.Lock()
 
     def poke(self) -> None:
         self._wake.set()
+
+    async def close(self) -> None:
+        if self._copy is not None and not self._copy.done():
+            self._copy.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._copy
 
     @property
     def notifier(self):
@@ -49,6 +56,7 @@ class Housekeeper:
         while True:
             try:
                 await self.tick()
+                health.heartbeat("housekeeper", every_s=INTERVAL_SECONDS)
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -66,7 +74,6 @@ class Housekeeper:
             booked = await process_waitlist(db, self.settings, self.notifier, now)
             await self._reminders(db, now)
             await self._ready(db)
-            await self._disk(db, now)
             await db.execute(delete(SentNotification).where(SentNotification.created_at < now - timedelta(days=60)))
             await db.commit()
             await self.notifier.retry_due(db)
@@ -80,16 +87,41 @@ class Housekeeper:
         await self._backup(now)
 
     async def _backup(self, now: datetime) -> None:
+        """The daily bundle and its copy off the machine; how it went is what the backup checks show."""
+        async with self._backup_lock:
+            await self._backup_locked(now)
+
+    async def _backup_locked(self, now: datetime) -> None:
         if self._backup_failed_at and now - self._backup_failed_at < timedelta(hours=1):
             return
         if not maintenance.backup_due(self.settings, now):
             return
+        devenv = getattr(self.state, "devenv", None)
+        docker = devenv.docker if devenv is not None else None
         try:
-            path = await asyncio.to_thread(maintenance.make_backup, self.settings, "daily")
-            log.info("database backup written to %s", path)
+            status = await maintenance.run_backup(self.settings, docker, offsite=False)
+            log.info("backup written: %s", status.get("last_bundle"))
         except Exception:
             self._backup_failed_at = now
-            log.exception("database backup failed")
+            log.warning("backup failed", exc_info=True)  # shown by the backup check, which alerts the admins
+        else:
+            # the copy may take minutes (a NAS, a helper container): reminders must not wait for it
+            bundle = maintenance.backup_dir(self.settings) / status["last_bundle"]
+            if self.settings.backup_target and (self._copy is None or self._copy.done()):
+                self._copy = asyncio.create_task(self._offsite(docker, bundle), name="backup-copy")
+        self._poke_health()
+
+    async def _offsite(self, docker, bundle) -> None:
+        try:
+            await maintenance.run_offsite(self.settings, docker, bundle)
+        except Exception:
+            log.exception("copying the backup off the machine failed")
+        self._poke_health()
+
+    def _poke_health(self) -> None:
+        monitor = getattr(self.state, "health", None)
+        if monitor is not None:
+            monitor.poke()
 
     async def _expire_pending(self, db: AsyncSession, now: datetime) -> None:
         """Requests still unreviewed when they would start lapse and free their time."""
@@ -144,17 +176,6 @@ class Housekeeper:
             and await once(db, f"res:{r.id}:ready:{target.spec}")
         ):
             self.notifier.emit("model_ready", user_id=r.user_id, reservation_id=r.id)
-
-    async def _disk(self, db: AsyncSession, now: datetime) -> None:
-        if self._last_disk_check and now - self._last_disk_check < timedelta(hours=1):
-            return
-        self._last_disk_check = now
-        try:
-            free_gb = shutil.disk_usage(self.settings.models_dir).free / 1e9
-        except OSError:
-            return
-        if free_gb < max(2 * self.settings.download_min_free_gb, 5) and await once(db, f"disk:{now.date()}"):
-            self.notifier.emit("disk_low", free=f"{free_gb:.1f}")
 
 
 _waitlist_lock = asyncio.Lock()

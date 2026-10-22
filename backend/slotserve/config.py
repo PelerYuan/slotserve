@@ -122,6 +122,10 @@ class Settings(BaseSettings):
     usage_busy_percent: int = 10
     audit_retention_days: int = 730
     backup_keep: int = 7
+    # Where daily backup bundles are copied off this machine: an absolute path SlotServe can write (a mounted NAS
+    # share) or storage:<id> (a storage from Admin -> Storage); empty = only data/backups (same disk).
+    backup_target: str = ""
+    backup_hour: int = 3  # local hour (timezone setting) of the daily backup; -1 = every 24 hours from the last
 
     # Dev environments: Docker containers with SSH, booked like GPU time. Off until an admin turns them on.
     devenv_enabled: bool = False

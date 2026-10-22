@@ -22,6 +22,7 @@ from ..schemas import (
 )
 from ..services import booking, queries, scanner
 from ..services.audit import record
+from ..services.models import sync_default_flags
 
 router = APIRouter(prefix="/api/models", tags=["models"])
 
@@ -281,14 +282,6 @@ async def drop_pending_args(
         model.args_pending = None
         await db.commit()
     return (await queries.model_out(db, [model], get_settings(), lanes.loaded_model_ids()))[0]
-
-
-async def sync_default_flags(db: AsyncSession) -> None:
-    """Keeps ``models.is_default`` (used for sorting) in line with the lanes' default models."""
-    ids = {mid for mid in (await db.execute(select(Lane.default_model_id))).scalars() if mid is not None}
-    await db.execute(update(LlmModel).values(is_default=False))
-    if ids:
-        await db.execute(update(LlmModel).where(LlmModel.id.in_(ids)).values(is_default=True))
 
 
 @router.post("/{model_id}/default", response_model=ModelOut)

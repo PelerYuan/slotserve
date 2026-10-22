@@ -34,7 +34,7 @@ from ...containers.harden import VERSION as HARDEN_VERSION
 from ...containers.helpers import Folder, parent_binds, q
 from ...containers.model import ContainerSpec, NodePolicy, SpecError
 from ...containers.names import placeholder_values
-from ...containers.redact import redact
+from ...containers.redact import redact_mapping
 from ...db import SessionLocal, utcnow
 from ...orm import (
     HOLDING_STATUSES,
@@ -48,7 +48,7 @@ from ...orm import (
     User,
 )
 from ...runtime.manager import RuntimeState
-from .. import storage
+from .. import maintenance, storage
 from ..devenv_cpu import CpuEnvs
 from ..docker_api import DockerClient, DockerError, tar_files
 from .constants import (
@@ -724,7 +724,7 @@ class DevEnvManager:
         except (SpecError, HardenError) as exc:
             return {"ok": False, "error": {"code": exc.code, "params": exc.params}}
         host = body["HostConfig"]
-        secrets_ = [ctx.web.get("token"), ctx.ssh.secret, ctx.ssh.host_key]
+        secrets_ = [ctx.web.get("token"), ctx.ssh.secret]
         secrets_.append(placeholder_values(0, [], ctx.web.get("token") or "")["token_sha256"])
         for st in getattr(ctx.storage, "storages", {}).values():
             with contextlib.suppress(Exception):
@@ -762,9 +762,9 @@ class DevEnvManager:
                 "log": host.get("LogConfig"),
             },
             files=sorted(spec.files),
-            body=redact(body, secrets_),
+            body=redact_mapping(body, extra=[x for x in secrets_ if x]),
         )
-        return redact(out, secrets_)
+        return redact_mapping(out, extra=[x for x in secrets_ if x])
 
     @staticmethod
     def _web_spec(s: DevSession, template: DevTemplate | None) -> dict:
@@ -1121,6 +1121,8 @@ class DevEnvManager:
             if project is not None and project.container_id == c["Id"]:
                 if c.get("State") == "running":
                     await self._pause(db, project, c["Id"])
+                continue
+            if maintenance.restore_hold(self.settings):  # [health] after a restore: keep until the report is seen
                 continue
             await self.docker.remove(c["Id"])
         projects = set((await db.execute(select(DevProject.id))).scalars())

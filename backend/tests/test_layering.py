@@ -3,10 +3,9 @@
 `api` is the outermost layer: routers call services, never the other way round. Code that a service needs from
 `api` (e.g. the booking `*_core` functions) belongs in `services/`.
 
-The check starts in report-only mode: existing violations are printed and shown as warnings, the test passes.
-Set STRICT = True once they are gone (planned with the move of `*_core` to services), or run with
-SLOTSERVE_LAYERING_STRICT=1 to see it fail now. Function-level ("lazy") imports inside the package are counted
-too, since most of them exist to hide such cycles.
+The check is strict since the booking `*_core` functions moved to `services/reservations.py` (W1-03): a new
+import of `api` from a lower layer fails the test. Function-level ("lazy") imports inside the package are counted
+and reported too, since most of them exist to hide such cycles.
 """
 
 from __future__ import annotations
@@ -20,7 +19,7 @@ from pathlib import Path
 PACKAGE = Path(__file__).resolve().parents[1] / "slotserve"
 LOWER_LAYERS = ("services", "runtime", "cluster", "gateway")
 FORBIDDEN = "slotserve.api"
-STRICT = False
+STRICT = True
 
 
 @dataclass(frozen=True)

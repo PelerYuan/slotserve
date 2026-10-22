@@ -189,11 +189,17 @@ async def test_a_taken_host_port_fails_the_start(backend):
     assert "port is already allocated" in err.value.message
 
 
-@endpoints("containers.create")
+@endpoints("containers.create", "containers.start", "containers.remove")
 async def test_create_on_a_missing_network(backend):
+    # Real Docker (28.x) accepts the create and only fails at start; either way the container never runs.
     body = backend.container(host={"NetworkMode": backend.name("no-such-network")})
+    name = backend.name("lost")
     with pytest.raises(DockerError) as err:
-        await backend.docker.create(backend.name("lost"), body)
+        await backend.docker.create(name, body)
+        try:
+            await backend.docker.start(name)
+        finally:
+            await backend.docker.remove(name)
     assert err.value.status == 404
 
 

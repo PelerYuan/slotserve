@@ -1,5 +1,6 @@
-"""Turns events into per-person messages and sends them to every chat channel a person linked,
-and selected events to group webhooks."""
+"""Turns events into per-person messages: each lands in the person's in-app inbox first (the ``notifications``
+table, ``GET /api/me/notifications``), then goes to every chat channel the person linked; selected events also go
+to group webhooks. Members only receive their own events; admins also receive the admin events (alerts, to-dos)."""
 
 import asyncio
 import json
@@ -12,7 +13,7 @@ from sqlalchemy import select
 
 from ..config import Settings
 from ..db import SessionLocal, utcnow
-from ..orm import DevProject, DevTemplate, Lane, LlmModel, ModelPreset, OutboxItem, Reservation, User
+from ..orm import DevProject, DevTemplate, Lane, LlmModel, ModelPreset, Notification, OutboxItem, Reservation, User
 
 log = logging.getLogger(__name__)
 
@@ -55,15 +56,28 @@ EVENT_PREF = {
     "storage_quota": "downloads",
     "storage_quota_admin": "admin_alerts",
     "storage_down": "admin_alerts",
+    # settings changes (services/settings_impact.py): the people a new booking rule affects, if the admin asks
+    "policy_quota_weekly_hours": "booking_changes",
+    "policy_quota_upcoming": "booking_changes",
+    "policy_max_reservation_hours": "booking_changes",
+    "policy_max_advance_days": "booking_changes",
+    "policy_approval_mode": "booking_changes",
+    "settings_sensitive": "admin_alerts",
+    # health checks (services/health.py): a check reached its alert level, or left it
+    "check_alert": "admin_alerts",
+    "check_recovered": "admin_alerts",
 }
 
 ADMIN_EVENTS = {
+    "settings_sensitive",
     "load_failed",
     "user_registered",
     "disk_low",
     "storage_quota_admin",
     "storage_down",
     "args_approval_requested",
+    "check_alert",
+    "check_recovered",
 }
 # Events that can also go to group webhooks, by the kind admins switch on (setting group_events).
 GROUP_KIND = {
@@ -72,12 +86,77 @@ GROUP_KIND = {
     "disk_low": "admin_alerts",
     "storage_quota_admin": "admin_alerts",
     "storage_down": "admin_alerts",
+    "settings_sensitive": "admin_alerts",
     "fallback_admin": "admin_alerts",
+    "check_alert": "admin_alerts",
+    "check_recovered": "admin_alerts",
     "approval_requested": "approvals",
     "args_approval_requested": "approvals",
     "announcement": "announcements",
 }
 RETRY_SECONDS = (30, 120, 600, 1800, 7200)  # then the message is dropped
+
+# In-app inbox: level of each event (info by default) and the page it links to.
+INBOX_LEVEL = {
+    "devenv_failed": "error",
+    "booking_cancelled": "warn",
+    "booking_released": "warn",
+    "booking_rejected": "warn",
+    "booking_expired": "warn",
+    "fallback": "warn",
+    "download_failed": "error",
+    "storage_quota": "warn",
+    "load_failed": "error",
+    "fallback_admin": "warn",
+    "disk_low": "warn",
+    "storage_quota_admin": "warn",
+    "storage_down": "error",
+    "approval_requested": "warn",
+    "args_approval_requested": "warn",
+    "check_alert": "error",
+    "model_ready": "success",
+    "exclusive_ready": "success",
+    "devenv_ready": "success",
+    "booking_approved": "success",
+    "waitlist_booked": "success",
+    "download_done": "success",
+    "check_recovered": "success",
+}
+INBOX_LINK = {
+    "devenv_ready": "/devenv",
+    "devenv_failed": "/devenv",
+    "storage_quota": "/devenv",
+    "download_done": "/models",
+    "download_failed": "/models",
+    "args_approval_requested": "/models",
+    "waitlist_free": "/schedule",
+    "approval_requested": "/admin?tab=reservations",
+    "load_failed": "/admin?tab=runtime",
+    "fallback_admin": "/admin?tab=runtime",
+    "user_registered": "/admin?tab=users",
+    "storage_down": "/admin?tab=storage",
+    "storage_quota_admin": "/admin?tab=storage",
+    "disk_low": "/admin",
+    "check_alert": "/admin",
+    "check_recovered": "/admin",
+}
+# Inbox group "admin" (alerts and to-dos only admins receive); everything else is "personal".
+ADMIN_CATEGORY = ADMIN_EVENTS | {"approval_requested", "fallback_admin"}
+
+
+def inbox_link(event: str, data: dict) -> str | None:
+    if event in INBOX_LINK:
+        return INBOX_LINK[event]
+    if data.get("reservation_id") is not None:
+        return f"/schedule?reservation={data['reservation_id']}"
+    return None
+
+
+def _json_params(data: dict) -> str:
+    """The event's parameters for the inbox, JSON-safe."""
+    out = {k: v if isinstance(v, str | int | float | bool) or v is None else str(v) for k, v in data.items()}
+    return json.dumps(out, ensure_ascii=False)
+
 
 MESSAGES: dict[str, dict[str, str]] = {
     "en": {
@@ -121,6 +200,17 @@ MESSAGES: dict[str, dict[str, str]] = {
         "reject": "Reject",
         "announcement": "📢 {text}",
         "review_on_web": " Review it in SlotServe.",
+        "policy_quota_weekly_hours": "ℹ️ An admin set the weekly booking limit to {after} hours. Your bookings are "
+        "kept; new bookings and changes must fit the new limit.",
+        "policy_quota_upcoming": "ℹ️ An admin set the number of open bookings per person to {after}. Your bookings "
+        "are kept; new bookings must fit the new limit.",
+        "policy_max_reservation_hours": "ℹ️ An admin set the longest booking to {after} hours. Your bookings are "
+        "kept; changes to them must fit the new limit.",
+        "policy_max_advance_days": "ℹ️ An admin set how far ahead you can book to {after} days. Your bookings are kept.",
+        "policy_approval_mode": "ℹ️ An admin changed which bookings need approval. Your bookings are kept.",
+        "settings_sensitive": "⚠️ {by} changed settings that can run commands on the host: {keys}.",
+        "check_alert": "🚨 {title_en}{detail}",
+        "check_recovered": "✅ Back to normal: {title_en}",
     },
     "zh-CN": {
         "reminder_start": "⏰ 你的预约将在 {start} 开始：{what}。",
@@ -161,6 +251,17 @@ MESSAGES: dict[str, dict[str, str]] = {
         "reject": "拒绝",
         "announcement": "📢 {text}",
         "review_on_web": "请到 SlotServe 审批。",
+        "policy_quota_weekly_hours": "ℹ️ 管理员把每人每周可预约时长设为 {after} 小时。你已有的预约保留不变；"
+        "新预约和修改需符合新上限。",
+        "policy_quota_upcoming": "ℹ️ 管理员把每人可持有的未结束预约数设为 {after}。你已有的预约保留不变；"
+        "新预约需符合新上限。",
+        "policy_max_reservation_hours": "ℹ️ 管理员把单次预约最长时长设为 {after} 小时。你已有的预约保留不变；"
+        "修改时需符合新上限。",
+        "policy_max_advance_days": "ℹ️ 管理员把最多可提前预约的天数设为 {after} 天。你已有的预约保留不变。",
+        "policy_approval_mode": "ℹ️ 管理员调整了需要审批的预约范围。你已有的预约保留不变。",
+        "settings_sensitive": "⚠️ {by} 修改了可在宿主机上执行命令的设置：{keys}。",
+        "check_alert": "🚨 {title_zh}{detail}",
+        "check_recovered": "✅ 已恢复正常：{title_zh}",
     },
 }
 
@@ -274,7 +375,7 @@ class Notifier:
                     await db.execute(select(User).where(User.is_admin.is_(True), User.disabled_at.is_(None)))
                 ).scalars()
                 for admin in admins:
-                    await self._deliver(db, admin, event, text(admin, event, **_clean(data)))
+                    await self._deliver(db, admin, event, text(admin, event, **_clean(data)), data=data)
                 await self._to_groups(event, lambda who: text(who, event, **_clean(data)))
                 return
             if event == "announcement":
@@ -314,7 +415,7 @@ class Notifier:
                             (text(user, "release"), f"rel:{r.id}"),
                         ]
                     ]
-            await self._deliver(db, user, event, text(user, event, **params), buttons)
+            await self._deliver(db, user, event, text(user, event, **params), buttons, data=data)
 
     async def _approval_requested(self, db, data: dict) -> None:
         r = await db.get(Reservation, data["reservation_id"])
@@ -336,7 +437,7 @@ class Notifier:
         admins = (await db.execute(select(User).where(User.is_admin.is_(True), User.disabled_at.is_(None)))).scalars()
         for admin in admins:
             buttons = [[(text(admin, "approve"), f"apr:{r.id}"), (text(admin, "reject"), f"rej:{r.id}")]]
-            await self._deliver(db, admin, "approval_requested", await message(admin), buttons)
+            await self._deliver(db, admin, "approval_requested", await message(admin), buttons, data=data)
         group = _Locale(self.settings.chat_default_locale)
         if self._group_targets("approval_requested"):
             body = await message(group) + text(group, "review_on_web")
@@ -346,16 +447,20 @@ class Notifier:
         owner = await db.get(User, data["user_id"])
         params = {"model": data.get("model"), "default": data.get("default"), "user": owner.username if owner else "?"}
         if owner is not None:
-            await self._deliver(db, owner, "fallback", text(owner, "fallback", **params))
+            await self._deliver(db, owner, "fallback", text(owner, "fallback", **params), data=data)
         admins = (await db.execute(select(User).where(User.is_admin.is_(True), User.disabled_at.is_(None)))).scalars()
         for admin in admins:
             if owner is None or admin.id != owner.id:
-                await self._deliver(db, admin, "fallback_admin", text(admin, "fallback_admin", **params))
+                await self._deliver(db, admin, "fallback_admin", text(admin, "fallback_admin", **params), data=data)
         await self._to_groups("fallback_admin", lambda who: text(who, "fallback_admin", **params))
 
-    async def _deliver(self, db, user: User, event: str, message: str, buttons=None) -> None:
-        """Sends to every chat channel the person linked and did not switch off."""
-        if user.disabled_at is not None or self.hub is None:
+    async def _deliver(self, db, user: User, event: str, message: str, buttons=None, *, data: dict | None = None):
+        """Writes the message to the person's in-app inbox, then sends it to every chat channel the person linked
+        and did not switch off (the notification preferences only govern chat platforms)."""
+        if user.disabled_at is not None:
+            return
+        await self._to_inbox(db, user, event, message, data or {})
+        if self.hub is None:
             return
         if not prefs(user).get(EVENT_PREF.get(event, "admin_alerts"), True):
             return
@@ -365,6 +470,26 @@ class Notifier:
             del self.sent[:-200]
             if not await channel.send(address, message, buttons, locale=locale):
                 await self._queue_retry(channel.id, address, message, buttons, locale)
+
+    async def _to_inbox(self, db, user: User, event: str, message: str, data: dict) -> None:
+        try:
+            db.add(
+                Notification(
+                    user_id=user.id,
+                    event=event,
+                    category="admin" if event in ADMIN_CATEGORY else "personal",
+                    level=INBOX_LEVEL.get(event, "info"),
+                    title_key=event,
+                    params_json=_json_params(data),
+                    message=message,
+                    link=inbox_link(event, data),
+                    interruption_id=data.get("interruption_id"),
+                )
+            )
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            log.exception("could not write %s to the inbox of user %s", event, user.id)
 
     # ---- group webhooks ---------------------------------------------------------
 

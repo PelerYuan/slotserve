@@ -40,7 +40,7 @@ async def test_create_reset_and_delete_user(make_client):
     names = [u["username"] for u in (await admin.get("/api/admin/users")).json()]
     assert "carol" not in names
 
-    actions = [e["action"] for e in (await admin.get("/api/admin/audit")).json()["items"]]
+    actions = [e["action"] for e in (await admin.get("/api/admin/audit?action=user.*")).json()["items"]]
     assert actions[:3] == ["user.delete", "user.reset_password", "user.create"]
 
 
@@ -125,7 +125,7 @@ async def test_settings_override_and_reset(make_client):
     items = (await admin.get("/api/admin/audit")).json()["items"]
     assert items[0]["action"] == "auth.register" and items[0]["detail"]["method"] == "invite_code"
     audit = items[1]
-    assert audit["action"] == "settings.update" and audit["detail"]["invite_code"] == "***"
+    assert audit["action"] == "settings.update" and audit["detail"]["after"]["invite_code"].startswith("fp:")
 
 
 async def test_stats(make_client):

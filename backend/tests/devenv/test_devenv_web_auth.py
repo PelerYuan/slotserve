@@ -8,6 +8,7 @@ from sqlalchemy import select
 from test_v09_devenv import _book, _setup, _ticks
 
 from slotserve.containers.contributors.web import code_server_cookie
+from slotserve.containers.redact import MASK
 from slotserve.db import SessionLocal
 from slotserve.gateway.devenv_web import Target, _forward_headers
 from slotserve.orm import User
@@ -108,8 +109,8 @@ async def test_preview_is_redacted(app, make_client):
         bob_hash = (await db.execute(select(User.devenv_password_hash).where(User.username == "bob"))).scalar_one()
     assert bob_hash not in text and "smb-secret-pw" not in text and "$6$" not in text
     env = dict(e.split("=", 1) for e in p["body"]["Env"])
-    assert env["SLOTSERVE_WEB_TOKEN"] == "***" and env["JUPYTER_TOKEN"] == "***"
-    assert "token=***" in p["body"]["Cmd"][2]  # the token inside the command line, too
+    assert env["SLOTSERVE_WEB_TOKEN"] == MASK and env["JUPYTER_TOKEN"] == MASK
+    assert f"token={MASK}" in p["body"]["Cmd"][2]  # the token inside the command line, too
     assert len(docker.created) == created  # nothing was created
     assert (await bob.get("/api/devenv/sessions")).json() == []
 
