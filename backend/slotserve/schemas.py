@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -34,6 +35,8 @@ class UserOut(ORMModel):
     is_admin: bool
     created_at: datetime
     locale: str | None = None
+    # Signed up with an invite that needs approval: not signed in, waits for an admin.
+    approval_pending: bool = False
 
 
 class PreferencesIn(BaseModel):
@@ -70,6 +73,10 @@ class AdminPasswordIn(BaseModel):
 
 class ApiKeyCreateIn(BaseModel):
     name: str = Field(min_length=1, max_length=64)
+    # What the key may do: only "llm" (the /v1 API) exists; there is never an admin scope (D15).
+    scope: Literal["llm"] = "llm"
+    # Days until the key stops working; None = it does not expire.
+    expires_in_days: int | None = Field(default=None, ge=1, le=3650)
 
 
 class ApiKeyOut(ORMModel):
@@ -79,6 +86,11 @@ class ApiKeyOut(ORMModel):
     created_at: datetime
     last_used_at: datetime | None
     revealable: bool = False  # the owner can view the full key again
+    kind: str = "api"  # api | env (a dev environment's key, security/credentials.py)
+    scope: str = "llm"
+    expires_at: datetime | None = None
+    expired: bool = False
+    last_ip: str | None = None
 
 
 class ApiKeyRevealOut(BaseModel):
@@ -403,6 +415,7 @@ class RequestLogOut(BaseModel):
     duration_ms: int
     prompt_tokens: int
     completion_tokens: int
+    source: str = "api"  # api | env | playground
 
 
 class RequestPageOut(BaseModel):

@@ -35,6 +35,7 @@ def serve() -> None:
         host=settings.host,
         port=settings.port,
         proxy_headers=True,
+        forwarded_allow_ips=settings.forwarded_allow_ips,
         log_level="info",
         # Open streams (live logs, long generations) must not keep a restart waiting.
         timeout_graceful_shutdown=5,
@@ -46,7 +47,7 @@ async def _update_user(username: str, *, password: str | None = None, admin: boo
 
     from . import db
     from .orm import User
-    from .security import hash_password
+    from .security import hash_password, sessions
 
     settings = get_settings()
     settings.data_dir.mkdir(parents=True, exist_ok=True)
@@ -63,6 +64,7 @@ async def _update_user(username: str, *, password: str | None = None, admin: boo
                 return False
             if password is not None:
                 user.password_hash = hash_password(password)
+                await sessions.revoke_user(session, user.id, "password")  # signed-in browsers must sign in again
             if admin is not None:
                 user.is_admin = admin
             await session.commit()

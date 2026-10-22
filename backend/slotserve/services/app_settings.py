@@ -124,6 +124,9 @@ EDITABLE: dict[str, Editable] = {
     "backup_keep": Editable(int, min=0, max=100),
     "backup_target": Editable(str, max=500),
     "backup_hour": Editable(int, min=-1, max=23, unit="h"),
+    "playground_enabled": Editable(bool),
+    "playground_rate_per_minute": Editable(int, min=0, max=10_000, unit="/min"),
+    "playground_default_model_only": Editable(bool),
 }
 
 # Changing one of these restarts the Telegram bot.

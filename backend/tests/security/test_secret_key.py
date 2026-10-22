@@ -8,7 +8,6 @@ import stat
 import pytest
 from itsdangerous import TimestampSigner
 from security_helpers import client, register_admin, running_app
-from starlette.middleware.sessions import SessionMiddleware
 
 from slotserve.config import Settings
 from slotserve.security import decrypt_api_key, encrypt_api_key
@@ -20,11 +19,6 @@ def forged_cookie(key: str, uid: int = 1) -> str:
     return TimestampSigner(key).sign(base64.b64encode(json.dumps({"uid": uid}).encode())).decode()
 
 
-def session_key_of(app) -> str:
-    (mw,) = [m for m in app.user_middleware if m.cls is SessionMiddleware]
-    return mw.kwargs["secret_key"]
-
-
 @pytest.mark.parametrize("value", [None, "change-me", "", "  "])
 async def test_unset_or_default_key_is_generated(tmp_path, monkeypatch, value):
     async with running_app(tmp_path, monkeypatch, SLOTSERVE_SECRET_KEY=value) as app:
@@ -32,7 +26,7 @@ async def test_unset_or_default_key_is_generated(tmp_path, monkeypatch, value):
         assert path.is_file()
         key = path.read_text().strip()
         assert len(key) >= 40 and key != "change-me"
-        assert app.state.settings.secret_key == key == session_key_of(app)
+        assert app.state.settings.secret_key == key
         if os.name != "nt":
             assert stat.S_IMODE(path.stat().st_mode) == 0o600
     # a restart keeps the key (sessions and encrypted copies stay valid)
@@ -42,7 +36,7 @@ async def test_unset_or_default_key_is_generated(tmp_path, monkeypatch, value):
 
 async def test_explicit_key_wins_and_no_file_is_written(tmp_path, monkeypatch):
     async with running_app(tmp_path, monkeypatch, SLOTSERVE_SECRET_KEY="configured-in-dot-env") as app:
-        assert app.state.settings.secret_key == "configured-in-dot-env" == session_key_of(app)
+        assert app.state.settings.secret_key == "configured-in-dot-env"
         assert not (tmp_path / "data" / "secret_key").exists()
 
 
@@ -53,15 +47,17 @@ async def test_explicit_key_wins_over_an_existing_file(tmp_path, monkeypatch):
         assert app.state.settings.secret_key == "configured-in-dot-env"
 
 
-@pytest.mark.parametrize("configured", [None, "configured-in-dot-env"])
+@pytest.mark.parametrize("configured", [None, "configured-in-dot-env", "change-me"])
 async def test_cookie_signed_with_change_me_is_refused(tmp_path, monkeypatch, configured):
+    """Signed cookies of the old stateless sessions mean nothing now: sessions live in the database."""
     async with running_app(tmp_path, monkeypatch, SLOTSERVE_SECRET_KEY=configured) as app:
         async with client(app) as admin:
             await register_admin(app, admin)
             assert (await admin.get("/api/auth/me")).json()["is_admin"] is True
-        async with client(app, cookies={"slotserve_session": forged_cookie("change-me")}) as forger:
-            assert (await forger.get("/api/auth/me")).status_code == 401
-            assert (await forger.get("/api/admin/settings")).status_code == 401
+        for key in ("change-me", app.state.settings.secret_key):
+            async with client(app, cookies={"slotserve_session": forged_cookie(key)}) as forger:
+                assert (await forger.get("/api/auth/me")).status_code == 401
+                assert (await forger.get("/api/admin/settings")).status_code == 401
 
 
 def test_resolve_leaves_settings_alone_for_explicit_keys(tmp_path):
