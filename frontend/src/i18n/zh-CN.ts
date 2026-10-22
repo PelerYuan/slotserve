@@ -1261,7 +1261,6 @@ const zh: typeof en = {
         model_args_update: '修改模型参数',
         auth_login: '登录',
         auth_login_failed: '登录失败',
-        key_create: '新建 API 密钥',
         ssh_key_add: '添加 SSH 公钥',
         ssh_key_remove: '删除 SSH 公钥',
         backup_download: '下载备份',

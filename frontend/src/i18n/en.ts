@@ -1262,7 +1262,6 @@ export default {
         model_args_update: 'Changed model arguments',
         auth_login: 'Signed in',
         auth_login_failed: 'Failed sign-in',
-        key_create: 'Created API key',
         ssh_key_add: 'Added SSH key',
         ssh_key_remove: 'Removed SSH key',
         backup_download: 'Downloaded backup',
