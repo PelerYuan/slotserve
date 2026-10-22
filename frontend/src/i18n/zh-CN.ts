@@ -1247,6 +1247,8 @@ const zh: typeof en = {
         storage_create: '添加存储',
         storage_update: '修改存储',
         storage_delete: '删除存储',
+        model_args_request: '申请模型参数',
+        model_args_update: '修改模型参数',
       },
       allGpus: '全部可见 GPU',
     },

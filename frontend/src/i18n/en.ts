@@ -1248,6 +1248,8 @@ export default {
         storage_create: 'Added storage',
         storage_update: 'Changed storage',
         storage_delete: 'Deleted storage',
+        model_args_request: 'Asked for model arguments',
+        model_args_update: 'Changed model arguments',
       },
       allGpus: 'all visible GPUs',
     },
