@@ -18,11 +18,37 @@ import urllib.request
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import Browser, Page, sync_playwright
+from playwright.sync_api import Browser, sync_playwright
+
+from helpers import INVITE, PASSWORD, sign_in
 
 ROOT = Path(__file__).resolve().parents[1]
-INVITE = "e2e-invite"
-PASSWORD = "e2e-pass-123"
+
+# The tests share one server and build on each other (the first sign-up becomes the admin and sets the default
+# model; later tests add a second lane), so modules run in this order. Modules not listed run afterwards, in
+# the usual order; new test files should not depend on anything but `test_setup.py`.
+MODULE_ORDER = (
+    "test_setup.py",
+    "test_gateway.py",
+    "test_schedule.py",
+    "test_admin.py",
+    "test_lanes.py",
+    "test_usage.py",
+    "test_channels.py",
+    "test_devenv.py",
+    "test_models.py",
+)
+
+# Tests import these from helpers.py; re-exported for tests written against the old conftest.
+__all__ = ["INVITE", "PASSWORD", "sign_in"]
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    def rank(item: pytest.Item) -> int:
+        name = item.path.name
+        return MODULE_ORDER.index(name) if name in MODULE_ORDER else len(MODULE_ORDER)
+
+    items.sort(key=rank)  # stable: keeps the order inside each module
 
 
 def _free_port() -> int:
@@ -105,12 +131,3 @@ def page(browser: Browser):
     pg.errors = errors  # type: ignore[attr-defined]
     yield pg
     ctx.close()
-
-
-def sign_in(page: Page, base: str, username: str, password: str = PASSWORD) -> None:
-    page.goto(f"{base}/login")
-    page.get_by_role("tab", name="Sign in").click()
-    page.locator("input").nth(0).fill(username)
-    page.locator("input").nth(1).fill(password)
-    page.get_by_role("button", name="Sign in", exact=True).last.click()
-    page.wait_for_url(f"{base}/")
