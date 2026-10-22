@@ -333,7 +333,10 @@ REGISTRY: dict[str, Editable] = {
         tier="basic",
         card="devenv",
         depends_on="devenv_cpu_enabled",
-        doc=("Memory one environment without a GPU may use (0 = no limit)", "单个无 GPU 环境可用的内存（0 表示不限）"),
+        doc=(
+            "Memory one environment without a GPU may use (0 = the host's memory less max(4 GB, 10 %))",
+            "单个无 GPU 环境可用的内存（0 表示主机内存减去 max(4 GB, 10%)）",
+        ),
     ),
     "devenv_cpu_memory_pool_gb": Editable(
         float,
@@ -407,7 +410,23 @@ REGISTRY: dict[str, Editable] = {
         unit="GB",
         group="devenv",
         depends_on="devenv_enabled",
-        doc=("Memory limit of one environment with a GPU (0 = no limit)", "单个 GPU 环境的内存上限（0 表示不限）"),
+        doc=(
+            "Memory limit of one environment with a GPU (0 = the host's memory less max(4 GB, 10 %))",
+            "单个 GPU 环境的内存上限（0 表示主机内存减去 max(4 GB, 10%)）",
+        ),
+    ),
+    "devenv_pids_limit": Editable(
+        int,
+        min=64,
+        max=1048576,
+        group="devenv",
+        tier="expert",
+        depends_on="devenv_enabled",
+        keywords=("pids", "fork", "进程"),
+        doc=(
+            "Processes one dev environment may run at once (a fork bomb stays inside its container)",
+            "单个开发环境可同时运行的进程数（fork 炸弹只影响它自己的容器）",
+        ),
     ),
     "devenv_shm_gb": Editable(
         float,
@@ -1107,8 +1126,9 @@ REGISTRY: dict[str, Editable] = {
         tier="expert",
         restart_required=True,
         doc=(
-            "Image of the short-lived containers that check storages from **Admin → Storage** (pulled when missing)",
-            "检查**管理 → 存储**中各存储的临时容器所用的镜像（缺少时自动拉取）",
+            "Image of the short-lived helper containers that check storages and create folders on them (never a"
+            " person's image; pulled when missing)",
+            "检查存储并在其中创建目录的临时辅助容器所用的镜像（从不使用个人的镜像；缺少时自动拉取）",
         ),
     ),
     "storage_check_minutes": Editable(

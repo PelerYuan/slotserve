@@ -59,14 +59,15 @@ Admins change every setting except the deployment parameters in **Admin → Syst
 | `SLOTSERVE_DEVENV_CPU_ENABLED` | `true` | advanced | Let people start dev environments without a GPU (no booking) |
 | `SLOTSERVE_DEVENV_CPU_PER_USER` | `2` | basic | Environments without a GPU one person can run at once |
 | `SLOTSERVE_DEVENV_CPU_CORES` | `4` | basic | CPU cores one environment without a GPU may use (0 = the whole shared pool) |
-| `SLOTSERVE_DEVENV_CPU_MEMORY_GB` | `16` | basic | Memory one environment without a GPU may use (0 = no limit) |
+| `SLOTSERVE_DEVENV_CPU_MEMORY_GB` | `16` | basic | Memory one environment without a GPU may use (0 = the host's memory less max(4 GB, 10 %)) |
 | `SLOTSERVE_DEVENV_CPU_MEMORY_POOL_GB` | `0` | expert | Memory all environments without a GPU may claim together (0 = no limit) |
 | `SLOTSERVE_DEVENV_CPU_CORES_PER_GPU` | `8` | expert | CPU cores each lane reserves per GPU for its bookings (cpuset); 0 = none |
 | `SLOTSERVE_DEVENV_SSH_HOST` | *empty* | advanced | Host name shown in ssh commands; empty = the address the browser uses |
 | `SLOTSERVE_DEVENV_SSH_PORTS` | `2200-2299` | advanced | Host ports given to dev environments |
 | `SLOTSERVE_DEVENV_PASSWORD_LOGIN` | `true` | advanced | Allow SSH logins with the environment password as well as keys |
 | `SLOTSERVE_DEVENV_CPUS` | `0` | advanced | CPU limit of one environment with a GPU (0 = no limit) |
-| `SLOTSERVE_DEVENV_MEMORY_GB` | `0` | advanced | Memory limit of one environment with a GPU (0 = no limit) |
+| `SLOTSERVE_DEVENV_MEMORY_GB` | `0` | advanced | Memory limit of one environment with a GPU (0 = the host's memory less max(4 GB, 10 %)) |
+| `SLOTSERVE_DEVENV_PIDS_LIMIT` | `4096` | expert | Processes one dev environment may run at once (a fork bomb stays inside its container) |
 | `SLOTSERVE_DEVENV_SHM_GB` | `8` | advanced | Shared memory (`/dev/shm`) of one environment |
 | `SLOTSERVE_DEVENV_CUSTOM_IMAGES` | `true` | advanced | Let people create templates from any image |
 | `SLOTSERVE_DEVENV_ALLOWED_REGISTRIES` | *empty* | advanced | Comma-separated registries images may come from; empty = any |
@@ -200,7 +201,7 @@ Admins change every setting except the deployment parameters in **Admin → Syst
 | `SLOTSERVE_DOCKER_HOST` | `unix:///var/run/docker.sock` | expert | ⚠️ **Runs as root on the host.** Docker (or Podman) API used for dev environments |
 | `SLOTSERVE_DROPBEAR_PATH` | `/opt/slotserve/bin/dropbearmulti` | expert | Static Dropbear (`dropbearmulti`) copied into each dev environment; bundled in the image |
 | `SLOTSERVE_DEVENV_WEB_PORT` | `8001` | expert | Port of the dev environment web interfaces, a separate origin (0 = serve them on `PORT`, not recommended) |
-| `SLOTSERVE_STORAGE_HELPER_IMAGE` | `busybox:1.37` | expert | Image of the short-lived containers that check storages from **Admin → Storage** (pulled when missing) |
+| `SLOTSERVE_STORAGE_HELPER_IMAGE` | `busybox:1.37` | expert | Image of the short-lived helper containers that check storages and create folders on them (never a person's image; pulled when missing) |
 | `SLOTSERVE_STORAGE_CHECK_MINUTES` | `30` | expert | How often storages are checked (free space, per-person usage); 0 = only on demand |
 | `SLOTSERVE_TELEGRAM_API_BASE` | `https://api.telegram.org` | expert | Telegram Bot API address, for a self-hosted Bot API server |
 | `SLOTSERVE_DINGTALK_API_BASE` | `https://api.dingtalk.com` | expert | DingTalk API address (only for proxies or testing) |

@@ -59,14 +59,15 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_DEVENV_CPU_ENABLED` | `true` | 进阶 | 允许以无 GPU 模式启动开发环境（无需预约） |
 | `SLOTSERVE_DEVENV_CPU_PER_USER` | `2` | 常用 | 每人同时可运行的无 GPU 环境数 |
 | `SLOTSERVE_DEVENV_CPU_CORES` | `4` | 常用 | 单个无 GPU 环境可用的 CPU 核心数（0 表示整个共享池） |
-| `SLOTSERVE_DEVENV_CPU_MEMORY_GB` | `16` | 常用 | 单个无 GPU 环境可用的内存（0 表示不限） |
+| `SLOTSERVE_DEVENV_CPU_MEMORY_GB` | `16` | 常用 | 单个无 GPU 环境可用的内存（0 表示主机内存减去 max(4 GB, 10%)） |
 | `SLOTSERVE_DEVENV_CPU_MEMORY_POOL_GB` | `0` | 专家 | 所有无 GPU 环境合计可占用的内存（0 表示不限） |
 | `SLOTSERVE_DEVENV_CPU_CORES_PER_GPU` | `8` | 专家 | 每个通道按每块 GPU 为其预约保留的 CPU 核心数（cpuset）；0 表示不保留 |
 | `SLOTSERVE_DEVENV_SSH_HOST` | *空* | 进阶 | ssh 命令中显示的主机名；留空则使用浏览器访问的地址 |
 | `SLOTSERVE_DEVENV_SSH_PORTS` | `2200-2299` | 进阶 | 分配给开发环境的宿主机端口 |
 | `SLOTSERVE_DEVENV_PASSWORD_LOGIN` | `true` | 进阶 | 除公钥外也允许用环境密码 SSH 登录 |
 | `SLOTSERVE_DEVENV_CPUS` | `0` | 进阶 | 单个 GPU 环境的 CPU 上限（0 表示不限） |
-| `SLOTSERVE_DEVENV_MEMORY_GB` | `0` | 进阶 | 单个 GPU 环境的内存上限（0 表示不限） |
+| `SLOTSERVE_DEVENV_MEMORY_GB` | `0` | 进阶 | 单个 GPU 环境的内存上限（0 表示主机内存减去 max(4 GB, 10%)） |
+| `SLOTSERVE_DEVENV_PIDS_LIMIT` | `4096` | 专家 | 单个开发环境可同时运行的进程数（fork 炸弹只影响它自己的容器） |
 | `SLOTSERVE_DEVENV_SHM_GB` | `8` | 进阶 | 单个环境的共享内存（`/dev/shm`） |
 | `SLOTSERVE_DEVENV_CUSTOM_IMAGES` | `true` | 进阶 | 允许用户用任意镜像新建模板 |
 | `SLOTSERVE_DEVENV_ALLOWED_REGISTRIES` | *空* | 进阶 | 允许的镜像仓库，逗号分隔；留空表示不限 |
@@ -200,7 +201,7 @@ SlotServe 读取 `SLOTSERVE_*` 环境变量，或工作目录下的 `.env` 文�
 | `SLOTSERVE_DOCKER_HOST` | `unix:///var/run/docker.sock` | 专家 | ⚠️ **以 root 身份在宿主机上执行。** 开发环境使用的 Docker（或 Podman）接口 |
 | `SLOTSERVE_DROPBEAR_PATH` | `/opt/slotserve/bin/dropbearmulti` | 专家 | 复制进每个开发环境的静态 Dropbear（`dropbearmulti`）；镜像中已自带 |
 | `SLOTSERVE_DEVENV_WEB_PORT` | `8001` | 专家 | 开发环境网页界面的端口，作为独立的源（0 表示在 `PORT` 上提供，不推荐） |
-| `SLOTSERVE_STORAGE_HELPER_IMAGE` | `busybox:1.37` | 专家 | 检查**管理 → 存储**中各存储的临时容器所用的镜像（缺少时自动拉取） |
+| `SLOTSERVE_STORAGE_HELPER_IMAGE` | `busybox:1.37` | 专家 | 检查存储并在其中创建目录的临时辅助容器所用的镜像（从不使用个人的镜像；缺少时自动拉取） |
 | `SLOTSERVE_STORAGE_CHECK_MINUTES` | `30` | 专家 | 多久检查一次存储（可用空间、每人用量）；0 表示只在手动检查时 |
 | `SLOTSERVE_TELEGRAM_API_BASE` | `https://api.telegram.org` | 专家 | Telegram Bot API 地址，用于自建的 Bot API 服务 |
 | `SLOTSERVE_DINGTALK_API_BASE` | `https://api.dingtalk.com` | 专家 | 钉钉 API 地址（仅用于代理或测试） |

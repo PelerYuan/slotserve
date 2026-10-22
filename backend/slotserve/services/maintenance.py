@@ -351,6 +351,7 @@ def _q(text: str) -> str:
 async def copy_to_storage(docker, settings: Settings, st: Storage, bundle: Path, keep: int) -> str:
     """Copies a bundle onto a managed storage through a helper container (the storage helper image); the bundle
     goes in as an archive, so SlotServe never needs the storage mounted itself."""
+    from ..containers import helpers
     from . import storage as storage_mod
 
     image = settings.storage_helper_image
@@ -383,14 +384,8 @@ async def copy_to_storage(docker, settings: Settings, st: Storage, bundle: Path,
     mount, volumes = storage_mod._helper_mount(st, settings.secret_key, "/dst")
     await storage_mod.ensure_volumes(docker, volumes)
     archive = await asyncio.to_thread(_tar_dir, bundle, f"incoming/{name}")
-    config = {
-        "Image": image,
-        "Entrypoint": ["/bin/sh", "-c", script],
-        "Cmd": [],
-        "User": "root",
-        "Labels": {storage_mod.LABEL: "helper"},
-        "HostConfig": {"Mounts": [mount]},
-    }
+    # a helper like the storage ones: hardened (containers/harden.py), SlotServe's helper image
+    config = helpers.helper_body(helpers.helper_spec(image, script, label_key=storage_mod.LABEL, mounts=[mount]))
     container = "slotserve-backup-copy"
     await docker.remove(container)
     cid = await docker.create(container, config)
