@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .services.diagnostics import Diagnosis
+
 
 class ORMModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -485,6 +487,7 @@ class LoadEventOut(BaseModel):
     command: str | None = None
     exit_code: int | None = None
     log_excerpt: str | None = None
+    diagnosis: Diagnosis | None = None  # failed loads only: likely cause and next steps (services/diagnostics)
 
 
 class LaneRuntimeOut(BaseModel):
@@ -506,6 +509,7 @@ class LaneRuntimeOut(BaseModel):
     failure_log: list[str]
     target_model: str | None
     target_reason: str | None
+    diagnosis: Diagnosis | None = None  # while the lane's server is failed
 
 
 class AdminStatsOut(BaseModel):

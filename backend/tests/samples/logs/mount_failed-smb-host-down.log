@@ -1,0 +1,2 @@
+mount error(112): Host is down
+Refer to the mount.cifs(8) manual page (e.g. man mount.cifs) and kernel log messages (dmesg)

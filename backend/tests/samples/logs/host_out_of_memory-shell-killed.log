@@ -1,0 +1,5 @@
+===== 2026-10-21T02:10:05.661902+00:00 start: /bin/sh -c 'vllm serve /models/Qwen2.5-32B-Instruct --cpu-offload-gb 48 --port 8083'
+(APIServer pid=42) INFO 10-21 02:10:11 [api_server.py:1805] vLLM API server version 0.10.1.1
+(EngineCore_0 pid=97) INFO 10-21 02:10:30 [gpu_model_runner.py:1953] Starting to load model /models/Qwen2.5-32B-Instruct...
+Loading safetensors checkpoint shards:  41% Completed | 7/17 [00:52<01:14,  7.45s/it]
+/bin/sh: line 1:    42 Killed                  vllm serve /models/Qwen2.5-32B-Instruct --cpu-offload-gb 48 --port 8083

@@ -1,0 +1,2 @@
+# Keep the samples byte for byte (they are compared line by line with what the matcher shows).
+* -text
