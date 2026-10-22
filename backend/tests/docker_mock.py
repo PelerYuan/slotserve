@@ -304,6 +304,7 @@ class FakeDocker:
                 "Id": c["Id"],
                 "Name": "/" + c["Name"],
                 "State": {"Running": c["Running"], "ExitCode": c["ExitCode"]},
+                "Config": {"Image": c["Config"].get("Image"), "Labels": c["Config"].get("Labels") or {}},
                 "NetworkSettings": {
                     "Ports": ports if c["Running"] else {},
                     "Networks": {

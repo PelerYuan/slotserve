@@ -10,6 +10,7 @@ from sqlalchemy import update
 from slotserve.db import SessionLocal, utcnow
 from slotserve.orm import Lane
 from slotserve.services.devenv import SshBundle, parse_port_range, parse_public_key
+from slotserve.services.devenv.ssh import host_key_fingerprint
 
 
 def ed25519_key(comment: str = "bob@laptop") -> str:
@@ -87,7 +88,7 @@ async def test_keys_and_templates(app, make_client):
         "vscode",
     }
     info = (await bob.get("/api/devenv")).json()
-    assert info["enabled"] and info["docker"] == {"ok": True} and info["host_key_fingerprint"] == "SHA256:fakehostkey"
+    assert info["enabled"] and info["docker"] == {"ok": True} and info["host_key_fingerprint"] is None
 
     mine = await bob.post("/api/devenv/templates", json={"name": "Mine", "image": "ghcr.io/me/env:1"})
     assert mine.status_code == 201 and mine.json()["kind"] == "custom" and mine.json()["mine"]
@@ -142,7 +143,13 @@ async def test_lifecycle(app, make_client):
     ]["Mounts"]
     files = docker.archives[container["Id"]]
     assert files["opt/slotserve/ssh/authorized_keys"].decode().strip() == key
-    assert files["opt/slotserve/ssh_host_key"] == b"hostkey" and b"dropbear" in files["opt/slotserve/start.sh"]
+    # its own host key (R1-07), shown with the session
+    session_out = next(s for s in (await bob.get("/api/devenv/sessions")).json() if s["state"] == "running")
+    host_key = files["opt/slotserve/ssh_host_key"]
+    assert (
+        host_key_fingerprint(host_key) == session_out["host_key_fingerprint"]
+        and b"dropbear" in files["opt/slotserve/start.sh"]
+    )
     assert (
         container["Modes"]["opt/slotserve/ssh"] == 0o700 and container["Modes"]["opt/slotserve/ssh_host_key"] == 0o600
     )

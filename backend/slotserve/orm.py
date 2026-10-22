@@ -393,8 +393,21 @@ class DevTemplate(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     # JSON list of extra paths inside the container that are kept between bookings (besides /workspace).
     persist_paths: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Compatibility mode (containers/harden.py, D14): the image needs setuid programs (sudo, s6-overlay), so its
+    # containers run without no-new-privileges; every other limit stays.
+    compat: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class DevSharedMember(Base):
+    """Someone who joined a lane's shared idle environment: only they get an account there (keys only)."""
+
+    __tablename__ = "devenv_shared_members"
+
+    lane_id: Mapped[int] = mapped_column(ForeignKey("lanes.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
+    joined_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
 class DevProject(Base):

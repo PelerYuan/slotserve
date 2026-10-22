@@ -183,6 +183,11 @@ async def test_shared_environment(app, make_client):
     await bob.post("/api/ssh-keys", json={"public_key": key})
     await eve.put("/api/devenv/password", json={"password": "eve's password"})
     lane = (await admin.get("/api/lanes")).json()[0]
+    # only people who joined get an account, with keys only (R1-10): a password is not enough to join
+    assert (await bob.post(f"/api/devenv/shared/{lane['id']}/join")).status_code == 204
+    r = await eve.post(f"/api/devenv/shared/{lane['id']}/join")
+    assert r.status_code == 400 and r.json()["detail"]["code"] == "ssh_key_required"
+    assert (await eve.post("/api/devenv/shared/999/join")).status_code == 404
     body = {"name": lane["name"], "gpus": lane["gpus"], "idle_mode": "devenv", "idle_template_id": mine["id"]}
     r = await admin.patch(f"/api/admin/lanes/{lane['id']}", json=body)
     assert r.status_code == 400  # only templates offered to everyone
@@ -200,8 +205,10 @@ async def test_shared_environment(app, make_client):
     sessions = (await eve.get("/api/devenv/sessions")).json()
     [shared] = [s for s in sessions if s["kind"] == "shared"]
     assert shared["state"] == "running" and shared["reservation_id"] is None and shared["username"] is None
-    assert shared["ssh_command"] == f"ssh -p {shared['ssh_port']} eve@test" and shared["lane_id"] == lane["id"]
-    assert (await bob.get("/api/devenv/sessions")).json()[0]["ssh_command"].endswith(" bob@test")
+    assert shared["joined"] is False and shared["ssh_command"] is None and shared["lane_id"] == lane["id"]
+    assert shared["host_key_fingerprint"].startswith("SHA256:")
+    bob_shared = (await bob.get("/api/devenv/sessions")).json()[0]
+    assert bob_shared["joined"] is True and bob_shared["ssh_command"].endswith(" bob@test")
     assert app.state.devenv.holds_gpu(lane["id"])
 
     [container] = [c for c in docker.containers.values() if c["Running"]]
@@ -212,13 +219,22 @@ async def test_shared_environment(app, make_client):
     assert not any(m["Target"] == "/workspace" for m in mounts)
     files = docker.archives[container["Id"]]
     ssh = files["opt/slotserve/ssh.sh"].decode()
-    assert " -w " in ssh and " -s " not in ssh and "-T 3" in ssh and "accounts.sh" in ssh and "-D " not in ssh
+    # keys only (-s), never root (-w), whatever the password login setting says
+    assert " -w -s " in ssh and "-T 3" in ssh and "accounts.sh" in ssh and "-D " not in ssh
     async with SessionLocal() as db:
         users = {u.username: u for u in (await db.execute(select(User))).scalars()}
     accounts = files["opt/slotserve/accounts"].decode().splitlines()
-    assert f"bob:{20000 + users['bob'].id}:*" in accounts
-    assert f"eve:{20000 + users['eve'].id}:{users['eve'].devenv_password_hash}" in accounts
-    assert files["opt/slotserve/keys/bob"].decode().strip() == key and files["opt/slotserve/keys/eve"] == b""
+    assert accounts == [f"bob:{20000 + users['bob'].id}:*"]  # not eve (not joined), not root, no hashes
+    assert files["opt/slotserve/keys/bob"].decode().strip() == key and "opt/slotserve/keys/eve" not in files
+
+    # eve adds a key and joins: her account appears (still without a password)
+    await eve.post("/api/ssh-keys", json={"public_key": ed25519_key("eve@pc")})
+    assert (await eve.post(f"/api/devenv/shared/{lane['id']}/join")).status_code == 204
+    await _ticks(app, 1)
+    files = docker.archives[container["Id"]]
+    assert f"eve:{20000 + users['eve'].id}:*" in files["opt/slotserve/accounts"].decode().splitlines()
+    eve_shared = next(s for s in (await eve.get("/api/devenv/sessions")).json() if s["kind"] == "shared")
+    assert eve_shared["joined"] and eve_shared["ssh_command"] == f"ssh -p {eve_shared['ssh_port']} eve@test"
     assert b"useradd" in files["opt/slotserve/accounts.sh"] and b"adduser" in files["opt/slotserve/accounts.sh"]
 
     # anyone can see it, only admins can restart it or read its logs
@@ -238,9 +254,9 @@ async def test_shared_environment(app, make_client):
     await _ticks(app, 1)
     assert len(docker.exec_calls) == runs  # nothing changed, nothing to do
 
-    # a failing refresh is shown to admins
+    # a failing refresh is shown to admins (eve leaves: the accounts change)
     docker.exec_result = (2, b"slotserve: this image has neither useradd nor adduser")
-    await eve.delete("/api/devenv/password")
+    assert (await eve.delete(f"/api/devenv/shared/{lane['id']}/join")).status_code == 204
     await _ticks(app, 1)
     shared = next(s for s in (await admin.get("/api/devenv/sessions")).json() if s["kind"] == "shared")
     assert "neither useradd nor adduser" in shared["error"]

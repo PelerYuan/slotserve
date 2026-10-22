@@ -13,7 +13,7 @@ from ..config import get_settings
 from ..db import get_db, utcnow
 from ..deps import current_user
 from ..errors import ApiError
-from ..orm import DevProject, DevSession, DevTemplate, Lane, Reservation, SshKey, User
+from ..orm import DevProject, DevSession, DevSharedMember, DevTemplate, Lane, Reservation, SshKey, User
 from ..services.audit import record
 from ..services.devenv import (
     OPEN_STATES,
@@ -130,6 +130,8 @@ class SessionOut(BaseModel):
     ssh_user: str | None
     ssh_command: str | None
     web: list[WebOut]  # the declared web interfaces, while it runs
+    host_key_fingerprint: str | None = None  # this environment's own SSH host key (None until it first starts)
+    joined: bool | None = None  # shared idle environments: whether you joined it (only members get an account)
     start_at: datetime | None
     end_at: datetime | None
     started_at: datetime | None
@@ -165,6 +167,7 @@ class ProjectOut(BaseModel):
     last_used_at: datetime | None
     created_at: datetime
     upcoming: int  # bookings that will continue it
+    host_key_fingerprint: str | None = None  # its own SSH host key, kept across pauses and GPU changes
 
 
 class PasswordIn(BaseModel):
@@ -235,17 +238,12 @@ async def devenv_info(request: Request, user: User = Depends(current_user)):
     s = get_settings()
     manager = request.app.state.devenv
     docker = await manager.refresh_status() if s.devenv_enabled else {"ok": False, "error": None, "version": None}
-    fingerprint = None
-    if s.devenv_enabled:
-        try:
-            fingerprint = manager.ssh_bundle().fingerprint
-        except (DevEnvError, OSError):
-            fingerprint = None
     return {
         "enabled": s.devenv_enabled,
         "docker": docker if user.is_admin else {"ok": docker["ok"]},
         "ssh_host": ssh_host(request),
-        "host_key_fingerprint": fingerprint,
+        # every environment has its own host key now: see host_key_fingerprint of sessions and projects
+        "host_key_fingerprint": None,
         "custom_images": s.devenv_custom_images,
         "saved_limit": s.devenv_saved_images,
         "pull_minutes": s.devenv_pull_minutes,
@@ -367,10 +365,14 @@ async def delete_template(
 
 async def _session_out(db: AsyncSession, request: Request, rows: list[DevSession], user: User) -> list[SessionOut]:
     host = ssh_host(request)
+    manager = request.app.state.devenv
     names: dict[int, str] = {}
+    joined: set[int] = set()
     if any(s.kind == "shared" for s in rows):
         users = list((await db.execute(select(User).where(User.disabled_at.is_(None)))).scalars())
         names = unix_names(users)
+        member = select(DevSharedMember.lane_id).where(DevSharedMember.user_id == user.id)
+        joined = set((await db.execute(member)).scalars())
     out = []
     for s in rows:
         r = await db.get(Reservation, s.reservation_id) if s.reservation_id else None
@@ -381,7 +383,8 @@ async def _session_out(db: AsyncSession, request: Request, rows: list[DevSession
         web = session_web(s) if s.state == "running" else None
         base = int((web or {}).get("base_session") or s.id)  # a kept environment's container keeps its paths
         running = s.state == "running" and s.ssh_port is not None
-        login = names.get(user.id) if s.kind == "shared" else "root"
+        member = s.kind != "shared" or s.lane_id in joined
+        login = (names.get(user.id) if member else None) if s.kind == "shared" else "root"
         out.append(
             SessionOut(
                 id=s.id,
@@ -406,6 +409,8 @@ async def _session_out(db: AsyncSession, request: Request, rows: list[DevSession
                     WebOut(name=p["name"], port=p["port"], kind=p["kind"], url=web_base(base, p["port"]))
                     for p in (web or {}).get("ports", [])
                 ],
+                host_key_fingerprint=manager.host_key_fingerprint(manager.env_key(s)),
+                joined=(s.lane_id in joined) if s.kind == "shared" else None,
                 start_at=r.start_at if r else None,
                 end_at=r.end_at if r else None,
                 started_at=s.started_at,
@@ -499,6 +504,36 @@ async def session_logs(
     return {"text": await request.app.state.devenv.logs(s, tail)}
 
 
+# ---- shared idle environments ---------------------------------------------------
+
+
+@router.post("/shared/{lane_id}/join", status_code=204)
+async def join_shared(
+    lane_id: int, request: Request, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
+):
+    """Joins a lane's shared idle environment: you get an account there (SSH keys only, R1-10)."""
+    if await db.get(Lane, lane_id) is None:
+        raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
+    if (await db.execute(select(SshKey.id).where(SshKey.user_id == user.id).limit(1))).first() is None:
+        raise ApiError(status.HTTP_400_BAD_REQUEST, "ssh_key_required")
+    if await db.get(DevSharedMember, (lane_id, user.id)) is None:
+        db.add(DevSharedMember(lane_id=lane_id, user_id=user.id))
+        await db.commit()
+    request.app.state.devenv.accounts_changed()
+
+
+@router.delete("/shared/{lane_id}/join", status_code=204)
+async def leave_shared(
+    lane_id: int, request: Request, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
+):
+    """Leaves a lane's shared idle environment: your account there loses its keys at the next refresh."""
+    row = await db.get(DevSharedMember, (lane_id, user.id))
+    if row is not None:
+        await db.delete(row)
+        await db.commit()
+    request.app.state.devenv.accounts_changed()
+
+
 # ---- SSH keys -------------------------------------------------------------------
 
 
@@ -578,7 +613,7 @@ async def clear_password(request: Request, user: User = Depends(current_user), d
 # ---- kept environments (projects) -----------------------------------------------------
 
 
-async def _project_out(db: AsyncSession, rows: list[DevProject], user: User) -> list[ProjectOut]:
+async def _project_out(db: AsyncSession, rows: list[DevProject], user: User, manager=None) -> list[ProjectOut]:
     out = []
     now = utcnow()
     for p in rows:
@@ -608,6 +643,7 @@ async def _project_out(db: AsyncSession, rows: list[DevProject], user: User) -> 
                 last_used_at=p.last_used_at,
                 created_at=p.created_at,
                 upcoming=upcoming,
+                host_key_fingerprint=manager.host_key_fingerprint(f"p{p.id}") if manager is not None else None,
             )
         )
     return out
@@ -621,11 +657,13 @@ async def _project(db: AsyncSession, project_id: int, user: User) -> DevProject:
 
 
 @router.get("/projects", response_model=list[ProjectOut])
-async def list_projects(everyone: bool = False, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
+async def list_projects(
+    request: Request, everyone: bool = False, user: User = Depends(current_user), db: AsyncSession = Depends(get_db)
+):
     stmt = select(DevProject).order_by(DevProject.id)
     if not (everyone and user.is_admin):
         stmt = stmt.where(DevProject.owner_id == user.id)
-    return await _project_out(db, list((await db.execute(stmt)).scalars()), user)
+    return await _project_out(db, list((await db.execute(stmt)).scalars()), user, request.app.state.devenv)
 
 
 @router.post("/projects", response_model=ProjectOut, status_code=201)

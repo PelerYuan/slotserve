@@ -30,7 +30,9 @@ from datetime import datetime
 import httpx
 from sqlalchemy import func, select
 
-from ..containers.contributors.cpu import cpu_ranges as cpu_ranges  # re-exported for api/devenv_cpu.py
+from ..containers.contributors.cpu import cpu_ranges as cpu_ranges
+from ..containers.contributors.ssh import needs_no_login
+from ..containers.names import load_web_ports  # re-exported for api/devenv_cpu.py
 from ..db import SessionLocal, utcnow
 from ..orm import DevProject, DevSession, DevTemplate, Lane, Reservation, SshKey, UsageSample, User
 from .docker_api import DockerError
@@ -277,9 +279,13 @@ class CpuEnvs:
         from .devenv import DevEnvError
 
         await self.check_room(db, user.id)
+        source = template
+        if project is not None and project.template_id:
+            source = await db.get(DevTemplate, project.template_id)
         has_key = (await db.execute(select(SshKey.id).where(SshKey.user_id == user.id).limit(1))).first()
         password = self.settings.devenv_password_login and user.devenv_password_hash
-        if has_key is None and not password:
+        web = needs_no_login(load_web_ports(source.web_ports)) if source is not None else False
+        if has_key is None and not password and not web:
             raise DevEnvError("ssh_login_required" if self.settings.devenv_password_login else "ssh_key_required")
         if project is not None:
             if await self._project_open(db, project.id):

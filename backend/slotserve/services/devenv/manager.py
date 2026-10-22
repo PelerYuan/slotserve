@@ -29,11 +29,22 @@ from ...containers.context import (
     UserInfo,
 )
 from ...containers.contributors.ssh import account_files
-from ...containers.harden import HardenError
+from ...containers.harden import COMPAT_LABEL, HARDENED_LABEL, HardenError
+from ...containers.harden import VERSION as HARDEN_VERSION
 from ...containers.helpers import Folder, parent_binds, q
 from ...containers.model import ContainerSpec, NodePolicy, SpecError
 from ...db import SessionLocal, utcnow
-from ...orm import HOLDING_STATUSES, DevProject, DevSession, DevTemplate, Lane, Reservation, SshKey, User
+from ...orm import (
+    HOLDING_STATUSES,
+    DevProject,
+    DevSession,
+    DevSharedMember,
+    DevTemplate,
+    Lane,
+    Reservation,
+    SshKey,
+    User,
+)
 from ...runtime.manager import RuntimeState
 from .. import storage
 from ..devenv_cpu import CpuEnvs
@@ -50,7 +61,7 @@ from .constants import (
     network_name,
     project_network_name,
 )
-from .ssh import SshBundle
+from .ssh import SshBundle, generate_host_key, host_key_fingerprint
 from .templates import load_web_ports, session_web
 from .validation import _slug, load_paths, parse_port_range, unix_names
 
@@ -232,32 +243,69 @@ class DevEnvManager:
         return self.status
 
     def ssh_bundle(self) -> SshBundle:
-        """The Dropbear binary and the host key every environment shares (so clients see one stable key)."""
+        """The Dropbear binary SlotServe copies into every environment (host keys are per environment)."""
         if self._bundle is not None:
             return self._bundle
         binary_path = Path(self.settings.dropbear_path)
         if not binary_path.is_file():
             raise DevEnvError("devenv_ssh_missing", path=str(binary_path))
-        key_dir = self.settings.data_dir / "devenv"
-        key_dir.mkdir(parents=True, exist_ok=True)
-        key = key_dir / "ssh_host_ed25519"
-        if not key.is_file():
-            subprocess.run(
-                [str(binary_path), "dropbearkey", "-t", "ed25519", "-f", str(key)],
-                check=True,
-                capture_output=True,
-                timeout=30,
-            )
-        try:
-            out = subprocess.run(
-                [str(binary_path), "dropbearkey", "-y", "-f", str(key)], check=True, capture_output=True, timeout=30
-            ).stdout.decode(errors="replace")
-        except (OSError, subprocess.SubprocessError) as exc:
-            log.warning("could not read the SSH host key fingerprint: %s", exc)
-            out = ""
-        m = re.search(r"Fingerprint: (\S+)", out)
-        self._bundle = SshBundle(binary_path.read_bytes(), key.read_bytes(), m.group(1) if m else "")
+        self._bundle = SshBundle(binary_path.read_bytes())
         return self._bundle
+
+    @staticmethod
+    def env_key(s: DevSession) -> str:
+        """Whose host key a session's container gets: its kept environment's, its lane's shared one, or its own."""
+        if s.project_id:
+            return f"p{s.project_id}"
+        if s.kind == "shared":
+            return f"l{s.lane_id}"
+        return f"s{s.id}"
+
+    def _host_key_path(self, env: str) -> Path:
+        return self.settings.data_dir / "devenv" / "hostkeys" / env
+
+    def host_key(self, env: str) -> tuple[bytes, str]:
+        """An environment's own SSH host key (created the first time; a kept environment that ran before this
+        existed gets one on its next start) and its fingerprint."""
+        path = self._host_key_path(env)
+        if not path.is_file():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_name(path.name + ".new")
+            tmp.unlink(missing_ok=True)
+            binary = Path(self.settings.dropbear_path)
+            made = False
+            if os.name != "nt" and binary.is_file() and os.access(binary, os.X_OK):
+                try:
+                    subprocess.run(
+                        [str(binary), "dropbearkey", "-t", "ed25519", "-f", str(tmp)],
+                        check=True,
+                        capture_output=True,
+                        timeout=30,
+                    )
+                    made = True
+                except (OSError, subprocess.SubprocessError) as exc:
+                    log.warning("dropbearkey failed, generating the host key in SlotServe: %s", exc)
+                    tmp.unlink(missing_ok=True)
+            if not made:
+                fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                with os.fdopen(fd, "wb") as f:
+                    f.write(generate_host_key())
+            with contextlib.suppress(OSError):
+                os.chmod(tmp, 0o600)
+            os.replace(tmp, path)
+        key = path.read_bytes()
+        return key, host_key_fingerprint(key)
+
+    def host_key_fingerprint(self, env: str) -> str | None:
+        """The fingerprint of an environment's host key, if it has one yet (no key is created here)."""
+        path = self._host_key_path(env)
+        try:
+            return host_key_fingerprint(path.read_bytes()) or None
+        except OSError:
+            return None
+
+    def drop_host_key(self, env: str) -> None:
+        self._host_key_path(env).unlink(missing_ok=True)
 
     async def _models_mount(self) -> str | None:
         """Host path of the models directory: SlotServe's own bind mount when it runs in a container."""
@@ -531,21 +579,27 @@ class DevEnvManager:
 
     # ---- starting -----------------------------------------------------------------
 
-    async def _accounts(self, db) -> list[Account]:
-        """The accounts of a shared environment: every active user, their keys and (maybe) password hash."""
+    async def _accounts(self, db, lane_id: int | None) -> list[Account]:
+        """The accounts of a lane's shared environment: the active people who joined it, with their keys only (no
+        password hashes in the container, R1-10)."""
+        members = select(DevSharedMember.user_id).where(DevSharedMember.lane_id == lane_id)
         users = list((await db.execute(select(User).where(User.disabled_at.is_(None)))).scalars())
-        names = unix_names(users)
+        names = unix_names(users)  # over everyone, so a name does not change when someone joins
+        joined = set((await db.execute(members)).scalars())
         keys: dict[int, list[str]] = {}
-        for user_id, key in (await db.execute(select(SshKey.user_id, SshKey.public_key).order_by(SshKey.id))).all():
+        rows = await db.execute(
+            select(SshKey.user_id, SshKey.public_key).where(SshKey.user_id.in_(joined)).order_by(SshKey.id)
+        )
+        for user_id, key in rows.all():
             keys.setdefault(user_id, []).append(key)
-        out = []
-        for u in sorted(users, key=lambda x: x.id):
-            secret = u.devenv_password_hash if self.settings.devenv_password_login and u.devenv_password_hash else "*"
-            out.append(Account(names[u.id], UID_BASE + u.id, tuple(keys.get(u.id, [])), secret))
-        return out
+        return [
+            Account(names[u.id], UID_BASE + u.id, tuple(keys.get(u.id, [])))
+            for u in sorted(users, key=lambda x: x.id)
+            if u.id in joined
+        ]
 
-    async def _account_files(self, db) -> tuple[dict[str, tuple[bytes, int]], str]:
-        return account_files(await self._accounts(db))
+    async def _account_files(self, db, lane_id: int | None) -> tuple[dict[str, tuple[bytes, int]], str]:
+        return account_files(await self._accounts(db, lane_id))
 
     async def _refresh_accounts(self, db, s: DevSession) -> None:
         loop = asyncio.get_running_loop()
@@ -553,7 +607,7 @@ class DevEnvManager:
         if not due:
             return
         self._accounts_checked[s.id] = loop.time()
-        files, digest = await self._account_files(db)
+        files, digest = await self._account_files(db, s.lane_id)
         if self._accounts_digest.get(s.id) == digest:
             return
         await self.docker.put_archive(s.container_id, "/", tar_files(files))
@@ -580,7 +634,7 @@ class DevEnvManager:
         secret = None
         accounts: tuple[Account, ...] = ()
         if s.kind == "shared":
-            accounts = tuple(await self._accounts(db))
+            accounts = tuple(await self._accounts(db, s.lane_id))
         else:
             keys = tuple((await db.execute(select(SshKey.public_key).where(SshKey.user_id == s.user_id))).scalars())
             secret = user.devenv_password_hash if user is not None and password_login else None
@@ -591,7 +645,7 @@ class DevEnvManager:
             session_id=s.id,
             kind=s.kind or "booking",
             image=s.image,
-            ssh=SshInputs(bundle.binary, bundle.host_key, keys, secret, password_login, accounts),
+            ssh=SshInputs(bundle.binary, self.host_key(self.env_key(s))[0], keys, secret, password_login, accounts),
             resources=Resources(
                 shm_bytes=int(self.settings.devenv_shm_gb * 1024**3),
                 cpus=self.settings.devenv_cpus,
@@ -864,6 +918,11 @@ class DevEnvManager:
             and (project.container_storage or "") == (plan.storage.signature if plan.storage else "")
             and project.container_port is not None
             and project.container_port not in used
+            # created before harden() (or by an older version of it): recreated once from a snapshot, since
+            # no-new-privileges and the dropped capabilities cannot be added to an existing container
+            and ((info.get("Config") or {}).get("Labels") or {}).get(HARDENED_LABEL) == HARDEN_VERSION
+            and ((info.get("Config") or {}).get("Labels") or {}).get(COMPAT_LABEL)
+            == (plan.body()["Labels"].get(COMPAT_LABEL))
         )
         if same:
             if info.get("State", {}).get("Running"):
@@ -892,7 +951,7 @@ class DevEnvManager:
                         "devenv_ready", user_id=s.user_id, reservation_id=s.reservation_id, port=project.container_port
                     )
                 return True
-        # Different GPUs, paths or port: keep what was installed by snapshotting the container into an image.
+        # Different GPUs, paths, port or hardening: keep what was installed by snapshotting the container into an image.
         s.detail = "snapshot"
         await db.commit()
         ref = f"slotserve/project-{project.id}:{utcnow().strftime('%Y%m%d%H%M%S')}"
@@ -939,6 +998,8 @@ class DevEnvManager:
             project.state = "paused"
         if project is None:
             await self._drop_network(network_name(s.id))
+            if s.kind != "shared":
+                self.drop_host_key(self.env_key(s))  # a new environment next time, with a new key
         s.web = None
 
     async def _stop(self, db, s: DevSession, state: str) -> None:
@@ -1144,6 +1205,7 @@ class DevEnvManager:
                         await self.docker.remove_volume(f"slotserve-project{project.id}-{_slug(path)}")
         await self.ports.release_project(db, project)  # direct ports: its fixed host ports go back to the pool
         await self._drop_network(project_network_name(project.id))
+        self.drop_host_key(f"p{project.id}")
         if project.image.startswith(f"slotserve/project-{project.id}:"):
             with contextlib.suppress(DockerError, httpx.HTTPError, OSError):
                 await self.docker.remove_image(project.image)

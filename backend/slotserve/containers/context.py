@@ -48,7 +48,6 @@ class Account:
     name: str
     uid: int
     keys: tuple[str, ...] = ()
-    hash: str = "*"  # SHA-512-crypt password hash; "*" = no password
 
 
 @dataclass(frozen=True)

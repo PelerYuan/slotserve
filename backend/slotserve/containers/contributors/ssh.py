@@ -1,7 +1,10 @@
-"""SSH: the static Dropbear SlotServe copies in, the environment's host key and the logins.
+"""SSH: the static Dropbear SlotServe copies in, the environment's own host key and the logins.
 
 A person's own environment: root logs in with the person's keys, and with their environment password when admins
-allow password login. A lane's shared idle environment: one account per person (never root).
+allow password login. Credentials are optional for templates with a web interface (F03): without any, root has no
+password ("*") and no keys, so SSH simply lets nobody in; a template without a web interface still needs a way in.
+A lane's shared idle environment: one account per person who joined it (never root), with keys only - no password
+hashes are ever copied into it (R1-10).
 """
 
 import hashlib
@@ -34,7 +37,7 @@ def account_files(accounts: tuple[Account, ...] | list[Account]) -> tuple[dict[s
     files: dict[str, tuple[bytes, int]] = {}
     lines = []
     for a in accounts:
-        lines.append(f"{a.name}:{a.uid}:{a.hash}")
+        lines.append(f"{a.name}:{a.uid}:*")  # never a password hash: keys only
         files[f"opt/slotserve/keys/{a.name}"] = ("".join(k + "\n" for k in a.keys).encode(), 0o600)
     files["opt/slotserve/accounts"] = (("\n".join(lines) + "\n").encode(), 0o600)
     files["opt/slotserve/accounts.sh"] = (ACCOUNTS_SCRIPT.encode(), 0o700)
@@ -43,6 +46,11 @@ def account_files(accounts: tuple[Account, ...] | list[Account]) -> tuple[dict[s
     for path in sorted(files):
         digest.update(path.encode() + b"\0" + files[path][0] + b"\0")
     return files, digest.hexdigest()
+
+
+def needs_no_login(web_ports) -> bool:
+    """A template with a web interface can start without SSH credentials (it is used in the browser)."""
+    return bool(web_ports)
 
 
 class SshContributor:
@@ -60,13 +68,11 @@ class SshContributor:
         if ctx.kind == "shared":
             files, spec.accounts_digest = account_files(ssh.accounts)
             spec.files.update(files)
-            # everyone logs in to their own account (-w: not as root); passwords only when admins allow them
-            script = SSH_SCRIPT.format(
-                setup=SHARED_SETUP, flags="-w" if ssh.password_login else "-w -s", tries=MAX_AUTH_TRIES, key_dir=""
-            )
+            # everyone logs in to their own account (-w: not as root), with keys only (-s)
+            script = SSH_SCRIPT.format(setup=SHARED_SETUP, flags="-w -s", tries=MAX_AUTH_TRIES, key_dir="")
             spec.files["opt/slotserve/ssh.sh"] = (script.encode(), 0o755)
             spec.files["opt/slotserve/start.sh"] = (START_SCRIPT.format(cd="").encode(), 0o755)
             return
-        if not ssh.keys and not ssh.secret:
+        if not ssh.keys and not ssh.secret and not needs_no_login(ctx.web.get("ports")):
             raise SpecError("ssh_login_required" if ssh.password_login else "ssh_key_required")
         spec.files.update(booking_ssh_files(ssh, list(ssh.keys), ssh.secret))

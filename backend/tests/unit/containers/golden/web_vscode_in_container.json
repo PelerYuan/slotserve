@@ -124,7 +124,7 @@
     },
     "opt/slotserve/ssh_host_key": {
       "mode": "0o600",
-      "text": "golden host key"
+      "text": "golden host key of s11"
     },
     "opt/slotserve/start.sh": {
       "mode": "0o755",

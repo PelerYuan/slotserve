@@ -193,10 +193,15 @@ async def free_windows(db: AsyncSession, lane_id: int, start: datetime, end: dat
     return gaps
 
 
-async def check_devenv_login(db: AsyncSession, settings: Settings, owner: User) -> None:
-    """A dev environment needs a way in: an SSH key, or an environment password when password login is on."""
+async def check_devenv_login(db: AsyncSession, settings: Settings, owner: User, template=None) -> None:
+    """A dev environment needs a way in: an SSH key, or an environment password when password login is on - unless
+    its template has a web interface (used in the browser, no credentials needed)."""
+    from ..containers.contributors.ssh import needs_no_login
+    from ..containers.names import load_web_ports
     from ..orm import SshKey
 
+    if template is not None and needs_no_login(load_web_ports(template.web_ports)):
+        return
     if settings.devenv_password_login and owner.devenv_password_hash:
         return
     if (await db.execute(select(SshKey.id).where(SshKey.user_id == owner.id).limit(1))).first() is None:
@@ -217,7 +222,7 @@ async def resolve_devenv(db: AsyncSession, settings: Settings, template_id: int 
     template = await db.get(DevTemplate, template_id)
     if not visible(template, owner):
         raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
-    await check_devenv_login(db, settings, owner)
+    await check_devenv_login(db, settings, owner, template)
     return template
 
 
@@ -236,7 +241,10 @@ async def resolve_project(
         project = await db.get(DevProject, project_id)
         if project is None or project.owner_id != owner.id:
             raise ApiError(status.HTTP_404_NOT_FOUND, "not_found")
-        await check_devenv_login(db, settings, owner)
+        from ..orm import DevTemplate
+
+        template = await db.get(DevTemplate, project.template_id) if project.template_id else None
+        await check_devenv_login(db, settings, owner, template)
         return project
     if not new_name or not new_name.strip():
         return None

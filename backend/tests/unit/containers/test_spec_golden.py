@@ -26,7 +26,7 @@ from sqlalchemy.pool import StaticPool
 from slotserve.config import Settings
 from slotserve.containers.harden import check
 from slotserve.db import Base
-from slotserve.orm import DevProject, DevSession, DevTemplate, Lane, Reservation, SshKey, Storage, User
+from slotserve.orm import DevProject, DevSession, DevSharedMember, DevTemplate, Lane, Reservation, SshKey, Storage, User
 from slotserve.services.devenv import BUILTINS, DevEnvError, DevEnvManager, SshBundle
 
 GOLDEN = Path(__file__).parent / "golden"
@@ -88,6 +88,10 @@ def people() -> list:
         Lane(id=2, name="Lane B", gpu_indices="2", position=1),
         Lane(id=3, name="any GPU", gpu_indices="", position=2),
     ]
+
+
+def members() -> list:
+    return [DevSharedMember(lane_id=2, user_id=u) for u in (1, 2, 4)] + [DevSharedMember(lane_id=1, user_id=3)]
 
 
 def booking(session_id: int = 11, lane_id: int = 1, template_id: int | None = 1, **extra) -> list:
@@ -158,10 +162,12 @@ def cases() -> dict[str, tuple]:
             {},
             {},
         ),
-        # A lane's shared idle environment: an account for every active person, their keys and password hashes.
+        # A lane's shared idle environment: an account for everyone active who joined it (alice, Bob; not carol, who
+        # did not, nor dave, who is disabled), keys only - no password hashes.
         "shared_idle_accounts": (
             [
                 builtin("pytorch", id=1),
+                *members(),
                 DevSession(
                     id=11, kind="shared", lane_id=2, template_id=1, image="pytorch/pytorch:latest", state="starting"
                 ),
@@ -177,6 +183,7 @@ def cases() -> dict[str, tuple]:
                 host_storage(1, "personal"),
                 host_storage(2, "shared", mount_path="/data", read_only=True),
                 host_storage(3, "shared", mount_path="/team", access="users", user_ids="[1]"),
+                *members(),
                 DevSession(
                     id=11, kind="shared", lane_id=2, template_id=1, image="pytorch/pytorch:latest", state="starting"
                 ),
@@ -343,7 +350,8 @@ async def _plan(rows: list, settings_overrides: dict, manager_overrides: dict) -
     manager = DevEnvManager(SimpleNamespace(settings=settings(**settings_overrides)), docker=StubDocker())
     manager.in_container = manager_overrides.get("in_container", False)
     manager._models_source = manager_overrides.get("models", "/srv/models")
-    manager._bundle = SshBundle(b"ELF golden dropbear", b"golden host key", "SHA256:golden")
+    manager._bundle = SshBundle(b"ELF golden dropbear")
+    manager.host_key = lambda env: (f"golden host key of {env}".encode(), "SHA256:golden")
     with Session(ENGINE, expire_on_commit=False) as db:
         return _normalize(await manager._plan(SyncDb(db), db.get(DevSession, 11)))
 
