@@ -31,9 +31,9 @@ def test_lanes_and_approval_ui(page: Page, server: str):
     )
     member.goto(f"{server}/schedule")
     member.get_by_role("button", name="New booking").first.click()
-    dialog = member.get_by_role("dialog")
+    dialog = member.get_by_role("dialog")  # QuickBook
     expect(dialog.get_by_text("needs an admin's approval")).to_be_visible()
-    dialog.get_by_role("button", name="New booking").click()
+    dialog.locator("[data-action=quickbook-submit]").click()
     expect(member.locator(".mine li").first).to_contain_text("Awaiting approval")
     member.context.close()
 

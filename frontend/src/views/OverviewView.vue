@@ -9,6 +9,7 @@ import { CalendarPlus, Cpu, Hand, KeyRound, Lock, RotateCw, ScrollText, ShieldCh
 import StatusDot from '@/components/StatusDot.vue'
 import CodeBlock from '@/components/CodeBlock.vue'
 import LogDrawer from '@/components/LogDrawer.vue'
+import QuickBook from '@/features/quickbook/components/QuickBook.vue'
 import { api } from '@/api/client'
 import type { LaneStatus } from '@/api/types'
 import { session } from '@/composables/session'
@@ -22,6 +23,7 @@ const { status, refresh } = useStatus()
 const now = useNow()
 const { showError, message } = useErrorMessage()
 const showLogs = ref(false)
+const quickBook = ref(false)
 const restarting = ref(false)
 
 const runtime = computed(() => status.value?.runtime)
@@ -111,12 +113,10 @@ async function restart() {
         <h1>{{ t('overview.title') }}</h1>
         <p>{{ t('overview.subtitle') }}</p>
       </div>
-      <RouterLink :to="{ name: 'schedule' }">
-        <NButton type="primary">
-          <template #icon><CalendarPlus :size="16" /></template>
-          {{ t('overview.book') }}
-        </NButton>
-      </RouterLink>
+      <NButton type="primary" @click="quickBook = true">
+        <template #icon><CalendarPlus :size="16" /></template>
+        {{ t('overview.book') }}
+      </NButton>
     </div>
 
     <div v-if="fallbackFrom" class="banner warn">
@@ -336,6 +336,7 @@ async function restart() {
     </div>
 
     <LogDrawer v-model:show="showLogs" />
+    <QuickBook v-model:show="quickBook" @done="refresh" />
   </div>
 </template>
 

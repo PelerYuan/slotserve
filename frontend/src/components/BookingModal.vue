@@ -35,6 +35,8 @@ const props = defineProps<{
   editing?: Reservation | null
   laneId?: number | null
   initialKind?: 'model' | 'exclusive' | 'devenv' | null
+  /** what QuickBook's "More options" carries over (model, template or kept environment, lane) */
+  draft?: Partial<BookingInput> | null
 }>()
 const emit = defineEmits<{ done: [] }>()
 
@@ -133,8 +135,26 @@ watch(show, async (open) => {
     if (!ready.value.some((m) => m.id === modelId.value)) {
       modelId.value = (ready.value.find((m) => m.is_default) ?? ready.value[0])?.id ?? null
     }
+    applyDraft(props.draft)
   }
   if (isAdmin.value && !r && !users.value.length) users.value = await api.admin.users().catch(() => [])
+})
+
+function applyDraft(d: Partial<BookingInput> | null | undefined) {
+  if (!d) return
+  if (d.lane_id) lane.value = d.lane_id
+  if (d.model_id && ready.value.some((m) => m.id === d.model_id)) modelId.value = d.model_id
+  if (d.devenv_project_id && projects.value.some((p) => p.id === d.devenv_project_id)) {
+    devSource.value = 'project'
+    projectId.value = d.devenv_project_id
+  } else if (d.devenv_template_id && templates.value.some((tpl) => tpl.id === d.devenv_template_id)) {
+    templateId.value = d.devenv_template_id
+  }
+}
+
+// the lanes may arrive after the dialog opened: never leave the lane empty
+watch(lanes, (list) => {
+  if (show.value && !list.some((l) => l.id === lane.value)) lane.value = list[0]?.id ?? null
 })
 
 // the models may arrive after the dialog opened

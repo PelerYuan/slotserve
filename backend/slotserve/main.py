@@ -26,6 +26,7 @@ from .api import (
     metrics,
     models,
     notifications,
+    placement,
     reservations,
     runtime_admin,
     status,
@@ -194,6 +195,7 @@ def create_app(settings: Settings | None = None, *, start_background: bool = Tru
     app.include_router(storage.user_router)
     app.include_router(devenv_cpu.router)  # devenv_cpu: environments without a GPU
     app.include_router(devenv_ports.router)
+    app.include_router(placement.router)  # QuickBook: where a booking can go
     app.include_router(proxy.router)
     app.include_router(devenv_web.router)
 

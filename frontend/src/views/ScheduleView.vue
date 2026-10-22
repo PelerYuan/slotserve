@@ -8,6 +8,7 @@ import { NButton, NButtonGroup, NDropdown, NModal, useDialog, useMessage } from 
 import { CalendarPlus, ChevronLeft, ChevronRight, Hourglass, Repeat } from 'lucide-vue-next'
 import WeekCalendar from '@/components/WeekCalendar.vue'
 import BookingModal from '@/components/BookingModal.vue'
+import QuickBook from '@/features/quickbook/components/QuickBook.vue'
 import { api } from '@/api/client'
 import type { Model, Reservation, WaitlistEntry } from '@/api/types'
 import { session } from '@/composables/session'
@@ -119,11 +120,18 @@ function openBooking(start?: Date, end?: Date) {
   booking.value = true
 }
 
-// /schedule?book=devenv opens the booking dialog for a dev environment (from the dev environments page).
+// "New booking" opens QuickBook; dragging across the calendar opens the full dialog with that time.
+const quick = ref(false)
+const quickIntent = ref<'model' | 'exclusive' | 'devenv' | null>(null)
+function openQuick(intent: 'model' | 'exclusive' | 'devenv' | null = null) {
+  quickIntent.value = intent
+  quick.value = true
+}
+
+// /schedule?book=devenv (older links from the dev environments page) opens QuickBook for a dev environment.
 function bookFromQuery() {
   if (route.query.book !== 'devenv') return
-  initialKind.value = 'devenv'
-  openBooking()
+  openQuick('devenv')
   router.replace({ query: {} })
 }
 watch(() => route.query.book, bookFromQuery)
@@ -211,7 +219,7 @@ const what = (r: Reservation) =>
         <h1>{{ t('schedule.title') }}</h1>
         <p>{{ t('schedule.subtitle') }}</p>
       </div>
-      <NButton type="primary" @click="openBooking()">
+      <NButton type="primary" @click="openQuick()">
         <template #icon><CalendarPlus :size="16" /></template>
         {{ t('schedule.newBooking') }}
       </NButton>
@@ -318,6 +326,7 @@ const what = (r: Reservation) =>
       :initial-kind="initialKind"
       @done="onBooked"
     />
+    <QuickBook v-model:show="quick" :intent="quickIntent" :models="models" @done="onBooked" />
 
     <NModal
       :show="!!detail"
