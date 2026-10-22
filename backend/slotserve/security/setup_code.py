@@ -95,9 +95,11 @@ class SetupCode:
 async def cli_setup_code(settings) -> str | None:
     """``slotserve setup-code``: the current code, or None when an admin already exists."""
     settings.data_dir.mkdir(parents=True, exist_ok=True)
+    # never upgrade from the CLI: the upgrade (with its snapshot) belongs to the server's start
+    db.prepare(settings.data_dir / "slotserve.db", settings.data_dir / "backups", migrate=False)
     db.configure(settings.database_url)
-    await db.create_all()
     try:
+        await db.create_all()
         async with db.SessionLocal() as session:
             if await admin_exists(session):
                 return None

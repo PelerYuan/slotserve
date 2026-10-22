@@ -21,6 +21,12 @@ def serve() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
     settings = get_settings()
+    from . import db
+
+    try:  # a database from a newer SlotServe: say so plainly instead of a startup traceback
+        db.check(settings.data_dir / "slotserve.db", settings.data_dir / "backups")
+    except db.SchemaError as exc:
+        sys.exit(str(exc))
     uvicorn.run(
         "slotserve.main:create_app",
         factory=True,
@@ -42,9 +48,11 @@ async def _update_user(username: str, *, password: str | None = None, admin: boo
 
     settings = get_settings()
     settings.data_dir.mkdir(parents=True, exist_ok=True)
+    # Never upgrade from here: the upgrade (with its snapshot) belongs to the server's start.
+    db.prepare(settings.data_dir / "slotserve.db", settings.data_dir / "backups", migrate=False)
     db.configure(settings.database_url)
-    await db.create_all()
     try:
+        await db.create_all()
         async with db.SessionLocal() as session:
             user = (
                 await session.execute(select(User).where(func.lower(User.username) == username.lower()))
@@ -77,10 +85,15 @@ def main() -> None:
         serve()
         return
 
+    from . import db
+
     if args.command == "setup-code":
         from .security.setup_code import cli_setup_code
 
-        code = asyncio.run(cli_setup_code(get_settings()))
+        try:
+            code = asyncio.run(cli_setup_code(get_settings()))
+        except db.SchemaError as exc:
+            sys.exit(str(exc))
         if code is None:
             sys.exit("An admin account already exists; no setup code is needed.")
         print(code)
@@ -92,9 +105,13 @@ def main() -> None:
             sys.exit("Password must be at least 6 characters.")
         if getpass.getpass("Repeat: ") != password:
             sys.exit("Passwords do not match.")
-        ok = asyncio.run(_update_user(args.username, password=password))
+        update = _update_user(args.username, password=password)
     else:
-        ok = asyncio.run(_update_user(args.username, admin=not args.revoke))
+        update = _update_user(args.username, admin=not args.revoke)
+    try:
+        ok = asyncio.run(update)
+    except db.SchemaError as exc:
+        sys.exit(str(exc))
     if not ok:
         sys.exit(f"User '{args.username}' not found.")
     print("Done.")
